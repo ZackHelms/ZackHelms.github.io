@@ -10,7 +10,7 @@
   F.tap(s, { kind: 'dock' }); run(20);
   F.choose(s, 'hire'); F.choose(s, 'job:sell');
   s.money = 100; s.seen.sellOnly = true; F.buySlot(s, 1); F.setRule(s, 1, 0, 'sellOnly');
-  s.bin.push('plank', 'rough', 'dowels', 'rough', 'dowels', 'rough', 'dowels', 'rough', 'plank');
+  s.bin.push('plank', 'rough', 'dowels', 'largePlank', 'dowels', 'rough', 'largePlank', 'rough', 'plank');
   s.recycled.push('gnarled', 'small', 'sappy', 'dowels'); s.recycledN = 4;   // the recycle bin with things poking out
   s.force.log = ['sappy']; s.force.slip = [false];                            // a sap log rolls in next
   run(120);

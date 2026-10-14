@@ -307,6 +307,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 #fx-panel-body .fx-rec td:first-child { white-space: normal; }
 .fx-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: #8a96a3; }
 .fx-dot.good { background: #2fbf71; } .fx-dot.soso { background: #f2b632; } .fx-dot.bad { background: #e5484d; }
+.fx-evals .fx-ghost:disabled { opacity: .45; }
 
 @media (prefers-reduced-motion: no-preference) {
   .bar span, .stat-track i, .stat-track em, .goalbar i, .goalbar em { transition: width 160ms ease, left 160ms ease; }
@@ -315,7 +316,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 12:46 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 15:48 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option></select>
@@ -623,40 +624,51 @@ const FACTORY = (function () {
     names: ['Bolt', 'Sprocket'],     // until you name them
     nameMax: 16,
     slots: [5, 10, 15, 20, 25],      // instruction slots: each robot's own, bought in order (the CD's prices)
-    logs: { gnarled: 0.2, small: 0.2, sappy: 0.1 },   // what rolls off the rack; the rest are good logs
+    logs: { gnarled: 0.15, small: 0.15, large: 0.1, sappy: 0.1 },   // what rolls off the rack; the rest are good medium logs
     logCost: 1,             // machine01 costs $1 for every log it processes, yours included (the CD, 2026-10-14)
     // what a robot does when no instruction covers it (each robot rolls its own dice)
     uninstructed: {
       think: 0.25,          // an operator stops to think first (no instruction covers this yet)
       free: 0.25,           // a seller gives a plank away...
       cheap: 0.35,          // ...or lets it go cheap
-      mislabel: 0.5         // a seller passes a rough plank or dowels off as a plank
+      mislabel: 0.5         // a seller passes something that is not a medium plank off as one
     },
     slip: 0.05,             // a robot ignores an instruction it has 1 time in 20, and does what it would have done without it
-    price: { plank: 5, rough: 3, dowels: 1 },   // the right price for each thing
+    price: { plank: 5, rough: 3, dowels: 1, largePlank: 3 },   // the right price for each thing (plank: a medium plank)
     cheapPlank: 3,          // what a careless seller lets a plank go for
-    mislabel: 5,            // what it asks for a rough plank or dowels passed off as a plank
+    mislabel: 5,            // what it asks for anything else passed off as a medium plank
     // customer satisfaction: how much our customers trust us and our products (not the formal
     // mode's Trust, which is how much the team trusts the AI tool). It starts at 100%.
     satStart: 100, satMin: 10, satUp: 1, satHit: 15,
     satHeal: 0.005          // customers forget: each second closes this share of the gap to 100
   };
 
-  // The instruction pool: the CD's six (2026-10-14) and the sap-log one (the CD's third brief,
-  // the same day, when the sap barrel went and sap came in on the logs). Each prevents one
-  // mistake and belongs to one job: on a robot doing any other job it does nothing. A rule joins
-  // the list the first time a robot makes the mistake it prevents. "Never put sap on input log"
-  // now prevents nothing (no robot pours sap any more): it joins the list beside the sap-log
-  // instruction (`joins`), an extraneous choice the CD is happy to leave in it.
+  // The instruction pool, in the CD's words: six on 2026-10-14, the sap-log one with the third
+  // brief, and with the fourth the size ones and the seller's recycle ones, with 1"x4"x4' renamed
+  // "medium". Each belongs to one job: on a robot doing another job it is never consulted, so it
+  // does nothing. Each joins the list the first time a robot makes the mistake it prevents. An
+  // operator's log instruction names the logs it keeps out of machine01 (`rejects`); a seller's
+  // recycle instruction the thing it takes out of the sale bin (`recycles`). A row with `joins`
+  // rides onto the list with others and prevents no mistake: "Never put sap on input log" (no robot
+  // pours sap since the barrel went) and "Put medium logs in recycle bin" (for a factory that
+  // wants dowels; on a plank line it throws the good logs away). Gnarled and sap logs are
+  // medium-sized.
   const RULES = [
-    { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: 'sappy' },
-    { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin' },
-    { id: 'gnarled', job: 'operate', text: 'Put gnarled logs in recycle bin' },
-    { id: 'small', job: 'operate', text: 'Only input logs bigger than 1"x4"x4\'' },
-    { id: 'output', job: 'operate', text: 'Only output 1"x4"x4\' wood planks' },
-    { id: 'sellOnly', job: 'sell', text: 'Only sell 1"x4"x4\' wood planks' },
-    { id: 'price', job: 'sell', text: 'Sell 1"x4"x4\' wood planks for $5' }
+    { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: ['sappy'] },
+    { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin', rejects: ['sappy'] },
+    { id: 'gnarled', job: 'operate', text: 'Put gnarled logs in recycle bin', rejects: ['gnarled'] },
+    { id: 'medium', job: 'operate', text: 'Only input medium logs', rejects: ['small', 'large'] },
+    { id: 'smallLog', job: 'operate', text: 'Put small logs in recycle bin', rejects: ['small'] },
+    { id: 'largeLog', job: 'operate', text: 'Put large logs in recycle bin', rejects: ['large'] },
+    { id: 'mediumLog', job: 'operate', text: 'Put medium logs in recycle bin', rejects: ['log', 'gnarled', 'sappy'], joins: ['smallLog', 'largeLog'] },
+    { id: 'output', job: 'operate', text: 'Only output medium wood planks' },
+    { id: 'sellOnly', job: 'sell', text: 'Only sell medium wood planks' },
+    { id: 'price', job: 'sell', text: 'Sell medium wood planks for $5' },
+    { id: 'dowelsOut', job: 'sell', text: 'Put dowel rods in recycle bin', recycles: 'dowels' },
+    { id: 'largeOut', job: 'sell', text: 'Put large planks in recycle bin', recycles: 'largePlank' },
+    { id: 'roughOut', job: 'sell', text: 'Put gnarled planks in recycle bin', recycles: 'rough' }
   ];
+  const RENAMED = { small: 'medium' };   // "Only input logs bigger than 1x4x4'" became "Only input medium logs"
   const RULE = {};
   RULES.forEach(q => { RULE[q.id] = q; });
   // each job's base prompt, shown above a robot's own instructions (the CD's words)
@@ -737,11 +749,13 @@ const FACTORY = (function () {
   // it does what it would have done anyway. Each job asks only about its own instructions, so
   // one about another job is never consulted: it does nothing
   function follows(s, r, id) { return has(r, id) && !chance(s, 'slip', CFG.slip); }
-  function see(s, id, by) {
-    if (s.seen[id]) return;
-    s.seen[id] = true;
-    RULES.forEach(q => { if (q.joins === id) s.seen[q.id] = true; });
-    ev(s, 'rule', { id, by });
+  // a mistake was made: the instructions that prevent it join the list (with any that ride in
+  // with them); one 'rule' event however many joined
+  function see(s, ids, by) {
+    const fresh = [].concat(ids).filter(id => !s.seen[id]);
+    if (!fresh.length) return;
+    fresh.forEach(id => { s.seen[id] = true; RULES.forEach(q => { if (q.joins && q.joins.indexOf(id) >= 0) s.seen[q.id] = true; }); });
+    ev(s, 'rule', { id: fresh[0], ids: fresh, by });
   }
   function known(s) { return RULES.filter(q => s.seen[q.id]); }
   function slotsOpen(s) { return s.hired >= CFG.hire.length; }
@@ -779,7 +793,7 @@ const FACTORY = (function () {
   function priceNow(s, item) { return paid(s, CFG.price[item]); }
   function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }
   // one sale, whoever makes it. fair: the thing at its own price; cheap: a plank let go for less;
-  // free: a plank given away; mislabel: a rough plank or dowels sold as a plank
+  // free: a plank given away; mislabel: anything else sold as a medium plank
   function settle(s, item, sale, by) {
     const ask = sale === 'fair' ? CFG.price[item] : sale === 'cheap' ? CFG.cheapPlank : sale === 'mislabel' ? CFG.mislabel : 0;
     const p = paid(s, ask);
@@ -903,18 +917,27 @@ const FACTORY = (function () {
   }
 
   /* ---------- machine01 ---------- */
-  const LOGS = ['log', 'gnarled', 'small', 'sappy'];
-  // what a press makes of each: a gnarled log's plank keeps the log's holes ('rough'), and a sap
-  // log makes nothing ('sap'): it jams the machine
-  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', sappy: 'sap' };
-  // how each thing a robot can do is graded on its record
-  const GRADE = { plank: 'good', think: 'soso', rough: 'soso', dowels: 'bad', sap: 'bad', reject: 'good',
-    fair: 'good', honest: 'good', cheap: 'soso', free: 'bad', mislabel: 'bad', looking: 'soso' };
-  function nextLog(s) { return roll(s, 'log', [['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['sappy', CFG.logs.sappy]], 'log'); }
+  const LOGS = ['log', 'gnarled', 'small', 'large', 'sappy'];   // 'log': a good medium log
+  // what a press makes of each: a medium plank, a gnarled plank (the log's holes kept: 'rough'),
+  // dowel rods, a large plank; a sap log makes nothing ('sap'): it jams the machine
+  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'sap' };
+  // the instructions that join the list when an operator cuts each wrong log
+  const FED = { rough: ['gnarled'], dowels: ['medium', 'smallLog'], largePlank: ['medium', 'largeLog'] };
+  // How each thing a robot does is graded in its evals (the CD, fourth brief): red only for a
+  // blocker (a jam) or a hit to customer satisfaction (something passed off as a medium plank);
+  // anything unexpected or wasteful yellow; the rest green. A key is the action, then ':' and the
+  // thing it was done to; a trailing '!' means it was done against the robot's own instructions
+  // (it slipped), which turns a green action yellow and leaves red red.
+  const GRADE = { plank: 'good', think: 'soso', rough: 'soso', dowels: 'soso', largePlank: 'soso', sap: 'bad', reject: 'good',
+    caught: 'good', fair: 'good', honest: 'good', cheap: 'soso', free: 'soso', mislabel: 'bad', looking: 'soso', recycle: 'good' };
+  function gradeOf(key) {
+    const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
+    return against && g === 'good' ? 'soso' : g;
+  }
+  function nextLog(s) { return roll(s, 'log', [['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['large', CFG.logs.large], ['sappy', CFG.logs.sappy]], 'log'); }
   function ready(s) { const m = s.machine; return m.phase === 'ready' && m.staged >= 1; }
   // a press cuts whatever is on the in-feed, and machine01 charges for the log whatever it is
-  // (money may go below zero): a good log makes a plank, a gnarled one a plank with holes, a
-  // small one dowels; a sap log jams the machine
+  // (money may go below zero)
   function press(s, by) {
     const m = s.machine;
     if (!ready(s)) return false;
@@ -942,13 +965,24 @@ const FACTORY = (function () {
     restage(s);
     return true;
   }
-  function credit(s, by, what) {
+  // an outcome: counted in the robot's evals and its tally, shown on its face
+  function credit(s, by, what, against) {
     if (typeof by !== 'number') return;
     const r = s.robots[by];
     if (!r) return;
-    const g = GRADE[what];
-    r.tally[g]++; r.record[what] = (r.record[what] || 0) + 1; r.mood = g; r.moodT = 2.4;
-    ev(s, 'outcome', { by, grade: g, job: r.job, what });
+    const key = what + (against ? '!' : ''), g = gradeOf(key);
+    r.tally[g]++; r.record[key] = (r.record[key] || 0) + 1; r.mood = g; r.moodT = 2.4;
+    ev(s, 'outcome', { by, grade: g, job: r.job, what: key });
+  }
+  // a line in the evals that is not an outcome (a reach that came up empty, a cut caught at the exit)
+  function note(r, key) { r.record[key] = (r.record[key] || 0) + 1; }
+  // a robot's evals start again: fresh data for its latest instructions (the CD, fourth brief)
+  function resetEvals(s, id) {
+    const r = s.robots[id];
+    if (!r) return false;
+    r.record = {}; r.tally = { good: 0, soso: 0, bad: 0 }; r.since = s.t;
+    ev(s, 'evalsReset', { id });
+    return true;
   }
   function stepMachine(s, dt) {
     const m = s.machine;
@@ -958,20 +992,19 @@ const FACTORY = (function () {
     if (m.result === 'sap' && m.t >= CFG.jamAt) {
       m.phase = 'jam'; m.t = 0; m.dirt = 1;
       ev(s, 'jam', { by: m.by });
-      if (typeof m.by === 'number') { see(s, 'sappy', m.by); credit(s, m.by, 'sap'); }
+      if (typeof m.by === 'number' && s.robots[m.by]) { see(s, 'sappy', m.by); credit(s, m.by, 'sap', s.robots[m.by].against); }
     } else if (m.result !== 'sap' && m.t >= CFG.processSec) {
       const item = m.result, by = m.by, r = typeof by === 'number' ? s.robots[by] : null;
       ev(s, 'made', { item, by });
       if (by === 'player') s.tally.player.made++;
       if (r) {
-        if (item === 'rough') see(s, 'gnarled', by);
-        if (item === 'dowels') see(s, 'small', by);
-        credit(s, by, m.what);
+        if (FED[item]) see(s, FED[item], by);
+        credit(s, by, m.what, r.against || (r.outSlip && item !== 'plank'));
       }
-      // an operator told to check its output catches anything that is not a plank on its way out
+      // an operator told to check its output catches anything that is not a medium plank on its way out
       if (r && r.check && item !== 'plank') {
         recycle(s, item, by, 'out');
-        r.record.caught = (r.record.caught || 0) + 1;
+        note(r, 'caught:' + item);
         r.state = 'flick'; r.t = 0;
       } else s.belt.push({ item, t: 0, by });
       if (r) r.check = false;
@@ -1069,13 +1102,15 @@ const FACTORY = (function () {
     const i = s.robots.length, r = SPOT.rest[i];
     return { id: i, name: CFG.names[i], x: r.x, y: r.y, yawT: r.face, path: [], dist: 0, job: null, state: 'unbox', t: 0,
       goal: null, think: false, check: false, sale: null, hunt: null, carry: null, mood: null, moodT: 0,
-      slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {} };
+      against: false, outSlip: false, huntSlip: false,
+      slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {}, since: s.t };
   }
   function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'sell' ? SPOT.sell : SPOT.rest[r.id]; }
   // a robot taken off a job lets go of what the job had it holding
   function release(s, r) {
     if (r.carry) s.bin.unshift(r.carry);
-    r.carry = null; r.think = false; r.check = false; r.sale = null; r.hunt = null; r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;
+    r.carry = null; r.think = false; r.check = false; r.sale = null; r.hunt = null; r.against = false; r.outSlip = false; r.huntSlip = false;
+    r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;
   }
   function stepRobot(s, r, dt) {
     if (r.moodT > 0) r.moodT = Math.max(0, r.moodT - dt);
@@ -1094,24 +1129,28 @@ const FACTORY = (function () {
     if (r.job === 'operate') operate(s, r, dt);
     else if (r.job === 'sell') vend(s, r, dt);
   }
-  // the operator's turn at machine 01: look at the log (a bad one it has an instruction for goes
-  // in the recycle bin), then (perhaps) a think, then a press
+  // the operator's turn at machine 01: look at the log (one it holds an instruction about goes in
+  // the recycle bin; each such instruction gets its own chance to be followed), then (perhaps) a
+  // think, then a press. Cutting a log one of its instructions was about is against its instructions
   function operate(s, r, dt) {
     const m = s.machine, U = CFG.uninstructed;
     switch (r.state) {
       case 'idle': {
         if (m.phase === 'jam') { r.mood = 'stuck'; r.moodT = 0.5; return; }
         if (!ready(s)) return;
-        if (m.log !== 'log' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; }
+        const held = RULES.filter(q => q.rejects && q.rejects.indexOf(m.log) >= 0 && has(r, q.id));
+        if (held.some(q => follows(s, r, q.id))) { r.state = 'reject'; r.t = 0; return; }
+        r.against = held.length > 0;
         r.think = chance(s, 'think', U.think);
         r.check = follows(s, r, 'output');
+        r.outSlip = has(r, 'output') && !r.check;
         r.t = 0;
         r.state = r.think ? 'dawdle' : 'press';
         return;
       }
       case 'reject':
         r.yawT = N; r.t += dt;
-        if (r.t >= CFG.tossSec) { if (rejectLog(s, r.id)) credit(s, r.id, 'reject'); r.state = 'idle'; r.t = 0; }
+        if (r.t >= CFG.tossSec) { const log = m.log; if (rejectLog(s, r.id)) credit(s, r.id, 'reject:' + log); r.state = 'idle'; r.t = 0; }
         return;
       case 'dawdle':
         r.t += dt; if (r.t >= CFG.dawdleSec) { r.state = 'press'; r.t = 0; }
@@ -1134,11 +1173,12 @@ const FACTORY = (function () {
     }
   }
   // the seller's turn at the bin: "sell the items in this bin". It reaches in and sells what it
-  // takes out, and it never takes anything out but to sell it. Without an instruction it takes
-  // the next thing, whatever it is. Told to sell only planks, it hunts for one through each sale
-  // (deciding once a sale, so a slip is 1 sale in 20): every reach turns up a plank with the
-  // chance planks / everything in the bin, and one that turns up something else is a "looking
-  // for plank" on its record (the CD's rule, 2026-10-14) and another reach.
+  // takes out. Without an instruction it takes the next thing, whatever it is. Told to sell only
+  // medium planks, it hunts for one through each sale (deciding once a sale, so a slip is 1 sale
+  // in 20): every reach turns up a plank with the chance planks / everything in the bin (the CD's
+  // rule, 2026-10-14), and one that turns up something else picks it in proportion to what is
+  // there. Whatever it turns up that it holds a recycle instruction for goes in the recycle bin
+  // (the fourth brief); anything else turned up on a hunt goes back, a "looking for plank".
   function vend(s, r, dt) {
     const U = CFG.uninstructed;
     switch (r.state) {
@@ -1149,22 +1189,38 @@ const FACTORY = (function () {
         r.yawT = 0.3; r.t += dt;
         if (r.t < CFG.reachSec) return;
         if (!s.bin.length) { r.state = 'idle'; return; }
-        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly');
+        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; }
         let at = 0;
         if (r.hunt) {
           const planks = s.bin.filter(k => k === 'plank').length;
-          if (!chance(s, 'find', planks / s.bin.length) || !planks) {
-            r.record.looking = (r.record.looking || 0) + 1;
-            ev(s, 'looking', { by: r.id, of: s.bin.length });
-            r.state = 'look'; r.t = 0;
-            return;
+          if (planks && chance(s, 'find', planks / s.bin.length)) at = s.bin.indexOf('plank');
+          else {
+            const kinds = ITEMS.filter(k => k !== 'plank' && s.bin.indexOf(k) >= 0), n = s.bin.length - planks;
+            at = s.bin.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, s.bin.filter(x => x === k).length / n]), kinds[kinds.length - 1]) : kinds[0]);
           }
-          at = s.bin.indexOf('plank');
         }
+        const kind = s.bin[at];
+        r.against = false;
+        const out = RULES.find(q => q.recycles === kind);
+        if (out && !has(r, out.id)) see(s, out.id, r.id);
+        else if (out) {
+          if (follows(s, r, out.id)) { r.carry = s.bin.splice(at, 1)[0]; r.state = 'drop'; r.t = 0; return; }
+          r.against = true;   // it slipped: the thing stays in its hands
+        }
+        if (r.hunt && kind !== 'plank') {
+          note(r, 'looking' + (r.against ? '!' : ''));
+          ev(s, 'looking', { by: r.id, of: s.bin.length, item: kind });
+          r.state = 'look'; r.t = 0;
+          return;
+        }
+        if (kind !== 'plank' && r.huntSlip) r.against = true;
         r.hunt = null;
         const item = r.carry = s.bin.splice(at, 1)[0];
-        if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');
-        else r.sale = chance(s, 'mislabel', U.mislabel) ? 'mislabel' : 'honest';
+        if (item === 'plank') {
+          const told = follows(s, r, 'price');
+          r.sale = told ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');
+          r.against = has(r, 'price') && !told && r.sale !== 'fair';
+        } else r.sale = chance(s, 'mislabel', U.mislabel) ? 'mislabel' : 'honest';
         r.state = 'pitch'; r.t = 0;
         return;
       }
@@ -1172,15 +1228,22 @@ const FACTORY = (function () {
         r.yawT = 0.3; r.t += dt;
         if (r.t >= CFG.lookSec) { r.state = 'idle'; r.t = 0; }
         return;
+      case 'drop':   // into the recycle bin, just to its left
+        r.yawT = 2.9; r.t += dt;
+        if (r.t >= CFG.tossSec) {
+          recycle(s, r.carry, r.id, 'bin'); credit(s, r.id, 'recycle:' + r.carry);
+          r.carry = null; r.state = 'cool'; r.t = 0;
+        }
+        return;
       case 'pitch':
         r.yawT = 0; r.t += dt;
         if (r.t >= CFG.pitchSec) {
-          const sale = r.sale;
-          settle(s, r.carry, sale === 'honest' ? 'fair' : sale, r.id);
+          const sale = r.sale, item = r.carry;
+          settle(s, item, sale === 'honest' ? 'fair' : sale, r.id);
           if (sale === 'free' || sale === 'cheap') see(s, 'price', r.id);
           if (sale === 'mislabel') see(s, 'sellOnly', r.id);
-          credit(s, r.id, sale);
-          r.carry = null; r.sale = null; r.state = 'cool'; r.t = 0;
+          credit(s, r.id, item === 'plank' ? sale : sale + ':' + item, r.against);
+          r.carry = null; r.sale = null; r.against = false; r.state = 'cool'; r.t = 0;
         }
         return;
       case 'cool':
@@ -1190,8 +1253,8 @@ const FACTORY = (function () {
   }
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
-  const ITEMS = ['plank', 'rough', 'dowels'];
-  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'pitch', 'cool'];
+  const ITEMS = ['plank', 'rough', 'dowels', 'largePlank'];   // plank: a medium plank; rough: a gnarled plank
+  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'pitch', 'cool'];
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
     if (!b || !a.task || !a.task.arrived || a.path.length) return null;
@@ -1289,12 +1352,14 @@ const FACTORY = (function () {
       s.robots = s.robots.slice(0, CFG.hire.length);
       s.hired = s.robots.length;
       s.seen = {};
-      RULES.forEach(q => { if (d.seen && d.seen[q.id] === true) s.seen[q.id] = true; });
+      const seenWas = {};
+      Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true) seenWas[RENAMED[k] || k] = true; });
+      RULES.forEach(q => { if (seenWas[q.id]) s.seen[q.id] = true; });
       s.robots.forEach((r, i) => {
         r.id = i;
         r.name = typeof r.name === 'string' && r.name.trim() ? r.name.trim().slice(0, CFG.nameMax) : CFG.names[i];
         r.slots = Math.max(0, Math.min(CFG.slots.length, r.slots | 0));
-        const was = Array.isArray(r.rules) ? r.rules : [], rules = [];
+        const was = (Array.isArray(r.rules) ? r.rules : []).map(id => RENAMED[id] || id), rules = [];
         for (let k = 0; k < r.slots; k++) {
           const id = RULE[was[k]] && rules.indexOf(was[k]) < 0 ? was[k] : null;
           rules.push(id);
@@ -1302,8 +1367,10 @@ const FACTORY = (function () {
         }
         r.rules = rules;
         r.record = r.record && typeof r.record === 'object' ? r.record : {};
-        // a state this build no longer has (the sap run, the seller's drop) or a held thing that
-        // is not an item: back to idle, anything sellable it held back in the bin
+        r.since = Number.isFinite(+r.since) ? Math.min(+r.since, s.t) : 0;
+        r.against = !!r.against; r.outSlip = !!r.outSlip; r.huntSlip = !!r.huntSlip;
+        // a state this build does not have (the old sap run) or a held thing that is not an item:
+        // back to idle, anything sellable it held back in the bin
         if (ITEMS.indexOf(r.carry) < 0) r.carry = null;
         if (typeof r.hunt !== 'boolean') r.hunt = null;
         if (STATES.indexOf(r.state) < 0) release(s, r);
@@ -1319,8 +1386,8 @@ const FACTORY = (function () {
     } catch (e) { return null; }
   }
 
-  return { CFG, LAYOUT, ITEMS, LOGS, RULES, BASE, GRADE, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice,
-    known, slotsOpen, slotPrice, buySlot, setRule, rename, ready, path, free, nearestFree, grid, save, load, rects, CELL };
+  return { CFG, LAYOUT, ITEMS, LOGS, MAKES, RULES, BASE, GRADE, gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice,
+    known, slotsOpen, slotPrice, buySlot, setRule, rename, resetEvals, ready, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
 if (typeof module !== 'undefined') module.exports = FACTORY;
 </script>
@@ -2253,8 +2320,15 @@ const MODE = (function () {
     sapAt(0.3, 0.45, 0.125, 0.03), sapAt(-0.31, 0.45, 0.125, 0.03),
     ell(-0.1, -0.01, 0.152, 0.07, 0.022, 0.01, 6, 3, '!#efffc4', 1, { ol: 0 }), ell(0.14, -0.05, 0.15, 0.025, 0.014, 0.008, 6, 3, '!#efffc4', 1, { ol: 0 })];
   const M_SMALL = [xf(cyl(0, 0, -0.36, 0.065, 0.72, 8, COL.bark, COL.woodEnd), My(Math.PI / 2))];
-  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, sappy: M_SAPPY, plank: M_PLANK, rough: M_ROUGH, dowels: M_DOWELS };
-  const LIFT = { log: 0.65, gnarled: 0.66, small: 0.6, sappy: 0.655 };   // a log's centre, resting on the belt
+  // a large log: fatter and longer than a good one, and the plank it makes is wider, longer and thicker
+  const M_LARGE = [xf(cyl(0, 0, -0.52, 0.17, 1.04, 10, COL.bark, COL.woodEnd), My(Math.PI / 2)),
+    xf(cyl(0, 0, -0.005, 0.12, 0.01, 10, '#c99a58', '#c99a58', 0, { ol: 0 }), chain(Mt(0.522, 0, 0), My(Math.PI / 2)))];
+  const M_LPLANK = [box(-0.52, -0.17, 0, 0.52, 0.17, 0.09, COL.plank, COL.plankTop),
+    box(-0.36, -0.08, 0.09, 0.3, -0.07, 0.092, '#c9a160', '#c9a160', '#c9a160', { ol: 0 }), box(-0.12, 0.06, 0.09, 0.44, 0.07, 0.092, '#c9a160', '#c9a160', '#c9a160', { ol: 0 })];
+  // log kinds and the things a press makes share this table ('large' is the log, 'largePlank' its plank)
+  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, large: M_LARGE, sappy: M_SAPPY,
+    plank: M_PLANK, rough: M_ROUGH, dowels: M_DOWELS, largePlank: M_LPLANK };
+  const LIFT = { log: 0.65, gnarled: 0.66, small: 0.6, large: 0.7, sappy: 0.655 };   // a log's centre, resting on the belt
 
   function drawItem(kind, M, extra) {
     const ps = ITEM_MODEL[kind].map(p => ({ p, M }));
@@ -2396,6 +2470,7 @@ const MODE = (function () {
     else if (r.state === 'look') { const u = clamp(k / C.lookSec, 0, 1); armR = 1.2 + 0.25 * Math.sin(u * Math.PI * 3); armL = 1.05; tilt = 0.22; headYaw = 0.35 * Math.sin(u * Math.PI * 4); }
     else if (r.state === 'reject') { const u = clamp(k / C.tossSec, 0, 1), heave = Math.sin(Math.min(1, u * 1.8) * Math.PI / 2); armR = armL = 1.0 + 1.1 * heave; tilt = 0.15 - 0.2 * heave; }
     else if (r.state === 'flick') { const u = clamp(k / C.tossSec, 0, 1); armR = 0.5 + 1.3 * Math.sin(u * Math.PI); abR = 0.35; }
+    else if (r.state === 'drop') { const u = clamp(k / C.tossSec, 0, 1); armR = 1.3 - 0.5 * u; armL = 0.8; tilt = 0.15; }
     else if (r.state === 'pitch') { const u = clamp(k / C.pitchSec, 0, 1); armR = 2.6 * Math.sin(Math.min(1, u * 2) * Math.PI / 2); armL = 0.3; abR = 0.1; }
     if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'pitch' };
     if (r.state === 'idle' && r.job === null) headYaw = 0.3 * Math.sin(clock * 0.7 + r.id);
@@ -2784,9 +2859,11 @@ const MODE = (function () {
   const MINI = {
     plank: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><rect x="1" y="1" width="28" height="8" rx="1" fill="#ebc77f" stroke="#1d2430" stroke-width="1.5"/></svg>',
     rough: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><rect x="1" y="1" width="28" height="8" rx="1" fill="#c99a58" stroke="#1d2430" stroke-width="1.5"/><g fill="#22140a"><circle cx="7" cy="4" r="1.7"/><circle cx="15.5" cy="6" r="1.7"/><circle cx="23.5" cy="4.5" r="1.7"/></g></svg>',
-    dowels: '<svg viewBox="0 0 30 12" width="26" height="10" aria-hidden="true"><g stroke="#1d2430" stroke-width="1.2" fill="#e6c58c"><rect x="1" y="1" width="28" height="3" rx="1.5"/><rect x="1" y="4.5" width="28" height="3" rx="1.5"/><rect x="1" y="8" width="28" height="3" rx="1.5"/></g><rect x="13" y="0.5" width="4" height="11" fill="#d0453b"/></svg>'
+    dowels: '<svg viewBox="0 0 30 12" width="26" height="10" aria-hidden="true"><g stroke="#1d2430" stroke-width="1.2" fill="#e6c58c"><rect x="1" y="1" width="28" height="3" rx="1.5"/><rect x="1" y="4.5" width="28" height="3" rx="1.5"/><rect x="1" y="8" width="28" height="3" rx="1.5"/></g><rect x="13" y="0.5" width="4" height="11" fill="#d0453b"/></svg>',
+    largePlank: '<svg viewBox="0 0 34 14" width="30" height="12" aria-hidden="true"><rect x="1" y="1" width="32" height="12" rx="1.5" fill="#ebc77f" stroke="#1d2430" stroke-width="1.6"/><path d="M6 5h14M12 9.5h16" stroke="#c9a160" stroke-width="1.2"/></svg>'
   };
-  const ITEM_NAME = { plank: 'a plank', rough: 'a plank with holes', dowels: 'dowels' };
+  const ITEM_NAME = { plank: 'a medium plank', rough: 'a gnarled plank', dowels: 'dowel rods', largePlank: 'a large plank' };
+  const LOG_NAME = { log: 'a medium log', gnarled: 'a gnarled log', small: 'a small log', large: 'a large log', sappy: 'a sap log' };
   let bubbleSig = '';
   function anchorOf(b) {
     if (b.kind === 'bin') return [5.22, 2.9, 0.7];
@@ -2805,7 +2882,7 @@ const MODE = (function () {
         bubbleEl.hidden = false;
         const btns = opts.map(o => {
           let inner = ICON[o.icon] || '';
-          if (o.item && o.item !== 'plank') inner = MINI[o.item] + inner;
+          if (o.item && o.item !== 'plank') inner = (MINI[o.item] || '') + inner;
           let label = '';
           if (o.price !== undefined && o.price !== null) label = '$' + o.price;
           if (o.id === 'notes' && o.slots) label = o.filled + '/' + o.slots;
@@ -2869,30 +2946,48 @@ const MODE = (function () {
       '<h2>Robot factory</h2>' +
       '<p>Machine 01 is a task. You can always do it yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
       '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
-      '<p>About ' + pct(C.logs.gnarled) + ' of the logs off the rack are gnarled, ' + pct(C.logs.small) + ' are small and ' + pct(C.logs.sappy) + ' are sap logs. You toss those in the recycle bin yourself; a robot does what it is told. <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +
+      '<p>The factory makes medium planks. About ' + pct(1 - C.logs.gnarled - C.logs.small - C.logs.large - C.logs.sappy) + ' of the logs off the rack are good medium logs; the rest are gnarled (' + pct(C.logs.gnarled) + '), small (' + pct(C.logs.small) + '), large (' + pct(C.logs.large) + ') or sap logs (' + pct(C.logs.sappy) + '). You toss those in the recycle bin yourself; a robot does what it is told. <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +
+      '<p>Each robot\'s page ends in its <b>evals</b>: what it has done, counted, with a dot for how it went. Reset them to start counting again after you change its instructions.</p>' +
       '<ul>' +
-      '<li><b>Good</b>: a good log made into a smooth plank; a bad log put in the recycle bin; a plank sold for its price.</li>' +
-      '<li><b>So-so</b>: the operator stops to think first, or cuts a gnarled log into a plank with holes ($' + C.price.rough + '); the seller lets a plank go for $' + C.cheapPlank + '.</li>' +
-      '<li><b>Bad</b>: a sap log fed in, which jams the machine until you scrub it clean yourself; a small log cut into dowels ($' + C.price.dowels + '); a plank given away for $0; a plank with holes or dowels sold to a customer as a plank for $' + C.mislabel + ', which costs ' + C.satHit + ' points of customer satisfaction.</li>' +
-      '<li><b>The seller sells what is in the bin</b>, and only that. Told to sell only planks, it leaves everything else where it is and has to hunt for a plank: each reach finds one as often as planks make up the bin. A reach that comes up with something else is a "looking for plank" on its record.</li>' +
+      '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a plank sold for its price; anything sold for its own price when nothing says not to.</li>' +
+      '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; a gnarled, small or large log cut into a gnarled plank ($' + C.price.rough + '), dowel rods ($' + C.price.dowels + ') or a large plank ($' + C.price.largePlank + '); a plank let go for $' + C.cheapPlank + ' or given away; a reach that came up with something other than a plank; and anything done against the robot\'s own instructions.</li>' +
+      '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the machine until you scrub it clean yourself; anything else sold to a customer as a medium plank for $' + C.mislabel + ', which costs ' + C.satHit + ' points of customer satisfaction.</li>' +
+      '<li><b>The seller sells what is in the bin</b>. Told to sell only medium planks, it leaves everything else where it is and has to hunt for a plank: each reach finds one as often as planks make up the bin, and a reach that comes up with something else is a "looking for plank". Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up.</li>' +
       '<li><b>Satisfaction sets what customers pay</b>: every price is multiplied by it. Each fair sale wins back a point, and customers slowly forget a bad one.</li>' +
       '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing.</li>' +
       '</ul>' +
-      '<h3>Measured so far</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Good</th><th>So-so</th><th>Bad</th><th>Good %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
+      '<h3>Measured since each robot\'s evals were last reset</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Green</th><th>Yellow</th><th>Red</th><th>Green %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
       '<p class="fx-small">You: ' + s.tally.player.made + ' planks made, ' + s.tally.player.tossed + ' bad logs tossed, ' + s.tally.player.sold + ' sold by hand. Earned in all: $' + s.earned + '; spent on logs: $' + s.spent + '.</p>' +
       '<div class="fx-row"><button class="fx-ghost" data-panel="restart">' + (confirmReset ? 'Tap again to start over' : 'Start over') + '</button><button class="fx-ghost" data-panel="close">Close</button></div>';
   }
   let confirmReset = false;
 
-  /* ---------- a robot's page: its name, its base prompt, its own instructions, its record ---------- */
+  /* ---------- a robot's page: its name, its base prompt, its own instructions, its evals ---------- */
   let panelMode = 'info', pageBot = -1, pickSlot = -1, pageSig = '';
-  const DOING = {   // a robot's record, in words
-    plank: 'Good log, smooth plank', think: 'Stopped to think, then a plank', rough: 'Cut a gnarled log: a plank with holes',
-    dowels: 'Cut a small log: dowels', sap: 'Fed in a sap log: a jam', reject: 'Put a bad log in the recycle bin',
-    caught: 'Caught a bad cut: into the recycle bin',
-    fair: 'Sold a plank for its price', honest: 'Sold a plank with holes or dowels for their price', cheap: 'Let a plank go cheap',
-    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one', looking: 'Looking for plank'
+  // a robot's evals: each key is an action, ':' and what it was done to, and '!' when it was done
+  // against the robot's own instructions (it slipped). In the order they are listed:
+  const DOING = {
+    plank: () => 'Medium log, medium plank', think: () => 'Stopped to think, then a medium plank',
+    rough: () => 'Cut a gnarled log: a gnarled plank', dowels: () => 'Cut a small log: dowel rods',
+    largePlank: () => 'Cut a large log: a large plank', sap: () => 'Fed in a sap log: a jam',
+    reject: x => 'Put ' + (LOG_NAME[x] || 'a bad log') + ' in the recycle bin',
+    caught: x => 'Caught ' + (ITEM_NAME[x] || 'a bad cut') + ' at the exit: into the recycle bin',
+    fair: () => 'Sold a medium plank for its price', cheap: () => 'Let a medium plank go cheap', free: () => 'Gave a medium plank away',
+    honest: x => x ? 'Sold ' + ITEM_NAME[x] + (x === 'dowels' ? ' for their price' : ' for its price') : 'Sold something else for its price',
+    mislabel: x => 'Sold ' + (ITEM_NAME[x] || 'something') + ' as a medium plank',
+    looking: () => 'Looking for plank',
+    recycle: x => 'Put ' + (ITEM_NAME[x] || 'something') + ' in the recycle bin'
   };
+  const DOING_ORDER = Object.keys(DOING);
+  function doing(key) {
+    const against = key.slice(-1) === '!', [act, what] = key.replace(/!$/, '').split(':');
+    return DOING[act] ? DOING[act](what) + (against ? ', against its instructions' : '') : key;
+  }
+  function evalRows(r) {
+    const rank = k => { const [act, what] = k.replace(/!$/, '').split(':'); return DOING_ORDER.indexOf(act) * 100 + (what ? 10 + ITEMS_ALL.indexOf(what) : 0) + (k.slice(-1) === '!' ? 50 : 0); };
+    return Object.keys(r.record).filter(k => r.record[k] > 0).sort((a, b) => rank(a) - rank(b));
+  }
+  const ITEMS_ALL = F.LOGS.concat(F.ITEMS);
   const CROSS = '<svg viewBox="0 0 12 12" width="13" height="13" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
   function openRobot(id) {
     const r = s.robots[id];
@@ -2911,7 +3006,7 @@ const MODE = (function () {
     const r = s.robots[pageBot], dyn = document.getElementById('fx-rp-dyn');
     if (!r || !dyn) return;
     const price = F.slotPrice(s, r.id), open = F.slotsOpen(s), known = F.known(s);
-    const sig = JSON.stringify([r.name, r.job, r.slots, r.rules, known.map(q => q.id), open, price !== null && s.money >= price, r.record, pickSlot]);
+    const sig = JSON.stringify([r.name, r.job, r.slots, r.rules, known.map(q => q.id), open, price !== null && s.money >= price, r.record, pickSlot, Math.floor((s.t - r.since) / 60)]);
     if (sig === pageSig) return;
     pageSig = sig;
     const base = F.BASE[r.job];
@@ -2940,8 +3035,11 @@ const MODE = (function () {
       }).join('') + '</div>';
       h += '<div class="fx-row"><button class="fx-ghost" data-panel="cancel">Cancel</button></div></div>';
     }
-    const rec = Object.keys(DOING).filter(k => r.record[k]).map(k => '<tr><td><i class="fx-dot ' + (F.GRADE[k] || 'good') + '"></i>' + DOING[k] + '</td><td>' + r.record[k] + '</td></tr>').join('');
-    h += '<div class="fx-sec"><div class="fx-h"><span>What ' + esc(r.name) + ' has done</span></div>' + (rec ? '<div class="fx-scroll"><table class="fx-rec"><tbody>' + rec + '</tbody></table></div>' : '<p class="fx-small">Nothing yet.</p>') + '</div>';
+    const rec = evalRows(r).map(k => '<tr><td><i class="fx-dot ' + F.gradeOf(k) + '"></i>' + esc(doing(k)) + '</td><td>' + r.record[k] + '</td></tr>').join('');
+    const mins = Math.floor((s.t - r.since) / 60);
+    h += '<div class="fx-sec fx-evals"><div class="fx-h"><span>Evals</span><span>' + (mins < 1 ? 'under a minute' : mins + ' min') + '</span></div>' +
+      (rec ? '<div class="fx-scroll"><table class="fx-rec"><tbody>' + rec + '</tbody></table></div>' : '<p class="fx-small">Nothing yet.</p>') +
+      '<div class="fx-row"><button class="fx-ghost" data-panel="evals-reset"' + (rec ? '' : ' disabled') + '>Reset evals</button></div></div>';
     h += '<div class="fx-row"><button class="fx-ghost" data-panel="close">Close</button></div>';
     dyn.innerHTML = h;
   }
@@ -2970,6 +3068,7 @@ const MODE = (function () {
     else if (act.indexOf('clear:') === 0) { if (F.setRule(s, id, +act.slice(6), null)) { if (pickSlot === +act.slice(6)) pickSlot = -1; save(); } }
     else if (act.indexOf('rule:') === 0) { if (F.setRule(s, id, pickSlot, act.slice(5))) { pickSlot = -1; save(); } }
     else if (act === 'cancel') pickSlot = -1;
+    else if (act === 'evals-reset') { if (F.resetEvals(s, id)) { SND.sfx('pop'); save(); } }
     renderRobot();
     const pk = act.indexOf('pick:') === 0 || act === 'buy' ? panelBody.querySelector('.fx-picker') : null;
     if (pk && pk.scrollIntoView) pk.scrollIntoView({ block: 'nearest' });

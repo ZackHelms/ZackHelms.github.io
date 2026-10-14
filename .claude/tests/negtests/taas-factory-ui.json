@@ -266,8 +266,8 @@
  {
   "name": "sap-log-dry",
   "file": "games/taas/index.html",
-  "old": "  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, sappy: M_SAPPY,",
-  "new": "  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, sappy: [M_LOG], /* @negtest */"
+  "old": "  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, large: M_LARGE, sappy: M_SAPPY,",
+  "new": "  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, large: M_LARGE, sappy: [M_LOG], /* @negtest */"
  },
  {
   "name": "barrel-back",
@@ -278,13 +278,49 @@
  {
   "name": "looking-not-shown",
   "file": "games/taas/index.html",
-  "old": "    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one', looking: 'Looking for plank'",
-  "new": "    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one' /* @negtest */"
+  "old": "    looking: () => 'Looking for plank',",
+  "new": "    /* @negtest */"
  },
  {
   "name": "panel-no-log-cost",
   "file": "games/taas/index.html",
-  "old": "' are sap logs. You toss those in the recycle bin yourself; a robot does what it is told. <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +",
-  "new": "' are sap logs. You toss those in the recycle bin yourself; a robot does what it is told.</p>' + /* @negtest */"
+  "old": " <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +",
+  "new": "</p>' + /* @negtest */"
+ },
+ {
+  "name": "badge-top-right",
+  "file": "games/taas/index.html",
+  "old": "<div id=\"build-badge\" style=\"position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;",
+  "new": "<!-- @negtest --><div id=\"build-badge\" style=\"position:fixed;top:2px;right:6px;"
+ },
+ {
+  "name": "evals-old-name",
+  "file": "games/taas/index.html",
+  "old": "<span>Evals</span><span>' + (mins < 1 ? 'under a minute' : mins + ' min') + '</span></div>' +",
+  "new": "<span>What it has done</span><span>' + (mins < 1 ? 'under a minute' : mins + ' min') + '</span></div>' + /* @negtest */"
+ },
+ {
+  "name": "evals-reset-dead",
+  "file": "games/taas/index.html",
+  "old": "    else if (act === 'evals-reset') { if (F.resetEvals(s, id)) { SND.sfx('pop'); save(); } }",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "against-unlabelled",
+  "file": "games/taas/index.html",
+  "old": "    return DOING[act] ? DOING[act](what) + (against ? ', against its instructions' : '') : key;",
+  "new": "    return DOING[act] ? DOING[act](what) : key; /* @negtest */"
+ },
+ {
+  "name": "dots-old-table",
+  "file": "games/taas/index.html",
+  "old": "'<tr><td><i class=\"fx-dot ' + F.gradeOf(k) + '\"></i>'",
+  "new": "'<tr><td><i class=\"fx-dot ' + /* @negtest */ (F.GRADE[k] || 'good') + '\"></i>'"
+ },
+ {
+  "name": "large-plank-no-icon",
+  "file": "games/taas/index.html",
+  "old": "    largePlank: '<svg viewBox=\"0 0 34 14\"",
+  "new": "    largePlankX: /* @negtest */ '<svg viewBox=\"0 0 34 14\""
  }
 ]

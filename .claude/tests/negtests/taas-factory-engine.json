@@ -158,14 +158,14 @@
  {
   "name": "rough-is-plank",
   "file": "games/taas/index.html",
-  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', sappy: 'sap' };",
-  "new": "  const MAKES = { log: 'plank', gnarled: 'plank', small: 'dowels', sappy: 'sap' }; /* @negtest */"
+  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'sap' };",
+  "new": "  const MAKES = { log: 'plank', gnarled: 'plank', small: 'dowels', large: 'largePlank', sappy: 'sap' }; /* @negtest */"
  },
  {
   "name": "dowels-are-planks",
   "file": "games/taas/index.html",
-  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', sappy: 'sap' };",
-  "new": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'plank', sappy: 'sap' }; /* @negtest */"
+  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'sap' };",
+  "new": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'plank', large: 'largePlank', sappy: 'sap' }; /* @negtest */"
  },
  {
   "name": "cheap-full-price",
@@ -218,14 +218,14 @@
  {
   "name": "no-credit",
   "file": "games/taas/index.html",
-  "old": "    r.tally[g]++; r.record[what] = (r.record[what] || 0) + 1; r.mood = g; r.moodT = 2.4;",
+  "old": "    r.tally[g]++; r.record[key] = (r.record[key] || 0) + 1; r.mood = g; r.moodT = 2.4;",
   "new": "    r.mood = g; r.moodT = 2.4; /* @negtest */"
  },
  {
   "name": "seller-copies-operator",
   "file": "games/taas/index.html",
-  "old": "        if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');",
-  "new": "        if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : s.robots.some(x => x.job === 'operate' && x.mood === 'bad' && x.moodT > 0) ? 'free' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair'); /* @negtest */"
+  "old": "          r.sale = told ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');",
+  "new": "          r.sale = told ? 'fair' : s.robots.some(x => x.job === 'operate' && x.mood === 'bad' && x.moodT > 0) ? 'free' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair'); /* @negtest */"
  },
  {
   "name": "first-log-bad",
@@ -254,8 +254,8 @@
  {
   "name": "gnarled-rule-ignored",
   "file": "games/taas/index.html",
-  "old": "        if (m.log !== 'log' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; }",
-  "new": "        /* @negtest */"
+  "old": "        const held = RULES.filter(q => q.rejects && q.rejects.indexOf(m.log) >= 0 && has(r, q.id));",
+  "new": "        const held = RULES.filter(q => q.rejects && q.rejects.indexOf(m.log) >= 0 && has(r, q.id) && q.id !== 'gnarled'); /* @negtest */"
  },
  {
   "name": "output-rule-ignored",
@@ -266,14 +266,14 @@
  {
   "name": "sellonly-rule-ignored",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly');",
-  "new": "        if (r.hunt === null) r.hunt = false; /* @negtest */"
+  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; }",
+  "new": "        if (r.hunt === null) { r.hunt = false; r.huntSlip = false; } /* @negtest */"
  },
  {
   "name": "price-rule-ignored",
   "file": "games/taas/index.html",
-  "old": "        if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' :",
-  "new": "        if (item === 'plank') r.sale = false ? 'fair' : /* @negtest */"
+  "old": "          const told = follows(s, r, 'price');",
+  "new": "          const told = false; /* @negtest */"
  },
  {
   "name": "never-slips",
@@ -284,8 +284,8 @@
  {
   "name": "operator-rule-leaks-into-selling",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly');",
-  "new": "        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly') || has(r, 'output'); /* @negtest */"
+  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; }",
+  "new": "        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly') || has(r, 'output'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; } /* @negtest */"
  },
  {
   "name": "slots-before-both",
@@ -326,14 +326,14 @@
  {
   "name": "never-seen",
   "file": "games/taas/index.html",
-  "old": "    if (s.seen[id]) return;\n    s.seen[id] = true;",
-  "new": "    return; /* @negtest */"
+  "old": "    const fresh = [].concat(ids).filter(id => !s.seen[id]);",
+  "new": "    const fresh = []; /* @negtest */"
  },
  {
   "name": "seen-every-time",
   "file": "games/taas/index.html",
-  "old": "    if (s.seen[id]) return;\n    s.seen[id] = true;",
-  "new": "    s.seen[id] = true; /* @negtest */"
+  "old": "    const fresh = [].concat(ids).filter(id => !s.seen[id]);",
+  "new": "    const fresh = [].concat(ids); /* @negtest */"
  },
  {
   "name": "output-seen-on-plank",
@@ -344,8 +344,8 @@
  {
   "name": "jam-not-seen",
   "file": "games/taas/index.html",
-  "old": "      if (typeof m.by === 'number') { see(s, 'sappy', m.by); credit(s, m.by, 'sap'); }",
-  "new": "      if (typeof m.by === 'number') { credit(s, m.by, 'sap'); /* @negtest */ }"
+  "old": "{ see(s, 'sappy', m.by); credit(s, m.by, 'sap', s.robots[m.by].against); }",
+  "new": "{ credit(s, m.by, 'sap', s.robots[m.by].against); /* @negtest */ }"
  },
  {
   "name": "mislabel-not-seen",
@@ -356,14 +356,14 @@
  {
   "name": "reject-no-credit",
   "file": "games/taas/index.html",
-  "old": "        if (r.t >= CFG.tossSec) { if (rejectLog(s, r.id)) credit(s, r.id, 'reject'); r.state = 'idle'; r.t = 0; }",
-  "new": "        if (r.t >= CFG.tossSec) { rejectLog(s, r.id); r.state = 'idle'; r.t = 0; } /* @negtest */"
+  "old": "if (rejectLog(s, r.id)) credit(s, r.id, 'reject:' + log);",
+  "new": "rejectLog(s, r.id); /* @negtest */"
  },
  {
   "name": "no-small-logs",
   "file": "games/taas/index.html",
-  "old": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['sappy', CFG.logs.sappy]], 'log'); }",
-  "new": "[['gnarled', CFG.logs.gnarled], ['sappy', CFG.logs.sappy]], 'log'); /* @negtest */ }"
+  "old": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['large', CFG.logs.large], ['sappy', CFG.logs.sappy]], 'log'); }",
+  "new": "[['gnarled', CFG.logs.gnarled], ['large', CFG.logs.large], ['sappy', CFG.logs.sappy]], 'log'); /* @negtest */ }"
  },
  {
   "name": "name-no-cap",
@@ -404,32 +404,32 @@
  {
   "name": "sappy-rule-ignored",
   "file": "games/taas/index.html",
-  "old": "        if (m.log !== 'log' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; }",
-  "new": "        if (m.log !== 'log' && m.log !== 'sappy' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; } /* @negtest */"
+  "old": "        const held = RULES.filter(q => q.rejects && q.rejects.indexOf(m.log) >= 0 && has(r, q.id));",
+  "new": "        const held = RULES.filter(q => q.rejects && q.rejects.indexOf(m.log) >= 0 && has(r, q.id) && q.id !== 'sappy'); /* @negtest */"
  },
  {
   "name": "decoy-consulted",
   "file": "games/taas/index.html",
-  "old": "        if (m.log !== 'log' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; }",
-  "new": "        if (m.log !== 'log' && (follows(s, r, m.log) || m.log === 'sappy' && has(r, 'sap'))) { r.state = 'reject'; r.t = 0; return; } /* @negtest */"
+  "old": "        if (held.some(q => follows(s, r, q.id))) { r.state = 'reject'; r.t = 0; return; }",
+  "new": "        if (held.some(q => follows(s, r, q.id)) || m.log === 'sappy' && has(r, 'sap')) { r.state = 'reject'; r.t = 0; return; } /* @negtest */"
  },
  {
   "name": "decoy-never-joins",
   "file": "games/taas/index.html",
-  "old": "    RULES.forEach(q => { if (q.joins === id) s.seen[q.id] = true; });",
-  "new": "    /* @negtest */"
+  "old": "    fresh.forEach(id => { s.seen[id] = true; RULES.forEach(q => { if (q.joins && q.joins.indexOf(id) >= 0) s.seen[q.id] = true; }); });",
+  "new": "    fresh.forEach(id => { s.seen[id] = true; }); /* @negtest */"
  },
  {
   "name": "no-sap-logs",
   "file": "games/taas/index.html",
-  "old": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['sappy', CFG.logs.sappy]], 'log'); }",
-  "new": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small]], 'log'); /* @negtest */ }"
+  "old": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['large', CFG.logs.large], ['sappy', CFG.logs.sappy]], 'log'); }",
+  "new": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['large', CFG.logs.large]], 'log'); /* @negtest */ }"
  },
  {
   "name": "sap-log-cuts",
   "file": "games/taas/index.html",
-  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', sappy: 'sap' };",
-  "new": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', sappy: 'plank' }; /* @negtest */"
+  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'sap' };",
+  "new": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'plank' }; /* @negtest */"
  },
  {
   "name": "logs-free",
@@ -452,14 +452,14 @@
  {
   "name": "seller-recycles",
   "file": "games/taas/index.html",
-  "old": "            r.record.looking = (r.record.looking || 0) + 1;",
-  "new": "            r.record.looking = (r.record.looking || 0) + 1; recycle(s, s.bin.splice(s.bin.findIndex(k => k !== 'plank'), 1)[0], r.id, 'bin'); /* @negtest */"
+  "old": "          note(r, 'looking' + (r.against ? '!' : ''));",
+  "new": "          note(r, 'looking' + (r.against ? '!' : '')); recycle(s, s.bin.splice(at, 1)[0], r.id, 'bin'); /* @negtest */"
  },
  {
   "name": "find-ignores-mix",
   "file": "games/taas/index.html",
-  "old": "          if (!chance(s, 'find', planks / s.bin.length) || !planks) {",
-  "new": "          if (!chance(s, 'find', 0.5) || !planks) { /* @negtest */"
+  "old": "          if (planks && chance(s, 'find', planks / s.bin.length)) at = s.bin.indexOf('plank');",
+  "new": "          if (planks && chance(s, 'find', 0.5)) at = s.bin.indexOf('plank'); /* @negtest */"
  },
  {
   "name": "slip-every-reach",
@@ -470,20 +470,20 @@
  {
   "name": "looking-not-counted",
   "file": "games/taas/index.html",
-  "old": "            r.record.looking = (r.record.looking || 0) + 1;",
-  "new": "            /* @negtest */"
+  "old": "          note(r, 'looking' + (r.against ? '!' : ''));",
+  "new": "          /* @negtest */"
  },
  {
   "name": "instructed-seller-never-slips",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly');",
-  "new": "        if (r.hunt === null) r.hunt = has(r, 'sellOnly'); /* @negtest */"
+  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; }",
+  "new": "        if (r.hunt === null) { r.hunt = has(r, 'sellOnly'); r.huntSlip = false; } /* @negtest */"
  },
  {
   "name": "everyone-hunts",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly');",
-  "new": "        if (r.hunt === null) r.hunt = true; /* @negtest */"
+  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; }",
+  "new": "        if (r.hunt === null) { r.hunt = true; r.huntSlip = false; } /* @negtest */"
  },
  {
   "name": "load-floors-money",
@@ -502,5 +502,113 @@
   "file": "games/taas/index.html",
   "old": "      if (s.machine.sap) s.machine.log = 'sappy';   // sap poured on it, before sap came in on the logs",
   "new": "      /* @negtest */"
+ },
+ {
+  "name": "no-large-logs",
+  "file": "games/taas/index.html",
+  "old": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['large', CFG.logs.large], ['sappy', CFG.logs.sappy]], 'log'); }",
+  "new": "[['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['sappy', CFG.logs.sappy]], 'log'); /* @negtest */ }"
+ },
+ {
+  "name": "large-log-cuts-plank",
+  "file": "games/taas/index.html",
+  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'sap' };",
+  "new": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'plank', sappy: 'sap' }; /* @negtest */"
+ },
+ {
+  "name": "one-rule-per-log",
+  "file": "games/taas/index.html",
+  "old": "        if (held.some(q => follows(s, r, q.id))) { r.state = 'reject'; r.t = 0; return; }",
+  "new": "        if (held.length && follows(s, r, held[0].id)) { r.state = 'reject'; r.t = 0; return; } /* @negtest */"
+ },
+ {
+  "name": "medium-rule-small-only",
+  "file": "games/taas/index.html",
+  "old": "    { id: 'medium', job: 'operate', text: 'Only input medium logs', rejects: ['small', 'large'] },",
+  "new": "    { id: 'medium', job: 'operate', text: 'Only input medium logs', rejects: ['small'] }, /* @negtest */"
+ },
+ {
+  "name": "medium-log-rule-inert",
+  "file": "games/taas/index.html",
+  "old": "    { id: 'mediumLog', job: 'operate', text: 'Put medium logs in recycle bin', rejects: ['log', 'gnarled', 'sappy'], joins: ['smallLog', 'largeLog'] },",
+  "new": "    { id: 'mediumLog', job: 'operate', text: 'Put medium logs in recycle bin', rejects: [], joins: ['smallLog', 'largeLog'] }, /* @negtest */"
+ },
+ {
+  "name": "fed-sees-nothing",
+  "file": "games/taas/index.html",
+  "old": "        if (FED[item]) see(s, FED[item], by);",
+  "new": "        /* @negtest */"
+ },
+ {
+  "name": "seller-never-recycles",
+  "file": "games/taas/index.html",
+  "old": "          if (follows(s, r, out.id)) { r.carry = s.bin.splice(at, 1)[0]; r.state = 'drop'; r.t = 0; return; }",
+  "new": "          /* @negtest */"
+ },
+ {
+  "name": "recycle-rule-never-joins",
+  "file": "games/taas/index.html",
+  "old": "        if (out && !has(r, out.id)) see(s, out.id, r.id);",
+  "new": "        if (out && !has(r, out.id)) { /* @negtest */ }"
+ },
+ {
+  "name": "turnup-always-first",
+  "file": "games/taas/index.html",
+  "old": "            at = s.bin.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, s.bin.filter(x => x === k).length / n]), kinds[kinds.length - 1]) : kinds[0]);",
+  "new": "            at = s.bin.indexOf(kinds[0]); /* @negtest */"
+ },
+ {
+  "name": "against-never-marked",
+  "file": "games/taas/index.html",
+  "old": "    const key = what + (against ? '!' : ''), g = gradeOf(key);",
+  "new": "    const key = what, g = gradeOf(key); /* @negtest */"
+ },
+ {
+  "name": "against-stays-green",
+  "file": "games/taas/index.html",
+  "old": "    return against && g === 'good' ? 'soso' : g;",
+  "new": "    return g; /* @negtest */"
+ },
+ {
+  "name": "free-is-red",
+  "file": "games/taas/index.html",
+  "old": "cheap: 'soso', free: 'soso', mislabel: 'bad'",
+  "new": "cheap: 'soso', free: 'bad' /* @negtest */, mislabel: 'bad'"
+ },
+ {
+  "name": "dowels-are-red",
+  "file": "games/taas/index.html",
+  "old": "rough: 'soso', dowels: 'soso', largePlank",
+  "new": "rough: 'soso', dowels: 'bad' /* @negtest */, largePlank"
+ },
+ {
+  "name": "reset-keeps-tally",
+  "file": "games/taas/index.html",
+  "old": "    r.record = {}; r.tally = { good: 0, soso: 0, bad: 0 }; r.since = s.t;",
+  "new": "    r.record = {}; r.since = s.t; /* @negtest */"
+ },
+ {
+  "name": "reset-keeps-clock",
+  "file": "games/taas/index.html",
+  "old": "    r.record = {}; r.tally = { good: 0, soso: 0, bad: 0 }; r.since = s.t;",
+  "new": "    r.record = {}; r.tally = { good: 0, soso: 0, bad: 0 }; /* @negtest */"
+ },
+ {
+  "name": "rename-lost",
+  "file": "games/taas/index.html",
+  "old": "        const was = (Array.isArray(r.rules) ? r.rules : []).map(id => RENAMED[id] || id), rules = [];",
+  "new": "        const was = (Array.isArray(r.rules) ? r.rules : []), rules = []; /* @negtest */"
+ },
+ {
+  "name": "seen-rename-lost",
+  "file": "games/taas/index.html",
+  "old": "      Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true) seenWas[RENAMED[k] || k] = true; });",
+  "new": "      Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true) seenWas[k] = true; }); /* @negtest */"
+ },
+ {
+  "name": "slip-against-unmarked",
+  "file": "games/taas/index.html",
+  "old": "        r.against = held.length > 0;",
+  "new": "        r.against = false; /* @negtest */"
  }
 ]

@@ -9,9 +9,11 @@
  * while it runs, the whole first loop played with real touches (walk, press, the log's $1 in
  * red below zero, plank, bubble, $5), a drag that scrolls and never walks, hiring and a job
  * through the bubble, a robot's page (its name, its base prompt, buying a slot and giving it an
- * instruction, all by real taps, and the seller's "looking for plank" count), the recycle bin
- * drawn, the wall sign and the sap barrel gone, a sap log that shows its sap, a gnarled log's
- * holes in the same places on its plank (read off pixels), the info panel, saves that survive a
+ * instruction, all by real taps, the seller's "looking for plank" count, its Evals with their
+ * colours and a real tap on Reset evals), the recycle bin drawn, the wall sign and the sap barrel
+ * gone, a sap log that shows its sap, a gnarled log's holes in the same places on its plank (read
+ * off pixels), a large plank's own sell button, the build badge in the bottom right corner (the
+ * CD's call for this page), the info panel, saves that survive a
  * reload without touching the formal mode's, re-measuring after
  * a resize while hidden, and the chrome, HUD and bubble all on screen at phone, landscape
  * and desktop sizes. Frames are stepped through the page's own test hook (TAAS_FACTORY,
@@ -414,6 +416,24 @@ const server = http.createServer((req, res) => {
     await step(6);
     const hunt = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1]; T.openRobot(1); const row = [...document.querySelectorAll('.fx-rec tr')].find(tr => /Looking for plank/.test(tr.textContent)); return { n: r.record.looking, row: row && row.textContent, bin: T.s.bin.join(), dot: row && row.querySelector('.fx-dot').className }; });
     ok(hunt.n >= 3 && hunt.row === 'Looking for plank' + hunt.n && /soso/.test(hunt.dot) && hunt.bin === 'dowels,rough,dowels', 'the seller\'s page counts each reach that came up with something other than a plank: "Looking for plank" and how often', JSON.stringify(hunt));
+    // the evals: the section's name, a line per action and thing, a dot per grade, and the CD's
+    // example: a gnarled plank sold for its price is green, and yellow (a line of its own) once
+    // sold against "only sell medium planks"
+    const ev = await H(() => {
+      const T = window.TAAS_FACTORY, r = T.s.robots[1];
+      r.record = { fair: 4, 'honest:rough': 2, 'honest:rough!': 1, 'mislabel:dowels!': 1, 'recycle:largePlank': 2, looking: 3 };
+      T.openRobot(1); T.tick(1 / 60);
+      const sec = document.querySelector('.fx-evals');
+      return { head: sec && sec.querySelector('.fx-h span').textContent, old: /has done/.test(document.getElementById('fx-panel-body').textContent),
+        rows: [...sec.querySelectorAll('.fx-rec tr')].map(tr => tr.querySelector('.fx-dot').className.replace('fx-dot ', '') + '|' + tr.textContent) };
+    });
+    const want = ['good|Sold a medium plank for its price4', 'good|Sold a gnarled plank for its price2', 'soso|Sold a gnarled plank for its price, against its instructions1',
+      'bad|Sold dowel rods as a medium plank, against its instructions1', 'soso|Looking for plank3', 'good|Put a large plank in the recycle bin2'];
+    ok(ev.head === 'Evals' && !ev.old && JSON.stringify(ev.rows) === JSON.stringify(want), 'the bottom of a robot\'s page is its Evals: a gnarled plank sold for its price is green, sold against "only sell medium planks" a yellow line of its own, passed off as a medium plank red', JSON.stringify(ev));
+    await page.tap('[data-panel="evals-reset"]');
+    await step(0.05);
+    const rs = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1], sec = document.querySelector('.fx-evals'); return { keys: Object.keys(r.record).length, since: r.since === T.s.t || T.s.t - r.since < 0.2, rows: sec.querySelectorAll('.fx-rec tr').length, empty: /Nothing yet/.test(sec.textContent), dis: sec.querySelector('[data-panel="evals-reset"]').disabled, mins: sec.querySelector('.fx-h span:last-child').textContent }; });
+    ok(!rs.keys && rs.since && !rs.rows && rs.empty && rs.dis && rs.mins === 'under a minute', 'Reset evals empties them and starts the count again (and greys itself until there is something to reset)', JSON.stringify(rs));
     await H(() => window.TAAS_FACTORY.closePanel());
   });
 
@@ -446,6 +466,23 @@ const server = http.createServer((req, res) => {
     await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.machine.log = 'sappy'; s.bin = []; T.tick(0); });
     const sap = await H(() => { const T = window.TAAS_FACTORY, V = T.view, k = V.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const a = T.screen(1.2, 3.05, 0.5), b = T.screen(2.2, 2.75, 0.85); const d = g.getImageData(Math.round(a[0] * k), Math.round(b[1] * k), Math.round((b[0] - a[0]) * k), Math.round((a[1] - b[1]) * k)).data; let n = 0, all = 0; for (let i = 0; i < d.length; i += 4) { all++; if (d[i + 1] > d[i] + 40 && d[i + 1] > d[i + 2] + 60) n++; } return n / all; });
     ok(sap > 0.04, 'a sap log rolls in green with sap', (sap * 100).toFixed(1) + '% green');
+    // a large plank in the bin: its own button, its own icon, its own price
+    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.bin = ['largePlank', 'plank']; s.avatar.x = 5.25; s.avatar.y = 4.1; FACTORY.tap(s, { kind: 'bin' }); T.tick(1 / 60); });
+    const lp = await H(() => { const b = document.querySelector('#fx-bubble [data-opt="sell:largePlank"]'); return b && { price: b.querySelector('.fx-lbl').textContent, icon: !!b.querySelector('svg[viewBox="0 0 34 14"]'), aria: b.getAttribute('aria-label') }; });
+    ok(lp && lp.price === '$' + (await H(() => FACTORY.CFG.price.largePlank)) && lp.icon && lp.aria === 'Sell a large plank', 'a large plank in the bin has its own button to sell it by hand, with its own icon and price', JSON.stringify(lp));
+  });
+
+  /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
+  await section('12. badge', async () => {
+    const bad = [];
+    for (const [w, h] of [[390, 844], [844, 390]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await fresh(13);
+      const b = await H(() => { const r = document.getElementById('build-badge').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight, text: document.getElementById('build-badge').textContent }; });
+      if (!(b.b <= b.vh && b.b >= b.vh - 24 && b.r <= b.vw && b.r >= b.vw - 24 && /^build \d{4}-\d\d-\d\d \d\d:\d\d UTC$/.test(b.text))) bad.push(w + 'x' + h + ' ' + JSON.stringify(b));
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    ok(!bad.length, 'the build badge sits in the bottom right corner, not the top right', bad.join('; '));
   });
 
   ok(!errors.length, 'no page errors or console errors over the whole drive', errors.slice(0, 3).join(' | '));

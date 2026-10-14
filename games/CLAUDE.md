@@ -163,6 +163,11 @@ committing:**
 Excluded: frozen checkpoint files (e.g. `stick-commander-3d.v001.html`) —
 they're intentionally never modified, so they don't get a badge.
 
+**One placement exception:** TAAS's badge sits in the **bottom** right corner
+(`bottom:calc(2px + env(safe-area-inset-bottom))`), on the CD's call while
+playtesting its factory (2026-10-14); its suite checks it there. Every other
+page keeps the top right until the CD says otherwise.
+
 ---
 
 ## Hub Back Button (SOP — required for every game)
@@ -1028,10 +1033,11 @@ robots hired as **AI agents** run the button and the selling and make mistakes w
 (sap logs that jam the machine until you scrub it, gnarled logs cut into planks with holes,
 small ones cut into dowels, planks given away, dowels sold as planks at the cost of **customer
 satisfaction**, which starts at 100% and sets what customers pay). Every log costs $1 at the
-machine, so money can go red, and a seller told to sell only planks leaves everything else in
-the bin and has to hunt for them. Each mistake you see adds an instruction to
-a list, and each robot has its own named page: its base prompt, then five instruction slots
-bought with cash ($5-$25), which it follows but for a 1-in-20 slip. Static scenery is baked per scale and blitted on
+machine, so money can go red, and a seller told to sell only medium planks leaves everything
+else in the bin and has to hunt for them, unless it is told to recycle each kind. Each mistake
+you see adds an instruction to a list, and each robot has its own named page: its base prompt, then five instruction slots
+bought with cash ($5-$25), which it follows but for a 1-in-20 slip, and its **Evals**: what
+it did, red only for a blocker or a hit to customer satisfaction, resettable. Static scenery is baked per scale and blitted on
 whole device pixels, the canvas is capped at 2x, and the busy scene holds 60 fps.
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`
 (rules, pure node), `drive-taas-ui.cjs` (the page in Chromium) and `eval-taas.cjs` (balance
