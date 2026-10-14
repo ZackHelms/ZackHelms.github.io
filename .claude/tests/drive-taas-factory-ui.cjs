@@ -12,11 +12,13 @@
  * instruction, all by real taps, the seller's "looking for plank" count, its Evals with their
  * colours and a real tap on Reset evals), the recycle bin drawn, the wall sign and the sap barrel
  * gone, a sap log that shows its sap, a gnarled log's holes in the same places on its plank (read
- * off pixels), a large plank's own sell button, the build badge in the bottom right corner (the
- * CD's call for this page), the info panel, saves that survive a
- * reload without touching the formal mode's, re-measuring after
- * a resize while hidden, and the chrome, HUD and bubble all on screen at phone, landscape
- * and desktop sizes. Frames are stepped through the page's own test hook (TAAS_FACTORY,
+ * off pixels), a large plank's own sell button, the build badge in the bottom right corner in
+ * both modes (the CD's call for this page), the info panel opened from the menu, saves that
+ * survive a reload without touching the formal mode's, re-measuring after a resize while hidden,
+ * the chrome and bubble all on screen at phone, landscape and desktop sizes, and money and
+ * customer satisfaction as scoreboards on the back wall (read off pixels: red below zero, green
+ * as money comes in, scrolling with the floor, a window between them, the avatar passing in
+ * front). Frames are stepped through the page's own test hook (TAAS_FACTORY,
  * paused), so time is exact; input goes through real touch events.
  *
  * Usage:
@@ -76,6 +78,21 @@ const server = http.createServer((req, res) => {
   const rectOf = (id) => H(id => window.TAAS_FACTORY.spriteRect(id), id);
   const centre = r => [r.x + r.w / 2, r.y + r.h / 2];
   async function section(name, fn) { try { await fn(); } catch (e) { ok(false, name + ' played through', e.message.split('\n')[0]); } }
+  // the ink on a wall board's face, by colour (the face itself is a flat dark slate); `grow` widens
+  // the sampled box by that many metres each side, onto the frame, to catch text that overflows
+  const boardInk = (k, grow) => H(([k, grow]) => {
+    const T = window.TAAS_FACTORY, r = T.board(k), d = T.view.dpr, gx = (grow || 0) * T.view.S;
+    const x = Math.round((r.x - gx) * d), y = Math.round(r.y * d), w = Math.round((r.w + 2 * gx) * d), h = Math.round(r.h * d);
+    const im = document.getElementById('fx-canvas').getContext('2d').getImageData(x, y, w, h).data;
+    const o = { white: 0, red: 0, green: 0, amber: 0, caption: 0, edge: 0 };
+    for (let i = 0; i < im.length; i += 4) {
+      const R = im[i], G = im[i + 1], B = im[i + 2], px = (i / 4) % w;
+      const kind = R > 225 && G > 225 && B > 225 ? 'white' : R > 200 && G < 140 && B < 140 ? 'red' : G > 170 && R < 170 && B < 170 ? 'green' : R > 200 && G > 150 && B < 90 ? 'amber'
+        : Math.abs(R - 159) < 22 && Math.abs(G - 176) < 22 && Math.abs(B - 194) < 22 ? 'caption' : '';
+      if (kind) { o[kind]++; if (gx && (px < gx * d - 1 || px > w - gx * d)) o.edge++; }
+    }
+    return o;
+  }, [k, grow || 0]);
 
   /* ---------- 1. the mode dropdown ---------- */
   await section('1. mode', async () => {
@@ -116,8 +133,8 @@ const server = http.createServer((req, res) => {
     await step(5.6);
     const t2 = await S();
     ok(t2.bin.join() === 'plank' && t2.money === -1, 'four seconds later a plank is in the bin, and the log cost $1', t2.bin.join() + ' / ' + t2.money);
-    const neg = await H(() => { const e = document.getElementById('fx-money'), c = getComputedStyle(e).color.match(/\d+/g).map(Number); return { text: e.textContent, neg: e.classList.contains('neg'), c }; });
-    ok(neg.text === '-$1' && neg.neg && neg.c[0] > 180 && neg.c[1] < 90 && neg.c[2] < 90, 'below zero the HUD reads -$1, in red', JSON.stringify(neg));
+    const neg = await boardInk('cash'), said = await H(() => document.getElementById('fx-score').textContent);
+    ok(neg.red > 40 && neg.white < 5 && /^Money -\$1\./.test(said), 'below zero the money board on the wall reads -$1, in red', JSON.stringify(neg) + ' ' + said);
     const bin = await rectOf('binBack');
     await page.touchscreen.tap(centre(bin)[0], centre(bin)[1]);
     let open = false;
@@ -126,16 +143,19 @@ const server = http.createServer((req, res) => {
     ok(open && opts.length === 1 && opts[0].id === 'sell:plank' && !opts[0].dis && opts[0].svg, 'a tap on the bin walks over and opens a white bubble with one green dollar bill', JSON.stringify(opts));
     await page.tap('#fx-bubble [data-opt="sell:plank"]');
     await step(0.1);
-    const t3 = await S();
-    const hud = await H(() => { const e = document.getElementById('fx-money'), c = getComputedStyle(e).color.match(/\d+/g).map(Number); return { text: e.textContent, neg: e.classList.contains('neg'), red: c[0] > 180 && c[1] < 90 }; });
-    ok(t3.money === 4 && !t3.bin.length && hud.text === '$4' && !hud.neg, 'tapping the bill sells the plank: the HUD goes from -$1 to $4, and out of the red', JSON.stringify(hud));
-    // customer satisfaction: how much customers trust us and our products, from 100%
-    const read = () => H(() => { const e = document.getElementById('fx-sat'); return { text: e.querySelector('.fx-sat-top span').textContent + ' ' + document.getElementById('fx-sat-num').textContent, aria: e.getAttribute('aria-label'), cls: e.className, low: e.classList.contains('low') }; });
-    const sat0 = await read();
+    const t3 = await S(), bump = await boardInk('cash');
+    await step(0.5);
+    const after = await boardInk('cash'), said3 = await H(() => document.getElementById('fx-score').textContent);
+    ok(t3.money === 4 && !t3.bin.length && bump.green > 40 && bump.red === 0 && after.white > 40 && after.green === 0 && after.red === 0 && /^Money \$4\./.test(said3),
+      'tapping the bill sells the plank: the money board flashes green, then reads $4 in white, out of the red', JSON.stringify([bump, after]) + ' ' + said3);
+    // customer satisfaction: how much customers trust us and our products, from 100%, on its own board
+    const sat0 = await boardInk('sat');
+    await H(() => { window.TAAS_FACTORY.s.satisfaction = 70; window.TAAS_FACTORY.tick(1 / 60); });
+    const sat70 = await boardInk('sat');
     await H(() => { window.TAAS_FACTORY.s.satisfaction = 55; window.TAAS_FACTORY.tick(1 / 60); });
-    const sat1 = await read();
-    ok(sat0.text === 'customer satisfaction 100%' && sat0.aria === 'Customer satisfaction 100%' && !/low|mid/.test(sat0.cls) && /55%$/.test(sat1.text) && sat1.low,
-      'the HUD shows customer satisfaction, starting at 100%, and turns red when it falls', JSON.stringify([sat0, sat1]));
+    const sat1 = await boardInk('sat'), said4 = await H(() => document.getElementById('fx-score').textContent);
+    ok(sat0.green > 60 && !sat0.red && !sat0.amber && sat70.amber > 60 && !sat70.green && sat1.red > 60 && !sat1.green && !sat1.amber && /Customer satisfaction 55%\.$/.test(said4),
+      'the customer satisfaction board starts green at 100%, turns amber, then red as it falls', JSON.stringify([sat0, sat70, sat1]) + ' ' + said4);
   });
 
   /* ---------- 3. a drag scrolls and never walks ---------- */
@@ -226,7 +246,7 @@ const server = http.createServer((req, res) => {
     ok(!bad.length, 'at six sizes a tap on each drawn thing reaches that thing, and the floor maps back to the metre', bad.join('; '));
   });
 
-  /* ---------- 6. chrome, HUD and bubble all on screen ---------- */
+  /* ---------- 6. chrome and bubble all on screen ---------- */
   await section('6. layout', async () => {
     const sizes = [[390, 844], [320, 640], [844, 390], [1280, 800]];
     const bad = [];
@@ -237,31 +257,31 @@ const server = http.createServer((req, res) => {
       await step(4);
       const r = await H(() => {
         const box = id => { const e = document.getElementById(id); const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, hidden: e.hidden }; };
-        const ids = ['back-btn', 'mute-btn', 'mode-btn', 'fx-cash', 'fx-info', 'fx-sat', 'fx-bubble'];
+        const ids = ['menu-btn', 'mode-btn', 'reload-btn', 'fx-bubble'];
         const o = {}; ids.forEach(i => { o[i] = box(i); });
         o.vw = innerWidth; o.vh = innerHeight; o.sw = document.scrollingElement.scrollWidth;
         return o;
       });
       const inside = k => r[k].l >= 0 && r[k].r <= r.vw + 0.5 && r[k].t >= 0 && r[k].b <= r.vh + 0.5;
       const overlap = (a, b) => !(r[a].r <= r[b].l || r[b].r <= r[a].l || r[a].b <= r[b].t || r[b].b <= r[a].t);
-      ['back-btn', 'mute-btn', 'mode-btn', 'fx-cash', 'fx-info', 'fx-sat', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
+      ['menu-btn', 'mode-btn', 'reload-btn', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
       if (r['fx-bubble'].hidden) bad.push(w + 'x' + h + ' bubble did not open');
-      const pairs = [['back-btn', 'mute-btn'], ['mute-btn', 'mode-btn'], ['fx-bubble', 'mode-btn'], ['fx-cash', 'fx-info'], ['fx-cash', 'fx-sat'], ['fx-info', 'fx-sat']];
-      ['fx-cash', 'fx-info', 'fx-sat'].forEach(k => pairs.push(['mode-btn', k], ['mute-btn', k], ['fx-bubble', k]));
-      pairs.forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
-      if (!(r['back-btn'].r <= r['mute-btn'].l && r['mute-btn'].r <= r['mode-btn'].l)) bad.push(w + 'x' + h + ' chrome order');
+      [['menu-btn', 'mode-btn'], ['mode-btn', 'reload-btn'], ['fx-bubble', 'menu-btn'], ['fx-bubble', 'mode-btn'], ['fx-bubble', 'reload-btn']].forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
+      if (!(r['menu-btn'].r <= r['mode-btn'].l && r['mode-btn'].r <= r['reload-btn'].l && r.vw - r['reload-btn'].r < 24)) bad.push(w + 'x' + h + ' chrome order (menu, mode, then reload in the top right corner)');
       if (r.sw > r.vw) bad.push(w + 'x' + h + ' sideways scroll');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    ok(!bad.length, 'at four sizes: back, mute and mode in a row, the money and the bubble on screen, nothing on top of anything', bad.join('; '));
+    ok(!bad.length, 'at four sizes: menu and mode on the left, reload in the top right corner, the bubble on screen, nothing on top of anything', bad.join('; '));
   });
 
   /* ---------- 7. the info panel ---------- */
   await section('7. panel', async () => {
     await fresh(6);
-    await page.tap('#fx-info');
-    const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, rows: [...document.querySelectorAll('#fx-panel-body tbody tr')].map(r => r.textContent) }));
-    ok(p.open && p.rows.length === 1 && /No robots yet/.test(p.rows[0]), 'the i button opens the explanation, with the measured table (no robots yet)', JSON.stringify(p));
+    await page.tap('#menu-btn');
+    const sub = await H(() => document.getElementById('menu-info-sub').textContent);
+    await page.tap('[data-menu="info"]');
+    const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, menu: !document.getElementById('menu').hidden, rows: [...document.querySelectorAll('#fx-panel-body tbody tr')].map(r => r.textContent) }));
+    ok(p.open && !p.menu && sub === 'How the factory works' && p.rows.length === 1 && /No robots yet/.test(p.rows[0]), 'Info in the menu ("How the factory works") closes the menu and opens the explanation, with the measured table (no robots yet)', JSON.stringify(p) + ' ' + sub);
     const words = await H(() => document.getElementById('fx-panel-body').textContent);
     ok(/Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it explains customer satisfaction on its own terms, without leaning on the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
     ok(/Instructions/.test(words) && /\$5, \$10, \$15, \$20 and \$25/.test(words) && /recycle bin/.test(words) && !/prompt engineering|prompt level/i.test(words), 'and explains instructions (slot prices, the recycle bin), with nothing left of the prompt levels', (words.match(/prompt (engineering|level).{0,20}/i) || [''])[0]);
@@ -442,8 +462,9 @@ const server = http.createServer((req, res) => {
     await fresh(11);
     await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(1 / 60); });
     const px = (x, y, z) => H(([x, y, z]) => { const T = window.TAAS_FACTORY, p = T.screen(x, y, z), k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const d = g.getImageData(Math.round(p[0] * k) - 4, Math.round(p[1] * k) - 4, 9, 9).data; let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } return [r / n, gg / n, b / n].map(Math.round); }, [x, y, z]);
-    const wall = await px(3.0, 0.45, 1.8), bin = await px(3.8, 4.32, 0.3);
-    ok(wall[0] - wall[2] < 30 && Math.abs(wall[0] - wall[1]) < 30, 'the back wall carries no sign: where it hung is plain wall', 'rgb ' + wall);
+    // the sign hung at x 3.0, where the window over machine01 is now; the gap beside that window is plain wall
+    const wall = await px(2.16, 0.45, 1.8), bin = await px(3.8, 4.32, 0.3);
+    ok(wall[0] - wall[2] < 30 && Math.abs(wall[0] - wall[1]) < 30, 'the back wall carries no sign: beside the window over machine01 is plain wall', 'rgb ' + wall);
     ok(bin[1] > bin[0] + 30 && bin[1] > bin[2], 'the recycle bin is drawn, green, in front of the out-feed', 'rgb ' + bin);
     const was = await px(1.53, 4.2, 0.35), floor = await px(1.53, 5.2, 0);
     ok(Math.abs(was[0] - floor[0]) < 25 && Math.abs(was[2] - floor[2]) < 25, 'the sap barrel is gone: where it stood is bare floor', 'rgb ' + was + ' vs floor ' + floor);
@@ -474,15 +495,59 @@ const server = http.createServer((req, res) => {
 
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
   await section('12. badge', async () => {
-    const bad = [];
-    for (const [w, h] of [[390, 844], [844, 390]]) {
+    const bad = [], stamp = (SRC.match(/id="build-badge"[^>]*>([^<]*)</) || [])[1];
+    for (const [w, h, mode] of [[390, 844, 'robot-factory'], [844, 390, 'robot-factory'], [390, 844, 'formal']]) {
       await page.setViewportSize({ width: w, height: h });
-      await fresh(13);
-      const b = await H(() => { const r = document.getElementById('build-badge').getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight, text: document.getElementById('build-badge').textContent }; });
-      if (!(b.b <= b.vh && b.b >= b.vh - 24 && b.r <= b.vw && b.r >= b.vw - 24 && /^build \d{4}-\d\d-\d\d \d\d:\d\d UTC$/.test(b.text))) bad.push(w + 'x' + h + ' ' + JSON.stringify(b));
+      if (mode === 'formal') await go('?mode=formal'); else await fresh(13);
+      const b = await H(() => { const e = document.getElementById('build-badge'), r = e.getBoundingClientRect(); return { l: r.left, r: r.right, t: r.top, b: r.bottom, vw: innerWidth, vh: innerHeight, text: e.textContent, utc: e.dataset.utc, mode: document.documentElement.dataset.mode }; });
+      if (!(b.mode === mode && b.b <= b.vh && b.b >= b.vh - 24 && b.r <= b.vw && b.r >= b.vw - 24 && /^build \d{4}-\d\d-\d\d \d\d:\d\d \S+$/.test(b.text) && b.utc === stamp)) bad.push(w + 'x' + h + ' ' + JSON.stringify(b));
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    ok(!bad.length, 'the build badge sits in the bottom right corner, not the top right', bad.join('; '));
+    ok(!bad.length, 'the build badge sits in the bottom right corner in both modes, keeping the stamp it was given', bad.join('; ') + ' file: ' + stamp);
+  });
+
+  /* ---------- 13. money and customer satisfaction, as scoreboards on the wall (the CD, 2026-10-14) ---------- */
+  await section('13. wall boards', async () => {
+    await fresh(14);
+    const gone = await H(() => ['fx-hud', 'fx-info', 'fx-cash', 'fx-money', 'fx-sat', 'back-btn', 'mute-btn'].filter(id => document.getElementById(id)));
+    ok(!gone.length, 'the money and satisfaction pills, the i button, the back button and the mute button are gone from the screen', gone.join());
+    const g = await H(() => {
+      const T = window.TAAS_FACTORY, c = T.board('cash'), s = T.board('sat'), m = document.getElementById('menu-btn').getBoundingClientRect();
+      const win = [T.screen(2.3, 0.45, 2.35)[0], T.screen(3.4, 0.45, 2.35)[0]], mac = [T.screen(2.1, 3, 0)[0], T.screen(3.6, 3, 0)[0]];
+      return { c, s, chrome: m.bottom, win, mac, vw: innerWidth, vh: innerHeight, cam: T.view.camY, min: T.view.minY };
+    });
+    const onScreen = r => r.x >= 0 && r.x + r.w <= g.vw && r.y >= g.chrome && r.y + r.h <= g.vh;
+    ok(g.cam === g.min && onScreen(g.c) && onScreen(g.s) && g.c.w > 60 && g.s.w > 80 && g.c.h > 30,
+      'scrolled to the top, both boards are on screen below the chrome', JSON.stringify(g));
+    const glass = await H(() => { const T = window.TAAS_FACTORY, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      return [[2.6, 1.8], [3.1, 1.8], [1.1, 1.65], [4.8, 1.65]].map(([x, z]) => { const p = T.screen(x, 0.48, z), d = g.getImageData(Math.round(p[0] * k), Math.round(p[1] * k), 1, 1).data; return d[2] > 240 && d[1] > 215 && d[0] > 170 && d[0] < 215; }); });
+    ok(g.c.x + g.c.w < g.win[0] && g.win[1] < g.s.x && g.win[0] >= g.mac[0] && g.win[1] <= g.mac[1] && glass.join() === 'true,true,false,false',
+      'money on the left, a window in the middle over machine01 (glass on screen there, not over the boards), customer satisfaction on the right', JSON.stringify(g) + ' glass ' + glass);
+    const cap = await boardInk('sat');
+    ok(cap.caption > 150, 'the right-hand board is captioned in full: customer satisfaction', JSON.stringify(cap));
+    await H(() => { const T = window.TAAS_FACTORY; T.view.camY += 100; T.tick(0); });
+    const moved = await H(() => window.TAAS_FACTORY.board('cash'));
+    ok(Math.abs(moved.y - (g.c.y - 100)) < 0.01, 'they scroll with the floor, so a long way down they are out of sight', moved.y + ' vs ' + (g.c.y - 100));
+    await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(0); });
+    // the board draws the sum it is given, not a stale one: two sums, two different sets of figures
+    const figures = async (n) => H(n => { const T = window.TAAS_FACTORY; T.s.money = n; for (let i = 0; i < 3; i++) T.tick(1); const r = T.board('cash'), d = T.view.dpr;
+      const im = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data;
+      let bits = ''; for (let i = 0; i < im.length; i += 4) bits += im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225 ? '1' : '0'; return bits; }, n);
+    const f4 = await figures(4), f7 = await figures(7777);
+    let fd = 0; for (let i = 0; i < f4.length; i++) if (f4[i] !== f7[i]) fd++;
+    ok(fd > 200 && f4.indexOf('1') >= 0, 'the money board draws the sum it is given ($4 and $7,777 come out as different figures)', fd + ' px differ');
+    // a big number shrinks to fit its board rather than spilling onto the frame
+    await H(() => { const T = window.TAAS_FACTORY; T.s.money = 98765432; for (let i = 0; i < 3; i++) T.tick(1); });
+    const big = await boardInk('cash', 0.05);
+    ok(big.white > 60 && big.edge === 0, 'a very large sum shrinks to fit inside the money board', JSON.stringify(big));
+    // the avatar walking by the wall passes in front of the board, not behind it
+    const face = async () => H(() => { const T = window.TAAS_FACTORY, r = T.board('cash'), d = T.view.dpr; return Array.from(document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data); });
+    await H(() => { const T = window.TAAS_FACTORY; T.s.avatar.x = 4; T.s.avatar.y = 9; T.s.avatar.path = []; T.tick(0); });
+    const away = await face();
+    await H(() => { const T = window.TAAS_FACTORY; T.s.avatar.x = 1.08; T.s.avatar.y = 0.62; T.tick(0); });
+    const near = await face();
+    let diff = 0; for (let i = 0; i < away.length; i += 4) if (Math.abs(away[i] - near[i]) + Math.abs(away[i + 1] - near[i + 1]) + Math.abs(away[i + 2] - near[i + 2]) > 60) diff++;
+    ok(diff > 40, 'the avatar standing at the wall is drawn over the money board, as someone in front of it', diff + ' px changed');
   });
 
   ok(!errors.length, 'no page errors or console errors over the whole drive', errors.slice(0, 3).join(' | '));

@@ -1,7 +1,8 @@
 # TAAS (Team AI Adoption Simulator) - context
 
-`games/taas/index.html` (single file, ~3,100 lines) holds **two modes**, picked from a
-dropdown beside the mute button (2026-10-13): **Formal** (everything in this file down to §
+`games/taas/index.html` (single file, ~3,400 lines) holds **two modes**, picked from a
+dropdown beside the menu button (2026-10-13; the menu replaced the back and mute buttons on
+2026-10-14): **Formal** (everything in this file down to §
 Robot factory mode; the default) and **Robot factory** (§ Robot factory mode, a playful
 cel-shaded take on the same story). The formal mode is a management sim: you run one team
 for **eight quarters** (Y1Q1 to Y2Q4), and each quarter you split **60 story points (SP)**
@@ -126,7 +127,7 @@ the model works" panel too.
 | **Every speedup, cost, threshold, rate and decay** | `CFG`, `LEVELS`, `OPPS`, `INVESTS` | Tuned so the shape below holds; not from research beyond the J-curve's existence and DORA's rough magnitudes |
 | **The eight scripted opportunities, their order and copy** | `OPPS` | Picked to walk the ladder, mostly from DORA and Eledath |
 | **Its own "planning board" look**, not Neon Arcade: light and dark themes, Bricolage Grotesque + IBM Plex Sans + IBM Plex Mono, a DOM page with an SVG chart | the page's `<style>` | It is what the CD played and reviewed as the artifact; the repo default is Neon Arcade, so restyling is one ask away (open question 4) |
-| **Repo chrome positioned `absolute`, not fixed** | `#back-btn`, `#mute-btn` | The page scrolls; fixed buttons would sit on top of the text as it passes |
+| **Repo chrome positioned `absolute`, not fixed** | `#menu-btn`, `#mode-btn`, `#reload-btn`, `#menu` | The page scrolls; fixed buttons would sit on top of the text as it passes |
 | **Audio**: soft UI clicks, a fund/unfund pair, a quarter "stamp", a level-up arpeggio, year-end met/missed cues, and a slow four-chord office loop (76 bpm, music gain 0.09) | the page's audio block | The repo's every-game audio rule; a management sim wanted quiet |
 
 ## Open questions for the CD
@@ -192,7 +193,8 @@ One file, two `<script>` blocks.
    themselves.
    - **Storage:** `localStorage['taas.v' + CFG.version]` holds `{ state, plan }`; bump
      `CFG.version` whenever the state shape or the tables change meaning, which discards
-     old saves instead of replaying them under new rules. `taas-mute` holds the mute.
+     old saves instead of replaying them under new rules. `taas-mute` holds the sound switch
+     and `taas-vol` the three volumes (both modes share them).
      `drive-taas-ui` reads the run and the plan back out of this save after every click
      and checks the screen against `forecast()` on them, so the save's shape is part of
      what that suite relies on. It serves the page over a local http server rather than
@@ -276,7 +278,7 @@ row only if the CD has changed the design it describes.
 
 Every rule the two drive suites claim was broken on purpose, on copies of the page, and
 each break had to turn a named row red. The lists are kept so they can be re-run after a
-redesign (`.claude/tests/negtests/taas-engine.json`, 39 breaks; `taas-ui.json`, 24):
+redesign (`.claude/tests/negtests/taas-engine.json`, 39 breaks; `taas-ui.json`, 40):
 
 ```
 python3 .claude/scripts/negtest-copies.py .claude/tests/negtests/taas-engine.json --page-env TAAS_PAGE --jobs 4 -- node .claude/tests/drive-taas.cjs
@@ -296,6 +298,15 @@ the new code rather than dropping it.
 - **Page: 23 of 24 caught**, and the first pass also caught three only by a 30 s click
   timeout. The suite now gives each section a clean save, catches its own crash, and
   clicks with a 4 s timeout, so each break fails a row that names it.
+- **The shared chrome (2026-10-14, night): 17 more breaks, 17 caught** (`taas-ui.json` now
+  39 of 40): the menu button off screen, Info doing nothing or leaving the notes shut, a dead
+  sound switch, the switch leaving the ambience on, a slider on the wrong bus, volumes not
+  saved or not loaded, a tap outside or Escape not closing the menu, a reload on the same
+  address, a silent or a loud ambience, no cross-fade between the modes' ambiences, a badge left
+  in UTC or with no US Eastern fallback, Exit game pointing at the wrong place. Two rows were
+  tightened by the run: Exit game's link resolved to the same address either way on the
+  suite's server, so the row reads the attribute; and a menu left open by a broken scrim made
+  the next tap time out, so the row closes it itself and fails by name.
 - **One equivalent change, recorded rather than tested:** the `inc` click handler
   clamps to `investMax`, but `renderLeft()` disables the + at 12 and a disabled button
   never fires a click, so the clamp is unreachable through the page. Removing the
@@ -310,7 +321,7 @@ the new code rather than dropping it.
 
 Asked for on 2026-10-12, built overnight. In the CD's words, lightly trimmed:
 
-- **A mode button** at the top, right of the mute button, that opens a dropdown and shows
+- **A mode button** at the top, right of the mute button (the menu button since 2026-10-14), that opens a dropdown and shows
   the selected mode's name. The existing game becomes **"mode=formal"**.
 - **"Robot factory"**: the same concepts, as a more playful game. A **top-down view at a
   slight angle where up/down and left/right movement is parallel to the screen edges**
@@ -478,11 +489,43 @@ Four answers the CD gave before the build (2026-10-14):
 | What clears gnarled planks from the sale bin | **Add a recycle rule** for the seller ("put gnarled plank in recycle", per the first answer) |
 | How "Only input logs bigger than 1"x4"x4'" reads now | **"Only input medium logs"**: rejects small and large logs; gnarled and sap logs count as medium-sized, so they still need their own instructions |
 
+### The menu, a reload button and scoreboards on the wall (CD, 2026-10-14, night) - stated
+
+The CD's next note, from a phone screenshot of the factory (lightly trimmed, quotes made
+straight):
+
+- "**Move build date timestamp to lower right corner and change timezone to local device
+  timezone**; if not possible then just print in eastern time zone. Do this in all TAAS modes."
+- "I don't see the page reload button in the top right corner. ... **Add page reload btn to top
+  right corner** (in all TAAS modes)."
+- "**Move the '$' and 'customer satisfaction' values to the factory wall** (behind machine01 and
+  sales bin). These remain on the wall like scoreboards and I have to scroll to the top to see
+  them, but it frees up some screen space nicely."
+- "**Replace the top left 'Back' button with a settings accordion/hamburger 'menu' icon.** I can
+  tap the 'menu' icon in order to exit game (returns me to the arcade listing) or change settings
+  like **volume for music, ambient sounds, sound effects**. **Move the 'i' info button** from main
+  screen into this 'menu' list as an 'info' option I can click to see details about the current
+  TAAS mode."
+- The Evals name and the Reset evals button were missing on the CD's phone. **Traced**: the
+  fourth brief's push (`f47b497`) built, but its Pages *deploy* step failed after ten minutes
+  (run 38592967814), so the site kept serving the third brief; the screenshot's badge,
+  `12:46 UTC`, is the third brief's. This round's push redeployed both.
+
+Three answers the CD gave before the build:
+
+| Question | CD's answer |
+|---|---|
+| TAAS had no ambient sounds; what does the Ambient slider control? | **Add ambience**: a room tone in each mode with an occasional sound from elsewhere, and machine01's whir moved from effects to ambient |
+| Keep the mute button beside the menu? | **Fold it into the menu**: the top bar is the menu, the mode dropdown and the reload button |
+| Where on the wall do the boards go? | **"Window in middle, $ on left, customer satisfaction on right."** |
+
 ### What was built
 
 **The floor** is 6 m wide and 26 m deep (`FACTORY.LAYOUT`), drawn orthographically at a 50
 degree elevation, so x is screen x and depth is screen y, with heights foreshortened by
-cos 50. A plain back wall (windows and a pipe; no sign since 2026-10-14); the production
+cos 50. The back wall carries **two scoreboards**, money on the left and customer
+satisfaction on the right, with one window between them over machine01, and a pipe (no sign
+since 2026-10-14); the production
 line along it (log rack, in-feed belt, machine01 with its console and red button, out-feed
 belt, blue sale bin); a **green recycle bin** in front of the out-feed, between the button and
 the seller (the sap barrel that stood by the in-feed went on 2026-10-14); the hatch in the east wall where sold goods
@@ -504,7 +547,7 @@ the plank feeds out at the same speed, rides the out-feed (1 s) and drops into t
 
 **Every press costs $1** for the log, whoever presses and whatever the log (a sap log that jams
 included); a log tossed in the recycle bin costs nothing. "-$1" floats up from the machine at
-each press, and money may go **below zero**: the HUD then reads "-$3" in red. A purchase still
+each press, and money may go **below zero**: the money board then reads "-$3" in red. A purchase still
 needs the money in hand.
 
 **Robots.** The dock's bubble hires one ($20, then $40; two at most for now); it climbs out
@@ -573,14 +616,24 @@ Anything done **against the robot's own instructions** (on a slip) is a line of 
 "against its instructions", and is yellow where it would have been green: the CD's example is
 "Sold a gnarled plank for its price", green under the bare base prompt and a yellow line once
 the seller was told to sell only medium planks. The header shows how long the evals have run;
-**Reset evals** empties them and starts the clock again (it also zeroes the tally in the i
+**Reset evals** empties them and starts the clock again (it also zeroes the tally in the Info
 panel). The page stays live while open (money and the evals update). The robot's antenna
 bulb shows how many instructions it holds: red none, orange 1-2, yellow 3-4, green all five.
 
-**The build badge** sits in the bottom right corner (the CD, fourth brief), not the top right
-where every other game keeps it. **The HUD** (top right) is the money (red, minus first, below zero) with the i button beside it, and under them a white
-pill reading **customer satisfaction** with its percentage and a bar (green, amber under
-85%, red under 60%). **The i button** opens the reference: what maps to what (machine01 is a
+**The scoreboards** (the CD, 2026-10-14) are drawn on the back wall, so they scroll with the
+floor and are in view when you scroll to the top (where the page opens): dark slate faces in
+frames, the **money** in big white figures that swell green as money comes in, red with the
+minus first below zero, shrinking to fit a long sum; **customer satisfaction** captioned across
+the top, its percentage and a bar (green, amber under 85%, red under 60%). Anyone walking by
+the wall passes in front of them. A visually hidden line (`#fx-score`) says both numbers to a
+screen reader.
+
+**The chrome** (both modes, the CD, 2026-10-14): a **menu** button top left, the mode
+dropdown beside it, a **reload** button in the top right corner, and the **build badge** in the
+bottom right corner (the CD, fourth brief), in the device's own time zone. The menu holds
+**Info** (here, how the factory works; in formal, how the model works), **Sound** (a switch
+for everything, then Music, Ambient sounds and Sound effects, each 0-100%) and **Exit game**
+(the games list). **Info** opens the reference: what maps to what (machine01 is a
 task you can always do yourself, robots are AI agents that take the work off you and do not
 always do it well), what customer satisfaction is, the log mix and the $1 a log, what each
 grade does, the seller that hunts for planks, how
@@ -644,6 +697,15 @@ instruction doing nothing), each robot's measured tally by name, your own counts
 | **Fourth brief: Reset evals is one tap**, per robot, and also zeroes that robot's tally in the i panel; the header counts minutes since | `resetEvals()`, `renderRobot()` | Fresh data for the latest instructions, as the CD asked; counts are cheap to rebuild, so no confirm |
 | **Fourth brief: the badge moved on this page only**, to the bottom right, inside the safe area | `#build-badge` | The CD was playtesting TAAS; the other games keep the SOP's top right until the CD says otherwise |
 | **Fourth brief: a factory saved before it loads**: "Only input logs bigger than 1"x4"x4'" (`small`) becomes "Only input medium logs" (`medium`) in its slot and on the list; save version 2 kept | `RENAMED`, `load()` | The CD's factory in progress |
+| **Menu: a panel that drops from the menu button**, closed by a tap anywhere outside (which goes no further), by Escape, or by choosing Info; nothing else pauses | `#menu`, `#menu-scrim`, the menu block | "Accordion/hamburger"; a tap meant to close the menu must not also walk the avatar |
+| **Menu: the volumes are 0-100% in steps of 5**, each the plain fraction of its bus's level (music 0.09, ambience 0.4, effects 0.4 at 100%); the switch silences all three and keeps the levels; both remembered per browser | `SND` (`BASE`, `setVol`, `setMuted`), `taas-vol`, `taas-mute` | Readable numbers; at 100% everything sounds as it did |
+| **Menu: Info in formal mode opens "How the model works"** at the foot of the page and scrolls to it | `MODE.on('formal', { info })` | The formal mode's own explanation already lives there |
+| **The reload button is the usual chrome size** (38 x 30), not CYOA's double size; it clears any cache storage and loads the page again on a fresh address (`?_r=`), the mode riding along in `?mode=` | `#reload-btn` | "Reload the latest version" is what the CD needed when the fourth brief did not show; a new address is a cache miss for the page itself |
+| **The badge reads like "build 2026-10-14 16:35 EDT"**, the zone as US English names it (some zones come out "GMT+9"); a device that will not name its zone gets US Eastern, and with no time zones at all the stamp stays in UTC as written. The file keeps the UTC stamp (`stamp-badge.sh` writes it) and the page converts it on load | the script after `#build-badge` | The CD's "local device timezone; if not possible then eastern" |
+| **The ambience**: formal, an office's air handling and someone typing a few desks away every 7-19 s; the factory, the building's hum and, every 5-12 s, something metal set down or an air line letting go somewhere off the floor; machine01's whir moved from effects to ambience. The room tone sits at about a third of the music's level (measured on the buses: 0.0021 and 0.0025 RMS against the music's 0.008 and 0.0056) and the occasional sounds peak under the music's peaks | `SND` (`BEDS`, `clank`, `hiss`, `typing`) | The CD asked for ambience; quiet enough to leave on, and the slider for anyone who disagrees |
+| **The boards are drawn on the canvas**, not DOM, just in front of the wall sprite: dark slate faces, white money (green as it comes in, red below zero, shrunk to fit a long sum), "customer satisfaction" in mono over the percentage and a bar | `drawBoards()`, `BOARD` | Painted on the wall, so anyone walking by passes in front of them (a DOM board would sit over the avatar's head) |
+| **The middle window is 1.1 m wide** over machine01 (the old two were 1.3 m) and the money board spans 0.2-1.95 m, the satisfaction board 3.75-5.85 m | `BOARD`, `sceneObjects()` | Room for "customer satisfaction" to read at a phone's scale, with even gaps either side of the window |
+| **No back button and no mute button in the top bar** (a documented exception to the repo SOP, like CYOA's) | the chrome | The CD's call: exit and sound live in the menu |
 
 ### Open questions for the CD (factory)
 
@@ -720,12 +782,19 @@ Three script blocks join the page, in this order after the formal engine:
    - The engine emits `s.events` (press with its cost, made, binned, jam, cleaned, recycled,
      looking, sold, hired, assigned, outcome, rule, slot, instructed, notes, arrive) that the
      page drains for sound and effects; `notes` opens the robot's page.
-2. **`SND` and `MODE`**, shared by both modes: one AudioContext (formal's sounds moved here
-   unchanged, plus the factory's), two music tracks switched by the mode, the mute button;
-   and the mode switch, a native `<select id="mode-btn">` dressed as the third chrome
-   button (it listens to `change`, per the native-form-controls rule), which sets
-   `html[data-mode]` (CSS shows one mode and hides the other), remembers the choice, writes
-   `?mode=` with `replaceState`, and calls each mode's `enter`/`leave` hooks.
+2. **`SND`, `MODE` and the menu**, shared by both modes. `SND`: one AudioContext (formal's
+   sounds moved here unchanged, plus the factory's) with **three buses**, music, ambience and
+   effects (`BASE` levels times the player's `vol`, all zero while the switch is off; `setVol`,
+   `setMuted`), two music tracks and **two ambiences** switched by the mode (each a looped 4 s
+   noise buffer through its own filters, cross-faded on a switch, plus occasional sounds
+   scheduled from the same 50 ms loop as the music). The mode switch, a native `<select
+   id="mode-btn">` dressed as the second chrome button (it listens to `change`, per the
+   native-form-controls rule), sets `html[data-mode]` (CSS shows one mode and hides the other),
+   remembers the choice, writes `?mode=` with `replaceState`, and calls each mode's
+   `enter`/`leave` hooks, and `MODE.info()` calls the mode's own `info`. **The menu** block
+   wires the menu button, the scrim behind the open menu, the sound switch and sliders (`input`
+   events, never a tap helper), Info and the reload button. The badge's own script, right after
+   it, converts the UTC stamp to the device's time zone.
 3. **The factory UI** (an IIFE): the 3D kit and everything on screen.
    - **Primitives** (`box`, `cyl`, `ell` superellipsoids) are convex, wound outward by the
      centroid rule, and carry their **edge list** with the face on each side. `drawPrim()`
@@ -758,8 +827,11 @@ Three script blocks join the page, in this order after the formal engine:
      boxes (front-most wins), robots' projected boxes, then the floor. **One coordinate
      space**: the canvas is sized from its own `getBoundingClientRect()`, re-measured every
      frame, on resize, and on the way back into the mode.
-   - **The bubble, HUD and panel are DOM** over the canvas, so they stay crisp and are
-     testable; the bubble follows its anchor every frame and is clamped on screen. The panel
+   - **The bubble and panel are DOM** over the canvas, so they stay crisp and are testable; the
+     bubble follows its anchor every frame and is clamped on screen under the chrome row.
+     **Money and customer satisfaction are drawn** (`drawBoards()`, pushed at key 0.5005, just
+     in front of the wall sprite), read from the state every frame; `renderHud()` keeps only the
+     money's bump timer and the screen-reader line. The panel
      has two modes: the i reference (`renderPanel()`) and **a robot's page** (`openRobot()`,
      `renderRobot()`): the name field is built once and never re-rendered while typing; the
      rest re-renders only when its signature changes. **A robot's name is the player's
@@ -772,8 +844,11 @@ Three script blocks join the page, in this order after the formal engine:
      unknown log, a robot state this build no longer has), and an instruction a robot holds
      counts as seen.
    - **Test hook**: `window.TAAS_FACTORY` (`s`, `view`, `tick`, `paused`, `hitTest`,
-     `spriteRect`, `screen`, `save`, `layout`, `openRobot`, `closePanel`, `page`): the suites
-     step exact frames, find where things are drawn, and read which page is open.
+     `spriteRect`, `screen`, `board`, `showInfo`, `save`, `layout`, `openRobot`, `closePanel`,
+     `page`): the suites step exact frames, find where things are drawn (a board's face too), and
+     read which page is open. `SND.gains` (each bus's level, the playing ambience, each
+     ambience's fade) and `SND.probe(bus)` (an analyser on one bus) let them hear without
+     speakers; `window.TAAS_MENU` opens and closes the menu.
 
 ### Measured (2026-10-14, fourth brief)
 
@@ -814,15 +889,29 @@ select=#mode-btn:robot-factory evalFile=.claude/scripts/poses/taas-factory-busy.
 the busy pose now with the seller hunting a bin of junk, large planks among it, the recycle bin
 full and a sap log rolling in): **16.7 ms median, 2-6 of 149 frames over** across three runs
 (2026-10-14, fourth brief), against 1-2 of 149 for the third-brief build measured in the same
-container the same hour (it read 0 earlier that day): inside budget, at this container's noise. The 2026-10-13 fixes still carry it: blitting baked
+container the same hour (it read 0 earlier that day): inside budget, at this container's noise. With the wall scoreboards drawn live every frame
+(2026-10-14, night; the busy pose opens at the top of the floor, so they are on screen): **16.7
+ms median, 1-3 of 149 over** across three runs, against 0-1 for the fourth-brief build in the
+same container the same minutes: inside budget. The 2026-10-13 fixes still carry it: blitting baked
 sprites on whole device pixels (fractional offsets during a scroll forced resampling),
 capping the canvas at 2x, and baking the floor; before them, 26-57 of 149 were over.
 
 ### Negative tests (factory)
 
 `.claude/tests/negtests/taas-factory-engine.json` (102 breaks, against
-`drive-taas-factory.cjs`) and `taas-factory-ui.json` (54, against
-`drive-taas-factory-ui.cjs`): **101 and 52 caught** (2026-10-14, fourth brief: no large logs or
+`drive-taas-factory.cjs`) and `taas-factory-ui.json` (60, against
+`drive-taas-factory-ui.cjs`): **101 and 57 caught**. The wall scoreboards (2026-10-14, night)
+replaced five HUD breaks with eleven: the money board drawing a stale sum, never red or never
+swelling green, the satisfaction board never red or captioned "trust", the boards pinned to the
+screen instead of the wall or scrolled under the chrome, a long sum spilling onto the frame, the
+window moved off machine01, Info gone from the factory's menu, and the boards drawn after the
+avatar. That run tightened three rows: the colour rows passed a board showing a stale sum in
+the right colour, so a row now compares the figures two sums draw; a fresh swell is drawn on
+the next frame, so a row waits three frames before reading white; and the first "under the
+chrome" break moved the wall less than the gap it had to cross. **The new miss is equivalent**:
+drawing the boards' figures after the avatar instead of before changes nothing, because nothing
+on the floor stands tall enough to reach the figures or the bar (the parts of a board it can
+overlap are baked into the wall sprite, which is always behind it). (Fourth brief: no large logs or
 a large log cut into a medium plank, only the first instruction about a log consulted, "Only
 input medium logs" letting large logs through, "Put medium logs in recycle bin" doing nothing, a
 wrong cut putting nothing on the list, a seller that never recycles or whose recycle
@@ -879,6 +968,13 @@ save row was rescued by `pagehide`.
   fail until every bad log and every item but the product has its instruction.
 - **An eval line**: a key in `GRADE` (its colour), a `DOING` phrase in the UI (with the thing it
   was done to), and `credit()` or `note()` where it happens.
+- **A sound**: an effect is a row in `SND`'s `FX` (it plays on the effects bus); a mode's room
+  tone is its row in `BEDS`, and its occasional sounds are scheduled in `sched()` on the ambient
+  bus. Check a level change with `SND.probe(bus)` against the music, as `drive-taas-ui.cjs` § 9
+  does: nobody in this container can listen.
+- **Something on the wall boards**: `BOARD` holds where they are (their frames are baked with
+  the wall in `sceneObjects()`), `drawBoards()` what they say; keep anything new on them drawn
+  from the state, and readable at a 390 px phone's scale (about 60 px a metre).
 - **Move or add a thing on the floor**: its footprint in `LAYOUT.SOLID` (pathing reads it),
   its model in `sceneObjects()` (key = its front edge's y), a tap target in `hitTest()` if
   it does something, and a spot in `LAYOUT.SPOT`. The suite walks every spot to every other.
@@ -916,6 +1012,15 @@ save row was rescued by `pagehide`.
   build): the mode dropdown, the factory engine, the Canvas 2D toon renderer, shared audio,
   three suites and two break lists. Formal mode unchanged apart from its sounds moving into
   `SND`.
+- 2026-10-14 (night): **the menu, a reload button and scoreboards on the wall** (the CD's
+  note from a phone screenshot, and three answers). The back, mute and i buttons gave way to a
+  menu (Info for the mode in front of you, a sound switch, Music / Ambient sounds / Sound
+  effects volumes, Exit game); a reload button in the top right corner; the build badge in the
+  device's own time zone in both modes; **ambience** for each mode; money and customer
+  satisfaction painted on the back wall, either side of one window over machine01. Found while
+  answering it: the fourth brief's Pages deploy had failed, so the CD was still playing the third
+  brief; this push redeployed it. Page suites: formal 39 checks, factory 63; break lists 40 and
+  60 (39 and 57 caught, every miss an equivalent change).
 - 2026-10-14 (evening): **the fourth brief**: logs in sizes (small, medium, large; gnarled and
   sap logs medium-sized), large logs and large planks, 1"x4"x4' renamed "medium" in every
   instruction, the CD's size instructions (small, large, medium logs in the recycle bin) and,

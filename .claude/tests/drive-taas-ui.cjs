@@ -7,7 +7,11 @@
  * on screen, every button that refuses agrees with the engine (and the one rule only the
  * page keeps, 12 SP an investment), a reload puts back the run and the half-made plan, a
  * save from another version is never replayed, and the scorecard prints the engine's score.
- * Plus the phone layout and the keyboard focus that every render has to put back.
+ * Plus the phone layout and the keyboard focus that every render has to put back, and the
+ * chrome both modes share (the CD, 2026-10-14): the menu (Info, the sound switch and three
+ * volumes that reach the audio buses and persist, Exit game), the reload button that comes
+ * back on a fresh address in the same mode, and the build badge in the device's own time zone
+ * (US Eastern when the device will not say, the UTC stamp when neither works).
  *
  * The page is served from a local http server rather than file://, so one page can be
  * served again with CFG.version bumped at the same origin (same localStorage), which is
@@ -305,17 +309,119 @@ const click = (p, sel) => p.locator(sel).first().click();
         const r = await page.evaluate(() => {
           const vw = document.documentElement.clientWidth;
           const box = id => document.getElementById(id).getBoundingClientRect();
-          const b = box('back-btn'), m = box('mute-btn'), h = document.querySelector('.mast h1').getBoundingClientRect();
+          const b = box('menu-btn'), m = box('mode-btn'), rl = box('reload-btn'), h = document.querySelector('.mast h1').getBoundingClientRect();
           const svg = document.querySelector('#chart svg').getBoundingClientRect();
-          return { vw, iw: innerWidth, rows: document.querySelectorAll('#log tbody tr').length, sw: document.scrollingElement.scrollWidth, chrome: b.left >= 0 && m.right <= vw && b.right <= m.left, overH1: !(h.top >= Math.max(b.bottom, m.bottom) || h.right <= b.left), chart: svg.right <= vw + 0.5 };
+          return { vw, iw: innerWidth, rows: document.querySelectorAll('#log tbody tr').length, sw: document.scrollingElement.scrollWidth,
+            chrome: b.left >= 0 && b.right <= m.left && m.right <= rl.left && rl.right <= vw && vw - rl.right < 24,
+            overH1: !(h.top >= Math.max(b.bottom, m.bottom, rl.bottom)), chart: svg.right <= vw + 0.5 };
         });
         if (r.rows !== 2) bad.push(w + ': the log has ' + r.rows + ' rows, not 2');
         if (r.sw > r.vw || r.iw !== w) bad.push(w + ': page is ' + Math.max(r.sw, r.iw) + ' px wide');
-        if (!r.chrome) bad.push(w + ': back/mute off screen or overlapping');
-        if (r.overH1) bad.push(w + ': back/mute sit on the title');
+        if (!r.chrome) bad.push(w + ': menu/mode/reload off screen, overlapping or out of order');
+        if (r.overH1) bad.push(w + ': the chrome sits on the title');
         if (!r.chart) bad.push(w + ': chart wider than the screen');
       }
-      ok(!bad.length, 'at 390 and 320 px nothing scrolls sideways, the chart fits, and the back and mute buttons clear the title', bad.join('; '));
+      ok(!bad.length, 'at 390 and 320 px nothing scrolls sideways, the chart fits, and the menu, mode and reload buttons clear the title with reload in the top right corner', bad.join('; '));
+    });
+
+    /* ---------- 9. the menu (the CD, 2026-10-14): Info, sound, Exit game ---------- */
+    await section('9. menu', async () => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await fresh();
+      const gone = await page.evaluate(() => ['back-btn', 'mute-btn'].filter(id => document.getElementById(id)));
+      ok(!gone.length, 'the back button and the mute button have gone from the top bar', gone.join());
+      await page.tap('#menu-btn');
+      const m = await page.evaluate(() => ({ open: !document.getElementById('menu').hidden, exp: document.getElementById('menu-btn').getAttribute('aria-expanded'), sub: document.getElementById('menu-info-sub').textContent,
+        items: [...document.querySelectorAll('#menu .mi')].map(e => e.firstChild.textContent.trim()), exit: document.getElementById('menu-exit').getAttribute('href'), sliders: [...document.querySelectorAll('#menu input[type=range]')].map(e => e.closest('label').firstElementChild.textContent) }));
+      ok(m.open && m.exp === 'true' && m.sub === 'How the model works' && m.items.join() === 'Info,Exit game' && m.exit === '../index.html' && m.sliders.join() === 'Music,Ambient sounds,Sound effects',
+        'the menu opens with Info (how the model works), a volume for music, ambient sounds and sound effects, and Exit game back to the games list', JSON.stringify(m));
+      // the ambience is really playing, and sits under the music (measured on the buses, 1.5 s)
+      const lv = await page.evaluate(async () => {
+        const A = { music: SND.probe('music'), amb: SND.probe('amb') }, sum = { music: 0, amb: 0 }, buf = new Float32Array(2048);
+        for (let i = 0; i < 30; i++) { await new Promise(r => setTimeout(r, 50)); Object.keys(A).forEach(k => { A[k].getFloatTimeDomainData(buf); let s = 0; for (const v of buf) s += v * v; sum[k] += s / buf.length; }); }
+        return { music: Math.sqrt(sum.music / 30), amb: Math.sqrt(sum.amb / 30) };
+      });
+      ok(lv.amb > 0.0003 && lv.amb < lv.music * 0.6, 'the office ambience is audible and sits well under the music', JSON.stringify(lv));
+      await page.tap('[data-menu="info"]');
+      await page.waitForTimeout(100);
+      const info = await page.evaluate(() => { const d = document.getElementById('model'), r = d.getBoundingClientRect(); return { open: d.open, top: r.top, vh: innerHeight, menu: !document.getElementById('menu').hidden }; });
+      ok(info.open && info.top >= -1 && info.top < info.vh / 2 && !info.menu, 'Info closes the menu and opens how the model works, scrolled into view', JSON.stringify(info));
+      await page.evaluate(() => window.scrollTo(0, 0));
+      // the sound switch and the three volumes reach the buses, and persist
+      await page.tap('#menu-btn');
+      await page.tap('#snd-on');
+      const off = await page.evaluate(() => ({ muted: SND.muted, aria: document.getElementById('snd-on').getAttribute('aria-checked'), stored: localStorage.getItem('taas-mute'), g: SND.gains }));
+      await page.tap('#snd-on');
+      const on = await page.evaluate(() => ({ muted: SND.muted, stored: localStorage.getItem('taas-mute'), g: SND.gains }));
+      ok(off.muted && off.aria === 'false' && off.stored === '1' && off.g && off.g.music === 0 && off.g.amb === 0 && off.g.sfx === 0 && !on.muted && on.stored === '0' && on.g.sfx > 0 && on.g.music > 0 && on.g.amb > 0,
+        'the sound switch silences music, ambience and effects together, and turns them back on', JSON.stringify([off, on]));
+      await page.locator('#vol-music').fill('40');
+      await page.locator('#vol-amb').fill('0');
+      await page.locator('#vol-sfx').fill('70');
+      const v = await page.evaluate(() => ({ vol: SND.vol, g: SND.gains, out: ['music', 'amb', 'sfx'].map(k => document.getElementById('vol-' + k + '-out').textContent), stored: JSON.parse(localStorage.getItem('taas-vol')) }));
+      const near = (a, b) => Math.abs(a - b) < 1e-6;
+      ok(near(v.vol.music, 0.4) && near(v.vol.amb, 0) && near(v.vol.sfx, 0.7) && near(v.g.music, 0.09 * 0.4) && v.g.amb === 0 && near(v.g.sfx, 0.4 * 0.7) && v.out.join() === '40%,0%,70%' && !!v.stored && near(v.stored.music, 0.4) && near(v.stored.sfx, 0.7),
+        'each slider sets its own bus (music 40%, ambient 0, effects 70%) and is saved', JSON.stringify(v));
+      ok(Object.keys(v.g.beds).sort().join() === 'factory,formal' && v.g.bed === 'formal' && v.g.beds.formal > 0.9 && v.g.beds.factory < 0.1, 'there is an ambience for each mode, and only the formal one is playing', JSON.stringify(v.g));
+      await page.mouse.click(380, 800);   // outside the menu: the scrim takes it
+      const shut = await page.evaluate(() => document.getElementById('menu').hidden);
+      if (!shut) await page.evaluate(() => TAAS_MENU.close());   // so a failure here is this row's, not a stuck menu's
+      await page.tap('#menu-btn');
+      await page.keyboard.press('Escape');
+      const esc = await page.evaluate(() => ({ hidden: document.getElementById('menu').hidden, focus: document.activeElement && document.activeElement.id }));
+      ok(shut && esc.hidden && esc.focus === 'menu-btn', 'a tap outside closes the menu, and so does Escape (focus back on the menu button)', JSON.stringify(esc));
+      await load();
+      await page.tap('#menu-btn');
+      const kept = await page.evaluate(() => ({ vol: SND.vol, out: ['music', 'amb', 'sfx'].map(k => document.getElementById('vol-' + k + '-out').textContent) }));
+      ok(kept.out.join() === '40%,0%,70%' && near(kept.vol.music, 0.4), 'after a reload the menu shows the same volumes', JSON.stringify(kept));
+      await page.selectOption('#mode-btn', 'robot-factory');
+      await page.waitForTimeout(1600);   // the fade's time constant is 0.4 s
+      const fac = await page.evaluate(() => ({ g: SND.gains, sub: (TAAS_MENU.sync(), document.getElementById('menu-info-sub').textContent) }));
+      ok(fac.g && fac.g.bed === 'factory' && fac.g.beds.factory > 0.9 && fac.g.beds.formal < 0.1 && fac.sub === 'How the factory works', 'switching to the factory fades its own ambience in and the office out, and Info speaks for the factory', JSON.stringify(fac));
+      await page.selectOption('#mode-btn', 'formal');
+      await page.evaluate(() => { localStorage.removeItem('taas-vol'); localStorage.removeItem('taas-mute'); });
+    });
+
+    /* ---------- 10. reload: the latest version, past any cache, in the same mode ---------- */
+    await section('10. reload', async () => {
+      await fresh();
+      await page.evaluate(() => document.querySelector('button.fund').click());
+      const before = await saved(page);
+      await page.selectOption('#mode-btn', 'robot-factory');
+      const nav = page.waitForNavigation({ waitUntil: 'load' });
+      await page.tap('#reload-btn');
+      await nav;
+      await page.waitForFunction(() => document.documentElement.dataset.mode);
+      const r = await page.evaluate(() => ({ url: location.search, mode: document.documentElement.dataset.mode, rect: document.getElementById('reload-btn').getBoundingClientRect().right, vw: innerWidth }));
+      const after = await saved(page);
+      ok(/[?&]_r=[0-9a-z]+/.test(r.url) && /mode=robot-factory/.test(r.url) && r.mode === 'robot-factory' && after && after.plan.opp === before.plan.opp && before.plan.opp === true,
+        'the reload button comes back on a fresh address, in the same mode, with the run as it was', JSON.stringify(r));
+      await page.goto(URL + '?mode=formal', { waitUntil: 'load' });
+    });
+
+    /* ---------- 11. the badge in the device's own time zone ---------- */
+    await section('11. badge time zone', async () => {
+      const stamp = (SRC.match(/id="build-badge"[^>]*>([^<]*)</) || [])[1];
+      const m = /build (\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d) UTC/.exec(stamp || '');
+      if (!m) { ok(false, 'the page carries a UTC build stamp', stamp); return; }
+      const t = new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]));
+      const want = tz => { const f = new Intl.DateTimeFormat('en-US', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'short' }).formatToParts(t), g = k => f.find(x => x.type === k).value; return 'build ' + g('year') + '-' + g('month') + '-' + g('day') + ' ' + g('hour') + ':' + g('minute') + ' ' + g('timeZoneName'); };
+      const seen = {};
+      for (const [tz, init] of [['America/New_York'], ['Asia/Tokyo'], ['America/Los_Angeles', 'local'], ['America/Los_Angeles', 'none']]) {
+        const c = await browser.newContext({ viewport: { width: 390, height: 844 }, timezoneId: tz });
+        await c.route(u => !String(u).startsWith('http://127.0.0.1'), r => r.abort());
+        // 'local': this device will not name its own zone, so the page falls back to US Eastern; 'none': no Intl zones at all
+        if (init === 'local') await c.addInitScript(() => { const D = Intl.DateTimeFormat; Intl.DateTimeFormat = function (l, o) { if (!o || !o.timeZone) throw new RangeError('no zone'); return new D(l, o); }; });
+        if (init === 'none') await c.addInitScript(() => { Intl.DateTimeFormat = function () { throw new RangeError('no Intl'); }; });
+        const p = await c.newPage();
+        await p.goto(URL, { waitUntil: 'load' });
+        seen[tz + (init ? '/' + init : '')] = await p.evaluate(() => ({ text: document.getElementById('build-badge').textContent, utc: document.getElementById('build-badge').dataset.utc }));
+        await c.close();
+      }
+      ok(seen['America/New_York'].text === want('America/New_York') && /E[DS]T$/.test(seen['America/New_York'].text) && seen['Asia/Tokyo'].text === want('Asia/Tokyo'),
+        'the badge shows the build time in the device\'s own zone (New York, Tokyo)', JSON.stringify(seen));
+      ok(seen['America/Los_Angeles/local'].text === want('America/New_York') && seen['America/Los_Angeles/none'].text === stamp && seen['America/New_York'].utc === stamp,
+        'a device that will not name its zone gets US Eastern, and with no time zones at all the UTC stamp stays as written', JSON.stringify(seen));
     });
 
     ok(!errors.length, 'no page errors or console errors over the whole drive', errors.slice(0, 3).join(' | '));

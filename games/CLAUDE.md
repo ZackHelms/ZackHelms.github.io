@@ -166,7 +166,12 @@ they're intentionally never modified, so they don't get a badge.
 **One placement exception:** TAAS's badge sits in the **bottom** right corner
 (`bottom:calc(2px + env(safe-area-inset-bottom))`), on the CD's call while
 playtesting its factory (2026-10-14); its suite checks it there. Every other
-page keeps the top right until the CD says otherwise.
+page keeps the top right until the CD says otherwise. TAAS's badge also **shows
+the build time in the device's own time zone** (the CD's call, the same night):
+the file keeps the UTC stamp that `stamp-badge.sh` writes and a small script
+after the badge converts it on load (US Eastern if the device will not name its
+zone, the UTC stamp if neither works), so read the stamp back out of the file
+as usual and expect the live page to show the same moment in local time.
 
 ---
 
@@ -197,6 +202,10 @@ call it has no top-left chrome at all: its title page carries an EXIT plaque
 back to the hub, mute lives in its Settings, and its reload button sits
 top-right at twice the usual size (`.claude/cyoa.md`). `cyoa2/` follows CYOA
 in all of this, as its sequel; that was assumed, not asked (`.claude/cyoa2.md`).
+`taas/` has neither ← nor 🔊 since 2026-10-14, by the CD's call: a menu button
+holds Exit game (back to the hub), the sound switch and volumes for music,
+ambience and effects, and Info; a reload button sits top-right at the usual size
+(`.claude/taas.md`).
 
 ---
 
@@ -1019,12 +1028,13 @@ model's formulas and sources behind a details panel. That makes it the **third
 rendering exception** after wayfinder and music-mixer: forms, tables and one SVG, no
 canvas and no draw loop. It is also built in its **own planning-board look** (light and
 dark themes, Bricolage Grotesque + IBM Plex), not neon, which was assumed rather than
-asked. The standard ← and 🔊 sit top-left but are positioned `absolute`, because the page
-scrolls and fixed buttons would cover the text. The whole simulation is one DOM-free
+asked. Its chrome (a menu with Info, sound and Exit game in place of ← and 🔊, the mode
+dropdown, a reload button top right) is positioned `absolute`, because the page scrolls and
+fixed buttons would cover the text. The whole simulation is one DOM-free
 engine block whose `forecast()` is the only place an outcome is computed, so the
 preview on screen is exactly what running the quarter does. Every number is a first
 draft the CD is still tuning. Since 2026-10-13 that is the **Formal** mode, and a dropdown
-beside the mute button switches to **Robot factory**: the same story played by hand, a
+beside the menu button switches to **Robot factory**: the same story played by hand, a
 **Canvas 2D** scene of hand-written low-poly meshes in toon bands and ink outlines, seen
 Zelda-style from 50 degrees up. A chibi in a hard hat walks where you tap (an A* over the
 floor, a walk cycle driven by distance), presses machine01's glowing red button, and sells

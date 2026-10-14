@@ -138,9 +138,105 @@
   "new": ".scroll { overflow-x: visible; } /* @negtest */"
  },
  {
-  "name": "ui-chrome-fixed-top",
+  "name": "ui-chrome-off-left",
   "file": "games/taas/index.html",
-  "old": "<a id=\"back-btn\" href=\"../index.html\" aria-label=\"Back to games\">",
-  "new": "<a id=\"back-btn\" href=\"../index.html\" aria-label=\"Back to games\" style=\"left:-30px\"> <!-- @negtest -->"
+  "old": "#menu-btn { left: calc(8px + env(safe-area-inset-left)); }",
+  "new": "#menu-btn { left: -30px; } /* @negtest */"
+ },
+ {
+  "name": "menu-info-dead",
+  "file": "games/taas/index.html",
+  "old": "menu.querySelector('[data-menu=\"info\"]').addEventListener('click', () => { close(); MODE.info(); });",
+  "new": "menu.querySelector('[data-menu=\"info\"]').addEventListener('click', () => { close(); }); /* @negtest */"
+ },
+ {
+  "name": "formal-info-shut",
+  "file": "games/taas/index.html",
+  "old": "    d.open = true;\n",
+  "new": "    /* @negtest */\n"
+ },
+ {
+  "name": "mute-switch-dead",
+  "file": "games/taas/index.html",
+  "old": "sw.addEventListener('click', () => { SND.setMuted(!SND.muted); sync(); SND.sfx('tick'); });",
+  "new": "sw.addEventListener('click', () => { sync(); }); /* @negtest */"
+ },
+ {
+  "name": "mute-leaves-ambience",
+  "file": "games/taas/index.html",
+  "old": "ambGain.gain.value = muted ? 0 : BASE.amb * vol.amb;",
+  "new": "ambGain.gain.value = BASE.amb * vol.amb; /* @negtest */"
+ },
+ {
+  "name": "slider-wrong-bus",
+  "file": "games/taas/index.html",
+  "old": "SND.init(); SND.setVol(k, e.target.value / 100);",
+  "new": "SND.init(); SND.setVol('music', e.target.value / 100); /* @negtest */"
+ },
+ {
+  "name": "volume-not-saved",
+  "file": "games/taas/index.html",
+  "old": "    try { localStorage.setItem('taas-vol', JSON.stringify(vol)); } catch (e) { /* optional */ }\n",
+  "new": "    /* @negtest */\n"
+ },
+ {
+  "name": "volume-not-loaded",
+  "file": "games/taas/index.html",
+  "old": "    if (v) Object.keys(vol).forEach(",
+  "new": "    if (false && v) /* @negtest */ Object.keys(vol).forEach("
+ },
+ {
+  "name": "scrim-no-close",
+  "file": "games/taas/index.html",
+  "old": "  scrim.addEventListener('click', close);",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "escape-no-close",
+  "file": "games/taas/index.html",
+  "old": "if (e.key === 'Escape' && !menu.hidden) { close(); btn.focus(); }",
+  "new": "if (false) { close(); btn.focus(); } /* @negtest */"
+ },
+ {
+  "name": "reload-no-bust",
+  "file": "games/taas/index.html",
+  "old": "u.searchParams.set('_r', Date.now().toString(36)); location.replace",
+  "new": "/* @negtest */ location.replace"
+ },
+ {
+  "name": "ambience-silent",
+  "file": "games/taas/index.html",
+  "old": "      src.start(0, Math.random() * 3);\n",
+  "new": "      /* @negtest */\n"
+ },
+ {
+  "name": "ambience-loud",
+  "file": "games/taas/index.html",
+  "old": "formal: [{ type: 'lowpass', f: 140, q: 0.7, g: 0.08 }",
+  "new": "formal: [{ type: 'lowpass', f: 140, q: 0.7, g: 0.8 /* @negtest */ }"
+ },
+ {
+  "name": "ambience-no-crossfade",
+  "file": "games/taas/index.html",
+  "old": "    Object.keys(beds).forEach(k => beds[k].gain.setTargetAtTime(k === track ? 1 : 0, AC.currentTime, 0.4));\n",
+  "new": "    /* @negtest */\n"
+ },
+ {
+  "name": "badge-stays-utc",
+  "file": "games/taas/index.html",
+  "old": "  try { el.textContent = inZone(); } catch (e) {",
+  "new": "  try { /* @negtest */ } catch (e) {"
+ },
+ {
+  "name": "badge-no-eastern",
+  "file": "games/taas/index.html",
+  "old": "try { el.textContent = inZone('America/New_York'); } catch (e2)",
+  "new": "try { /* @negtest */ } catch (e2)"
+ },
+ {
+  "name": "exit-wrong-place",
+  "file": "games/taas/index.html",
+  "old": "<a class=\"mi\" id=\"menu-exit\" href=\"../index.html\">",
+  "new": "<a class=\"mi\" id=\"menu-exit\" href=\"index.html\"><!-- @negtest -->"
  }
 ]

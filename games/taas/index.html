@@ -48,14 +48,33 @@ body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--b
 h1, h2, h3, p, ol, ul { margin: 0; }
 ol, ul { padding: 0; list-style: none; }
 button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulation; }
-/* Repo chrome (games/CLAUDE.md § Hub Back Button). Absolute, not fixed: this page scrolls,
-   and fixed buttons would sit on top of the text as it passes under them. */
-#back-btn, #mute-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); z-index: 80;
-  width: 38px; height: 30px; display: flex; align-items: center; justify-content: center;
+/* Chrome: a menu in place of the hub's back button and the mute button (the CD, 2026-10-14:
+   exit, sound and info live in the menu), the mode switch beside it, and a reload button top
+   right. Absolute, not fixed: the formal page scrolls, and fixed buttons would sit on top of
+   the text as it passes under them. */
+#menu-btn, #reload-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); z-index: 80;
+  width: 38px; height: 30px; display: flex; align-items: center; justify-content: center; padding: 0;
   background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); }
-#back-btn { left: calc(8px + env(safe-area-inset-left)); font-size: 17px; text-decoration: none; }
-#mute-btn { left: calc(52px + env(safe-area-inset-left)); font-size: 14px; padding: 0; }
-#back-btn:hover, #mute-btn:hover { border-color: var(--ink); color: var(--ink); }
+#menu-btn { left: calc(8px + env(safe-area-inset-left)); }
+#reload-btn { right: calc(8px + env(safe-area-inset-right)); font-size: 18px; line-height: 1; }
+#menu-btn:hover, #reload-btn:hover, #menu-btn[aria-expanded="true"] { border-color: var(--ink); color: var(--ink); }
+#menu-btn svg { width: 18px; height: 14px; display: block; }
+#menu-scrim { position: fixed; inset: 0; z-index: 84; background: transparent; }
+#menu { position: absolute; z-index: 85; top: calc(44px + env(safe-area-inset-top)); left: calc(8px + env(safe-area-inset-left));
+  width: min(300px, calc(100vw - 16px)); padding: 6px; display: flex; flex-direction: column; gap: 2px;
+  background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 28px rgba(15,20,28,.28); }
+.mi { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; width: 100%; padding: 10px 10px; border: 0; border-radius: 7px;
+  background: none; color: var(--ink); font: 600 15px var(--body); text-align: left; text-decoration: none; }
+.mi small { font: 400 12px var(--body); color: var(--muted); }
+.mi:hover, .mi:focus-visible { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+.msnd { margin: 2px 0; padding: 8px 10px 10px; border-block: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+.mrow { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; font: 500 13px var(--body); }
+.mrow input[type=range] { grid-column: 1 / -1; width: 100%; margin: 0; accent-color: var(--sp); touch-action: pan-y; }
+.mrow output { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.msnd.off .mrow:not(.mhead) { opacity: .45; }
+.mhead { font: 600 15px var(--body); }
+#snd-on { min-width: 52px; height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--line); background: none; color: var(--muted); font: 600 12px var(--body); }
+#snd-on[aria-checked="true"] { background: var(--sp); border-color: var(--sp); color: var(--panel); }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
 .num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .label { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
@@ -209,8 +228,8 @@ details.sheet > summary { cursor: pointer; font-family: var(--display); font-siz
   .rung { font-size: 11px; }
   .outcome .big { font-size: 38px; }
 }
-/* the mode switch: a native select dressed as the third chrome button */
-#mode-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: calc(96px + env(safe-area-inset-left)); z-index: 80;
+/* the mode switch: a native select dressed as the second chrome button */
+#mode-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: calc(52px + env(safe-area-inset-left)); z-index: 80;
   height: 30px; padding: 0 26px 0 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); font: 600 13px var(--body);
   background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237b8794' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center / 10px 6px;
   -webkit-appearance: none; appearance: none; cursor: pointer; }
@@ -224,29 +243,9 @@ html[data-mode="robot-factory"] #factory { display: block; }
 html[data-mode="robot-factory"] .wrap { display: none; }
 html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow: hidden; overscroll-behavior: none; }
 #fx-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
-#fx-hud { position: absolute; top: calc(8px + env(safe-area-inset-top)); right: calc(8px + env(safe-area-inset-right)); z-index: 30;
-  display: flex; flex-direction: column; align-items: flex-end; gap: 6px; pointer-events: none; }
-#fx-hud > * { pointer-events: auto; }
-@media (max-width: 380px) { #fx-hud { top: calc(46px + env(safe-area-inset-top)); } }
-.fx-hudrow { display: flex; gap: 6px; align-items: center; }
-.fx-pill { background: #fff; color: #1d2430; border: 2px solid #1d2430; border-radius: 14px; box-shadow: 0 2px 0 #1d2430; }
-#fx-cash { min-width: 80px; padding: 6px 12px; text-align: right; }
-#fx-money { font: 800 18px/1 var(--display); font-variant-numeric: tabular-nums; display: inline-block; transform-origin: 100% 50%; }
-#fx-money.bump { animation: fxbump .35s ease-out; }
-#fx-money.neg { color: #d93a3a; }   /* below zero: logs cost money (the CD, 2026-10-14) */
-@keyframes fxbump { 0% { transform: scale(1.3); color: #1c8f4c; } 100% { transform: scale(1); } }
-/* customer satisfaction: how much our customers trust us and our products */
-#fx-sat { padding: 5px 10px 7px; display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
-.fx-sat-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; white-space: nowrap; font: 600 9.5px/1 var(--mono); color: #586663; }
-.fx-sat-top b { font: 800 14px/1 var(--display); color: #1c8f4c; font-variant-numeric: tabular-nums; }
-#fx-sat i { display: block; height: 7px; border-radius: 4px; background: #dfe5e9; overflow: hidden; position: relative; }
-#fx-sat i::after { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: var(--sat, 100%); background: #2fbf71; border-radius: 4px; transition: width .3s, background-color .3s; }
-#fx-sat.mid i::after { background: #f2b632; }
-#fx-sat.mid b { color: #b7791f; }
-#fx-sat.low i::after { background: #e5484d; }
-#fx-sat.low b { color: #c0392b; }
-#fx-info { width: 34px; height: 34px; border-radius: 50%; border: 2px solid #1d2430; background: #fff; color: #1d2430; padding: 0;
-  font: italic 800 17px/1 Georgia, 'Times New Roman', serif; box-shadow: 0 2px 0 #1d2430; }
+/* money and customer satisfaction are scoreboards drawn on the back wall (the CD, 2026-10-14);
+   this line says the same two numbers to a screen reader */
+.fx-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 .fx-bubble { position: absolute; left: 0; top: 0; z-index: 25; display: flex; gap: 6px; padding: 6px; background: #fff;
   border: 2.5px solid #1d2430; border-radius: 16px; box-shadow: 0 3px 0 rgba(29,36,48,.85); will-change: transform; }
 .fx-bubble::after { content: ''; position: absolute; left: calc(var(--tail, 50%) - 8px); bottom: -10px; width: 14px; height: 14px; background: #fff;
@@ -316,10 +315,39 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 15:48 UTC</div>
-<a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
-<button id="mute-btn" aria-label="Toggle sound">🔊</button>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 21:47 UTC</div>
+<script>
+/* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
+   US Eastern if the device will not say, and UTC as it was stamped if neither works. */
+(function () {
+  const el = document.getElementById('build-badge'), m = /build (\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d) UTC/.exec(el.textContent);
+  if (!m) return;
+  el.dataset.utc = m[0];
+  const t = new Date(Date.UTC(+m[1], m[2] - 1, +m[3], +m[4], +m[5]));
+  function inZone(tz) {
+    const o = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZoneName: 'short' };
+    if (tz) o.timeZone = tz;
+    const parts = new Intl.DateTimeFormat('en-US', o).formatToParts(t), g = k => (parts.find(x => x.type === k) || {}).value;
+    if (!g('timeZoneName') || !g('hour')) throw new Error('no zone');
+    return 'build ' + g('year') + '-' + g('month') + '-' + g('day') + ' ' + g('hour') + ':' + g('minute') + ' ' + g('timeZoneName');
+  }
+  try { el.textContent = inZone(); } catch (e) { try { el.textContent = inZone('America/New_York'); } catch (e2) { /* keep UTC */ } }
+})();
+</script>
+<button id="menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 7h16M1 12.5h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
 <select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option></select>
+<button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
+<div id="menu-scrim" hidden></div>
+<div id="menu" role="dialog" aria-label="Menu" hidden>
+  <button class="mi" type="button" data-menu="info">Info <small id="menu-info-sub">How this mode works</small></button>
+  <div class="msnd" id="menu-sound">
+    <div class="mrow mhead"><span id="snd-lbl">Sound</span><button id="snd-on" type="button" role="switch" aria-checked="true" aria-labelledby="snd-lbl">On</button></div>
+    <label class="mrow"><span>Music</span><output id="vol-music-out">100%</output><input type="range" id="vol-music" data-vol="music" min="0" max="100" step="5" value="100"></label>
+    <label class="mrow"><span>Ambient sounds</span><output id="vol-amb-out">100%</output><input type="range" id="vol-amb" data-vol="amb" min="0" max="100" step="5" value="100"></label>
+    <label class="mrow"><span>Sound effects</span><output id="vol-sfx-out">100%</output><input type="range" id="vol-sfx" data-vol="sfx" min="0" max="100" step="5" value="100"></label>
+  </div>
+  <a class="mi" id="menu-exit" href="../index.html">Exit game <small>to the games list</small></a>
+</div>
 <div class="wrap">
   <header class="mast">
     <h1>TAAS<small>Team AI Adoption Simulator</small></h1>
@@ -352,10 +380,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 <div id="factory">
   <canvas id="fx-canvas" aria-label="The robot factory floor"></canvas>
-  <div id="fx-hud">
-    <div class="fx-hudrow"><div class="fx-pill" id="fx-cash"><span id="fx-money">$0</span></div><button id="fx-info" aria-label="How the factory works">i</button></div>
-    <div class="fx-pill" id="fx-sat" role="img" aria-label="Customer satisfaction 100%"><span class="fx-sat-top"><span>customer satisfaction</span><b id="fx-sat-num">100%</b></span><i></i></div>
-  </div>
+  <p id="fx-score" class="fx-sr">Money $0. Customer satisfaction 100%.</p>
   <div id="fx-bubble" class="fx-bubble" hidden></div>
   <div id="fx-panel" hidden><div id="fx-panel-body"></div></div>
 </div>
@@ -1394,9 +1419,17 @@ if (typeof module !== 'undefined') module.exports = FACTORY;
 <script>
 /* Shared by both modes: sound (one AudioContext, started by the first gesture) and the mode switch. */
 const SND = (function () {
-  let AC = null, sfxGain = null, musicGain = null, noiseBuf = null, mNext = 0, mStep = 0, track = 'formal';
+  let AC = null, sfxGain = null, musicGain = null, ambGain = null, noiseBuf = null, ambBuf = null, mNext = 0, mStep = 0, ambNext = 0, track = 'formal';
+  // three buses with their own volumes (the CD, 2026-10-14: music, ambient sounds, sound effects)
+  // and one master switch; all four live in the menu and persist per browser
+  const BASE = { music: 0.09, amb: 0.4, sfx: 0.4 };
+  const vol = { music: 1, amb: 1, sfx: 1 };
   let muted = false;
   try { muted = localStorage.getItem('taas-mute') === '1'; } catch (e) { /* optional */ }
+  try {
+    const v = JSON.parse(localStorage.getItem('taas-vol') || 'null');
+    if (v) Object.keys(vol).forEach(k => { const n = Number(v[k]); if (isFinite(n)) vol[k] = Math.max(0, Math.min(1, n)); });
+  } catch (e) { /* optional */ }
   function init() {
     if (AC) { if (AC.state === 'suspended' && !muted) AC.resume(); return; }
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -1404,21 +1437,25 @@ const SND = (function () {
     AC = new Ctx();
     sfxGain = AC.createGain(); sfxGain.connect(AC.destination);
     musicGain = AC.createGain(); musicGain.connect(AC.destination);
-    const len = AC.sampleRate * 0.5, nb = AC.createBuffer(1, len, AC.sampleRate), d = nb.getChannelData(0);
-    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
-    noiseBuf = nb;
-    applyMute();
+    ambGain = AC.createGain(); ambGain.connect(AC.destination);
+    const noise = sec => { const len = Math.round(AC.sampleRate * sec), b = AC.createBuffer(1, len, AC.sampleRate), d = b.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; return b; };
+    noiseBuf = noise(0.5);
+    ambBuf = noise(4);   // long enough that a room tone never sounds like a loop
+    applyGains();
+    startBeds();
     mNext = AC.currentTime + 0.1;
+    ambNext = AC.currentTime + 3;
     setInterval(sched, 50);
   }
-  function applyMute() {
-    document.getElementById('mute-btn').textContent = muted ? '\u{1F507}' : '\u{1F50A}';
+  function applyGains() {
     if (!AC) return;
-    sfxGain.gain.value = muted ? 0 : 0.4;
-    musicGain.gain.value = muted ? 0 : 0.09;
+    sfxGain.gain.value = muted ? 0 : BASE.sfx * vol.sfx;
+    musicGain.gain.value = muted ? 0 : BASE.music * vol.music;
+    ambGain.gain.value = muted ? 0 : BASE.amb * vol.amb;
   }
+  const live = k => AC && !muted && vol[k] > 0;
   function tone(freq, dur, vol, type, at, glide) {
-    if (!AC || muted) return;
+    if (!live('sfx')) return;
     const t = AC.currentTime + (at || 0);
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = type || 'sine'; o.frequency.setValueAtTime(freq, t);
@@ -1428,7 +1465,7 @@ const SND = (function () {
     o.connect(g); g.connect(sfxGain); o.start(t); o.stop(t + dur + 0.02);
   }
   function noise(dur, vol, freq, type, at, q) {
-    if (!AC || muted) return;
+    if (!live('sfx')) return;
     const t = AC.currentTime + (at || 0), s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain();
     s.buffer = noiseBuf; f.type = type || 'lowpass'; f.frequency.setValueAtTime(freq || 900, t); if (q) f.Q.value = q;
     g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
@@ -1463,15 +1500,16 @@ const SND = (function () {
     toss: () => { noise(0.12, 0.22, 900, 'bandpass', 0, 2); tone(150, 0.12, 0.14, 'sine', 0.2, 80); }
   };
   function sfx(name) { if (FX[name]) FX[name](); }
-  // machine01 running: a buzz under a filtered noise, for as long as the cut takes
+  // machine01 running: a buzz under a filtered noise, for as long as the cut takes. It is the
+  // factory's own noise rather than an answer to anything, so it rides the ambient bus.
   function whir(dur) {
-    if (!AC || muted) return { stop() {} };
+    if (!live('amb')) return { stop() {} };
     const t = AC.currentTime, src = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(), o = AC.createOscillator(), og = AC.createGain();
     src.buffer = noiseBuf; src.loop = true; f.type = 'bandpass'; f.frequency.value = 1400; f.Q.value = 1.2;
     o.type = 'sawtooth'; o.frequency.value = 75;
     g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(0.09, t + 0.15); g.gain.setValueAtTime(0.09, t + dur - 0.2); g.gain.linearRampToValueAtTime(0.0001, t + dur);
     og.gain.setValueAtTime(0.0001, t); og.gain.linearRampToValueAtTime(0.03, t + 0.15); og.gain.setValueAtTime(0.03, t + dur - 0.2); og.gain.linearRampToValueAtTime(0.0001, t + dur);
-    src.connect(f); f.connect(g); g.connect(sfxGain); o.connect(og); og.connect(sfxGain);
+    src.connect(f); f.connect(g); g.connect(ambGain); o.connect(og); og.connect(ambGain);
     src.start(t); o.start(t); src.stop(t + dur + 0.05); o.stop(t + dur + 0.05);
     return { stop() { try { const n = AC.currentTime; g.gain.cancelScheduledValues(n); og.gain.cancelScheduledValues(n); g.gain.setValueAtTime(0.0001, n); og.gain.setValueAtTime(0.0001, n); src.stop(n + 0.02); o.stop(n + 0.02); } catch (e) { /* already stopped */ } } };
   }
@@ -1483,7 +1521,12 @@ const SND = (function () {
   };
   function sched() {
     if (!AC || muted || document.hidden) return;
+    if (live('amb') && AC.currentTime >= ambNext) {
+      if (track === 'factory') { (Math.random() < 0.7 ? clank : hiss)(AC.currentTime + 0.05); ambNext = AC.currentTime + 5 + Math.random() * 7; }
+      else { typing(AC.currentTime + 0.05); ambNext = AC.currentTime + 7 + Math.random() * 12; }
+    }
     if (mNext < AC.currentTime) mNext = AC.currentTime + 0.05;  // after a pause, rejoin rather than replay the gap
+    if (!live('music')) return;
     const T = TRACKS[track];
     while (mNext < AC.currentTime + 0.25) {
       if (track === 'formal') schedFormal(T); else schedFactory(T);
@@ -1519,20 +1562,91 @@ const SND = (function () {
     if (e % 2 === 1) hat(mNext, 0.05);
     if (e === 6) { osc('square', 1760, mNext, 0.05, 0.04, 0.002); }
   }
-  function setTrack(name) { if (TRACKS[name] && name !== track) { track = name; mStep = 0; if (AC) mNext = AC.currentTime + 0.1; } }
+  function setTrack(name) {
+    if (!TRACKS[name] || name === track) return;
+    track = name; mStep = 0;
+    if (!AC) return;
+    mNext = AC.currentTime + 0.1; ambNext = AC.currentTime + 3;
+    Object.keys(beds).forEach(k => beds[k].gain.setTargetAtTime(k === track ? 1 : 0, AC.currentTime, 0.4));
+  }
+
+  // Ambience: a room tone per mode under everything (filtered noise, one loop each, faded
+  // across on a mode switch), and now and then a sound from elsewhere in the building.
+  const BEDS = {
+    formal: [{ type: 'lowpass', f: 140, q: 0.7, g: 0.08 }, { type: 'bandpass', f: 650, q: 0.5, g: 0.02 }],     // air handling
+    factory: [{ type: 'lowpass', f: 170, q: 0.9, g: 0.07 }, { type: 'bandpass', f: 1100, q: 0.8, g: 0.025 }]  // the building's hum
+  };
+  const beds = {};
+  function startBeds() {
+    Object.keys(BEDS).forEach(name => {
+      const g = AC.createGain(), src = AC.createBufferSource();
+      g.gain.value = name === track ? 1 : 0; g.connect(ambGain);
+      src.buffer = ambBuf; src.loop = true;
+      BEDS[name].forEach(b => {
+        const f = AC.createBiquadFilter(), lg = AC.createGain();
+        f.type = b.type; f.frequency.value = b.f; f.Q.value = b.q; lg.gain.value = b.g;
+        src.connect(f); f.connect(lg); lg.connect(g);
+      });
+      src.start(0, Math.random() * 3);
+      beds[name] = g;
+    });
+  }
+  // something metal set down somewhere off the floor: three inharmonic partials, dulled by distance
+  function clank(at) {
+    const lp = AC.createBiquadFilter(), base = 170 + Math.random() * 170;
+    lp.type = 'lowpass'; lp.frequency.value = 1800; lp.connect(ambGain);
+    [1, 2.76, 5.4].forEach((k, i) => {
+      const o = AC.createOscillator(), g = AC.createGain(), end = at + 0.45 + 0.3 / (i + 1);
+      o.type = 'triangle'; o.frequency.value = base * k;
+      g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.035 / (i + 1), at + 0.004); g.gain.exponentialRampToValueAtTime(0.0001, end);
+      o.connect(g); g.connect(lp); o.start(at); o.stop(end + 0.05);
+    });
+  }
+  // an air line letting go
+  function hiss(at) {
+    const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(), d = 0.5 + Math.random() * 0.4;
+    s.buffer = noiseBuf; s.loop = true; f.type = 'bandpass'; f.frequency.value = 2800; f.Q.value = 0.9;
+    g.gain.setValueAtTime(0.0001, at); g.gain.linearRampToValueAtTime(0.05, at + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, at + d);
+    s.connect(f); f.connect(g); g.connect(ambGain); s.start(at); s.stop(at + d + 0.05);
+  }
+  // someone typing a few desks away
+  function typing(at) {
+    const n = 4 + Math.floor(Math.random() * 9);
+    for (let i = 0; i < n; i++) {
+      const s = AC.createBufferSource(), f = AC.createBiquadFilter(), g = AC.createGain(), space = Math.random() < 0.15;
+      s.buffer = noiseBuf; f.type = space ? 'bandpass' : 'highpass'; f.frequency.value = space ? 900 : 2600;
+      g.gain.setValueAtTime(space ? 0.03 : 0.025, at); g.gain.exponentialRampToValueAtTime(0.0001, at + (space ? 0.03 : 0.014));
+      s.connect(f); f.connect(g); g.connect(ambGain); s.start(at, Math.random() * 0.4); s.stop(at + 0.05);
+      at += 0.07 + Math.random() * 0.11;
+    }
+  }
+
+  function setMuted(m) {
+    muted = !!m;
+    try { localStorage.setItem('taas-mute', muted ? '1' : '0'); } catch (e) { /* optional */ }
+    if (!muted) { init(); if (AC && AC.state === 'suspended') AC.resume(); if (AC) mNext = AC.currentTime + 0.1; }
+    applyGains();
+  }
+  function setVol(k, v) {
+    if (!(k in vol)) return;
+    vol[k] = Math.max(0, Math.min(1, Number(v) || 0));
+    try { localStorage.setItem('taas-vol', JSON.stringify(vol)); } catch (e) { /* optional */ }
+    if (AC && vol.music > 0 && mNext < AC.currentTime) mNext = AC.currentTime + 0.05;
+    applyGains();
+  }
 
   document.addEventListener('visibilitychange', () => { if (AC) { if (document.hidden) AC.suspend(); else if (!muted) AC.resume(); } });
-  document.getElementById('mute-btn').addEventListener('click', () => {
-    muted = !muted;
-    try { localStorage.setItem('taas-mute', muted ? '1' : '0'); } catch (e) { /* optional */ }
-    if (!muted) { init(); if (AC && AC.state === 'suspended') AC.resume(); mNext = AC ? AC.currentTime + 0.1 : 0; }
-    applyMute();
-  });
-  applyMute();
-  return { init, sfx, whir, setTrack, get muted() { return muted; } };
+  return {
+    init, sfx, whir, setTrack, setMuted, setVol,
+    get muted() { return muted; }, get vol() { return Object.assign({}, vol); },
+    // for the suites: what each bus is set to right now (null before the first gesture)
+    get gains() { const bl = {}; Object.keys(beds).forEach(k => { bl[k] = beds[k].gain.value; }); return AC ? { music: musicGain.gain.value, amb: ambGain.gain.value, sfx: sfxGain.gain.value, bed: track, beds: bl } : null; },
+    // and a level meter on one bus, after its volume
+    probe(k) { const b = { music: musicGain, amb: ambGain, sfx: sfxGain }[k]; if (!b) return null; const a = AC.createAnalyser(); a.fftSize = 2048; b.connect(a); return a; }
+  };
 })();
 
-/* The mode switch: a native select beside the mute button. ?mode= wins, then the last choice. */
+/* The mode switch: a native select beside the menu button. ?mode= wins, then the last choice. */
 const MODE = (function () {
   const NAMES = { 'formal': 'Formal', 'robot-factory': 'Robot factory' };
   const ALIAS = { factory: 'robot-factory', robot: 'robot-factory', robotfactory: 'robot-factory' };
@@ -1563,9 +1677,53 @@ const MODE = (function () {
     SND.setTrack(m === 'robot-factory' ? 'factory' : 'formal');
   }
   function on(m, h) { hooks[m] = h; if (cur === m && h.enter) h.enter(); }
+  // the menu's Info: each mode says how it works in its own way
+  function info() { if (hooks[cur] && hooks[cur].info) hooks[cur].info(); }
   sel.addEventListener('change', () => { SND.init(); set(sel.value); sel.blur(); });
   set(pick());
-  return { set, on, get current() { return cur; }, NAMES };
+  return { set, on, info, get current() { return cur; }, NAMES };
+})();
+
+/* The menu (the CD, 2026-10-14), in place of the hub's back button and the mute button: Info
+   on the mode in front of you, the sound switch and three volumes, and Exit game. Beside it the
+   mode switch, and top right a reload that fetches the latest version past any cache. */
+(function () {
+  const btn = document.getElementById('menu-btn'), menu = document.getElementById('menu'), scrim = document.getElementById('menu-scrim');
+  const sw = document.getElementById('snd-on'), box = document.getElementById('menu-sound');
+  const SUB = { 'formal': 'How the model works', 'robot-factory': 'How the factory works' };
+  const out = inp => document.getElementById(inp.id + '-out');
+  function sync() {
+    sw.setAttribute('aria-checked', SND.muted ? 'false' : 'true');
+    sw.textContent = SND.muted ? 'Off' : 'On';
+    box.classList.toggle('off', SND.muted);
+    const v = SND.vol;
+    menu.querySelectorAll('input[data-vol]').forEach(inp => { inp.value = Math.round(v[inp.dataset.vol] * 100); out(inp).textContent = inp.value + '%'; });
+    document.getElementById('menu-info-sub').textContent = SUB[MODE.current] || '';
+  }
+  function open() { SND.init(); sync(); menu.hidden = false; scrim.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
+  function close() { menu.hidden = true; scrim.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
+  btn.addEventListener('click', () => { if (menu.hidden) { open(); SND.sfx('tick'); } else close(); });
+  scrim.addEventListener('click', close);   // a tap outside closes the menu and goes no further
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !menu.hidden) { close(); btn.focus(); } });
+  sw.addEventListener('click', () => { SND.setMuted(!SND.muted); sync(); SND.sfx('tick'); });
+  menu.addEventListener('input', e => {
+    const k = e.target.dataset && e.target.dataset.vol;
+    if (!k) return;
+    SND.init(); SND.setVol(k, e.target.value / 100);
+    out(e.target).textContent = e.target.value + '%';
+  });
+  menu.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.vol === 'sfx') SND.sfx('tick'); });   // a sample of the new level
+  menu.querySelector('[data-menu="info"]').addEventListener('click', () => { close(); MODE.info(); });
+  document.getElementById('reload-btn').addEventListener('click', async () => {
+    try {
+      if ('caches' in window) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
+      if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r => r.unregister())); }
+    } catch (e) { /* best effort */ }
+    // a new address is a cache miss for the page itself; ?mode= rides along, so the mode stays
+    const u = new URL(location.href); u.searchParams.set('_r', Date.now().toString(36)); location.replace(u.toString());
+  });
+  sync();
+  window.TAAS_MENU = { open, close, sync, get isOpen() { return !menu.hidden; } };
 })();
 </script>
 <script>
@@ -1863,7 +2021,7 @@ const MODE = (function () {
   // sound lives in SND (shared with the robot factory), above
 
   document.addEventListener('click', ev => {
-    if (ev.target.closest('#mute-btn')) return;
+    if (ev.target.closest('#menu, #menu-btn')) return;
     SND.init();
     const b = ev.target.closest('[data-act]');
     if (!b || b.disabled) return;
@@ -1889,6 +2047,13 @@ const MODE = (function () {
   window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (lastView) renderChart(lastView); }, 120); });
   renderNotes();
   start({});
+  // the menu's Info, in this mode: the model's own notes, opened where they sit at the foot of the page
+  MODE.on('formal', { info() {
+    const d = document.getElementById('model');
+    d.open = true;
+    d.scrollIntoView({ block: 'start' });
+    d.querySelector('summary').focus({ preventScroll: true });
+  } });
 })();
 </script>
 <script>
@@ -1903,8 +2068,7 @@ const MODE = (function () {
   const cv = document.getElementById('fx-canvas');
   let ctx = cv.getContext('2d');   // let: the floor bake borrows it for a moment
   const bubbleEl = document.getElementById('fx-bubble');
-  const moneyEl = document.getElementById('fx-money'), satEl = document.getElementById('fx-sat'), satNum = document.getElementById('fx-sat-num');
-  const hudEl = document.getElementById('fx-hud'), panelEl = document.getElementById('fx-panel');
+  const scoreEl = document.getElementById('fx-score'), menuBtn = document.getElementById('menu-btn'), panelEl = document.getElementById('fx-panel');
   const panelBody = document.getElementById('fx-panel-body');
 
   let s = null, on = false, raf = 0, lastT = 0, clock = 0, saveT = 0, paused = false;
@@ -1924,7 +2088,7 @@ const MODE = (function () {
     const first = !VW.w;
     VW.w = w; VW.h = h; VW.dpr = dpr;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
-    VW.hudBottom = Math.max(50, hudEl.getBoundingClientRect().bottom - r.top);
+    VW.hudBottom = Math.max(42, menuBtn.getBoundingClientRect().bottom - r.top + 4);   // under the chrome row
     // enough depth to see the line, the dock and the desk at once; a short landscape screen settles for the line
     const S = clamp(Math.min((w - 32) / L.W, h / ((h < 500 ? 9.5 : 13) * SE)), 34, 110);
     VW.S = S;
@@ -2111,6 +2275,7 @@ const MODE = (function () {
   const COL = {
     floor: '#cdd5dc', tile: '#bcc6cf', zone: '#c2cbd3', stripe: '#f2c230', back: '#26303c',
     wall: '#c8d2db', wallTop: '#9eacb9', kick: '#66788a', glass: '!#bfe6ff', mullion: '#55697c',
+    board: '#3b4450', boardTop: '#56616f', boardFace: '!#1c2430',
     steel: '#5d8fb8', steelTop: '#83b4da', hood: '#4a789f', plinth: '#47525e', dark: '#2b3139',
     rail: '#5c6672', bed: '#2d333b', yellow: '#f2c230', panel: '#e8ecf0', panelTop: '#f5f7f9',
     bark: '#7a4a2a', woodEnd: '#e0b072', plank: '#ebc77f', plankTop: '#f3d595', rough: '#c99a58', roughTop: '#d7ab6c', dowel: '#e6c58c', band: '#d0453b',
@@ -2125,6 +2290,8 @@ const MODE = (function () {
   // the antenna bulb: how many instructions the robot holds (none, 1-2, 3-4, all five)
   const BULB_COL = ['#e05a4f', '#f2a33a', '#f2d23a', '#4fd07a'];
   const bulbOf = r => { const n = r.rules.filter(Boolean).length; return n === 0 ? 0 : n <= 2 ? 1 : n <= 4 ? 2 : 3; };
+  // the two scoreboards' faces on the back wall, in metres: x spans, then the height and the face's depth
+  const BOARD = { cash: [0.2, 1.95], sat: [3.75, 5.85], z0: 0.95, z1: 2.35, y: 0.5 };
 
   /* ---------- the scene's static objects (world coordinates) ---------- */
   function beltFrame(x0, x1) {
@@ -2138,14 +2305,19 @@ const MODE = (function () {
   function sceneObjects() {
     const o = [];
     const add = (id, key, prims, extra) => o.push(Object.assign({ id, key, prims }, extra || {}));
-    // back wall: windows and a pipe
+    // back wall: the money board, a window over machine01, the customer satisfaction board, a pipe
+    // (the CD, 2026-10-14). The boards' faces are baked dark; drawBoards() writes on them live.
+    const board = k => { const b = BOARD[k]; return [
+      box(b[0] - 0.06, 0.45, BOARD.z0 - 0.06, b[1] + 0.06, BOARD.y - 0.01, BOARD.z1 + 0.06, COL.board, COL.boardTop),
+      box(b[0], BOARD.y - 0.01, BOARD.z0, b[1], BOARD.y, BOARD.z1, COL.boardFace, COL.boardFace, COL.boardFace, { ol: 0 })
+    ]; };
     add('wall', 0.5, [
       box(0, 0, 0, 6, 0.45, 2.7, COL.wall, COL.wallTop),
       box(0, 0.45, 0, 6, 0.52, 0.22, COL.kick),
-      box(0.45, 0.45, 1.25, 1.75, 0.47, 2.35, COL.mullion, COL.mullion, COL.mullion, { ol: 0 }),
-      box(0.5, 0.47, 1.3, 1.08, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }), box(1.12, 0.47, 1.3, 1.7, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }),
-      box(4.25, 0.45, 1.25, 5.55, 0.47, 2.35, COL.mullion, COL.mullion, COL.mullion, { ol: 0 }),
-      box(4.3, 0.47, 1.3, 4.88, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }), box(4.92, 0.47, 1.3, 5.5, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }),
+      ...board('cash'),
+      box(2.3, 0.45, 1.25, 3.4, 0.47, 2.35, COL.mullion, COL.mullion, COL.mullion, { ol: 0 }),
+      box(2.35, 0.47, 1.3, 2.83, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }), box(2.87, 0.47, 1.3, 3.35, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }),
+      ...board('sat'),
       xf(cyl(0, 0, 0, 0.06, 6, 8, '#8a96a3'), chain(Mt(0, 0.55, 2.5), My(Math.PI / 2)))
     ]);
     const endLog = (x, z, r, bark) => xf(cyl(0, 0, -0.6, r || 0.12, 1.2, 9, bark || COL.bark, COL.woodEnd), chain(Mt(x, 2.88, z), Mx(Math.PI / 2)));
@@ -2744,6 +2916,59 @@ const MODE = (function () {
     drawPrim(ctx, M_BEACON, Mt(2.45, 2.7, 1.48), VW.ox, -VW.camY, VW.S, outlinePx() * 0.7, [col, col]);
   }
   /* ---------- one frame ---------- */
+  // Money and customer satisfaction on the wall (the CD, 2026-10-14): drawn live just in front of
+  // the wall sprite, so they scroll with the floor and anyone walking by the wall passes in front.
+  const FONT = (function () { const cs = getComputedStyle(document.documentElement); return { display: cs.getPropertyValue('--display').trim() || 'sans-serif', mono: cs.getPropertyValue('--mono').trim() || 'monospace' }; })();
+  const SAT_COL = v => v >= 85 ? '#4fd07a' : v >= 60 ? '#f2b632' : '#ff6b6b';
+  function boardRect(k) {
+    const b = BOARD[k], x0 = PX(b[0]), y0 = PY(BOARD.y, BOARD.z1);
+    return { x: x0, y: y0, w: PX(b[1]) - x0, h: PY(BOARD.y, BOARD.z0) - y0 };
+  }
+  function fitText(text, font, size, maxW) {
+    ctx.font = font.replace('#', size.toFixed(1));
+    const w = ctx.measureText(text).width;
+    if (w > maxW) { size *= maxW / w; ctx.font = font.replace('#', size.toFixed(1)); }
+    return size;
+  }
+  function drawBoards() {
+    const S = VW.S, pad = 0.09 * S;
+    let r = boardRect('cash');
+    if (r.y > VW.h || r.y + r.h < 0) return;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    // money: one big number; it swells green as money comes in, and goes red below zero
+    const u = clamp(bumpT / 0.35, 0, 1), money = cash(s.money);
+    ctx.save();
+    ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
+    ctx.scale(1 + 0.3 * u, 1 + 0.3 * u);
+    fitText(money, '700 #px ' + FONT.display, 0.5 * S, (r.w - 2 * pad) / (1 + 0.3 * u));
+    ctx.textAlign = 'center';
+    ctx.fillStyle = s.money < 0 ? '#ff6b6b' : u > 0.4 ? '#7ff09a' : '#f5f7f9';
+    ctx.fillText(money, 0, 0.03 * S);
+    ctx.restore();
+    // customer satisfaction: its name across the top, then the number and a bar
+    r = boardRect('sat');
+    const v = Math.round(s.satisfaction), col = SAT_COL(v), top = r.y + pad;
+    ctx.textAlign = 'left';
+    fitText('customer satisfaction', '500 #px ' + FONT.mono, 0.15 * S, r.w - 2 * pad);
+    ctx.fillStyle = '#9fb0c2';
+    ctx.fillText('customer satisfaction', r.x + pad, top + 0.08 * S);
+    const rowY = r.y + r.h * 0.64, numSize = fitText('100%', '700 #px ' + FONT.display, 0.36 * S, (r.w - 2 * pad) * 0.45);
+    ctx.fillStyle = col;
+    ctx.fillText(v + '%', r.x + pad, rowY);
+    ctx.font = '700 ' + numSize.toFixed(1) + 'px ' + FONT.display;
+    const bx = r.x + pad + ctx.measureText('100%').width + 0.1 * S, bw = r.x + r.w - pad - bx, bh = Math.max(4, 0.11 * S);
+    ctx.fillStyle = '#323d4b';
+    roundRect(bx, rowY - bh / 2, bw, bh, bh / 2);
+    ctx.fillStyle = col;
+    if (v > 0) roundRect(bx, rowY - bh / 2, Math.max(bh, bw * clamp(v, 0, 100) / 100), bh, bh / 2);
+    ctx.restore();
+  }
+  function roundRect(x, y, w, h, rad) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, rad); else ctx.rect(x, y, w, h);
+    ctx.fill();
+  }
   function draw(dt) {
     const sp = bake();
     ctx.setTransform(VW.dpr, 0, 0, VW.dpr, 0, 0);
@@ -2753,6 +2978,7 @@ const MODE = (function () {
     if (running || m.staged < 1 || s.belt.length) beltOff += dt * (running ? 0.9 / C.processSec : 1.0);
     const D = [];
     sp.forEach(q => { if (q.crate !== undefined && s.hired > q.crate) return; D.push({ key: q.key, f: () => blit(q) }); });
+    D.push({ key: 0.5005, f: drawBoards });
     D.push({ key: 3.205, f: () => { beltTop(1.0, 2.15, running || m.staged < 1, beltOff); beltTop(3.55, 4.7, running || s.belt.length, beltOff); } });
     D.push({ key: 3.585, f: machineWindow });
     D.push({ key: 3.586, f: drawBeacon });
@@ -2915,23 +3141,16 @@ const MODE = (function () {
   });
 
   /* ---------- HUD and the opt-in panel ---------- */
-  let shownMoney = null, shownSat = -1;
+  let shownMoney = null, shownSat = -1, bumpT = 0;
   const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US');
-  function renderHud() {
-    if (s.money !== shownMoney) {
-      if (shownMoney !== null && s.money > shownMoney) { moneyEl.classList.remove('bump'); void moneyEl.offsetWidth; moneyEl.classList.add('bump'); }
-      shownMoney = s.money;
-      moneyEl.textContent = cash(s.money);
-      moneyEl.classList.toggle('neg', s.money < 0);
-    }
-    if (Math.round(s.satisfaction) !== shownSat) {
-      shownSat = Math.round(s.satisfaction);
-      satEl.style.setProperty('--sat', shownSat + '%');
-      satEl.classList.toggle('mid', shownSat < 85 && shownSat >= 60);
-      satEl.classList.toggle('low', shownSat < 60);
-      satNum.textContent = shownSat + '%';
-      satEl.setAttribute('aria-label', 'Customer satisfaction ' + shownSat + '%');
-    }
+  // the boards draw from the state every frame; this keeps the bump timer and the screen-reader line
+  function renderHud(dt) {
+    bumpT = Math.max(0, bumpT - (dt || 0));
+    const v = Math.round(s.satisfaction);
+    if (s.money === shownMoney && v === shownSat) return;
+    if (shownMoney !== null && s.money > shownMoney) bumpT = 0.35;
+    shownMoney = s.money; shownSat = v;
+    scoreEl.textContent = 'Money ' + cash(s.money) + '. Customer satisfaction ' + v + '%.';
   }
   const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const JOB_NAME = j => j === 'operate' ? 'on machine 01' : j === 'sell' ? 'selling' : 'resting';
@@ -3048,7 +3267,8 @@ const MODE = (function () {
     if (inp && document.activeElement === inp) inp.blur();
     panelEl.hidden = true; panelMode = 'info'; pageBot = -1; pickSlot = -1;
   }
-  document.getElementById('fx-info').addEventListener('click', () => { SND.init(); SND.sfx('pop'); confirmReset = false; panelMode = 'info'; renderPanel(); panelEl.hidden = false; });
+  // how the factory works: the menu's Info in this mode
+  function showInfo() { SND.init(); SND.sfx('pop'); confirmReset = false; pageBot = -1; pickSlot = -1; panelMode = 'info'; renderPanel(); panelEl.hidden = false; }
   panelEl.addEventListener('click', ev => {
     const b = ev.target.closest('[data-panel]');
     if (!b) { if (ev.target === panelEl) closePanel(); return; }
@@ -3151,8 +3371,8 @@ const MODE = (function () {
       ctx.strokeStyle = 'rgba(255,255,255,' + (1 - u) + ')'; ctx.lineWidth = 2.5;
       ctx.beginPath(); ctx.ellipse(PX(MARK.x), PY(MARK.y, 0), VW.S * (0.1 + 0.25 * u), VW.S * (0.1 + 0.25 * u) * SE, 0, 0, Math.PI * 2); ctx.stroke();
     }
+    renderHud(dt);
     renderBubble();
-    renderHud();
     if (!panelEl.hidden && panelMode === 'robot') renderRobot();
     saveT += dt;
     if (saveT > 2) save();
@@ -3186,11 +3406,12 @@ const MODE = (function () {
     view: VW, layout, tick, save, hitTest, spriteRect, openRobot, closePanel,
     get page() { return { mode: panelMode, bot: pageBot, pick: pickSlot, open: !panelEl.hidden }; },
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],
+    board: boardRect, showInfo,
     get on() { return on; },
     set paused(v) { paused = !!v; }, get paused() { return paused; }
   };
 
-  MODE.on('robot-factory', { enter, leave });
+  MODE.on('robot-factory', { enter, leave, info: showInfo });
 })();
 </script>
 </body>
