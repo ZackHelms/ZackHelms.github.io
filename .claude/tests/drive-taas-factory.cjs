@@ -6,11 +6,13 @@
  * (`const FACTORY = (function () { ... })()`), so the rules are checked here against that
  * block, lifted out of the page, with no browser: the floor and its paths, the manual loop
  * the CD described (tap the button, the avatar walks over and presses, four seconds, a plank
- * in the bin, sell it for $5) and the logs you toss yourself, hiring at $20 and $40, the two
- * jobs, every mistake a robot can make and what it does, the robots' instructions (the CD's
- * six, each robot's own slots at $5-$25, the list that grows with the mistakes seen, each
- * instruction preventing its mistake, the 1-in-20 slip, an instruction about another job doing
- * nothing), the rates as MEASURED over real play, customer satisfaction and prices, and saving.
+ * in the bin, sell it for $5), $1 a log whoever presses, and the logs you toss yourself, hiring
+ * at $20 and $40, the two jobs, every mistake a robot can make and what it does, the seller
+ * that only sells what is in the bin and hunts it for planks when told to, the robots'
+ * instructions (the CD's seven, each robot's own slots at $5-$25, the list that grows with the
+ * mistakes seen, each instruction preventing its mistake, the one that now prevents nothing,
+ * the 1-in-20 slip, an instruction about another job doing nothing), the rates as MEASURED
+ * over real play, customer satisfaction and prices, and saving.
  * Numbers come from FACTORY.CFG, so a retune never turns this red.
  * The page around the engine is drive-taas-factory-ui.cjs.
  *
@@ -50,8 +52,8 @@ const until = (s, pred, max) => { for (let t = 0; t < (max || 60); t += 0.05) { 
 const take = (s, kind) => s.events.filter(x => x.kind === kind);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 const many = (v, n) => Array(n || 60).fill(v);
-// the dice, made quiet: good logs, no sap, no thinking (each queue is what the next rolls of that name come up)
-const calm = () => ({ log: many('log'), sap: many(false), think: many(false) });
+// the dice, made quiet: good logs, no thinking (each queue is what the next rolls of that name come up)
+const calm = () => ({ log: many('log'), think: many(false) });
 function onFree(s, pts) { return pts.every(p => F.free(s, p.x, p.y)); }
 // geometry, not the pathing grid: a walked segment keeps 0.1 m clear of every solid footprint
 function segFree(s, from, pts) {
@@ -89,7 +91,7 @@ function instruct(s, id, rules) {
   return s;
 }
 const RULE_TEXT = {
-  sap: 'Never put sap on input log', gnarled: 'Put gnarled logs in recycle bin', small: 'Only input logs bigger than 1"x4"x4\'',
+  sap: 'Never put sap on input log', sappy: 'Put sap logs in recycle bin', gnarled: 'Put gnarled logs in recycle bin', small: 'Only input logs bigger than 1"x4"x4\'',
   output: 'Only output 1"x4"x4\' wood planks', sellOnly: 'Only sell 1"x4"x4\' wood planks', price: 'Sell 1"x4"x4\' wood planks for $5'
 };
 
@@ -97,20 +99,22 @@ const RULE_TEXT = {
 {
   ok(C.hire.length === 2 && C.hire[0] === 20 && C.hire[1] === 40, 'two robots, at $20 and $40 (the CD\'s numbers)', C.hire.join());
   ok(C.processSec === 4 && C.price.plank === 5, 'a plank takes 4 s and sells for $5 (the CD\'s numbers)');
-  ok(C.price.dowels <= 1 && C.price.rough < C.price.plank && C.mislabel === C.price.plank && C.cheapPlank < C.price.plank, 'dowels sell for $1 at most, a rough plank for less than a plank; passed off as a plank they ask a plank\'s price');
+  ok(C.price.dowels <= 1 && C.price.rough < C.price.plank && C.mislabel === C.price.plank && C.cheapPlank < C.price.plank, 'dowels sell for $1 at most, a plank with holes for less than a plank; passed off as a plank they ask a plank\'s price');
+  ok(C.logCost === 1, 'machine01 costs $1 for every log it processes (the CD\'s number)', C.logCost);
   ok(JSON.stringify(C.slots) === '[5,10,15,20,25]' && C.slots.reduce((a, b) => a + b, 0) * C.hire.length === 150, 'instruction slots cost $5 / $10 / $15 / $20 / $25 for each robot: $150 for all five on both (the CD\'s numbers)', C.slots.join());
-  ok(F.RULES.length === 6 && F.RULES.every(q => RULE_TEXT[q.id] === q.text), 'the instruction pool is the CD\'s six, word for word', F.RULES.map(q => q.text).join(' | '));
-  ok(F.RULES.filter(q => q.job === 'operate').map(q => q.id).join() === 'sap,gnarled,small,output' && F.RULES.filter(q => q.job === 'sell').map(q => q.id).join() === 'sellOnly,price', 'four are about running machine 01, two about selling');
+  ok(F.RULES.length === 7 && F.RULES.every(q => RULE_TEXT[q.id] === q.text), 'the instruction pool is the CD\'s six and the sap-log one, word for word', F.RULES.map(q => q.text).join(' | '));
+  ok(F.RULES.filter(q => q.job === 'operate').map(q => q.id).join() === 'sap,sappy,gnarled,small,output' && F.RULES.filter(q => q.job === 'sell').map(q => q.id).join() === 'sellOnly,price', 'five are about running machine 01, two about selling');
   ok(F.BASE.operate === 'Use machine01 to refine raw materials.' && F.BASE.sell === 'Sell the items in this bin.', 'the base prompts are the CD\'s: "use machine01 to refine raw materials" and "sell the items in this bin"');
   ok(C.slip > 0 && C.slip <= 0.1 && C.names.length >= C.hire.length && new Set(C.names).size === C.names.length, 'a robot slips on an instruction rarely (' + C.slip + '), and the robots start with names of their own');
-  const L0 = C.logs.gnarled + C.logs.small;
-  ok(L0 > 0 && L0 < 0.7 && Object.keys(U).every(k => U[k] > 0 && U[k] < 1), 'some logs off the rack are gnarled or small, most are good; every uninstructed mistake is a chance, not a certainty');
+  const L0 = C.logs.gnarled + C.logs.small + C.logs.sappy;
+  ok(C.logs.sappy > 0 && L0 > 0 && L0 < 0.7 && Object.keys(U).every(k => U[k] > 0 && U[k] < 1), 'some logs off the rack are gnarled, small or sappy, most are good; every uninstructed mistake is a chance, not a certainty');
+  ok(U.sap === undefined && !L.SOLID.barrel && !SP.sap && F.LOGS.indexOf('sappy') >= 0, 'the sap barrel is gone (the CD, 2026-10-14): no robot pours sap; it comes in on the logs');
 }
 
 /* ---------- 2. the floor ---------- */
 {
   const s = F.newGame();
-  const spots = ['start', 'press', 'operate', 'sap', 'sell', 'bin', 'dock'].map(k => Object.assign({ k }, SP[k]));
+  const spots = ['start', 'press', 'operate', 'sell', 'bin', 'dock'].map(k => Object.assign({ k }, SP[k]));
   ok(onFree(s, spots), 'every spot stands on free floor', spots.filter(p => !F.free(s, p.x, p.y)).map(p => p.k).join());
   const bad = [];
   spots.forEach(a => spots.forEach(b => {
@@ -155,6 +159,7 @@ const RULE_TEXT = {
   until(s, x => x.bin.length > 0, 5);
   ok(made.length === 1 && made[0].item === 'plank' && s.bin.join() === 'plank' && Math.abs(s.t - pressT - C.processSec - C.outSec - C.dropSec) < 0.1,
     'one smooth plank rides the out-feed belt and drops into the bin', s.bin.join() + ' at +' + (s.t - pressT).toFixed(2));
+  ok(s.money === -C.logCost && s.spent === C.logCost && take(s, 'press')[0].cost === C.logCost, 'the press cost $' + C.logCost + ' for the log: money goes below zero, $0 to -$' + C.logCost, s.money);
 
   s.events = [];
   s.avatar.x = SP.press.x + 0.4;   // near the button, not on its spot
@@ -170,8 +175,9 @@ const RULE_TEXT = {
   until(s, x => !!F.bubbleOpen(x), 10);
   const o = F.options(s);
   ok(early === 0 && o.length === 1 && o[0].id === 'sell:plank' && o[0].enabled && o[0].price === 5, 'at the bin, and only once there, the bubble offers one thing: sell a plank for $5', JSON.stringify(o));
+  const m0 = s.money;
   F.choose(s, 'sell:plank');
-  ok(s.money === 5 && s.bin.length === 1, 'one tap sells exactly one plank: $0 to $5', s.money + ' / ' + s.bin.length);
+  ok(m0 === -2 * C.logCost && s.money === m0 + 5 && s.bin.length === 1, 'one tap sells exactly one plank: $5 more (two logs in, -$' + (2 * C.logCost) + ' to $' + (5 - 2 * C.logCost) + ')', m0 + ' > ' + s.money + ' / ' + s.bin.length);
   F.choose(s, 'sell:plank');
   const empty = F.options(s)[0];
   const before = JSON.stringify([s.money, s.bin, s.satisfaction]);
@@ -183,7 +189,7 @@ const RULE_TEXT = {
   for (let i = 0; i < 2; i++) { F.tap(s, { kind: 'machine' }); until(s, x => x.machine.phase === 'ready' && x.machine.staged >= 1 && !x.belt.length && take(x, 'binned').length >= 3 + i, 20); }
   F.tap(s, { kind: 'bin' }); until(s, x => !!F.bubbleOpen(x), 10);
   while (F.choose(s, 'sell:plank'));
-  ok(s.money === 20 && s.tally.player.sold === 4, 'four planks sold by hand is $20', s.money);
+  ok(s.money === 20 - 4 * C.logCost && s.spent === 4 * C.logCost && s.earned === 20 && s.tally.player.sold === 4, 'four planks sold by hand is $20, less $' + (4 * C.logCost) + ' for their logs', s.money);
 
   // you never get it wrong: a gnarled or a small log goes in the recycle bin, and you press the next good one
   const g = F.newGame(); g.force.log = ['small', 'log'];
@@ -194,10 +200,10 @@ const RULE_TEXT = {
   ok(rec.length === 2 && rec[0].item === 'gnarled' && rec[1].item === 'small' && rec.every(e => e.by === 'player' && e.from === 'in') && g.machine.log === 'log' && g.machine.by === 'player' && g.tally.player.tossed === 2,
     'tapping the button with a gnarled log on the belt: you toss it in the recycle bin, then the small one after it, and press on the good log', rec.map(e => e.item).join());
   until(g, x => x.bin.length > 0, 10);
-  ok(g.bin.join() === 'plank' && g.recycled.join() === 'gnarled,small' && g.recycledN === 2 && !F.known(g).length, 'so your plank is a plank, the two bad logs are in the recycle bin, and no instruction joins the list (you made no mistake)');
-  const sp = F.newGame(); sp.force.log = ['log']; sp.machine.sap = true;
+  ok(g.bin.join() === 'plank' && g.recycled.join() === 'gnarled,small' && g.recycledN === 2 && !F.known(g).length && g.spent === C.logCost, 'so your plank is a plank, the two bad logs are in the recycle bin (a toss costs nothing: only the log pressed is paid for), and no instruction joins the list (you made no mistake)', g.spent);
+  const sp = F.newGame(); sp.force.log = ['log']; sp.machine.log = 'sappy';
   F.tap(sp, { kind: 'machine' }); until(sp, x => x.machine.phase === 'run', 20); run(sp, 2);
-  ok(take(sp, 'recycled').length === 1 && sp.machine.phase === 'run' && !take(sp, 'jam').length, 'a log with sap on it goes in the recycle bin too: your press never jams the machine');
+  ok(take(sp, 'recycled').length === 1 && take(sp, 'recycled')[0].item === 'sappy' && sp.machine.phase === 'run' && !take(sp, 'jam').length, 'a sap log goes in the recycle bin too: your press never jams the machine');
 }
 
 /* ---------- 4. hiring ---------- */
@@ -281,27 +287,27 @@ function opCycle(log, force, rules) {
   s = opCycle('gnarled');
   until(s, x => x.bin.length > 0, 20);
   const rule1 = take(s, 'rule');
-  ok(s.bin.join() === 'rough' && s.robots[0].tally.soso === 1 && s.robots[0].record.rough === 1 && rule1.length && rule1[0].id === 'gnarled' && rule1[0].by === 0,
-    'with no instruction a gnarled log goes in and a rough plank comes out (so-so), and "' + RULE_TEXT.gnarled + '" joins the list', s.bin.join() + ' / ' + F.known(s).map(q => q.id).join());
-  ok(F.known(s).map(q => q.id).join() === 'gnarled,output', 'and once the rough plank lands in the bin, "' + RULE_TEXT.output + '" joins it: those two and no others', F.known(s).map(q => q.id).join());
+  ok(s.bin.join() === 'rough' && s.robots[0].tally.soso === 1 && s.robots[0].record.rough === 1 && rule1.length && rule1[0].id === 'gnarled' && rule1[0].by === 0 && s.spent === C.logCost,
+    'with no instruction a gnarled log goes in (for $' + C.logCost + ') and a plank with holes comes out (so-so), and "' + RULE_TEXT.gnarled + '" joins the list', s.bin.join() + ' / ' + F.known(s).map(q => q.id).join());
+  ok(F.known(s).map(q => q.id).join() === 'gnarled,output', 'and once the plank with holes lands in the bin, "' + RULE_TEXT.output + '" joins it: those two and no others', F.known(s).map(q => q.id).join());
 
   s = opCycle('small');
   until(s, x => x.bin.length > 0, 20);
   ok(s.bin.join() === 'dowels' && s.robots[0].tally.bad === 1 && s.robots[0].record.dowels === 1 && s.seen.small, 'a small log goes in and dowel rods come out (bad), and its instruction joins the list', s.bin.join());
 
-  s = opCycle('log', { sap: [true] });
-  const fetched = until(s, x => x.robots[0].carry === 'sap', 10);
-  until(s, x => x.machine.phase === 'jam', 10);
+  s = opCycle('sappy');
+  until(s, x => x.machine.phase === 'jam', 20);
   run(s, 60);
-  ok(fetched && s.machine.phase === 'jam' && !s.bin.length && !take(s, 'made').length && s.robots[0].tally.bad === 1 && s.robots[0].record.sap === 1 && F.known(s).map(q => q.id).join() === 'sap',
-    'sap: it fetches sap, pours it on the log, the machine gums up and stays jammed (60 s later no robot has fixed it), and "' + RULE_TEXT.sap + '" joins the list', s.machine.phase);
+  ok(s.machine.phase === 'jam' && !s.bin.length && !take(s, 'made').length && s.robots[0].tally.bad === 1 && s.robots[0].record.sap === 1 && s.seen.sappy && take(s, 'rule').length === 1 && take(s, 'rule')[0].id === 'sappy',
+    'a sap log: with no instruction it goes in, the machine gums up and stays jammed (60 s later no robot has fixed it), and "' + RULE_TEXT.sappy + '" joins the list', s.machine.phase);
+  ok(F.known(s).map(q => q.id).join() === 'sap,sappy' && s.spent === C.logCost, 'and "' + RULE_TEXT.sap + '" joins it, an instruction that sounds right and now prevents nothing; the jammed log still cost $' + C.logCost, F.known(s).map(q => q.id).join());
   ok(s.robots[0].mood === 'stuck' && s.robots[0].state === 'idle', 'and the operator just stands there, stuck');
   F.tap(s, { kind: 'machine' });
   until(s, x => x.avatar.act && x.avatar.act.kind === 'clean', 10);
   const c0 = s.t;
   until(s, x => x.machine.phase !== 'jam', 10);
-  ok(s.machine.phase === 'ready' && Math.abs(s.t - c0 - C.cleanSec) < 0.11 && take(s, 'cleaned').length === 1 && !s.machine.sap, 'tapping the machine walks you over to scrub it clean, which takes ' + C.cleanSec + ' s', (s.t - c0).toFixed(2));
-  s = opCycle('log', { sap: [true] }); until(s, x => x.machine.phase === 'jam', 20);
+  ok(s.machine.phase === 'ready' && Math.abs(s.t - c0 - C.cleanSec) < 0.11 && take(s, 'cleaned').length === 1, 'tapping the machine walks you over to scrub it clean, which takes ' + C.cleanSec + ' s', (s.t - c0).toFixed(2));
+  s = opCycle('sappy'); until(s, x => x.machine.phase === 'jam', 20);
   F.tap(s, { kind: 'machine' }); until(s, x => x.avatar.act && x.avatar.act.kind === 'clean', 10);
   run(s, C.cleanSec / 2);
   F.tap(s, { kind: 'floor', x: 3, y: 6 }); run(s, 2);
@@ -341,11 +347,11 @@ function sale(item, force, sat, rules) {
   ok(r.paid === 5 && r.dt <= -C.satHit + 0.5 && r.dt > -C.satHit - 0.01 && r.e.sale === 'mislabel' && r.s.seen.sellOnly && F.known(r.s).map(q => q.id).join() === 'sellOnly',
     'bad: dowel rods sold as a plank for $5, customer satisfaction drops ' + C.satHit + ', and "' + RULE_TEXT.sellOnly + '" joins the list', r.paid + ' / ' + r.dt.toFixed(2));
   r = sale('rough', { mislabel: [true] });
-  ok(r.paid === 5 && r.e.sale === 'mislabel', 'a rough plank passed off as a plank goes the same way', r.paid);
+  ok(r.paid === 5 && r.e.sale === 'mislabel', 'a plank with holes passed off as a plank goes the same way', r.paid);
   r = sale('dowels', { mislabel: [false] });
-  ok(r.paid === C.price.dowels && r.e.sale === 'fair' && r.s.robots[1].record.honest === 1 && !F.known(r.s).length, 'or it sells dowels honestly, at their own price ($' + C.price.dowels + '): no mistake, nothing joins the list', r.paid);
+  ok(r.paid === C.price.dowels && r.e.sale === 'fair' && r.s.robots[1].record.honest === 1 && !F.known(r.s).length && !r.s.robots[1].record.looking, 'or it sells dowels honestly, at their own price ($' + C.price.dowels + '): no mistake, nothing joins the list (and with no instruction it never hunts: it sells what comes next)', r.paid);
   r = sale('rough', { mislabel: [false] });
-  ok(r.paid === C.price.rough, 'and a rough plank at its own price, $' + C.price.rough, r.paid);
+  ok(r.paid === C.price.rough, 'and a plank with holes at its own price, $' + C.price.rough, r.paid);
   r = sale('plank', { price: ['fair'] }, 70);
   ok(r.paid === Math.round(5 * r.e.satAt / 100) && r.paid === 4 && r.dt >= C.satUp && r.dt < C.satUp + 1, 'customer satisfaction sets the price: at 70% a plank fetches $4, and a fair sale wins a point back', r.paid + ' / ' + r.dt.toFixed(2));
   r = sale('dowels', { mislabel: [true] }, C.satMin + 3);
@@ -408,35 +414,68 @@ function sale(item, force, sat, rules) {
   s = opCycle('small', { slip: [false] }, ['small']);
   until(s, x => x.bin.length > 0, 20);
   ok(take(s, 'recycled').length === 1 && take(s, 'recycled')[0].item === 'small' && s.bin.join() === 'plank', '"' + RULE_TEXT.small + '": the small log goes in the recycle bin, not the machine');
-  s = opCycle('log', { slip: [false, false], sap: [true] }, ['sap']);
+  s = opCycle('sappy', { slip: [false] }, ['sappy']);
   until(s, x => x.bin.length > 0, 20);
-  ok(!take(s, 'sapped').length && s.machine.phase !== 'jam' && s.bin.join() === 'plank' && s.force.sap.length === 1, '"' + RULE_TEXT.sap + '": no sap, no jam (it never even reaches for the barrel)');
+  ok(take(s, 'recycled').length === 1 && take(s, 'recycled')[0].item === 'sappy' && !take(s, 'jam').length && s.bin.join() === 'plank' && s.spent === C.logCost,
+    '"' + RULE_TEXT.sappy + '": the sap log goes in the recycle bin, not the machine (no jam, and only the good log after it is paid for)', s.spent);
+  s = opCycle('sappy', { slip: [false] }, ['sap']);
+  until(s, x => x.machine.phase === 'jam', 20);
+  ok(s.machine.phase === 'jam' && s.force.slip.length === 1, '"' + RULE_TEXT.sap + '" prevents nothing now: the sap log goes in and jams the machine, and the instruction is never even consulted (its slip die is never rolled)');
   s = opCycle('gnarled', { slip: [false] }, ['output']);
   until(s, x => take(x, 'recycled').length > 0, 20); run(s, 3);
   const r2 = take(s, 'recycled')[0];
   ok(r2 && r2.item === 'rough' && r2.from === 'out' && !s.bin.length && !take(s, 'binned').length && s.robots[0].record.caught === 1 && s.robots[0].record.rough === 1,
-    '"' + RULE_TEXT.output + '": the gnarled log still goes in (that is another instruction), but the rough plank goes in the recycle bin, not the sale bin', r2 && r2.item);
-  let r = sale('dowels', { slip: [false], mislabel: [true] }, undefined, ['sellOnly']);
-  ok(!r.e && r.rec && r.rec.item === 'dowels' && r.rec.from === 'bin' && r.paid === 0 && r.dt === 0 && r.s.robots[1].record.recycle === 1, '"' + RULE_TEXT.sellOnly + '": the seller puts dowels in the recycle bin instead of selling them, and satisfaction is untouched');
-  r = sale('plank', { slip: [false], price: ['free'] }, undefined, ['price']);
+    '"' + RULE_TEXT.output + '": the gnarled log still goes in (that is another instruction), but the plank with holes goes in the recycle bin, not the sale bin', r2 && r2.item);
+  // "only sell planks": the seller only ever sells what is in the bin, so everything else stays
+  // there and it has to hunt for a plank
+  const hunt = (bin, force, done) => {
+    const t = staffed(13, [null, 'sell']); instruct(t, 1, ['sellOnly']);
+    until(t, x => x.robots[1].state === 'idle' && dist(x.robots[1], SP.sell) < 0.07, 20);
+    t.events = []; bin.forEach(k => t.bin.push(k));
+    Object.keys(force).forEach(k => { t.force[k] = force[k].slice(); });
+    const m0 = t.money, sat0 = t.satisfaction;
+    until(t, done, 12);
+    return { t, m0, sat0, r: t.robots[1] };
+  };
+  let h = hunt(['dowels', 'rough'], { slip: [false] }, x => x.t > 1e9);
+  ok(!take(h.t, 'sold').length && !take(h.t, 'recycled').length && h.t.bin.join() === 'dowels,rough' && h.r.record.looking >= 6 && take(h.t, 'looking').length === h.r.record.looking && h.t.money === h.m0 && !take(h.t, 'rule').length,
+    '"' + RULE_TEXT.sellOnly + '": with only dowels and a plank with holes in the bin, the seller sells nothing and takes nothing out (the recycle bin is not its job: "sell the items in this bin"); it keeps reaching, and each reach is a "looking for plank" on its record', h.t.bin.join() + ' / looking ' + h.r.record.looking);
+  h = hunt(['dowels', 'rough', 'plank', 'dowels'], { slip: [false, true, true], find: [false, false, true], price: ['fair'] }, x => take(x, 'sold').length > 0);
+  ok(h.r.record.looking === 2 && take(h.t, 'sold').length === 1 && take(h.t, 'sold')[0].item === 'plank' && h.t.bin.join() === 'dowels,rough,dowels' && h.t.force.slip.join() === 'true,true' && !h.t.force.find.length,
+    'two reaches turn up something else, the third a plank, which it sells; the rest stay where they are, and it decided once for that sale whether to follow the instruction (one slip die for the whole hunt, not one a reach)', 'looking ' + h.r.record.looking + ', bin ' + h.t.bin.join() + ', slip left ' + h.t.force.slip.join());
+  let r = sale('plank', { slip: [false], price: ['free'] }, undefined, ['price']);
   ok(r.paid === 5 && r.e.sale === 'fair', '"' + RULE_TEXT.price + '": a plank goes for $5 even on a day the seller would have given it away');
   // the slip: 1 time in 20 it does what it would have done anyway
   s = opCycle('gnarled', { slip: [true] }, ['gnarled']);
   until(s, x => x.bin.length > 0, 20);
   ok(s.bin.join() === 'rough' && !take(s, 'recycled').length, 'on a slip the instruction is ignored: the gnarled log goes in anyway');
   r = sale('rough', { slip: [true], mislabel: [true] }, undefined, ['sellOnly']);
-  ok(r.e && r.e.sale === 'mislabel', 'and a slipping seller can still pass a rough plank off as a plank');
+  ok(r.e && r.e.sale === 'mislabel' && !r.s.robots[1].record.looking, 'and a slipping seller does not hunt: it sells what comes next, and can pass a plank with holes off as a plank');
   // an instruction about another job does nothing: same dice, same day, exactly
   const day = rules => {
     const t = staffed(31, ['operate', 'sell']);
     if (rules) { instruct(t, 0, rules[0]); instruct(t, 1, rules[1]); }
     const log = [];
-    for (let k = 0; k < 6000; k++) { F.step(t, 0.05); t.events.forEach(e => { if (e.kind === 'outcome' || e.kind === 'sold' || e.kind === 'recycled') log.push(e.kind + ':' + (e.what || e.sale || e.item)); }); t.events = []; if (t.machine.phase === 'jam') { t.machine.dirt = 0.001; t.avatar.act = { kind: 'clean', t: 0 }; } }
-    return { log: log.join(), money: t.money, seed: t.seed };
+    for (let k = 0; k < 6000; k++) { F.step(t, 0.05); t.events.forEach(e => { if (e.kind === 'outcome' || e.kind === 'sold' || e.kind === 'recycled' || e.kind === 'looking') log.push(e.kind + ':' + (e.what || e.sale || e.item || '')); }); t.events = []; if (t.machine.phase === 'jam') { t.machine.dirt = 0.001; t.avatar.act = { kind: 'clean', t: 0 }; } }
+    return { log: log.join(), money: t.money, earned: t.earned, seed: t.seed };
   };
-  const plain = day(null), crossed = day([['sellOnly', 'price'], ['sap', 'gnarled', 'small', 'output']]), right = day([['sap', 'gnarled', 'small', 'output'], ['sellOnly', 'price']]);
+  const plain = day(null), crossed = day([['sellOnly', 'price'], ['sap', 'sappy', 'gnarled', 'small', 'output']]), right = day([['sappy', 'gnarled', 'small', 'output'], ['sellOnly', 'price']]);
   ok(plain.log.length > 200 && crossed.log === plain.log && crossed.money === plain.money && crossed.seed === plain.seed, 'an instruction about the other robot\'s job does nothing: crossed wires play the same day as no instructions, roll for roll', plain.money + ' vs ' + crossed.money);
-  ok(right.money > plain.money * 1.5, 'and the same instructions on the right robots earn over 1.5x as much (with every jam cleaned the moment it happens)', right.money + ' vs ' + plain.money);
+  const decoy = day([['sap'], []]);
+  ok(decoy.log === plain.log && decoy.seed === plain.seed, 'and so does "' + RULE_TEXT.sap + '" on the operator: an instruction that prevents nothing plays the same day as none, roll for roll');
+  ok(right.earned > plain.earned * 1.5 && right.money > plain.money * 2, 'and the right instructions on the right robots earn over 1.5x as much, and keep over twice as much (with every jam cleaned the moment it happens)', right.money + ' vs ' + plain.money + ' kept, ' + right.earned + ' vs ' + plain.earned + ' earned');
+  // an upstream instruction can keep a downstream mistake from ever happening: an operator told
+  // about every bad log hands the seller nothing but planks, so the seller's "only sell planks"
+  // never joins the list (no slips here, so the property is the instructions' and not the dice's)
+  const upstream = rules => {
+    const t = staffed(35, ['operate', 'sell']); if (rules) instruct(t, 0, rules);
+    t.force.slip = many(false, 5000);
+    let junk = 0, sold = 0;
+    for (let k = 0; k < 12000; k++) { F.step(t, 0.05); t.events.forEach(e => { if (e.kind === 'binned' && e.item !== 'plank') junk++; if (e.kind === 'sold') sold++; }); t.events = []; if (t.machine.phase === 'jam') { t.machine.dirt = 0.001; t.avatar.act = { kind: 'clean', t: 0 }; } }
+    return { t, junk, sold };
+  };
+  const told = upstream(['sappy', 'gnarled', 'small', 'output']), untold = upstream(null);
+  ok(!told.junk && told.sold > 50 && !told.t.seen.sellOnly && untold.junk > 20 && untold.t.seen.sellOnly, 'an operator told about every bad log hands the seller only planks, so "' + RULE_TEXT.sellOnly + '" never joins the list; untold, it does within ten minutes', 'told: ' + told.junk + ' non-planks binned, ' + told.sold + ' sold; untold: ' + untold.junk + ' non-planks');
   // instructions belong to the robot: swap their jobs and they go with it
   s = staffed(33, ['operate', 'sell']); instruct(s, 0, ['gnarled']);
   F.tap(s, { kind: 'robot', id: 1 }); until(s, x => !!F.bubbleOpen(x), 20); F.choose(s, 'job:operate');
@@ -463,6 +502,7 @@ function sale(item, force, sat, rules) {
         if (e.kind === 'outcome' && e.job === 'operate') lastOp = e.grade;
         if (e.kind === 'recycled' && e.from === 'in') n.logs[e.item] = (n.logs[e.item] || 0) + 1;
         if (e.kind === 'made') { const k = { plank: 'log', rough: 'gnarled', dowels: 'small' }[e.item]; n.logs[k] = (n.logs[k] || 0) + 1; }
+        if (e.kind === 'jam') n.logs.sappy = (n.logs.sappy || 0) + 1;
         if (e.kind === 'sold' && e.item === 'plank' && n.price[e.sale] !== undefined) { n.price[e.sale]++; if (lastOp) n.pairs.push([lastOp, e.sale]); }
       });
       s.events = [];
@@ -471,8 +511,8 @@ function sale(item, force, sat, rules) {
   };
   const within = (got, n, p) => Math.abs(got / n - p) <= 3.5 * Math.sqrt(p * (1 - p) / n) + 0.005;
   const a = measure(101, 3600);
-  const logsN = (a.logs.log || 0) + (a.logs.gnarled || 0) + (a.logs.small || 0);
-  ok(logsN > 400 && within(a.logs.gnarled || 0, logsN, C.logs.gnarled) && within(a.logs.small || 0, logsN, C.logs.small), 'over real play the rack sends gnarled and small logs at their rates', JSON.stringify(a.logs));
+  const logsN = (a.logs.log || 0) + (a.logs.gnarled || 0) + (a.logs.small || 0) + (a.logs.sappy || 0);
+  ok(logsN > 400 && within(a.logs.gnarled || 0, logsN, C.logs.gnarled) && within(a.logs.small || 0, logsN, C.logs.small) && within(a.logs.sappy || 0, logsN, C.logs.sappy), 'over real play the rack sends gnarled, small and sap logs at their rates', JSON.stringify(a.logs));
   const planks = a.price.fair + a.price.cheap + a.price.free;
   ok(planks > 1500 && within(a.price.free, planks, U.free) && within(a.price.cheap, planks, U.cheap), 'an uninstructed seller gives planks away and lets them go cheap at its rates', JSON.stringify(a.price));
   const pg = a.pairs.filter(p => p[0] === 'good'), pb = a.pairs.filter(p => p[0] === 'bad');
@@ -481,7 +521,7 @@ function sale(item, force, sat, rules) {
   // the slip, measured: an operator told to recycle gnarled logs feeds about 1 in 20 of them anyway
   // with the instruction, a gnarled log fed in shows up as a rough plank
   const fedRate = (() => {
-    const s = staffed(107, ['operate', 'sell']); instruct(s, 0, ['gnarled', 'small', 'sap']);
+    const s = staffed(107, ['operate', 'sell']); instruct(s, 0, ['gnarled', 'small', 'sappy']);
     let fedN = 0, tossedN = 0;
     for (let t = 0; t < 7200; t += 0.05) {
       F.step(s, 0.05);
@@ -492,6 +532,19 @@ function sale(item, force, sat, rules) {
     return { fedN, n: fedN + tossedN };
   })();
   ok(fedRate.n > 300 && within(fedRate.fedN, fedRate.n, C.slip), 'over real play, an operator told to recycle gnarled logs still feeds ' + Math.round(C.slip * 100) + '% of them in (it slips)', fedRate.fedN + ' of ' + fedRate.n);
+  // the hunt, measured: with one plank in four things, a reach finds a plank one time in four
+  const findRate = (() => {
+    const s = staffed(109, [null, 'sell']); instruct(s, 1, ['sellOnly']);
+    let found = 0, looked = 0;
+    for (let t = 0; t < 3600; t += 0.05) {
+      if (s.bin.length !== 4 || s.bin.filter(k => k === 'plank').length !== 1) { s.bin.length = 0; s.bin.push('dowels', 'rough', 'plank', 'dowels'); }
+      F.step(s, 0.05);
+      s.events.forEach(e => { if (e.kind === 'looking') looked++; if (e.kind === 'sold' && e.item === 'plank') found++; });
+      s.events = [];
+    }
+    return { found, n: found + looked };
+  })();
+  ok(findRate.n > 1000 && within(findRate.found, findRate.n, 0.25), 'over real play, a seller told to sell only planks finds one in a bin of four things with one plank in it one reach in four (planks / everything in the bin)', findRate.found + ' of ' + findRate.n);
 }
 
 /* ---------- 9. saving, determinism and the bounds, over seeded random play ---------- */
@@ -524,7 +577,8 @@ function sale(item, force, sat, rules) {
   const s = F.newGame(4);
   play(s, 300, x => {
     if (worst) return;
-    if (x.money < 0) worst = 'money ' + x.money;
+    const bought = x.events.reduce((n, e) => n + (e.kind === 'hired' || e.kind === 'slot' ? e.price : 0), 0);
+    if (!Number.isInteger(x.money) || x.money !== x.earned - x.spent - bought) worst = 'money ' + x.money + ' is not earned ' + x.earned + ' less logs ' + x.spent + ' and purchases ' + bought;
     else if (x.satisfaction < C.satMin || x.satisfaction > 100) worst = 'satisfaction ' + x.satisfaction;
     else if (!F.free(x, x.avatar.x, x.avatar.y)) worst = 'avatar inside something at ' + x.avatar.x.toFixed(2) + ',' + x.avatar.y.toFixed(2);
     else if (x.robots.some(r => !F.free(x, r.x, r.y))) worst = 'a robot inside something';
@@ -532,7 +586,7 @@ function sale(item, force, sat, rules) {
     else if (['ready', 'run', 'jam'].indexOf(x.machine.phase) < 0 || F.LOGS.indexOf(x.machine.log) < 0) worst = 'machine ' + x.machine.phase + ' ' + x.machine.log;
     else if (x.robots.some(r => r.slots > C.slots.length || r.rules.length !== r.slots || r.rules.some(id => id !== null && !x.seen[id]) || new Set(r.rules.filter(Boolean)).size !== r.rules.filter(Boolean).length)) worst = 'a robot\'s instructions ' + JSON.stringify(x.robots.map(r => r.rules));
   });
-  ok(!worst && s.robots.length >= 1, 'over 300 random taps and page visits: money never negative, satisfaction in bounds, nobody walks into anything, the bin holds only things, instructions only ever seen ones, once each', worst || (s.robots.length + ' robots, $' + s.money + ', ' + JSON.stringify(s.robots.map(r => r.rules))));
+  ok(!worst && s.robots.length >= 1 && s.spent > 0, 'over 300 random taps and page visits: money is always what was earned less what the logs, robots and slots cost, satisfaction in bounds, nobody walks into anything, the bin holds only things, instructions only ever seen ones, once each', worst || (s.robots.length + ' robots, $' + s.money + ', ' + JSON.stringify(s.robots.map(r => r.rules))));
 
   const a = play(F.newGame(8), 60), text = F.save(a), b = F.load(text);
   const strip = x => JSON.stringify(Object.assign({}, x, { events: [] }));
@@ -543,13 +597,28 @@ function sale(item, force, sat, rules) {
     'a save from another version (the prompt-lab factory included), or garbage, is not loaded');
   const h = staffed(41); instruct(h, 0, ['sap']);
   const raw = JSON.parse(F.save(h));
-  Object.assign(raw, { money: -50, satisfaction: 400, seen: { bogus: true } });
+  Object.assign(raw, { money: 'lots', spent: -9, satisfaction: 400, seen: { bogus: true } });
   raw.robots[0].slots = 9; raw.robots[0].rules = ['sap', 'sap', 'nonsense', 'price']; raw.robots[0].name = 'x'.repeat(40);
   raw.machine.log = 'stone';
   const hacked = F.load(JSON.stringify(raw));
-  ok(hacked && hacked.money === 0 && hacked.satisfaction === 100 && hacked.robots[0].slots === 5 && hacked.robots[0].rules.join() === 'sap,,,price,' && hacked.robots[0].name.length === C.nameMax &&
+  ok(hacked && hacked.money === 0 && hacked.spent === 0 && hacked.satisfaction === 100 && hacked.robots[0].slots === 5 && hacked.robots[0].rules.join() === 'sap,,,price,' && hacked.robots[0].name.length === C.nameMax &&
     hacked.seen.price && !hacked.seen.bogus && hacked.machine.log === 'log',
-    'a hand-edited save is clamped: money, satisfaction, slots, a repeated or unknown instruction, a long name, an unknown log', hacked && JSON.stringify([hacked.money, hacked.satisfaction, hacked.robots[0].slots, hacked.robots[0].rules, hacked.robots[0].name.length, hacked.seen, hacked.machine.log]));
+    'a hand-edited save is clamped: money, what was spent, satisfaction, slots, a repeated or unknown instruction, a long name, an unknown log', hacked && JSON.stringify([hacked.money, hacked.spent, hacked.satisfaction, hacked.robots[0].slots, hacked.robots[0].rules, hacked.robots[0].name.length, hacked.seen, hacked.machine.log]));
+  raw.money = -37;
+  ok(F.load(JSON.stringify(raw)).money === -37, 'and money below zero is kept: logs cost money');
+  // a save from before the sap barrel went: an operator out fetching sap, sap on the log, a seller
+  // about to drop dowels in the recycle bin
+  const old = staffed(43);
+  const o = JSON.parse(F.save(old));
+  Object.assign(o.robots[0], { state: 'sapGo', carry: 'sap', path: [{ x: 2, y: 4.6 }] });
+  Object.assign(o.robots[1], { state: 'drop', carry: 'dowels', sale: 'recycle' });
+  Object.assign(o.machine, { phase: 'ready', staged: 1, log: 'log', sap: true });
+  delete o.spent; o.bin = ['plank'];
+  const back = F.load(JSON.stringify(o));
+  ok(back && back.robots.every(r => r.state === 'idle' && !r.carry && !r.path.length) && back.bin.join() === 'dowels,plank' && back.machine.log === 'sappy' && !('sap' in back.machine) && back.spent === 0,
+    'a save from before the barrel went loads: robots caught mid-sap or mid-drop stand idle, the dowels go back in the bin, and a log with sap poured on it is a sap log', back && JSON.stringify([back.robots.map(r => r.state + ':' + r.carry), back.bin, back.machine.log]));
+  until(back, x => x.machine.phase === 'jam', 30);
+  ok(back.machine.phase === 'jam' && back.events.some(e => e.kind === 'press' && e.by === 0), 'and it carries on from there: the operator, holding no instructions, feeds the sap log in and jams the machine', back.machine.phase);
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);

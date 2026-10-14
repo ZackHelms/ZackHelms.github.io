@@ -233,6 +233,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 #fx-cash { min-width: 80px; padding: 6px 12px; text-align: right; }
 #fx-money { font: 800 18px/1 var(--display); font-variant-numeric: tabular-nums; display: inline-block; transform-origin: 100% 50%; }
 #fx-money.bump { animation: fxbump .35s ease-out; }
+#fx-money.neg { color: #d93a3a; }   /* below zero: logs cost money (the CD, 2026-10-14) */
 @keyframes fxbump { 0% { transform: scale(1.3); color: #1c8f4c; } 100% { transform: scale(1); } }
 /* customer satisfaction: how much our customers trust us and our products */
 #fx-sat { padding: 5px 10px 7px; display: flex; flex-direction: column; gap: 5px; min-width: 150px; }
@@ -314,7 +315,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 04:40 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 12:46 UTC</div>
 <a id="back-btn" href="../index.html" aria-label="Back to games">←</a>
 <button id="mute-btn" aria-label="Toggle sound">🔊</button>
 <select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option></select>
@@ -610,22 +611,22 @@ const FACTORY = (function () {
     stageSec: 0.9,          // the next log rolls from the rack to the machine's mouth
     outSec: 1.0,            // a finished item rides the out-feed belt
     dropSec: 0.35,          // ...and falls into the bin
-    jamAt: 1.3,             // seconds into a sap run when the machine gums up
+    jamAt: 1.3,             // seconds into a sap log's run when the machine gums up
     cleanSec: 2.5,          // scrubbing a jam clean
     pressSec: 0.45,         // reach and press the button
-    tossSec: 0.6,           // lift a bad log (or a bad item) and toss it in the recycle bin
+    tossSec: 0.6,           // lift a bad log (or a bad cut) and toss it in the recycle bin
     dawdleSec: 3,           // an operator stands and thinks before pressing
-    scoopSec: 0.6, pourSec: 0.5,
     reachSec: 0.45, pitchSec: 0.75, coolSec: 0.35,   // a robot sale
+    lookSec: 0.8,           // a seller rummaging through the bin for a plank and coming up with something else
     unboxSec: 0.9,
     hire: [20, 40],         // the first robot, the second
     names: ['Bolt', 'Sprocket'],     // until you name them
     nameMax: 16,
     slots: [5, 10, 15, 20, 25],      // instruction slots: each robot's own, bought in order (the CD's prices)
-    logs: { gnarled: 0.2, small: 0.25 },   // what rolls off the rack; the rest are good logs
+    logs: { gnarled: 0.2, small: 0.2, sappy: 0.1 },   // what rolls off the rack; the rest are good logs
+    logCost: 1,             // machine01 costs $1 for every log it processes, yours included (the CD, 2026-10-14)
     // what a robot does when no instruction covers it (each robot rolls its own dice)
     uninstructed: {
-      sap: 0.2,             // an operator pours sap on the log
       think: 0.25,          // an operator stops to think first (no instruction covers this yet)
       free: 0.25,           // a seller gives a plank away...
       cheap: 0.35,          // ...or lets it go cheap
@@ -641,11 +642,15 @@ const FACTORY = (function () {
     satHeal: 0.005          // customers forget: each second closes this share of the gap to 100
   };
 
-  // The instruction pool (the CD's six, 2026-10-14). Each prevents one mistake and belongs to
-  // one job: on a robot doing any other job it does nothing. A rule joins the list the first
-  // time a robot makes the mistake it prevents.
+  // The instruction pool: the CD's six (2026-10-14) and the sap-log one (the CD's third brief,
+  // the same day, when the sap barrel went and sap came in on the logs). Each prevents one
+  // mistake and belongs to one job: on a robot doing any other job it does nothing. A rule joins
+  // the list the first time a robot makes the mistake it prevents. "Never put sap on input log"
+  // now prevents nothing (no robot pours sap any more): it joins the list beside the sap-log
+  // instruction (`joins`), an extraneous choice the CD is happy to leave in it.
   const RULES = [
-    { id: 'sap', job: 'operate', text: 'Never put sap on input log' },
+    { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: 'sappy' },
+    { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin' },
     { id: 'gnarled', job: 'operate', text: 'Put gnarled logs in recycle bin' },
     { id: 'small', job: 'operate', text: 'Only input logs bigger than 1"x4"x4\'' },
     { id: 'output', job: 'operate', text: 'Only output 1"x4"x4\' wood planks' },
@@ -668,7 +673,6 @@ const FACTORY = (function () {
     outBelt: [3.55, 2.6, 4.7, 3.2],
     bin: [4.7, 2.3, 5.75, 3.5],   // 0.5 high: lower than the belt, so a plank drops in over the rim
     recycle: [3.55, 3.85, 4.05, 4.35],
-    barrel: [1.28, 3.95, 1.78, 4.45],
     dockPanel: [0.4, 7.15, 2.8, 7.45],
     pallets: [0.4, 13.0, 1.6, 14.2],
     tarp: [2.2, 14.0, 4.0, 15.5],
@@ -681,7 +685,6 @@ const FACTORY = (function () {
     start: { x: 3.0, y: 5.6, face: S },
     press: { x: 2.8, y: 4.3, face: N },
     operate: { x: 2.25, y: 4.25, face: N },
-    sap: { x: 2.05, y: 4.65, face: Math.PI },
     sell: { x: 4.35, y: 3.95, face: N },
     bin: { x: 5.25, y: 4.1, face: N },
     dock: { x: 1.6, y: 9.3, face: N },
@@ -695,9 +698,9 @@ const FACTORY = (function () {
   function newGame(seed) {
     return {
       version: CFG.version, t: 0, seed: (seed === undefined ? 20261013 : seed) >>> 0,
-      money: 0, earned: 0, satisfaction: CFG.satStart, hired: 0,
-      // log: what is on the in-feed (the first is always a good one); sap: poured on it
-      machine: { phase: 'ready', t: 0, staged: 1, log: 'log', sap: false, result: null, by: null, what: null, dirt: 0 },
+      money: 0, earned: 0, spent: 0, satisfaction: CFG.satStart, hired: 0,   // spent: on logs
+      // log: what is on the in-feed (the first is always a good one)
+      machine: { phase: 'ready', t: 0, staged: 1, log: 'log', result: null, by: null, what: null, dirt: 0 },
       belt: [], bin: [],
       recycled: [], recycledN: 0,   // the last few things in the recycle bin (newest last), and how many in all
       seen: {},                     // rule id -> true once a robot has made the mistake it prevents
@@ -734,7 +737,12 @@ const FACTORY = (function () {
   // it does what it would have done anyway. Each job asks only about its own instructions, so
   // one about another job is never consulted: it does nothing
   function follows(s, r, id) { return has(r, id) && !chance(s, 'slip', CFG.slip); }
-  function see(s, id, by) { if (!s.seen[id]) { s.seen[id] = true; ev(s, 'rule', { id, by }); } }
+  function see(s, id, by) {
+    if (s.seen[id]) return;
+    s.seen[id] = true;
+    RULES.forEach(q => { if (q.joins === id) s.seen[q.id] = true; });
+    ev(s, 'rule', { id, by });
+  }
   function known(s) { return RULES.filter(q => s.seen[q.id]); }
   function slotsOpen(s) { return s.hired >= CFG.hire.length; }
   function slotPrice(s, id) { const r = s.robots[id]; return r && r.slots < CFG.slots.length ? CFG.slots[r.slots] : null; }
@@ -895,28 +903,31 @@ const FACTORY = (function () {
   }
 
   /* ---------- machine01 ---------- */
-  const LOGS = ['log', 'gnarled', 'small'];
-  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels' };
+  const LOGS = ['log', 'gnarled', 'small', 'sappy'];
+  // what a press makes of each: a gnarled log's plank keeps the log's holes ('rough'), and a sap
+  // log makes nothing ('sap'): it jams the machine
+  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', sappy: 'sap' };
   // how each thing a robot can do is graded on its record
   const GRADE = { plank: 'good', think: 'soso', rough: 'soso', dowels: 'bad', sap: 'bad', reject: 'good',
-    fair: 'good', honest: 'good', cheap: 'soso', free: 'bad', mislabel: 'bad', recycle: 'good' };
-  function nextLog(s) { return roll(s, 'log', [['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small]], 'log'); }
+    fair: 'good', honest: 'good', cheap: 'soso', free: 'bad', mislabel: 'bad', looking: 'soso' };
+  function nextLog(s) { return roll(s, 'log', [['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['sappy', CFG.logs.sappy]], 'log'); }
   function ready(s) { const m = s.machine; return m.phase === 'ready' && m.staged >= 1; }
-  // a press cuts whatever is on the in-feed: a good log makes a plank, a gnarled one a rough
-  // plank, a small one dowels; a log with sap on it jams the machine
+  // a press cuts whatever is on the in-feed, and machine01 charges for the log whatever it is
+  // (money may go below zero): a good log makes a plank, a gnarled one a plank with holes, a
+  // small one dowels; a sap log jams the machine
   function press(s, by) {
     const m = s.machine;
     if (!ready(s)) return false;
     m.phase = 'run'; m.t = 0; m.by = by;
-    m.result = m.sap ? 'sap' : MAKES[m.log];
-    m.what = m.result === 'plank' ? 'plank' : m.result;
-    ev(s, 'press', { by });
+    m.result = m.what = MAKES[m.log];
+    s.money -= CFG.logCost; s.spent += CFG.logCost;
+    ev(s, 'press', { by, cost: CFG.logCost });
     return true;
   }
   // the machine is free again: the next log starts rolling in from the rack
   function restage(s) {
     const m = s.machine;
-    m.phase = 'ready'; m.t = 0; m.staged = 0; m.log = nextLog(s); m.sap = false; m.result = null; m.by = null; m.what = null;
+    m.phase = 'ready'; m.t = 0; m.staged = 0; m.log = nextLog(s); m.result = null; m.by = null; m.what = null;
   }
   function recycle(s, item, by, from) {
     s.recycled.push(item);
@@ -947,7 +958,7 @@ const FACTORY = (function () {
     if (m.result === 'sap' && m.t >= CFG.jamAt) {
       m.phase = 'jam'; m.t = 0; m.dirt = 1;
       ev(s, 'jam', { by: m.by });
-      if (typeof m.by === 'number') { see(s, 'sap', m.by); credit(s, m.by, 'sap'); }
+      if (typeof m.by === 'number') { see(s, 'sappy', m.by); credit(s, m.by, 'sap'); }
     } else if (m.result !== 'sap' && m.t >= CFG.processSec) {
       const item = m.result, by = m.by, r = typeof by === 'number' ? s.robots[by] : null;
       ev(s, 'made', { item, by });
@@ -1016,14 +1027,14 @@ const FACTORY = (function () {
     } else if (t.kind !== 'floor') s.bubble = { kind: t.kind };
     ev(s, 'arrive', { place: t.kind });
   }
-  // you at machine 01 always get it right: you scrub a jam, toss a bad log (or one with sap on
-  // it) in the recycle bin and wait for the next, and press on a good one
+  // you at machine 01 always get it right: you scrub a jam, toss a bad log (gnarled, small or
+  // sappy) in the recycle bin and wait for the next, and press on a good one
   function work(s) {
     const a = s.avatar, m = s.machine;
     if (m.phase === 'jam') a.act = { kind: 'clean', t: 0 };
     else if (m.phase !== 'ready') a.act = null;
     else if (m.staged < 1) a.act = { kind: 'wait', t: 0 };
-    else if (m.log !== 'log' || m.sap) a.act = { kind: 'toss', t: 0, item: m.log, done: false };
+    else if (m.log !== 'log') a.act = { kind: 'toss', t: 0, item: m.log, done: false };
     else a.act = { kind: 'press', t: 0, done: false };
   }
   function stepAvatar(s, dt) {
@@ -1034,7 +1045,7 @@ const FACTORY = (function () {
       if (k.kind === 'press') {
         if (!k.done && k.t >= CFG.pressSec * 0.55) {
           k.done = true;
-          if (m.phase === 'ready' && (m.log !== 'log' || m.sap)) { work(s); return; }   // it changed under your hand
+          if (m.phase === 'ready' && m.log !== 'log') { work(s); return; }   // it changed under your hand
           if (press(s, 'player')) s.tally.player.pressed++;
         }
         if (k.t >= CFG.pressSec) a.act = null;
@@ -1057,14 +1068,14 @@ const FACTORY = (function () {
   function newRobot(s) {
     const i = s.robots.length, r = SPOT.rest[i];
     return { id: i, name: CFG.names[i], x: r.x, y: r.y, yawT: r.face, path: [], dist: 0, job: null, state: 'unbox', t: 0,
-      goal: null, think: false, check: false, sale: null, carry: null, mood: null, moodT: 0,
+      goal: null, think: false, check: false, sale: null, hunt: null, carry: null, mood: null, moodT: 0,
       slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {} };
   }
   function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'sell' ? SPOT.sell : SPOT.rest[r.id]; }
   // a robot taken off a job lets go of what the job had it holding
   function release(s, r) {
-    if (r.carry && r.carry !== 'sap') s.bin.unshift(r.carry);
-    r.carry = null; r.think = false; r.check = false; r.sale = null; r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;
+    if (r.carry) s.bin.unshift(r.carry);
+    r.carry = null; r.think = false; r.check = false; r.sale = null; r.hunt = null; r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;
   }
   function stepRobot(s, r, dt) {
     if (r.moodT > 0) r.moodT = Math.max(0, r.moodT - dt);
@@ -1083,7 +1094,8 @@ const FACTORY = (function () {
     if (r.job === 'operate') operate(s, r, dt);
     else if (r.job === 'sell') vend(s, r, dt);
   }
-  // the operator's turn at machine 01: look at the log, then (perhaps) sap, (perhaps) a think, a press
+  // the operator's turn at machine 01: look at the log (a bad one it has an instruction for goes
+  // in the recycle bin), then (perhaps) a think, then a press
   function operate(s, r, dt) {
     const m = s.machine, U = CFG.uninstructed;
     switch (r.state) {
@@ -1091,12 +1103,10 @@ const FACTORY = (function () {
         if (m.phase === 'jam') { r.mood = 'stuck'; r.moodT = 0.5; return; }
         if (!ready(s)) return;
         if (m.log !== 'log' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; }
-        const sap = !m.sap && !follows(s, r, 'sap') && chance(s, 'sap', U.sap);
         r.think = chance(s, 'think', U.think);
         r.check = follows(s, r, 'output');
         r.t = 0;
-        if (sap) { r.state = 'sapGo'; r.path = path(s, r, SPOT.sap); }
-        else r.state = r.think ? 'dawdle' : 'press';
+        r.state = r.think ? 'dawdle' : 'press';
         return;
       }
       case 'reject':
@@ -1105,23 +1115,6 @@ const FACTORY = (function () {
         return;
       case 'dawdle':
         r.t += dt; if (r.t >= CFG.dawdleSec) { r.state = 'press'; r.t = 0; }
-        return;
-      case 'sapGo':
-        if (moveAlong(r, dt, CFG.robotSpeed)) { r.state = 'scoop'; r.t = 0; r.yawT = SPOT.sap.face; }
-        return;
-      case 'scoop':
-        r.t += dt; if (r.t >= CFG.scoopSec) { r.carry = 'sap'; r.state = 'sapBack'; r.path = path(s, r, SPOT.operate); }
-        return;
-      case 'sapBack':
-        if (moveAlong(r, dt, CFG.robotSpeed)) { r.x = SPOT.operate.x; r.y = SPOT.operate.y; r.state = 'pour'; r.t = 0; r.yawT = N; }
-        return;
-      case 'pour':
-        r.t += dt;
-        if (r.t >= CFG.pourSec) {
-          r.carry = null;
-          if (ready(s)) { m.sap = true; ev(s, 'sapped', { by: r.id }); }
-          r.state = r.think ? 'dawdle' : 'press'; r.t = 0;
-        }
         return;
       case 'press':
         r.yawT = N; r.t += dt;
@@ -1140,22 +1133,44 @@ const FACTORY = (function () {
         return;
     }
   }
-  // the seller's turn at the bin: take the next thing, decide what to do with it, do it
+  // the seller's turn at the bin: "sell the items in this bin". It reaches in and sells what it
+  // takes out, and it never takes anything out but to sell it. Without an instruction it takes
+  // the next thing, whatever it is. Told to sell only planks, it hunts for one through each sale
+  // (deciding once a sale, so a slip is 1 sale in 20): every reach turns up a plank with the
+  // chance planks / everything in the bin, and one that turns up something else is a "looking
+  // for plank" on its record (the CD's rule, 2026-10-14) and another reach.
   function vend(s, r, dt) {
     const U = CFG.uninstructed;
     switch (r.state) {
       case 'idle':
         if (s.bin.length) { r.state = 'reach'; r.t = 0; }
         return;
-      case 'reach':
+      case 'reach': {
         r.yawT = 0.3; r.t += dt;
-        if (r.t >= CFG.reachSec) {
-          if (!s.bin.length) { r.state = 'idle'; return; }
-          const item = r.carry = s.bin.shift();
-          if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');
-          else r.sale = follows(s, r, 'sellOnly') ? 'recycle' : chance(s, 'mislabel', U.mislabel) ? 'mislabel' : 'honest';
-          r.state = r.sale === 'recycle' ? 'drop' : 'pitch'; r.t = 0;
+        if (r.t < CFG.reachSec) return;
+        if (!s.bin.length) { r.state = 'idle'; return; }
+        if (r.hunt === null) r.hunt = follows(s, r, 'sellOnly');
+        let at = 0;
+        if (r.hunt) {
+          const planks = s.bin.filter(k => k === 'plank').length;
+          if (!chance(s, 'find', planks / s.bin.length) || !planks) {
+            r.record.looking = (r.record.looking || 0) + 1;
+            ev(s, 'looking', { by: r.id, of: s.bin.length });
+            r.state = 'look'; r.t = 0;
+            return;
+          }
+          at = s.bin.indexOf('plank');
         }
+        r.hunt = null;
+        const item = r.carry = s.bin.splice(at, 1)[0];
+        if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');
+        else r.sale = chance(s, 'mislabel', U.mislabel) ? 'mislabel' : 'honest';
+        r.state = 'pitch'; r.t = 0;
+        return;
+      }
+      case 'look':   // what it turned up was not a plank: back it goes, and it reaches again
+        r.yawT = 0.3; r.t += dt;
+        if (r.t >= CFG.lookSec) { r.state = 'idle'; r.t = 0; }
         return;
       case 'pitch':
         r.yawT = 0; r.t += dt;
@@ -1168,13 +1183,6 @@ const FACTORY = (function () {
           r.carry = null; r.sale = null; r.state = 'cool'; r.t = 0;
         }
         return;
-      case 'drop':   // into the recycle bin, just to its left
-        r.yawT = 2.9; r.t += dt;
-        if (r.t >= CFG.tossSec) {
-          recycle(s, r.carry, r.id, 'bin'); credit(s, r.id, 'recycle');
-          r.carry = null; r.sale = null; r.state = 'cool'; r.t = 0;
-        }
-        return;
       case 'cool':
         r.t += dt; if (r.t >= CFG.coolSec) { r.state = 'idle'; r.t = 0; }
         return;
@@ -1183,6 +1191,7 @@ const FACTORY = (function () {
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
   const ITEMS = ['plank', 'rough', 'dowels'];
+  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'pitch', 'cool'];
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
     if (!b || !a.task || !a.task.arrived || a.path.length) return null;
@@ -1293,12 +1302,19 @@ const FACTORY = (function () {
         }
         r.rules = rules;
         r.record = r.record && typeof r.record === 'object' ? r.record : {};
+        // a state this build no longer has (the sap run, the seller's drop) or a held thing that
+        // is not an item: back to idle, anything sellable it held back in the bin
+        if (ITEMS.indexOf(r.carry) < 0) r.carry = null;
+        if (typeof r.hunt !== 'boolean') r.hunt = null;
+        if (STATES.indexOf(r.state) < 0) release(s, r);
       });
+      if (s.machine.sap) s.machine.log = 'sappy';   // sap poured on it, before sap came in on the logs
+      delete s.machine.sap;
       if (LOGS.indexOf(s.machine.log) < 0) s.machine.log = 'log';
-      s.machine.sap = !!s.machine.sap;
       s.recycled = Array.isArray(s.recycled) ? s.recycled.slice(-6) : [];
       s.satisfaction = Math.max(CFG.satMin, Math.min(100, +s.satisfaction || CFG.satStart));
-      s.money = Math.max(0, +s.money || 0);
+      s.money = Math.round(+s.money) || 0;   // money may be below zero (logs cost money)
+      s.spent = Math.max(0, Math.round(+s.spent) || 0);
       return s;
     } catch (e) { return null; }
   }
@@ -1371,7 +1387,6 @@ const SND = (function () {
     flop: () => tone(330, 0.2, 0.1, 'triangle', 0, 220),
     boo: () => { tone(196, 0.35, 0.12, 'sawtooth', 0.1, 150); tone(185, 0.4, 0.1, 'sawtooth', 0.14, 140); },
     jam: () => { noise(0.4, 0.5, 300); tone(90, 0.5, 0.25, 'sawtooth', 0, 50); },
-    splat: () => { noise(0.18, 0.35, 700); tone(260, 0.15, 0.12, 'sine', 0, 120); },
     clean: () => [1047, 1319, 1568, 2093].forEach((f, i) => tone(f, 0.18, 0.08, 'sine', i * 0.05)),
     hire: () => { noise(0.15, 0.3, 1500); [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 0.11, 'square', 0.08 + i * 0.06)); },
     beep: () => { tone(880, 0.06, 0.1, 'square'); tone(1175, 0.08, 0.1, 'square', 0.07); },
@@ -1891,7 +1906,7 @@ const MODE = (function () {
     });
     const v = new Float32Array(verts.length * 3);
     verts.forEach((p, i) => { v[i * 3] = p[0]; v[i * 3 + 1] = p[1]; v[i * 3 + 2] = p[2]; });
-    return { v, f, e: edgesOf(f), c: cols, ol: opt && opt.ol !== undefined ? opt.ol : 1, cx, cy, cz };
+    return { v, f, e: edgesOf(f), c: cols, ol: opt && opt.ol !== undefined ? opt.ol : 1, bias: opt && opt.bias || 0, cx, cy, cz };
   }
   // every edge once, with the face on each side (-1 for an open edge): the ink goes only on
   // edges between a face that shows and one that does not
@@ -1948,7 +1963,7 @@ const MODE = (function () {
     const v = new Float32Array(p.v.length);
     for (let i = 0; i < p.v.length; i += 3) { const q = apply(M, p.v[i], p.v[i + 1], p.v[i + 2]); v[i] = q[0]; v[i + 1] = q[1]; v[i + 2] = q[2]; }
     const c = apply(M, p.cx, p.cy, p.cz);
-    return { v, f: p.f, e: p.e, c: p.c, ol: p.ol, cx: c[0], cy: c[1], cz: c[2] };
+    return { v, f: p.f, e: p.e, c: p.c, ol: p.ol, bias: p.bias, cx: c[0], cy: c[1], cz: c[2] };
   }
   const recol = (p, cols) => Object.assign({}, p, { c: cols });
 
@@ -2020,7 +2035,7 @@ const MODE = (function () {
   }
   // a set of parts drawn back to front by each part's centre depth, each with its own ink
   function drawParts(parts, outline) {
-    parts.forEach(q => { const c = apply(q.M, q.p.cx, q.p.cy, q.p.cz); q.d = c[1] * CE + c[2] * SE + (q.bias || 0); });
+    parts.forEach(q => { const c = apply(q.M, q.p.cx, q.p.cy, q.p.cz); q.d = c[1] * CE + c[2] * SE + (q.bias || 0) + (q.p.bias || 0); });
     parts.sort((a, b) => a.d - b.d);
     parts.forEach(q => { drawPrim(ctx, q.p, q.M, VW.ox, -VW.camY, VW.S, q.ol === undefined ? outline : q.ol, q.tint); if (q.after) q.after(); });
   }
@@ -2031,14 +2046,14 @@ const MODE = (function () {
     wall: '#c8d2db', wallTop: '#9eacb9', kick: '#66788a', glass: '!#bfe6ff', mullion: '#55697c',
     steel: '#5d8fb8', steelTop: '#83b4da', hood: '#4a789f', plinth: '#47525e', dark: '#2b3139',
     rail: '#5c6672', bed: '#2d333b', yellow: '#f2c230', panel: '#e8ecf0', panelTop: '#f5f7f9',
-    bark: '#7a4a2a', woodEnd: '#e0b072', plank: '#ebc77f', plankTop: '#f3d595', rough: '#b8874b', dowel: '#e6c58c', band: '#d0453b',
-    sap: '#9cbd2c', sapTop: '#b8d84a', barrel: '#2f6fb0', barrelBand: '#24578b',
+    bark: '#7a4a2a', woodEnd: '#e0b072', plank: '#ebc77f', plankTop: '#f3d595', rough: '#c99a58', roughTop: '#d7ab6c', dowel: '#e6c58c', band: '#d0453b',
+    sap: '#8fc21f', hole: '#22140a',
     bin: '#3d7cc4', binTop: '#8fc0f0', crate: '#d7a15d', crateTop: '#e9bc7f', slat: '#b98443',
     desk: '#8a6a4c', deskTop: '#a8835f', monitor: '#2a3038', key: '#d9dee3',
     dockPanel: '#e3e8ec', accent0: '#16b3a5', accent1: '#f2862e',
     skin: '#f6c8a2', hair: '#5a3a22', shirt: '#3d7fd9', pants: '#3b4350', boot: '#6b4a2e', hat: '#ffc928', hatBrim: '#f0b414',
     robot: '#eef2f5', robotDark: '#3b4450', limb: '#9aa5b1', face: '!#13202b', cone: '#ff7a2e', tarp: '#7fb2d9', pallet: '#c49a63',
-    gnarl: '#5b3a22', knot: '#3c2414', recycle: '#2e9e5b', recycleIn: '#173d27', recycleRim: '#46b874', recycleRimTop: '#5fcb88'
+    gnarl: '#5b3a22', recycle: '#2e9e5b', recycleIn: '#173d27', recycleRim: '#46b874', recycleRimTop: '#5fcb88'
   };
   // the antenna bulb: how many instructions the robot holds (none, 1-2, 3-4, all five)
   const BULB_COL = ['#e05a4f', '#f2a33a', '#f2d23a', '#4fd07a'];
@@ -2099,11 +2114,6 @@ const MODE = (function () {
       box(3.55, 3.85, 0.54, 4.05, 3.93, 0.64, COL.recycleRim, COL.recycleRimTop), box(3.55, 4.27, 0.54, 4.05, 4.35, 0.64, COL.recycleRim, COL.recycleRimTop),
       box(3.55, 3.93, 0.54, 3.63, 4.27, 0.64, COL.recycleRim, COL.recycleRimTop), box(3.97, 3.93, 0.54, 4.05, 4.27, 0.64, COL.recycleRim, COL.recycleRimTop)
     ], { decal: decalRecycle });
-    add('barrel', 4.45, [
-      cyl(1.53, 4.2, 0, 0.24, 0.72, 12, COL.barrel, COL.sap),
-      cyl(1.53, 4.2, 0.18, 0.255, 0.05, 12, COL.barrelBand), cyl(1.53, 4.2, 0.52, 0.255, 0.05, 12, COL.barrelBand),
-      ell(1.53, 4.2, 0.72, 0.17, 0.17, 0.05, 8, 4, COL.sapTop, 1, { ol: 0.6 })
-    ]);
     add('hatch', 4.72, [
       box(5.88, 3.5, 0, 6.0, 3.62, 1.6, COL.yellow), box(5.88, 4.58, 0, 6.0, 4.7, 1.6, COL.yellow),
       box(5.88, 3.5, 1.6, 6.0, 4.7, 1.74, COL.dark)
@@ -2220,21 +2230,31 @@ const MODE = (function () {
   const M_LOG = logPrim(0.9, 0.12);
   const M_PLANK = [box(-0.45, -0.13, 0, 0.45, 0.13, 0.06, COL.plank, COL.plankTop),
     box(-0.3, -0.06, 0.06, 0.25, -0.05, 0.062, '#c9a160', '#c9a160', '#c9a160', { ol: 0 }), box(-0.1, 0.04, 0.06, 0.38, 0.05, 0.062, '#c9a160', '#c9a160', '#c9a160', { ol: 0 })];
-  const M_ROUGH = [box(-0.42, -0.12, 0, 0.42, 0.12, 0.07, COL.rough),
-    xf(box(0, -0.02, 0, 0.16, 0.02, 0.03, COL.rough), chain(Mt(0.4, 0.08, 0.02), Mz(0.5))),
-    xf(box(0, -0.02, 0, 0.14, 0.02, 0.03, COL.rough), chain(Mt(-0.4, -0.06, 0.02), Mz(2.7))),
-    xf(box(0, -0.015, 0, 0.12, 0.015, 0.025, COL.rough), chain(Mt(0.38, -0.1, 0.04), Mz(-0.6)))];
+  // a gnarled log's holes, [along, across] in metres; its plank has them in the same places (the CD,
+  // 2026-10-14), since the log runs along x on the belt and the plank comes out along x
+  const HOLES = [[-0.25, 0.05], [0.03, -0.06], [0.26, 0.03]];
+  const M_ROUGH = [box(-0.45, -0.13, 0, 0.45, 0.13, 0.06, COL.rough, COL.roughTop)]
+    .concat(HOLES.map(([x, y]) => ell(x, y, 0.05, 0.045, 0.04, 0.014, 8, 3, COL.hole, 1, { ol: 0.5, bias: 0.1 })));   // over the board, wherever they sit on it
   const M_DOWELS = [0, 1, 2, 3, 4].map(i => xf(cyl(0, 0, -0.45, 0.035, 0.9, 7, COL.dowel, COL.woodEnd), chain(Mt(0, -0.1 + (i % 3) * 0.07 + (i > 2 ? 0.035 : 0), 0.035 + (i > 2 ? 0.06 : 0)), My(Math.PI / 2))))
     .concat([xf(cyl(0, 0, -0.03, 0.15, 0.06, 8, COL.band), chain(Mt(0, -0.03, 0.06), My(Math.PI / 2), Ms(0.95, 1.1, 1)))]);
-  const M_SAP = [ell(0, 0, 0.05, 0.2, 0.15, 0.09, 8, 5, COL.sap, 1), ell(-0.05, -0.04, 0.12, 0.05, 0.04, 0.02, 6, 3, '!#e9f7b8', 1, { ol: 0 })];
-  const M_BUCKET = [cyl(0, 0, 0, 0.09, 0.14, 8, '#8d98a3', COL.sap, 0.1)];
   const M_SPONGE = [box(-0.05, -0.04, -0.03, 0.05, 0.04, 0.03, '#ffd94a')];
-  const M_GNARLED = [xf(cyl(0, 0, -0.42, 0.13, 0.84, 9, COL.gnarl, COL.woodEnd), My(Math.PI / 2)),
-    ell(0.14, 0.1, 0.05, 0.07, 0.06, 0.06, 6, 4, COL.knot, 1), ell(-0.2, -0.11, -0.02, 0.06, 0.05, 0.06, 6, 4, COL.knot, 1),
-    ell(-0.04, 0.02, 0.13, 0.07, 0.05, 0.04, 6, 3, COL.knot, 1), ell(0.3, -0.05, 0.1, 0.05, 0.04, 0.04, 6, 3, COL.knot, 1)];
+  // a hole in a log's upper surface: a dark cap sunk into the bark where [along, across] says
+  const logHole = (x, y, R, w) => ell(x, y, Math.sqrt(R * R - y * y) - 0.012, w, w * 0.85, 0.025, 8, 3, COL.hole, 1, { ol: 0.5 });
+  const M_GNARLED = [xf(cyl(0, 0, -0.42, 0.13, 0.84, 9, COL.gnarl, COL.woodEnd), My(Math.PI / 2))]
+    .concat(HOLES.map(([x, y]) => logHole(x, y, 0.13, 0.05)));
+  // a sap log: holes, and green sap oozing out of them, pooled along its top and running down its
+  // front in drips (a blob at a point `th` radians round from the top toward the camera)
+  const sapAt = (x, th, R, r, k) => ell(x, R * Math.sin(th), R * Math.cos(th), r, r * (k || 1), r * 0.8, 7, 4, COL.sap, 1.1);
+  const M_SAPPY = [xf(cyl(0, 0, -0.43, 0.125, 0.86, 9, COL.bark, COL.woodEnd), My(Math.PI / 2)),
+    logHole(-0.31, 0.02, 0.125, 0.04), logHole(0.12, -0.05, 0.125, 0.045), logHole(0.33, 0.04, 0.125, 0.035),
+    ell(-0.05, 0.01, 0.118, 0.21, 0.075, 0.035, 10, 4, COL.sap, 1.3), ell(0.15, -0.04, 0.122, 0.07, 0.055, 0.03, 8, 3, COL.sap, 1.2),
+    sapAt(-0.13, 0.6, 0.125, 0.04), sapAt(-0.13, 0.95, 0.125, 0.033), sapAt(-0.13, 1.25, 0.125, 0.04),
+    sapAt(0.08, 0.6, 0.125, 0.035), sapAt(0.08, 0.95, 0.125, 0.042),
+    sapAt(0.3, 0.45, 0.125, 0.03), sapAt(-0.31, 0.45, 0.125, 0.03),
+    ell(-0.1, -0.01, 0.152, 0.07, 0.022, 0.01, 6, 3, '!#efffc4', 1, { ol: 0 }), ell(0.14, -0.05, 0.15, 0.025, 0.014, 0.008, 6, 3, '!#efffc4', 1, { ol: 0 })];
   const M_SMALL = [xf(cyl(0, 0, -0.36, 0.065, 0.72, 8, COL.bark, COL.woodEnd), My(Math.PI / 2))];
-  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, plank: M_PLANK, rough: M_ROUGH, dowels: M_DOWELS, sap: M_SAP };
-  const LIFT = { log: 0.65, gnarled: 0.66, small: 0.6 };   // a log's centre, resting on the belt
+  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, sappy: M_SAPPY, plank: M_PLANK, rough: M_ROUGH, dowels: M_DOWELS };
+  const LIFT = { log: 0.65, gnarled: 0.66, small: 0.6, sappy: 0.655 };   // a log's centre, resting on the belt
 
   function drawItem(kind, M, extra) {
     const ps = ITEM_MODEL[kind].map(p => ({ p, M }));
@@ -2363,7 +2383,7 @@ const MODE = (function () {
   function drawRobot(r, dt) {
     const v = visOf(r);
     turn(v, r.yawT, dt, 9);
-    const moving = r.state === 'move' || ((r.state === 'sapGo' || r.state === 'sapBack') && r.path.length);
+    const moving = r.state === 'move';
     v.walk += ((moving ? 1 : 0) - v.walk) * (1 - Math.exp(-dt * 6));
     if (r.state === 'unbox') v.pop = clamp(r.t / C.unboxSec, 0, 1); else v.pop = 1;
     const hover = 0.05 + 0.025 * Math.sin(clock * 3 + r.id * 2);
@@ -2372,15 +2392,12 @@ const MODE = (function () {
     const k = r.t;
     if (r.state === 'press') { const u = clamp(k / C.pressSec, 0, 1); armR = 1.35 * Math.sin(Math.min(1, u * 1.4) * Math.PI / 2); abR = 0.05; tilt = 0.1; }
     else if (r.state === 'dawdle') { headTilt = 0.25 * Math.sin(clock * 2.4); armL = 0.5; abL = 0.6 + 0.2 * Math.sin(clock * 5); }
-    else if (r.state === 'scoop') { armR = 1.1; armL = 1.1; tilt = 0.2; }
-    else if (r.state === 'pour') { const u = clamp(k / C.pourSec, 0, 1); armR = 1.2 + 0.4 * u; armL = 1.2 + 0.4 * u; tilt = 0.15; }
     else if (r.state === 'reach') { armR = 1.3; armL = 1.0; tilt = 0.18; }
+    else if (r.state === 'look') { const u = clamp(k / C.lookSec, 0, 1); armR = 1.2 + 0.25 * Math.sin(u * Math.PI * 3); armL = 1.05; tilt = 0.22; headYaw = 0.35 * Math.sin(u * Math.PI * 4); }
     else if (r.state === 'reject') { const u = clamp(k / C.tossSec, 0, 1), heave = Math.sin(Math.min(1, u * 1.8) * Math.PI / 2); armR = armL = 1.0 + 1.1 * heave; tilt = 0.15 - 0.2 * heave; }
     else if (r.state === 'flick') { const u = clamp(k / C.tossSec, 0, 1); armR = 0.5 + 1.3 * Math.sin(u * Math.PI); abR = 0.35; }
-    else if (r.state === 'drop') { armR = 1.25; armL = 0.8; tilt = 0.15; }
     else if (r.state === 'pitch') { const u = clamp(k / C.pitchSec, 0, 1); armR = 2.6 * Math.sin(Math.min(1, u * 2) * Math.PI / 2); armL = 0.3; abR = 0.1; }
-    if (r.carry === 'sap') hold = { parts: M_BUCKET, both: true };
-    else if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'pitch' };
+    if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'pitch' };
     if (r.state === 'idle' && r.job === null) headYaw = 0.3 * Math.sin(clock * 0.7 + r.id);
     const base = chain(Mt(r.x, r.y, hover * v.pop), Mz(v.yaw), Ms(sc, sc, sc), My(tilt));
     const parts = [];
@@ -2403,6 +2420,7 @@ const MODE = (function () {
     const top = apply(base, 0, 0, 1.3);
     const hx = PX(top[0]), hy = PY(top[1], top[2]);
     if (r.state === 'dawdle') dots(hx, hy);
+    else if (r.state === 'look') lens(hx, hy);
     if (r.moodT > 0 && r.mood && r.mood !== 'stuck') badge(hx, hy, r.mood, r.moodT);
     else if (r.mood === 'stuck' && r.moodT > 0) badge(hx, hy, 'stuck', 1);
   }
@@ -2433,6 +2451,17 @@ const MODE = (function () {
     rrect(ctx, x - 20, y - 26, 40, 20, 10); ctx.fill(); ctx.stroke();
     ctx.fillStyle = INK;
     for (let i = 0; i < 3; i++) { const on = Math.floor(clock * 3) % 3 >= i; ctx.globalAlpha = on ? 1 : 0.3; ctx.beginPath(); ctx.arc(x - 9 + i * 9, y - 16, 2.6, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  // a seller hunting the bin for a plank: a magnifying glass in a thought bubble
+  function lens(x, y) {
+    ctx.save();
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    rrect(ctx, x - 15, y - 30, 30, 26, 11); ctx.fill(); ctx.stroke();
+    const sw = Math.sin(clock * 6) * 2.5;
+    ctx.lineWidth = 2.6; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.arc(x - 2 + sw, y - 19, 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + 2.5 + sw, y - 14.5); ctx.lineTo(x + 7.5 + sw, y - 9.5); ctx.stroke();
     ctx.restore();
   }
   function badge(x, y, mood, life) {
@@ -2653,18 +2682,15 @@ const MODE = (function () {
     D.push({ key: 3.585, f: machineWindow });
     D.push({ key: 3.586, f: drawBeacon });
     D.push({ key: 3.89, f: drawButton });
-    // logs, products and sap on the belts; things in the bin
+    // logs and products on the belts; things in the bin
     const items = [];
     if (m.phase === 'ready') {
-      const x = 0.65 + 1.05 * m.staged;
-      items.push([m.log, x, 2.9, LIFT[m.log]]);
-      if (m.sap) items.push(['sap', x, 2.9, LIFT[m.log] + 0.1]);
+      items.push([m.log, 0.65 + 1.05 * m.staged, 2.9, LIFT[m.log]]);
     } else if (m.phase === 'run') {
       const p = clamp(m.t / C.processSec, 0, 1);
       const p2 = m.result === 'sap' ? Math.min(p, C.jamAt / C.processSec) : p;
       items.push([m.log, 1.7 + 0.9 * p2, 2.9, LIFT[m.log]]);
-      if (m.result === 'sap') items.push(['sap', 1.7 + 0.9 * p2, 2.9, LIFT[m.log] + 0.1]);
-      else items.push([m.result, 3.1 + 0.9 * p, 2.9, 0.53]);
+      if (m.result !== 'sap') items.push([m.result, 3.1 + 0.9 * p, 2.9, 0.53]);
     } else if (m.phase === 'jam') {
       items.push([m.log, 1.7 + 0.9 * C.jamAt / C.processSec, 2.9, LIFT[m.log]]);
     }
@@ -2675,7 +2701,7 @@ const MODE = (function () {
     });
     const shown = s.bin.length > 18 ? s.bin.slice(s.bin.length - 18) : s.bin;
     shown.forEach((k, i) => { const q = binSlot(i); items.push([k, q.x, q.y, q.z]); });
-    items.forEach(([k, x, y, z], i) => D.push({ key: 3.21 + i * 0.0001 + (k === 'sap' ? 0.001 : 0), f: () => drawItem(k, Mt(x, y, z)) }));
+    items.forEach(([k, x, y, z], i) => D.push({ key: 3.21 + i * 0.0001, f: () => drawItem(k, Mt(x, y, z)) }));
     // the last few things in the recycle bin poke out of its mouth (not the ones still in the air)
     const flying = FLY.filter(f => f.recycle).length, lay = s.recycled.slice(0, Math.max(0, s.recycled.length - flying)).slice(-4);
     lay.forEach((k, i) => { const q = RECYCLED_AT[i]; D.push({ key: 4.36 + i * 0.0001, f: () => drawItem(k, chain(Mt(q[0], q[1], 0.6), Mz(q[2]), Ms(0.5, 0.5, 0.5))) }); });
@@ -2711,12 +2737,14 @@ const MODE = (function () {
     s.events = [];
     evs.forEach(e => {
       switch (e.kind) {
-        case 'press': SND.sfx('press'); if (whir) whir.stop(); whir = SND.whir(C.processSec); break;
+        case 'press':
+          SND.sfx('press'); if (whir) whir.stop(); whir = SND.whir(C.processSec);
+          if (e.cost) FLOAT.push({ x: 2.85, y: 3.3, z: 1.5, text: '-$' + e.cost, color: '#ff8a8a', age: 0 });
+          break;
         case 'made': SND.sfx('done'); puff(3.6, 2.9, 0.6, 'dust', 10); break;
         case 'binned': SND.sfx('drop'); break;
         case 'jam': SND.sfx('jam'); if (whir) { whir.stop(); whir = null; } puff(3.12, 2.65, 1.8, 'smoke', 8); break;
         case 'cleaned': SND.sfx('clean'); puff(2.85, 3.6, 0.8, 'spark', 14); break;
-        case 'sapped': SND.sfx('splat'); break;
         case 'sold': {
           const src = typeof e.by === 'number' && s.robots[e.by] ? s.robots[e.by] : s.avatar;
           FLY.push({ item: e.item, x0: src.x, y0: src.y, z0: 0.9, x1: L.HATCH.x + 0.2, y1: L.HATCH.y, z1: 0.6, h: 1.2, sc: 0.7, spin: 5, age: 0, dur: 0.6 });
@@ -2755,9 +2783,10 @@ const MODE = (function () {
   };
   const MINI = {
     plank: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><rect x="1" y="1" width="28" height="8" rx="1" fill="#ebc77f" stroke="#1d2430" stroke-width="1.5"/></svg>',
-    rough: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><path d="M1 2l4 1 4-2 6 2 5-2 4 1 5-1v7l-4 1-5-1-6 2-5-2-5 1-3-1z" fill="#b8874b" stroke="#1d2430" stroke-width="1.5"/></svg>',
+    rough: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><rect x="1" y="1" width="28" height="8" rx="1" fill="#c99a58" stroke="#1d2430" stroke-width="1.5"/><g fill="#22140a"><circle cx="7" cy="4" r="1.7"/><circle cx="15.5" cy="6" r="1.7"/><circle cx="23.5" cy="4.5" r="1.7"/></g></svg>',
     dowels: '<svg viewBox="0 0 30 12" width="26" height="10" aria-hidden="true"><g stroke="#1d2430" stroke-width="1.2" fill="#e6c58c"><rect x="1" y="1" width="28" height="3" rx="1.5"/><rect x="1" y="4.5" width="28" height="3" rx="1.5"/><rect x="1" y="8" width="28" height="3" rx="1.5"/></g><rect x="13" y="0.5" width="4" height="11" fill="#d0453b"/></svg>'
   };
+  const ITEM_NAME = { plank: 'a plank', rough: 'a plank with holes', dowels: 'dowels' };
   let bubbleSig = '';
   function anchorOf(b) {
     if (b.kind === 'bin') return [5.22, 2.9, 0.7];
@@ -2782,7 +2811,7 @@ const MODE = (function () {
           if (o.id === 'notes' && o.slots) label = o.filled + '/' + o.slots;
           if (o.soldOut) label = 'sold out';
           if (o.count > 1) label += ' <span class="fx-count">x' + o.count + '</span>';
-          const aria = { 'job:operate': 'Run machine 01', 'job:sell': 'Sell from the bin', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions' }[o.id] || ('Sell ' + (o.item || ''));
+          const aria = { 'job:operate': 'Run machine 01', 'job:sell': 'Sell from the bin', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions' }[o.id] || ('Sell ' + (ITEM_NAME[o.item] || ''));
           return '<button class="fx-opt' + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + aria + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
         }).join('');
         bubbleEl.classList.toggle('robot', !!bot);
@@ -2809,12 +2838,14 @@ const MODE = (function () {
   });
 
   /* ---------- HUD and the opt-in panel ---------- */
-  let shownMoney = -1, shownSat = -1;
+  let shownMoney = null, shownSat = -1;
+  const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US');
   function renderHud() {
     if (s.money !== shownMoney) {
-      if (shownMoney >= 0 && s.money > shownMoney) { moneyEl.classList.remove('bump'); void moneyEl.offsetWidth; moneyEl.classList.add('bump'); }
+      if (shownMoney !== null && s.money > shownMoney) { moneyEl.classList.remove('bump'); void moneyEl.offsetWidth; moneyEl.classList.add('bump'); }
       shownMoney = s.money;
-      moneyEl.textContent = '$' + s.money.toLocaleString('en-US');
+      moneyEl.textContent = cash(s.money);
+      moneyEl.classList.toggle('neg', s.money < 0);
     }
     if (Math.round(s.satisfaction) !== shownSat) {
       shownSat = Math.round(s.satisfaction);
@@ -2838,16 +2869,17 @@ const MODE = (function () {
       '<h2>Robot factory</h2>' +
       '<p>Machine 01 is a task. You can always do it yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
       '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
-      '<p>About ' + pct(C.logs.gnarled) + ' of the logs off the rack are gnarled and ' + pct(C.logs.small) + ' are small. You toss those in the recycle bin yourself; a robot does what it is told.</p>' +
+      '<p>About ' + pct(C.logs.gnarled) + ' of the logs off the rack are gnarled, ' + pct(C.logs.small) + ' are small and ' + pct(C.logs.sappy) + ' are sap logs. You toss those in the recycle bin yourself; a robot does what it is told. <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +
       '<ul>' +
       '<li><b>Good</b>: a good log made into a smooth plank; a bad log put in the recycle bin; a plank sold for its price.</li>' +
-      '<li><b>So-so</b>: the operator stops to think first, or cuts a gnarled log into a rough plank ($' + C.price.rough + '); the seller lets a plank go for $' + C.cheapPlank + '.</li>' +
-      '<li><b>Bad</b>: sap poured on a log, which jams the machine until you scrub it clean yourself; a small log cut into dowels ($' + C.price.dowels + '); a plank given away for $0; a rough plank or dowels sold to a customer as a plank for $' + C.mislabel + ', which costs ' + C.satHit + ' points of customer satisfaction.</li>' +
+      '<li><b>So-so</b>: the operator stops to think first, or cuts a gnarled log into a plank with holes ($' + C.price.rough + '); the seller lets a plank go for $' + C.cheapPlank + '.</li>' +
+      '<li><b>Bad</b>: a sap log fed in, which jams the machine until you scrub it clean yourself; a small log cut into dowels ($' + C.price.dowels + '); a plank given away for $0; a plank with holes or dowels sold to a customer as a plank for $' + C.mislabel + ', which costs ' + C.satHit + ' points of customer satisfaction.</li>' +
+      '<li><b>The seller sells what is in the bin</b>, and only that. Told to sell only planks, it leaves everything else where it is and has to hunt for a plank: each reach finds one as often as planks make up the bin. A reach that comes up with something else is a "looking for plank" on its record.</li>' +
       '<li><b>Satisfaction sets what customers pay</b>: every price is multiplied by it. Each fair sale wins back a point, and customers slowly forget a bad one.</li>' +
-      '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instruction that prevents it. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing.</li>' +
+      '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing.</li>' +
       '</ul>' +
       '<h3>Measured so far</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Good</th><th>So-so</th><th>Bad</th><th>Good %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
-      '<p class="fx-small">You: ' + s.tally.player.made + ' planks made, ' + s.tally.player.tossed + ' bad logs tossed, ' + s.tally.player.sold + ' sold by hand. Earned in all: $' + s.earned + '.</p>' +
+      '<p class="fx-small">You: ' + s.tally.player.made + ' planks made, ' + s.tally.player.tossed + ' bad logs tossed, ' + s.tally.player.sold + ' sold by hand. Earned in all: $' + s.earned + '; spent on logs: $' + s.spent + '.</p>' +
       '<div class="fx-row"><button class="fx-ghost" data-panel="restart">' + (confirmReset ? 'Tap again to start over' : 'Start over') + '</button><button class="fx-ghost" data-panel="close">Close</button></div>';
   }
   let confirmReset = false;
@@ -2855,11 +2887,11 @@ const MODE = (function () {
   /* ---------- a robot's page: its name, its base prompt, its own instructions, its record ---------- */
   let panelMode = 'info', pageBot = -1, pickSlot = -1, pageSig = '';
   const DOING = {   // a robot's record, in words
-    plank: 'Good log, smooth plank', think: 'Stopped to think, then a plank', rough: 'Cut a gnarled log: a rough plank',
-    dowels: 'Cut a small log: dowels', sap: 'Poured sap on a log: a jam', reject: 'Put a bad log in the recycle bin',
+    plank: 'Good log, smooth plank', think: 'Stopped to think, then a plank', rough: 'Cut a gnarled log: a plank with holes',
+    dowels: 'Cut a small log: dowels', sap: 'Fed in a sap log: a jam', reject: 'Put a bad log in the recycle bin',
     caught: 'Caught a bad cut: into the recycle bin',
-    fair: 'Sold a plank for its price', honest: 'Sold a rough plank or dowels for their price', cheap: 'Let a plank go cheap',
-    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one', recycle: 'Put a non-plank in the recycle bin'
+    fair: 'Sold a plank for its price', honest: 'Sold a plank with holes or dowels for their price', cheap: 'Let a plank go cheap',
+    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one', looking: 'Looking for plank'
   };
   const CROSS = '<svg viewBox="0 0 12 12" width="13" height="13" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
   function openRobot(id) {
@@ -2927,7 +2959,7 @@ const MODE = (function () {
     if (act === 'restart') {
       if (!confirmReset) { confirmReset = true; renderPanel(); return; }
       confirmReset = false; s = F.newGame((Date.now() >>> 0) || 1); bubbleSig = ''; FX.length = FLOAT.length = FLY.length = 0;
-      shownMoney = -1; shownSat = -1; save(); closePanel(); VW.camY = VW.minY;
+      shownMoney = null; shownSat = -1; save(); closePanel(); VW.camY = VW.minY;
       return;
     }
     if (panelMode !== 'robot' || !s.robots[pageBot]) return;
@@ -3051,7 +3083,7 @@ const MODE = (function () {
 
   // test hook: lets the suites find where things are drawn and run frames without a display
   window.TAAS_FACTORY = {
-    get s() { return s; }, set s(v) { s = v; bubbleSig = ''; shownMoney = -1; shownSat = -1; },
+    get s() { return s; }, set s(v) { s = v; bubbleSig = ''; shownMoney = null; shownSat = -1; },
     view: VW, layout, tick, save, hitTest, spriteRect, openRobot, closePanel,
     get page() { return { mode: panelMode, bot: pageBot, pick: pickSlot, open: !panelEl.hidden }; },
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],

@@ -74,8 +74,8 @@
  {
   "name": "hud-money-stale",
   "file": "games/taas/index.html",
-  "old": "      moneyEl.textContent = '$' + s.money.toLocaleString('en-US');",
-  "new": "       /* @negtest */"
+  "old": "      moneyEl.textContent = cash(s.money);",
+  "new": "      /* @negtest */"
  },
  {
   "name": "restart-no-confirm",
@@ -238,5 +238,53 @@
   "file": "games/taas/index.html",
   "old": "        return '<button class=\"fx-rule' + (here ? ' on' : '') + '\" data-panel=\"rule:' + q.id + '\"' + (other ? ' disabled' : '') + '>'",
   "new": "        return '<button class=\"fx-rule' + (here ? ' on' : '') + '\" data-panel=\"rule:' + q.id + '\"' + '>' /* @negtest */"
+ },
+ {
+  "name": "money-never-red",
+  "file": "games/taas/index.html",
+  "old": "      moneyEl.classList.toggle('neg', s.money < 0);",
+  "new": "      /* @negtest */"
+ },
+ {
+  "name": "money-sign-inside",
+  "file": "games/taas/index.html",
+  "old": "  const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US');",
+  "new": "  const cash = n => '$' + n.toLocaleString('en-US'); /* @negtest */"
+ },
+ {
+  "name": "plank-holes-elsewhere",
+  "file": "games/taas/index.html",
+  "old": "    .concat(HOLES.map(([x, y]) => ell(x, y, 0.05,",
+  "new": "    .concat(HOLES.map(([x, y]) => ell(-x, y, 0.05, /* @negtest */"
+ },
+ {
+  "name": "plank-holes-under-board",
+  "file": "games/taas/index.html",
+  "old": "{ ol: 0.5, bias: 0.1 })));",
+  "new": "{ ol: 0.5 }))); /* @negtest */"
+ },
+ {
+  "name": "sap-log-dry",
+  "file": "games/taas/index.html",
+  "old": "  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, sappy: M_SAPPY,",
+  "new": "  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, sappy: [M_LOG], /* @negtest */"
+ },
+ {
+  "name": "barrel-back",
+  "file": "games/taas/index.html",
+  "old": "    add('hatch', 4.72, [",
+  "new": "    add('barrel', 4.45, [cyl(1.53, 4.2, 0, 0.24, 0.72, 12, '#2f6fb0', COL.sap)]); /* @negtest */\n    add('hatch', 4.72, ["
+ },
+ {
+  "name": "looking-not-shown",
+  "file": "games/taas/index.html",
+  "old": "    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one', looking: 'Looking for plank'",
+  "new": "    free: 'Gave a plank away', mislabel: 'Sold something as a plank that was not one' /* @negtest */"
+ },
+ {
+  "name": "panel-no-log-cost",
+  "file": "games/taas/index.html",
+  "old": "' are sap logs. You toss those in the recycle bin yourself; a robot does what it is told. <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +",
+  "new": "' are sap logs. You toss those in the recycle bin yourself; a robot does what it is told.</p>' + /* @negtest */"
  }
 ]
