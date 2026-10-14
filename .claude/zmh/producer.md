@@ -69,6 +69,21 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-10-14, TAAS pass** (pointer moved `3ea55c4` -> this pass's pre-commit HEAD,
+  range `3ea55c4..HEAD`, 36 commits). The CD scoped it "for TAAS", so it refined only the
+  TAAS commits: `2aef91c` (ship), `6b3f072` (negative tests), `c3e87c0` (robot factory),
+  `40e5c95` (customer satisfaction), `222aaa9` (instructions) and their merges `0376852`,
+  `fde393d`, `1d50f36`, `3bdbd56`. **Left behind, now buried**: the CYOA2 session's
+  `d7cc8a2`, `4b316cd`, `334f14e`, `2b30833`, `ea48684`, `3cdfda2`, `eade9ba`, `f40e802`,
+  `298ccea`, `551017a`, `8fd7978`, `6e3f571`, `f669ed2`, `90bdc2b`, `06c082e`, `5157f7b`,
+  `1415fb9`, `b280c77`, `f466559`, `926d8db`, `3758f5e`, `1ece523`, `b17e95d`, `f5a765a`
+  (checked with `git show --stat`: the feature commits edit `.claude/cyoa2.md` and
+  `.claude/tests/README.md` as they land, and the test-only second-pass commits are written
+  up in `f5a765a`, so they look refined inline; that session's to confirm), and the
+  character-lists `5270aff` + merge `f0a22e2` (one title's data file plus the manifest:
+  content under existing rules, nothing to refine). `a6c6876` is the CYOA2 session's own
+  refine commit, skippable. `99205d8` and `c28a947` stay buried as before.
+
   **2026-10-10, CYOA2 pass** (pointer moved `8e62e0f` -> `3ea55c4`, range
   `8e62e0f..3ea55c4`). Clean: `a677485`, `188890f` and `3ea55c4` (CYOA2 steps
   1, 2 and 3) are this session's, and `ddd0c5a` is the animation-rigs

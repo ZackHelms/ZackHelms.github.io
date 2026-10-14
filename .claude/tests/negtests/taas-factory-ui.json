@@ -165,7 +165,7 @@
   "name": "panel-says-prompt",
   "file": "games/taas/index.html",
   "old": "      '<li><b>Instructions</b>: tap a robot, then its clipboard.",
-  "new": "      '<li><b>Prompt engineering</b> /* @negtest */: tap a robot, then its clipboard."
+  "new": "      /* @negtest */ '<li><b>Prompt engineering</b>: tap a robot, then its clipboard."
  },
  {
   "name": "bubble-no-name",

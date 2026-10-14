@@ -123,6 +123,16 @@ Deterministic helpers for working on this repo.
   (one such row was found that way: it reloaded the page before an autosave had
   landed). `--only a,b` re-runs the ones that were missed.
 
+  **Every break on an .html page is parse-checked first** (2026-10-14,
+  `check-inline-js.cjs` on each copy, before any suite runs): a break whose `new`
+  does not parse kills its script block, and every row then "catches" it for the
+  wrong reason. It is refused as `NEGCOPIES=invalid <name>: the broken copy does not
+  parse` (`NEGCOPIES_NO_PARSE=1` skips the check). And a MISSED break is not always an
+  equivalent change: it can expose **dead code**. TAAS's `follows()` checked that an
+  instruction was about the robot's job, every caller already asked only about its
+  own job's instructions, so deleting the check changed nothing: the check went, and
+  the break moved to where the property could really fail.
+
 - `probe-cdp-touch.cjs` — **what does a synthetic touch mean in this Chromium?**
   Three suites drive real multi-touch through CDP's `Input.dispatchTouchEvent`,
   and two notes here described its `touchPoints` wrongly (one said a `touchEnd`

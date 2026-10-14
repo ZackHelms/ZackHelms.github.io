@@ -50,6 +50,16 @@ changes the text a row reads, and the break looks caught when the change itself 
 (met 2026-10-13, CYOA2's second pass).
 A break that no row can ever see may be an EQUIVALENT change (the code it removes is
 covered by another guard); say so in the game's context file instead of forcing a row.
+Or the code it removes may be DEAD: before recording a miss as equivalent, ask whether the
+guard decides anything at all. TAAS's follows() checked that an instruction was about the
+robot's job, and every caller only ever asked about its own job's instructions, so deleting
+the check changed nothing; the check went, and the break moved to where the property could
+really fail (2026-10-14).
+Every break on an .html page is parse-checked before any suite runs
+(check-inline-js.cjs on its copy): a break that does not parse makes the page fail to load,
+and every row then "catches" it for the wrong reason. NEGCOPIES=invalid names it.
+NEGCOPIES_NO_PARSE=1 skips the check. And stamp the build badge AFTER a run, not during it:
+the stamp edits the shipping file, so the run ends with NEGCOPIES=changed.
 """
 import json, os, re, shutil, subprocess, sys, tempfile, threading
 from concurrent.futures import ThreadPoolExecutor
@@ -88,6 +98,20 @@ def main():
         n = src.count(b['old'])
         if n != 1: bad.append('%s: "old" found %d times in %s' % (b['name'], n, b['file']))
         if '@negtest' not in b['new']: bad.append('%s: "new" lacks the @negtest marker' % b['name'])
+    if not bad and path.endswith('.html') and os.environ.get('NEGCOPIES_NO_PARSE') != '1':
+        # a break that does not parse is "caught" by every row for the wrong reason
+        checker = os.path.join(ROOT, '.claude', 'scripts', 'check-inline-js.cjs')
+        pdir = tempfile.mkdtemp(prefix='negparse-')
+        try:
+            for b in breaks:
+                cp = os.path.join(pdir, 'copy.html')
+                open(cp, 'w').write(src.replace(b['old'], b['new'], 1))
+                r = subprocess.run(['node', checker, cp], capture_output=True, text=True, cwd=ROOT)
+                if r.returncode:
+                    first = next((l for l in (r.stdout + r.stderr).splitlines() if l.strip() and 'INLINE-JS' not in l), '').strip()
+                    bad.append('%s: the broken copy does not parse (%s)' % (b['name'], first[:140]))
+        finally:
+            shutil.rmtree(pdir, ignore_errors=True)
     if bad:
         for m in bad: print('NEGCOPIES=invalid ' + m)
         return 1

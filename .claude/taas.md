@@ -1,6 +1,6 @@
 # TAAS (Team AI Adoption Simulator) - context
 
-`games/taas/index.html` (single file, ~3,000 lines) holds **two modes**, picked from a
+`games/taas/index.html` (single file, ~3,100 lines) holds **two modes**, picked from a
 dropdown beside the mute button (2026-10-13): **Formal** (everything in this file down to §
 Robot factory mode; the default) and **Robot factory** (§ Robot factory mode, a playful
 cel-shaded take on the same story). The formal mode is a management sim: you run one team
