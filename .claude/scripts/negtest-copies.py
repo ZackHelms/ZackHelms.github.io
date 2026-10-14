@@ -42,6 +42,12 @@ MISSED means the suite cannot see that failure: write the row that can, then re-
 --only. CAUGHT-BY-CRASH means the only failure was a timeout or an exception in the suite
 itself, not a named row: usually real (the break made something never happen), but read
 it, and if the same row "catches" unrelated breaks, the row is flaky, not the code.
+This runner does not run the unbroken page first. A suite that already fails on the page
+the breaks are pinned to (a list written against an older copy, then run with a suite that
+has moved on) makes every break "caught": run the suite once on that page before trusting a
+verdict. Keep the @negtest marker outside string literals too: a marker inside a string
+changes the text a row reads, and the break looks caught when the change itself does nothing
+(met 2026-10-13, CYOA2's second pass).
 A break that no row can ever see may be an EQUIVALENT change (the code it removes is
 covered by another guard); say so in the game's context file instead of forcing a row.
 """

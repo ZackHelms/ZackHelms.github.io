@@ -398,7 +398,7 @@ body.guest [data-host] { display:none !important; }
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 12:13 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 19:07 UTC</div>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <button id="ribbon-btn" type="button" aria-label="Menu" aria-haspopup="true">&#10086;</button>
 
@@ -665,6 +665,9 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 const clip = (s, n) => { s = String(s == null ? '' : s).trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
+/* a name looked up in a table, or in the tale's own lists, is one of its own entries: never "constructor" or "toString",
+   which every object answers to. Anything named by a file, a guest's phone or a tool is looked up through this. */
+const own = (o, k) => typeof k === 'string' && Object.prototype.hasOwnProperty.call(o, k);
 function el(tag, cls, text) {
   const e = document.createElement(tag);
   if (cls) e.className = cls;
@@ -1166,7 +1169,7 @@ function unpackMap(p) {
   /* things in their saved order (a thing always comes before what sits on it) */
   const ids = new Set(), slots = new Set(), kept = new Map();
   for (const o of list(p.objs)) {
-    if (!o || !ASSETS[o.a]) continue;
+    if (!o || !own(ASSETS, o.a)) continue;
     const id = str(o.id, 8); if (!id || ids.has(id)) continue;
     if (o.on) {
       const par = kept.get(o.on);
@@ -1542,6 +1545,7 @@ function addSite(st, kind, name, extra) {
    Tier two: a site's board, charted the first time anyone goes there. Each is a pure
    function of (seed, site id) plus what the town map says about its lot.          */
 const KIND_SUB = { town: 'a town', inn: 'an inn', smithy: 'a smithy', shop: 'a shop', chapel: 'a chapel', house: 'a house', cave: 'a cave' };
+const subOf = (k) => (own(KIND_SUB, k) ? KIND_SUB[k] : '');
 
 function innPlan(r, w) {
   const mir = r() < .5, kw = w >= 15 ? rint(r, 4, 5) : 4;
@@ -1684,7 +1688,7 @@ const HOUSE_FRONT = { house: 'living', shop: 'shopfloor', smithy: 'forge', chape
 function genBuilding(st, id) {
   const site = st.sites[id], lot = st.maps.S0.lots.find((l) => l.site === id), r = rngFor(st.seed, 'site:' + id, 0);
   const M = 2, w = lot.w + 2 * M, h = lot.h + 2 * M, m = newMap(id, site.kind, w, h, TR.GRASS);
-  m.title = site.name; m.sub = KIND_SUB[site.kind] + ' in ' + st.bible.town;
+  m.title = site.name; m.sub = (subOf(site.kind) || 'a place') + ' in ' + st.bible.town;
   const B = { x: M, y: M, w: lot.w, h: lot.h }, s = lot.side;
   const stone = site.kind === 'smithy' || site.kind === 'chapel';
   for (let j = 0; j < B.h; j++) for (let i = 0; i < B.w; i++) m.t[(B.y + j) * w + B.x + i] = stone ? TR.STONE : TR.WOOD;
@@ -2108,7 +2112,7 @@ const SPEED = 30;                                         /* feet a turn, for ev
 const PARTY_MAX = 6;
 const AREAS = ['narrate', 'talk', 'act', 'monsters', 'create'];   /* what a Game Master does at the table: each is the script's or a model's */
 const SIGHT = { town: 24, cave: 8 };                      /* how far the party sees, in squares: daylight, torchlight */
-const sightOf = (m) => SIGHT[m.kind] || 16;               /* and a lit room */
+const sightOf = (m) => (own(SIGHT, m.kind) ? SIGHT[m.kind] : 16);               /* and a lit room */
 const pcOf = (st, who) => st.party.find((p) => p.id === who) || null;
 const leadOf = (st) => pcOf(st, st.lead) || st.party[0];
 const moveLeft = (R) => SPEED + (R.extra | 0) - R.moved;  /* feet of this turn not yet walked */
@@ -2664,7 +2668,7 @@ function intent(st, it) {
         if (st.party.length >= PARTY_MAX) return no('full');
         const L = leadOf(st), m = st.maps[L.site], id = 'P' + (st.n.pc + 1), spot = freeNear(st, m, L.x, L.y, id);
         if (!spot) return no('blocked');
-        const cls = CLASSES[it.cls] ? it.cls : CLASS_ORDER[st.n.pc % CLASS_ORDER.length];
+        const cls = own(CLASSES, it.cls) ? it.cls : CLASS_ORDER[st.n.pc % CLASS_ORDER.length];
         const used = new Set(st.party.map((p) => p.name)), r = rngFor(st.seed, 'pc', st.n.pc + 1);
         let name = clip(String(it.name == null ? '' : it.name).replace(/\s+/g, ' '), 24);
         const given = !!name;
@@ -2691,7 +2695,7 @@ function intent(st, it) {
       if (it.op === 'class') {   /* a calling may be changed until it has been tested: before any experience is earned */
         const p = pcOf(st, it.id);
         if (!p) return no('nobody');
-        if (!CLASSES[it.cls]) return no('noclass');
+        if (!own(CLASSES, it.cls)) return no('noclass');
         if (p.xp > 0 || p.level > 1) return no('seasoned');
         if (p.cls !== it.cls) { const keep = { ancestry: p.ancestry, background: p.background, personality: p.personality, look: p.look, player: p.player }; st.gold = Math.max(0, st.gold + CLASSES[it.cls].gold - CLASSES[p.cls].gold); makeSheet(p, it.cls); Object.assign(p, keep); p.stock = false; fixLead(st); note(st, 'party', { op: 'class', who: p.id, name: p.name, cls: p.cls }); }
         return { ok: true, id: p.id, cls: p.cls };
@@ -2872,7 +2876,7 @@ function intent(st, it) {
     }
     case 'jump': {   /* the table's hand lifts the party to another site (a sandbox convenience) */
       if (R) return no('inround');
-      if (!st.sites[it.site]) return no('uncharted');
+      if (!own(st.sites, it.site)) return no('uncharted');
       return arrive(st, m, it.site, 'jump');
     }
     default: return no('bad');
@@ -3031,22 +3035,23 @@ function unpackState(p) {
     if (!q || typeof q !== 'object') continue;
     st.npcs[k] = Object.assign(q, { id: k, name: s(q.name, 60) || 'Someone', role: s(q.role, 80), kind: ['npc', 'foe', 'captive'].includes(q.kind) ? q.kind : 'npc', trait: s(q.trait, 40), home: s(q.home, 12) });
     if ('status' in q) q.status = ['alive', 'defeated', 'dead', 'gone'].includes(q.status) ? q.status : 'alive';
-    if ('tpl' in q && !BESTIARY[q.tpl]) delete q.tpl;
+    if ('tpl' in q && !own(BESTIARY, q.tpl)) delete q.tpl;
     if ('sheet' in q) {   /* a monster's block: the numbers bounded, its attacks always the template's own */
-      const z = q.sheet && typeof q.sheet === 'object' ? q.sheet : {}, tpl = BESTIARY[z.tpl] ? z.tpl : tplOf(q), hpMax = int(z.hpMax, 1, 400, BESTIARY[tpl].hp);
+      const z = q.sheet && typeof q.sheet === 'object' ? q.sheet : {}, tpl = own(BESTIARY, z.tpl) ? z.tpl : tplOf(q), hpMax = int(z.hpMax, 1, 400, BESTIARY[tpl].hp);
       q.sheet = { tpl, ac: int(z.ac, 5, 25, BESTIARY[tpl].ac), hp: int(z.hp, 0, hpMax, hpMax), hpMax, asleep: int(z.asleep, 0, 1e6, 0), turned: int(z.turned, 0, 1e6, 0) };
     }
   }
   const maps = p.maps && typeof p.maps === 'object' ? p.maps : {};
-  for (const k of Object.keys(maps)) { if (!st.sites[k]) continue; const m = unpackMap(maps[k]); if (m) { m.id = k; st.maps[k] = m; } }
+  for (const k of Object.keys(maps)) { if (!own(st.sites, k)) continue; const m = unpackMap(maps[k]); if (m) { m.id = k; st.maps[k] = m; } }
   if (!st.maps.S0) throw new Error('That tale has no town in it.');
+  for (const m of Object.values(st.maps)) for (const t of m.tokens) if (t.npc && !own(st.npcs, t.npc) && t.npc in st.npcs) t.npc = '';   /* not a person: a name every object answers to */
   /* the party: at most six, each with a name and an id of its own, all on one board */
-  const raw = (Array.isArray(p.party) ? p.party : []).filter((q) => q && typeof q === 'object' && st.maps[q.site]).slice(0, PARTY_MAX);
+  const raw = (Array.isArray(p.party) ? p.party : []).filter((q) => q && typeof q === 'object' && own(st.maps, q.site)).slice(0, PARTY_MAX);
   const lead = raw.find((q) => q.id === p.lead) || raw[0], home = lead ? lead.site : 'S0', hm = st.maps[home];
   for (const q of lead ? [lead].concat(raw.filter((x) => x !== lead)) : []) {   /* the leader is stood first; the rest stand where they were, or beside the leader */
     let id = /^P\d{1,4}$/.test(q.id) ? q.id : '';
     if (!id || pcOf(st, id)) { let k = 1; while (pcOf(st, 'P' + k)) k++; id = 'P' + k; }
-    const k = raw.indexOf(q), old = !CLASSES[q.cls];           /* a traveller from before there were sheets is given a calling by their place in the party */
+    const k = raw.indexOf(q), old = !own(CLASSES, q.cls);           /* a traveller from before there were sheets is given a calling by their place in the party */
     const pc = newPc(id, s(q.name, 24) || 'Wayfarer', home, q.x | 0, q.y | 0, old ? CLASS_ORDER[k % CLASS_ORDER.length] : q.cls, old ? true : !!q.stock), by = st.party[0] || { x: hm.w >> 1, y: hm.h >> 1 };
     if (!old) cleanPc(pc, q);
     if (q.site !== home || !tileFree(hm, pc.x, pc.y) || taken(st, hm, pc.x, pc.y, id)) {
@@ -3100,7 +3105,7 @@ function unpackState(p) {
   st.costs = Costs.sanitize(p.costs);
   const told = p.told && typeof p.told === 'object' ? p.told : {};
   for (const k of Object.keys(told).slice(0, 300)) if (/^[\w:.-]{1,24}$/.test(k) && told[k]) st.told[k] = 1;
-  for (const z of Array.isArray(p.fallen) ? p.fallen.slice(-60) : []) if (z && typeof z.name === 'string') st.fallen.push({ name: s(z.name, 24), cls: CLASSES[z.cls] ? z.cls : 'Fighter', level: int(z.level, 1, 5, 1), day: int(z.day, 1, 99999, 1) });
+  for (const z of Array.isArray(p.fallen) ? p.fallen.slice(-60) : []) if (z && typeof z.name === 'string') st.fallen.push({ name: s(z.name, 24), cls: own(CLASSES, z.cls) ? z.cls : 'Fighter', level: int(z.level, 1, 5, 1), day: int(z.day, 1, 99999, 1) });
   const nn = p.n && typeof p.n === 'object' ? p.n : {};
   let top = 0; for (const k of Object.keys(st.sites)) top = Math.max(top, +k.slice(1) + 1);
   let pcs = 1; for (const q of st.party) pcs = Math.max(pcs, +q.id.slice(1) || 1);
@@ -3167,12 +3172,12 @@ function pcByRef(st, ref) {
 function npcByRef(st, ref) {
   const s = String(ref == null ? '' : ref).trim();
   if (!s) return null;
-  return st.npcs[s] || Object.values(st.npcs).find((n) => n.name.toLowerCase() === s.toLowerCase()) || null;
+  return (own(st.npcs, s) && st.npcs[s]) || Object.values(st.npcs).find((n) => n.name.toLowerCase() === s.toLowerCase()) || null;
 }
 function siteByRef(st, ref) {
   const s = String(ref == null ? '' : ref).trim();
   if (!s) return null;
-  return st.sites[s] || Object.values(st.sites).find((x) => x.name.toLowerCase() === s.toLowerCase()) || null;
+  return (own(st.sites, s) && st.sites[s]) || Object.values(st.sites).find((x) => x.name.toLowerCase() === s.toLowerCase()) || null;
 }
 /* someone standing on the board in play: a party member, or a person by their id or name */
 function onBoard(st, m, ref) {
@@ -3412,7 +3417,7 @@ const TOOLS = {
       const m = st.maps[st.here], role = str(i.role, 60);
       if (!role) return err('role is required.');
       if (m.tokens.length >= 40) return err('This board is as crowded as it can be.');
-      if (i.template != null && !BESTIARY[i.template]) return err('Unknown template "' + i.template + '". Bestiary: ' + Object.keys(BESTIARY).join(', '));
+      if (i.template != null && !own(BESTIARY, i.template)) return err('Unknown template "' + i.template + '". Bestiary: ' + Object.keys(BESTIARY).join(', '));
       let name = str(i.name, 40);
       if (name) { const dup = Object.values(st.npcs).find((n) => n.name.toLowerCase() === name.toLowerCase()); if (dup) return err(dup.name + ' already exists as ' + dup.id + ' (' + dup.role + '). Use update_npc or move.'); }
       const A = anchorOf(st, m, i.near == null || i.near === '' ? st.lead : i.near);
@@ -3609,7 +3614,7 @@ const TOOLS = {
     desc: 'Get a ready-made character idea for a player who wants to be surprised. Does not create it: present it, then call create_character once the player agrees (they may change anything).',
     schema: obj({ class: Sc.enm(Object.keys(CLASSES), 'Optional class') }, []),
     run(st, i) {
-      const r = rngFor(st.seed, 'pregen', st.n.roll++), cls = CLASSES[i.class] ? i.class : pick(r, Object.keys(CLASSES));
+      const r = rngFor(st.seed, 'pregen', st.n.roll++), cls = own(CLASSES, i.class) ? i.class : pick(r, Object.keys(CLASSES));
       return ok({ name: pick(r, GIVEN) + ' ' + pick(r, FAMILY), class: cls, ancestry: pick(r, ANCESTRIES), background: pick(r, BACKGROUNDS), personality: pick(r, PERSONALITIES), look: pick(r, LOOKS) });
     } },
   create_character: {
@@ -3641,7 +3646,7 @@ const TOOLS = {
         st.quests[id] = { id, title, goal, main: false, status: 'active', notes: [] };
         return ok({ id, title, goal, status: 'active' }, 'A new task: ' + title + '.', 'quest');
       }
-      const q = st.quests[String(i.quest_id || 'Q0').trim()], text = str(i.note, 200);
+      const qk = String(i.quest_id || 'Q0').trim(), q = own(st.quests, qk) ? st.quests[qk] : null, text = str(i.note, 200);
       if (!q) return err('Unknown quest "' + i.quest_id + '". Quests: ' + Object.keys(st.quests).join(', '));
       if (q.status !== 'active') return err(q.title + ' is already ' + q.status + '.');
       if (i.op === 'note' && !text) return err('note is required.');
@@ -3671,7 +3676,7 @@ const TOOLS = {
       if (!words.length) return err('query needs at least one word of 3+ letters.');
       const score = (t) => { t = t.toLowerCase(); let n = 0; for (const w of words) if (t.includes(w)) n++; return n; }, hits = [];
       for (const f of st.facts) { const n = score(f.text + ' ' + subjectName(st, f.subject)); if (n) hits.push([n, 'fact [' + f.subject + ' ' + subjectName(st, f.subject) + ']: ' + f.text]); }
-      for (const x of Object.values(st.sites)) { const n = score(x.name + ' ' + x.kind); if (n) hits.push([n, 'place ' + x.id + ' ' + x.name + ' (' + (KIND_SUB[x.kind] || x.kind) + (st.maps[x.id] ? ', charted' : ', not yet charted') + ')']); }
+      for (const x of Object.values(st.sites)) { const n = score(x.name + ' ' + x.kind); if (n) hits.push([n, 'place ' + x.id + ' ' + x.name + ' (' + (subOf(x.kind) || x.kind) + (st.maps[x.id] ? ', charted' : ', not yet charted') + ')']); }
       for (const p of Object.values(st.npcs)) { const n = score(p.name + ' ' + p.role); if (n) hits.push([n, 'person ' + p.id + ' ' + p.name + ', ' + p.role + ', of ' + p.home + (p.status ? ' (' + p.status + ')' : '')]); }
       for (const q of Object.values(st.quests)) { const n = score(q.title + ' ' + q.goal); if (n) hits.push([n, 'quest ' + q.id + ' ' + q.title + ' (' + q.status + ')']); }
       hits.sort((a, b) => b[0] - a[0]);
@@ -3719,8 +3724,8 @@ function exec(st, name, input) {
 const flag = (st, k) => (st.flags && st.flags[k]) || 0;
 function setFlag(st, k, v) { st.flags[k] = v == null ? 1 : v; }
 const varyOf = (st, key, list) => list[Math.floor(rngFor(st.seed, 'say:' + key, 0)() * list.length) % list.length];
-const mainK = (st) => { const t = (st.bible.threads || []).find((x) => x.main); return t && MAIN[t.k] ? t.k : 'kidnap'; };
-const sideKs = (st) => (st.bible.threads || []).filter((x) => !x.main && WHISPERS[x.k]).map((x) => x.k);
+const mainK = (st) => { const t = (st.bible.threads || []).find((x) => x.main); return t && own(MAIN, t.k) ? t.k : 'kidnap'; };
+const sideKs = (st) => (st.bible.threads || []).filter((x) => !x.main && own(WHISPERS, x.k)).map((x) => x.k);
 const giverOf = (st) => (st.npcs[MAIN[mainK(st)].giver] ? MAIN[mainK(st)].giver : 'N4');
 const first = (name) => String(name || '').split(' ')[0];
 /* the names a line may use */
@@ -4431,7 +4436,7 @@ function bibleText(st) {
   for (const t of B.threads || []) L.push((t.main ? '  The matter at hand (quest Q0): ' : '  A whisper (a secret; let the party find it): ') + t.t);
   L.push('');
   L.push('PLACES (id | name | kind). Every place has its own board of 5 ft squares; a building is charted the first time the party walks in.');
-  for (const k of Object.keys(st.sites)) { const x = st.sites[k]; L.push([x.id, x.name, KIND_SUB[x.kind] || x.kind].join(' | ') + (x.keeper && st.npcs[x.keeper] ? ' | kept by ' + x.keeper + ' ' + st.npcs[x.keeper].name : '') + (x.fam ? ' | home of the ' + x.fam + ' family' : '')); }
+  for (const k of Object.keys(st.sites)) { const x = st.sites[k]; L.push([x.id, x.name, subOf(x.kind) || x.kind].join(' | ') + (x.keeper && own(st.npcs, x.keeper) ? ' | kept by ' + x.keeper + ' ' + st.npcs[x.keeper].name : '') + (x.fam ? ' | home of the ' + x.fam + ' family' : '')); }
   L.push('');
   L.push('OPENING SITUATION: ' + B.opening);
   return L.join('\n');
@@ -4849,7 +4854,7 @@ const Costs = {
   },
   /* one ledger line, its fields always in the same order (a save is compared byte for byte) */
   norm(e) {
-    const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0), o = { at: num(e.at), turn: Math.floor(num(e.turn)), kind: COST_KINDS[e.kind] ? e.kind : 'gm', task: clip(e.task, 20), desc: clip(e.desc, 200), model: clip(e.model, 80),
+    const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0 ? v : 0), o = { at: num(e.at), turn: Math.floor(num(e.turn)), kind: own(COST_KINDS, e.kind) ? e.kind : 'gm', task: clip(e.task, 20), desc: clip(e.desc, 200), model: clip(e.model, 80),
       usd: num(e.usd), calls: Math.floor(num(e.calls)), unknown: !!e.unknown };
     if (e.failed) o.failed = clip(e.failed, 20);
     if (e.tok) o.tok = { in: num(e.tok.in), out: num(e.tok.out), read: num(e.tok.read), write: num(e.tok.write) };
@@ -5588,7 +5593,7 @@ function tapAt(sx, sy) {
   if (p.lot) {
     const site = st.sites[p.lot.site] || { name: 'A building', kind: 'house' };
     View.sel = { x: p.lot.x, y: p.lot.y, w: p.lot.w, h: p.lot.h };
-    UI.card(site.name, cap(KIND_SUB[site.kind] || 'a building') + ', ' + p.lot.w * FT + ' by ' + p.lot.h * FT + ' ft.' + (st.maps[site.id] ? '' : ' Nobody has charted its rooms yet.'));
+    UI.card(site.name, cap(subOf(site.kind) || 'a building') + ', ' + p.lot.w * FT + ' by ' + p.lot.h * FT + ' ft.' + (st.maps[site.id] ? '' : ' Nobody has charted its rooms yet.'));
   } else if (p.obj) {
     const o = ASSETS[p.obj.a], f = footprint(p.obj), kids = (m._.kids.get(p.obj.id) || []).map((k) => ASSETS[k.a].n.toLowerCase());
     View.sel = { x: f.x, y: f.y, w: f.w, h: f.h };
@@ -6909,7 +6914,7 @@ const UI = {
     } else if (this.tab === 'places') {
       for (const id of Object.keys(st.sites)) {
         const s = st.sites[id], here = id === st.here, lost = s.kind !== 'town' && s.kind !== 'cave' && !st.maps.S0.lots.some((l) => l.site === id);
-        const e = entry(s.name, (KIND_SUB[s.kind] || 'a place') + ' · ' + (st.maps[id] ? 'charted' : 'not yet charted'), s.made ? 'Found while charting the town.' : '', here);
+        const e = entry(s.name, (subOf(s.kind) || 'a place') + ' · ' + (st.maps[id] ? 'charted' : 'not yet charted'), s.made ? 'Found while charting the town.' : '', here);
         if (!here && !lost) { const b = el('button', 'plaque small', 'Go'); b.type = 'button'; b.addEventListener('click', () => { if (G.busy) { this.toast(BUSY); return; } const res = intent(st, { t: 'jump', site: id }); this.closePanels(); this.follow(res); }); e.appendChild(b); }
       }
     } else if (this.tab === 'people') {

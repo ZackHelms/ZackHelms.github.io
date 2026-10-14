@@ -1,5 +1,14 @@
 # DONE — done log
 
+- 2026-10-13 [cyoa2] **The second negative-test pass, finished**: 688 breaks
+  at the last three pushes and step 4 (voice 122, script 190, table 129, book
+  154, step 4 93), every one caught by a named row or written up as having no
+  effect; 925 checks. It found a defect as well as holes: a name such as
+  "constructor" passed every table lookup made by truthiness, so a guest could
+  make the host's engine throw and a hostile save could reach a built-in
+  function. Fixed with `own()` at every lookup a file, a guest or a tool can
+  name (`90bdc2b`), with rows and 18 breaks at the new sites.
+
 - 2026-10-13 [cyoa2] **Step 4: other phones at the table.** One phone hosts
   the tale, the Game Master, the keys and the voice; others in the same room
   join by QR code, phone to phone over WebRTC with no server and no STUN, see
