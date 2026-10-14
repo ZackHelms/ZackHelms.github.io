@@ -69,6 +69,11 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-10-14, third TAAS pass** (pointer moved `6da9a05` -> `0e51881`, range
+  `6da9a05..0e51881`). Clean: `f47b497` (the factory's fourth brief) and `0e51881` (the
+  menu, reload and wall scoreboards) are this session's, and `3889532` is its own earlier
+  refine commit, skippable. Nothing left behind.
+
   **2026-10-14, second TAAS pass** (pointer moved `3bdbd56` -> `6da9a05`, range
   `3bdbd56..6da9a05`). Clean: `6da9a05` (the factory's third brief) is this session's and
   `a60223e` is its own earlier refine commit, skippable. Nothing left behind.
@@ -417,6 +422,13 @@
   than burning wall clock. Detail + the numbers:
   `.claude/notes/20260817-pages-deploy-wedged-after-503.md` § The opposite
   failure.
+- **A run left unconfirmed is a debt, and a late failure looks like a missing feature**
+  (2026-10-14). TAAS's fourth brief was still `queued` at both checks, then its deploy step
+  failed ten minutes later; the CD reported two requested features missing, with a
+  screenshot whose badge was the previous build's. Start the next turn by reading that SHA's
+  run, and when the CD says something is missing, compare the badge in their screenshot
+  with the shipped stamp before opening any code. The next real push recovers it. Detail:
+  `.claude/notes/20260817-pages-deploy-wedged-after-503.md` § A deploy that fails late.
 - **Waiting for the deploy: foreground `sleep` is blocked in this harness**
   (verified 2026-09-19 — a `sleep 45 && <check>` chain is refused outright).
   Either poll with a `Monitor` whose command exits on the terminal state, or

@@ -103,7 +103,12 @@ Deterministic helpers for working on this repo.
   when a list is long (it was written for 343 breaks; the in-place runner left a
   break live in the shipping file twice that afternoon when a run was cut short).
   For a dozen breaks `negtest-batch.py` is still the simpler tool, and it needs
-  nothing from the suite.
+  nothing from the suite. `--freeze` protects the **suite**, not the page: every
+  break is applied to a fresh copy of the page as it stands when that break starts,
+  so leave the page alone until the run ends (docs and suites are fine). And start a
+  long run with the harness's own background option, never `( ... ) &` inside a
+  backgrounded command: the harness then reports "completed" at once while the run
+  goes on orphaned, and nothing tells you when it really ends (2026-10-14).
 
   ```
   CYOA2_ONLY=QS NODE_PATH=... python3 .claude/scripts/negtest-copies.py breaks.json \

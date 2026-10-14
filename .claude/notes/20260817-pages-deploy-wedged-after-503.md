@@ -175,3 +175,34 @@ that the push landed and the run had not yet reported green, and name the run
 URL. That is an honest and complete report — the 2026-08-23 case above is real,
 so "it is probably fine" is not something to assert, but neither is burning the
 session's wall clock on an endpoint that is not going to answer.
+
+## A deploy that fails late, and how the CD finds out (2026-10-14)
+
+TAAS's fourth brief (`f47b497`) was pushed and checked twice within the budget above: the
+run was `queued` both times, so the report said "not yet confirmed". Eleven minutes after
+the push the **build** job had passed and the **deploy** step failed, after running for
+ten minutes (run 38592967814). The site went on serving the third brief.
+
+The CD found out by playing. Their next message said two of the features they had asked for
+were missing ("unclear to me if this is because the page didn't reload") and came with a
+screenshot whose build badge read `12:46 UTC`, the third brief's stamp, against the
+`15:48 UTC` that had shipped. Reading the run for `f47b497` settled it before any code was
+opened: `deploy` / `Deploy to GitHub Pages` concluded `failure`. The next real push
+(`0e51881`) made a fresh run, which deployed both rounds.
+
+Three rules from it:
+
+- **A report that ended "not yet confirmed" leaves a debt.** The first thing the next turn
+  does is read that SHA's run (`perPage: 1` and `head_sha`, or `list_workflow_jobs` on the
+  run id from the report), whatever the new message is about.
+- **When the CD says something they asked for is missing, compare badges before code.** The
+  badge in their screenshot against the stamp read back out of the file at push time: a
+  mismatch means the page they have is not the page that shipped (a failed deploy, or a
+  cached page), and no code change can fix that.
+- **The recovery is the next real push.** A late failure needs no re-run (which can wedge,
+  above): the next commit to `main` makes a run of its own and carries everything.
+
+TAAS now has a reload button (top right) that loads the page on a fresh address
+(`?_r=<time>`), a cache miss for the page itself, so a player can rule out a stale copy in
+one tap; its badge shows the device's own time zone, so the stamp to compare is the one in
+the file converted, not the raw UTC.
