@@ -123,6 +123,13 @@ Deterministic helpers for working on this repo.
   (one such row was found that way: it reloaded the page before an autosave had
   landed). `--only a,b` re-runs the ones that were missed.
 
+  **Size a Chromium sweep before starting it** (2026-10-14): TAAS's 48 page breaks
+  against a ~45 s suite took about 45 minutes at `--jobs 3` on 4 cores (roughly a
+  break a minute), against under three minutes for 84 breaks of its pure-node suite.
+  Run it in the background and leave the page alone until it ends (the runner reads
+  the page once at the start and prints `NEGCOPIES=changed` if it moved); write the
+  docs and poses meanwhile, then stamp the badge and run the gates.
+
   **Every break on an .html page is parse-checked first** (2026-10-14,
   `check-inline-js.cjs` on each copy, before any suite runs): a break whose `new`
   does not parse kills its script block, and every row then "catches" it for the

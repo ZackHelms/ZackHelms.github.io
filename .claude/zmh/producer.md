@@ -69,6 +69,10 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-10-14, second TAAS pass** (pointer moved `3bdbd56` -> `6da9a05`, range
+  `3bdbd56..6da9a05`). Clean: `6da9a05` (the factory's third brief) is this session's and
+  `a60223e` is its own earlier refine commit, skippable. Nothing left behind.
+
   **2026-10-14, TAAS pass** (pointer moved `3ea55c4` -> this pass's pre-commit HEAD,
   range `3ea55c4..HEAD`, 36 commits). The CD scoped it "for TAAS", so it refined only the
   TAAS commits: `2aef91c` (ship), `6b3f072` (negative tests), `c3e87c0` (robot factory),

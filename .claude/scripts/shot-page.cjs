@@ -19,7 +19,8 @@
 //   dpr=2                deviceScaleFactor
 //
 // Requirements: playwright-core resolvable (remote sessions:
-//   NODE_PATH=/opt/node22/lib/node_modules/playwright/node_modules) and a
+//   NODE_PATH=/opt/node-tools/node_modules, or on older images
+//   /opt/node22/lib/node_modules/playwright/node_modules) and a
 //   Chromium binary ($SMOKE_CHROMIUM, /opt/pw-browsers/chromium, or PATH).
 'use strict';
 const path = require('path');
