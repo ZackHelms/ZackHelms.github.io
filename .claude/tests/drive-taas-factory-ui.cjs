@@ -7,8 +7,10 @@
  * that a tap at the pixel where a thing is DRAWN reaches that thing at every viewport (the
  * canvas-space rule in games/CLAUDE.md), that the red button glows when ready and goes dark
  * while it runs, the whole first loop played with real touches (walk, press, plank, bubble,
- * $5), a drag that scrolls and never walks, hiring and a job through the bubble, the info
- * panel, saves that survive a reload without touching the formal mode's, re-measuring after
+ * $5), a drag that scrolls and never walks, hiring and a job through the bubble, a robot's
+ * page (its name, its base prompt, buying a slot and giving it an instruction, all by real
+ * taps), the recycle bin drawn and the wall sign gone, the info panel, saves that survive a
+ * reload without touching the formal mode's, re-measuring after
  * a resize while hidden, and the chrome, HUD and bubble all on screen at phone, landscape
  * and desktop sizes. Frames are stepped through the page's own test hook (TAAS_FACTORY,
  * paused), so time is exact; input goes through real touch events.
@@ -164,7 +166,8 @@ const server = http.createServer((req, res) => {
     await page.tap('#fx-bubble [data-opt="hire"]');
     await step(0.2);
     const jobs = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt));
-    ok(jobs.join() === 'job:operate,job:sell,job:rest' && (await S()).robots.length === 1, 'hiring it turns the bubble to its jobs', jobs.join());
+    const nm = await H(() => document.querySelector('#fx-bubble .fx-bname') && document.querySelector('#fx-bubble .fx-bname').textContent);
+    ok(jobs.join() === 'job:operate,job:sell,job:rest,notes' && nm === 'Bolt' && (await S()).robots.length === 1, 'hiring it turns the bubble to the new robot: its name, its jobs and its clipboard', nm + ': ' + jobs.join());
     await page.tap('#fx-bubble [data-opt="job:operate"]');
     await step(8);   // out of the crate, round the dock panel, up to the machine
     const r = (await S()).robots[0];
@@ -188,7 +191,8 @@ const server = http.createServer((req, res) => {
       await H(() => { const s = window.TAAS_FACTORY.s; s.money = 60; });
       const res = await H(() => {
         const T = window.TAAS_FACTORY, out = [];
-        const want = { machine: 'machine', console: 'machine', binBack: 'bin', binFront: 'bin', dockPanel: 'dock', desk: 'terminal' };
+        const want = { machine: 'machine', console: 'machine', binBack: 'bin', binFront: 'bin', dockPanel: 'dock' };
+        if (T.spriteRect('desk')) out.push('the prompt lab desk is still drawn');
         Object.keys(want).forEach(id => {
           const r = T.spriteRect(id);
           if (!r) { out.push(id + ' not drawn'); return; }
@@ -250,10 +254,11 @@ const server = http.createServer((req, res) => {
   await section('7. panel', async () => {
     await fresh(6);
     await page.tap('#fx-info');
-    const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, rows: document.querySelectorAll('#fx-panel-body tbody tr').length, cur: document.querySelector('#fx-panel-body tr.cur td') && document.querySelector('#fx-panel-body tr.cur td').textContent }));
-    ok(p.open && p.rows >= 5 && /No prompt/.test(p.cur), 'the i button opens the explanation, with the odds table and the current level marked', JSON.stringify(p));
+    const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, rows: [...document.querySelectorAll('#fx-panel-body tbody tr')].map(r => r.textContent) }));
+    ok(p.open && p.rows.length === 1 && /No robots yet/.test(p.rows[0]), 'the i button opens the explanation, with the measured table (no robots yet)', JSON.stringify(p));
     const words = await H(() => document.getElementById('fx-panel-body').textContent);
     ok(/Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it explains customer satisfaction on its own terms, without leaning on the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
+    ok(/Instructions/.test(words) && /\$5, \$10, \$15, \$20 and \$25/.test(words) && /recycle bin/.test(words) && !/prompt engineering|prompt level/i.test(words), 'and explains instructions (slot prices, the recycle bin), with nothing left of the prompt levels', (words.match(/prompt (engineering|level).{0,20}/i) || [''])[0]);
     await H(() => { window.TAAS_FACTORY.s.money = 33; });
     await page.tap('[data-panel="restart"]');
     const once = await S();
@@ -318,6 +323,86 @@ const server = http.createServer((req, res) => {
     const r2 = await H(() => { const T = window.TAAS_FACTORY, c = document.getElementById('fx-canvas'), m = T.spriteRect('machine'); const t = T.hitTest(m.x + m.w / 2, m.y + m.h * 0.6); return { cw: c.width / T.view.dpr, vw: T.view.w, hit: t && t.kind }; });
     ok(Math.abs(r2.cw - 430) <= 1 && r2.vw === 430 && r2.hit === 'machine', 'a resize while the factory shows re-measures it too', JSON.stringify(r2));
     await page.setViewportSize({ width: 390, height: 844 });
+  });
+
+  /* ---------- 10. a robot's page, by real taps ---------- */
+  await section('10. robot page', async () => {
+    await fresh(9);
+    // two robots by the engine's own route, the first at the button; two mistakes already seen
+    await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s;
+      s.money = 60;
+      ['operate', 'sell'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      s.force.log = Array(80).fill('log'); s.force.sap = Array(80).fill(false); s.force.think = Array(80).fill(false); s.force.price = Array(80).fill('fair');
+      for (let i = 0; i < 200; i++) FACTORY.step(s, 0.05);
+      s.robots[1].job = null; s.robots[1].state = 'idle'; s.robots[1].carry = null;   // the seller rests: no sales to move the money
+      s.events = []; s.money = 100; s.seen.sap = true; s.seen.gnarled = true;
+      T.tick(1 / 60);
+    });
+    const tapRobot = async id => {
+      const rp = await H(id => { const r = window.TAAS_FACTORY.s.robots[id]; return window.TAAS_FACTORY.screen(r.x, r.y, 0.55); }, id);
+      await page.touchscreen.tap(rp[0], rp[1]);
+      let ro = false;
+      for (let i = 0; i < 50 && !ro; i++) { await step(0.1); ro = await H(() => !!document.querySelector('#fx-bubble [data-opt="notes"]')); }
+      return ro;
+    };
+    const opened = await tapRobot(0);
+    const b0 = await H(() => ({ name: document.querySelector('#fx-bubble .fx-bname').textContent, note: document.querySelector('#fx-bubble [data-opt="notes"]').textContent.trim() }));
+    ok(opened && b0.name === 'Bolt' && b0.note === '', 'a tap on the drawn robot shows its name and its clipboard (nothing on it yet)', JSON.stringify(b0));
+    await page.tap('#fx-bubble [data-opt="notes"]');
+    await step(0.05);
+    const pg = await H(() => ({ open: !document.getElementById('fx-panel').hidden, mode: window.TAAS_FACTORY.page.mode, name: document.getElementById('fx-rp-name').value, base: document.querySelector('.fx-base').textContent, slots: document.querySelectorAll('.fx-slots li').length, buy: document.querySelector('[data-panel="buy"]').textContent, dis: document.querySelector('[data-panel="buy"]').disabled }));
+    ok(pg.open && pg.mode === 'robot' && pg.name === 'Bolt' && pg.base === 'Use machine01 to refine raw materials.' && pg.slots === 5 && pg.buy === 'Unlock this slot: $5' && !pg.dis,
+      'the clipboard opens its page: its name, its base prompt on top, five slots, the first for $5', JSON.stringify(pg));
+    await page.tap('[data-panel="buy"]');
+    await step(0.05);
+    const pk = await H(() => ({ money: window.TAAS_FACTORY.s.money, slots: window.TAAS_FACTORY.s.robots[0].slots, rules: [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent), pick: window.TAAS_FACTORY.page.pick }));
+    ok(pk.money === 95 && pk.slots === 1 && pk.pick === 0 && pk.rules.join('|') === 'Never put sap on input log|Put gnarled logs in recycle bin', 'unlocking a slot takes $5 and opens the list straight away: only the instructions for mistakes already seen', JSON.stringify(pk));
+    await page.tap('[data-panel="rule:sap"]');
+    await step(0.05);
+    const set = await H(() => ({ rules: window.TAAS_FACTORY.s.robots[0].rules, slot: document.querySelector('.fx-slot.filled') && document.querySelector('.fx-slot.filled').textContent, picker: !!document.querySelector('.fx-picker'), next: document.querySelector('[data-panel="buy"]').textContent }));
+    ok(set.rules.join() === 'sap' && set.slot === 'Never put sap on input log' && !set.picker && set.next === 'Unlock this slot: $10', 'tapping an instruction puts it in the slot, closes the list, and the next slot asks $10', JSON.stringify(set));
+    await page.tap('[data-panel="buy"]'); await step(0.05);
+    const dup = await H(() => [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent + ':' + b.disabled));
+    ok(dup.length === 2 && /slot 1\):true$/.test(dup[0]) && /:false$/.test(dup[1]), 'in the next slot\'s list, the instruction it already holds is greyed and says where', JSON.stringify(dup));
+    await page.tap('[data-panel="cancel"]'); await step(0.05);
+    ok(!(await H(() => !!document.querySelector('.fx-picker'))) && (await H(() => window.TAAS_FACTORY.s.robots[0].rules.join())) === 'sap,', 'Cancel closes the list and leaves the slot empty');
+    // a name: typed, trimmed, and shown as text wherever it appears
+    await page.fill('#fx-rp-name', '  <b>Planky</b>  ');
+    await H(() => document.getElementById('fx-rp-name').dispatchEvent(new Event('change')));
+    await step(0.05);
+    const nm = await H(() => ({ name: window.TAAS_FACTORY.s.robots[0].name, field: document.getElementById('fx-rp-name').value, injected: !!document.querySelector('#fx-panel-body b b, #fx-panel-body .fx-h b') }));
+    ok(nm.name === '<b>Planky</b>' && nm.field === '<b>Planky</b>' && !nm.injected, 'a robot can be named; the name is kept as typed (trimmed) and never read as markup', JSON.stringify(nm));
+    await page.tap('[data-panel="close"]');
+    await step(0.05);
+    ok(await H(() => document.getElementById('fx-panel').hidden), 'Close shuts the page');
+    await tapRobot(0);
+    const b1 = await H(() => ({ name: document.querySelector('#fx-bubble .fx-bname').textContent, html: document.querySelector('#fx-bubble .fx-bname').innerHTML, note: document.querySelector('#fx-bubble [data-opt="notes"]').textContent.trim() }));
+    ok(b1.name === '<b>Planky</b>' && /&lt;b&gt;/.test(b1.html) && b1.note === '1/2', 'its bubble wears the new name (as text) and its clipboard says 1 of 2 slots filled', JSON.stringify(b1));
+    // the page fits a small phone, scrolls, and its top is reachable
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.tap('#fx-bubble [data-opt="notes"]'); await step(0.05);
+    await page.tap('[data-panel="pick:1"]'); await step(0.05);
+    const fit = await H(() => { const p = document.getElementById('fx-panel'), body = document.getElementById('fx-panel-body'); p.scrollTop = -9999; const top = body.getBoundingClientRect().top - p.getBoundingClientRect().top; const wide = body.scrollWidth > body.clientWidth + 1 || document.scrollingElement.scrollWidth > innerWidth; return { top, wide, scrolls: p.scrollHeight > p.clientHeight }; });
+    ok(fit.top >= 0 && !fit.wide && fit.scrolls, 'at 320x568 the page scrolls, its top is reachable, and nothing runs off sideways', JSON.stringify(fit));
+    await H(() => window.TAAS_FACTORY.closePanel());
+    await page.setViewportSize({ width: 390, height: 844 });
+    // with one robot the slots wait for the second
+    await fresh(10);
+    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.money = 20; FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); s.money = 500; FACTORY.choose(s, 'notes'); T.tick(1 / 60); });
+    const one = await H(() => ({ open: !document.getElementById('fx-panel').hidden, buy: document.querySelector('[data-panel="buy"]').textContent, dis: document.querySelector('[data-panel="buy"]').disabled, base: document.querySelector('.fx-base').textContent }));
+    ok(one.open && one.dis && /once both robots are on staff/.test(one.buy) && /No job/.test(one.base), 'with one robot its page is there (name, no job yet), but slots wait for the second robot', JSON.stringify(one));
+    await H(() => window.TAAS_FACTORY.closePanel());
+  });
+
+  /* ---------- 11. the wall and the recycle bin, read off pixels ---------- */
+  await section('11. scene', async () => {
+    await fresh(11);
+    await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(1 / 60); });
+    const px = (x, y, z) => H(([x, y, z]) => { const T = window.TAAS_FACTORY, p = T.screen(x, y, z), k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const d = g.getImageData(Math.round(p[0] * k) - 4, Math.round(p[1] * k) - 4, 9, 9).data; let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } return [r / n, gg / n, b / n].map(Math.round); }, [x, y, z]);
+    const wall = await px(3.0, 0.45, 1.8), bin = await px(3.8, 4.32, 0.3);
+    ok(wall[0] - wall[2] < 30 && Math.abs(wall[0] - wall[1]) < 30, 'the back wall carries no sign: where it hung is plain wall', 'rgb ' + wall);
+    ok(bin[1] > bin[0] + 30 && bin[1] > bin[2], 'the recycle bin is drawn, green, in front of the out-feed', 'rgb ' + bin);
   });
 
   ok(!errors.length, 'no page errors or console errors over the whole drive', errors.slice(0, 3).join(' | '));

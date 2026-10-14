@@ -358,80 +358,160 @@ its tuning `CFG.sat*`; a save from before the rename keeps its number (`load()` 
 | Question | CD's answer |
 |---|---|
 | How to render cel-shaded 3D | **Canvas 2D meshes**: hand-written low-poly meshes, toon bands, ink outlines (as Star Surge's 3D style and Animation Rigs); no library, one file |
-| Prompt engineering in the first build | **Yes**: bought with $, steps that raise the good odds; prices and steps are Claude's, to tune |
+| Prompt engineering in the first build | **Yes**: bought with $, steps that raise the good odds; prices and steps are Claude's, to tune (**superseded 2026-10-14** by per-robot instructions, below) |
 | What customer trust does (now **customer satisfaction**) | **Lowers prices**: a good plank sells for $5 x satisfaction; fair sales win it back |
-| Outcome split at the start | **25 good / 35 so-so / 40 bad** (so-so: a slow cycle or a plank let go for $3) |
+| Outcome split at the start | **25 good / 35 so-so / 40 bad** (so-so: a slow cycle or a plank let go for $3) (**superseded 2026-10-14**: mistakes now come from causes, below) |
+
+### Instructions instead of prompt levels (CD, 2026-10-14) - stated
+
+The CD's second brief, after playing the first build, lightly trimmed:
+
+- **Remove the "robot factory" label from the back wall.**
+- **Instead of upgrading prompt quality at a computer**, the next step after buying the two
+  robots is: **tap a robot to add instructions to it, one at a time**. Instructions are
+  **attached to the robot**: each robot has **its own set**. **Instruction slots are bought
+  with cash, per robot: slots 1 / 2 / 3 / 4 / 5 cost $5 / $10 / $15 / $20 / $25**, so $150
+  unlocks all five on both robots.
+- **Each robot can be given a name.**
+- Instructions come from **a pool of pre-canned rules**, assigned to a slot: "I need to
+  scroll through the list and select the one I want that is appropriate for the task the
+  robot is doing." The six to start with (the CD's words, quotes made straight):
+  - Never put sap on input log
+  - Put gnarled logs in recycle bin
+  - Only input logs bigger than 1"x4"x4'
+  - Only output 1"x4"x4' wood planks
+  - Only sell 1"x4"x4' wood planks
+  - Sell 1"x4"x4' wood planks for $5
+- "These instructions start out obvious and straightforward, but later, as I want to
+  increase complexity of what I produce in my factory, the instructions will need to be
+  more nuanced. More on that later. **I want to playtest first** and think more on how I
+  want it to progress next."
+- **Why**: "The robots mimic AI because I am asking them to do tasks that are non-trivial
+  (QA input material and process into output, QA inventory and sell appropriately), and
+  like an intern they might occasionally mess up. So I see how they mess up and provide
+  instructions (ie guardrails) based on what I observe. Feels like prompt or context
+  engineering for a work task I ask AI for help on, and over time I observe ways I need to
+  refine my prompt."
+- **The robot's instructions page shows its base prompt at the top**, above the
+  instructions (guardrails) added to it: "use machine01 to refine raw materials", "sell the
+  items in this bin".
+
+Four answers the CD gave before the build (2026-10-14):
+
+| Question | CD's answer |
+|---|---|
+| Where mistakes come from | **Causes + rules**: the rack holds good, gnarled and small logs and a recycle bin joins the line; every mistake has a cause you can see, and the matching instruction in that robot's slots stops it. This **replaces the 25 / 35 / 40 dice and the prompt levels** |
+| How reliably a robot follows an instruction it has | **Rarely slips**: about 1 job in 20 it still makes that mistake (guardrails cut errors, they do not end them) |
+| An instruction about another job (e.g. the price rule on the operator) | **Does nothing**: a wasted slot, learned by watching |
+| Which instructions the list offers | **Only mistakes you have seen**: an instruction joins the list the first time a robot makes the mistake it prevents |
 
 ### What was built
 
 **The floor** is 6 m wide and 26 m deep (`FACTORY.LAYOUT`), drawn orthographically at a 50
 degree elevation, so x is screen x and depth is screen y, with heights foreshortened by
-cos 50. Back wall with the sign; the production line along it (log rack, in-feed belt,
-machine01 with its console and red button, out-feed belt, blue bin); a sap barrel by the
-in-feed; the hatch in the east wall where sold goods leave; the robot dock (charging panel,
-two crates on two pads); the prompt-lab desk and monitor; then two empty bays (pallets, a
-machine under a tarp, cones) as room to grow. A portrait phone sees the whole working area;
-the bays are a scroll away.
+cos 50. A plain back wall (windows and a pipe; no sign since 2026-10-14); the production
+line along it (log rack, in-feed belt, machine01 with its console and red button, out-feed
+belt, blue sale bin); a sap barrel by the in-feed; a **green recycle bin** in front of the
+out-feed, between the button and the seller; the hatch in the east wall where sold goods
+leave; the robot dock (charging panel, two crates on two pads); then two empty bays
+(pallets, a machine under a tarp, cones) as room to grow. The prompt lab's desk is gone. A
+portrait phone sees the whole working area; the bays are a scroll away.
 
 **The loop.** Tap anything and the avatar walks there (an A* over 0.2 m cells, string-pulled,
-aimed only at floor it can actually reach) and does the thing on arrival: presses the button,
-scrubs a jam, or opens that thing's chat bubble. Within 0.6 m it acts without walking. The
-press starts a 4 s cut: the log feeds in and the plank feeds out at the same speed, then
-rides the out-feed (1 s) and drops into the bin (0.35 s); the next log rolls off the rack in
-0.9 s, and only then does the button light again.
+aimed only at floor it can actually reach) and does the thing on arrival: works the
+machine, scrubs a jam, or opens that thing's chat bubble. Within 0.6 m it acts without
+walking. **Logs come off the rack in three kinds**: good (55%), **gnarled** (20%, dark and
+knotted) and **small** (25%, thin); the first log of a new factory is always good. At the
+machine **you always get it right**: a gnarled or small log (or one with sap on it) is
+tossed in the recycle bin (0.6 s) and you wait for the next to roll in (0.9 s), and you
+press on a good one. A press starts a 4 s cut: the log feeds in and the plank feeds out at
+the same speed, rides the out-feed (1 s) and drops into the bin (0.35 s); the next log rolls
+in, and only then does the button light again.
 
 **Robots.** The dock's bubble hires one ($20, then $40; two at most for now); it climbs out
-of its crate and the bubble turns to its three jobs: **the button**, **selling**, **rest**.
-Giving a job someone already has swaps them. Every job a robot does rolls good / so-so / bad
-from the current odds, independently:
+of its crate and the bubble turns to it: its **name** on top, then **the button**,
+**selling**, **rest**, and **its clipboard**. Giving a job someone already has swaps them.
+A robot does what is in front of it; **what it gets wrong depends on what it meets and on
+what it has been told**:
 
-| Robot | Good | So-so | Bad |
+| Robot | It meets | Without the instruction | The instruction that prevents it |
 |---|---|---|---|
-| Operator | a plank | half the time it stands and thinks 3 s first (still a plank), half the time a rough plank ($3) | half the time it fetches sap from the barrel and pours it in (the machine jams until **you** scrub it, 2.5 s; robots never clean), half the time dowel rods ($1) |
-| Seller | the right price | lets it go cheap (plank $3, rough $2, dowels $0) | a plank given away for $0, or dowels sold **as a plank for $5** (the sale goes through, customer satisfaction -15) |
+| Operator | every cycle | 20% of the time it fetches sap from the barrel and pours it on the log: the machine jams until **you** scrub it (2.5 s; robots never clean) | Never put sap on input log |
+| Operator | a gnarled log | feeds it in: a rough plank ($3), so-so | Put gnarled logs in recycle bin (it tosses the log and waits for the next) |
+| Operator | a small log | feeds it in: dowel rods ($1), bad | Only input logs bigger than 1"x4"x4' |
+| Operator | a rough plank or dowels coming out | they go to the sale bin | Only output 1"x4"x4' wood planks (it flicks the bad cut into the recycle bin as it leaves the machine) |
+| Operator | every cycle | 25% of the time it stops and thinks 3 s first (so-so); **no instruction covers this yet** | - |
+| Seller | a plank | 25% it gives it away for $0 (bad), 35% it lets it go for $3 (so-so), else $5 | Sell 1"x4"x4' wood planks for $5 |
+| Seller | a rough plank or dowels | 50% it sells it **as a plank for $5** (the sale goes through, customer satisfaction -15), else at its own price | Only sell 1"x4"x4' wood planks (it drops it in the recycle bin) |
+
+A robot that holds an instruction **slips 1 time in 20** and does what it would have done
+without it. **An instruction about another job is never consulted** (each job's code asks
+only about its own), so it does nothing; the rules suite proves it by playing a day with
+the instructions crossed between the robots and getting the same day, roll for roll, as
+with none. Instructions **belong to the robot**, so swapping jobs leaves each robot holding
+instructions for the job it no longer does. An upstream instruction can keep a downstream
+mistake from ever happening: with the operator told early, the seller may never be handed a
+rough plank or dowels, so its "only sell planks" instruction never even joins the list (the
+eval asserts exactly that).
 
 Each outcome shows: a check, a squiggle or a cross pops over the robot, its screen face
 changes, and it beeps; a jammed machine shakes, smokes and flashes amber while its operator
-shows a "?".
+shows a "?". Anything recycled arcs into the recycle bin, and the last few things in it
+poke out of its mouth. The first time a robot makes a kind of mistake, "new instruction"
+floats up over it.
 
-**Customer satisfaction** multiplies every price (`round(base x satisfaction)`), starts at 100%, takes 15 points per
-dowel sold as a plank, gives one back per fair sale, never drops below 10%, and **heals by
-itself**: each second closes 0.5% of the gap to 100 (customers forget). Your own sales are
-always fair; your own presses always make planks.
+**Customer satisfaction** multiplies every price (`round(base x satisfaction)`), starts at
+100%, takes 15 points per rough plank or dowels sold as a plank, gives one back per fair
+sale, never drops below 10%, and **heals by itself**: each second closes 0.5% of the gap to
+100 (customers forget). Your own sales are always fair.
 
-**Prompt engineering** is the prompt lab's terminal. It stays dark (a padlock) until both
-robots are on staff, then offers three levels, each replacing both robots' odds:
-
-| Level | Price | Good / so-so / bad |
-|---|---|---|
-| none | - | 25 / 35 / 40 (the CD's answer) |
-| 1 | $50 | 45 / 30 / 25 |
-| 2 | $120 | 65 / 22 / 13 |
-| 3 | $250 | 85 / 10 / 5 |
-
-The robots' antenna bulbs change colour with the level and the monitor shows the stars.
+**A robot's page** (its bubble's clipboard) is a panel over the floor: its **name** in an
+editable field (16 characters at most, trimmed; blank puts its own back), its **base
+prompt** for its current job in a dark prompt box ("Use machine01 to refine raw
+materials." / "Sell the items in this bin."; none while resting), then its **five slots**:
+filled ones show the instruction with a remove button, empty bought ones say "+ add an
+instruction", the next one to buy shows its price (greyed until both robots are on staff and
+the money is there), the rest just their prices. Tapping an empty or filled slot opens the
+**list**: the instructions for mistakes seen so far, one already in another slot greyed with
+its slot number; tap one to put it in the slot. Buying a slot opens the list for it straight
+away. Under the slots, **what the robot has done**, counted by kind, with a coloured dot per
+grade. The page stays live while open (money and the record update). The robot's antenna
+bulb shows how many instructions it holds: red none, orange 1-2, yellow 3-4, green all five.
 
 **The HUD** (top right) is the money with the i button beside it, and under them a white
 pill reading **customer satisfaction** with its percentage and a bar (green, amber under
 85%, red under 60%). **The i button** opens the reference: what maps to what (machine01 is a
 task you can always do yourself, robots are AI agents that take the work off you and do not
-always do it well), what customer satisfaction is, what each grade does, prompt engineering
-as better instructions for better odds, the odds table with the current level marked, each
-robot's measured tally and good percentage, and **Start over** (two taps). It names nothing
-from the formal mode.
+always do it well), what customer satisfaction is, the log mix, what each grade does, how
+instructions work (prices, the list growing with mistakes seen, the slip, an off-task
+instruction doing nothing), each robot's measured tally by name, your own counts, and
+**Start over** (two taps). It names nothing from the formal mode.
 
 ### Assumed, not decided (Claude's choices; the CD has not ruled on these)
 
 | Assumption | Where it lives | Why |
 |---|---|---|
 | **Formal stays the default** on a first visit; the choice is remembered (`taas-mode`) and `?mode=formal` or `?mode=robot-factory` wins over it | `MODE` | The CD said the current game *becomes* a mode, not that it stops being the front door |
-| **The look**: a chibi in a yellow hard hat and blue shirt; white robots on a hover base with a screen face, teal and orange accents; a light grey concrete floor, steel-blue machine, blue bin | `COL`, `AV`, `RB` | "Cute cel-shaded robots" and a chibi; the rest is taste |
+| **The look**: a chibi in a yellow hard hat and blue shirt; white robots on a hover base with a screen face, teal and orange accents; a light grey concrete floor, steel-blue machine, blue sale bin, green recycle bin with three chasing arrows; gnarled logs dark and knotted, small logs thin | `COL`, `AV`, `RB`, `M_GNARLED`, `M_SMALL` | "Cute cel-shaded robots" and a chibi; the rest is taste |
 | **Camera**: orthographic, 50 degrees above the floor, no yaw | `ELEV` | Zelda-like: moving up/down and left/right stays parallel to the screen edges |
-| **The floor's size and layout**, and the two empty bays | `FACTORY.LAYOUT` | Enough to scroll ("view the entirety"), and room for the expansion the CD promised |
-| **Timings**: 0.9 s for the next log, 1 s out-feed, 0.35 s drop; "near" is 0.6 m; walk 1.7 m/s, robots 1.3 m/s | `FACTORY.CFG` | The CD fixed only the 4 s |
-| **Outcome details** beyond the CD's examples: the so-so and bad splits in the table above, the rough plank ($3), the seller's cheap prices, the sale of dowels-as-a-plank going through for $5 | `operatorPlan()`, `settle()`, `CFG.soso` | The CD's examples, filled out so every grade does something visible |
-| **Prompt levels**: three, at $50 / $120 / $250 with the odds above, unlocked by hiring the second robot, applying to both robots | `CFG.prompt` | Tuned against the eval so each level arrives a few minutes apart |
-| **Customer satisfaction**: -15 per mislabelled sale, +1 per fair one, floor 10%, heals 0.5% of the gap a second | `CFG.sat*` | Without the healing an unprompted seller drives satisfaction to the floor, every price (yours too) falls to about $1, and the first prompt level takes 25 minutes; with it, unprompted robots sit near 60% and prompted ones near 100% (measured, below) |
+| **The floor's size and layout**, the two empty bays, and **the recycle bin in front of the out-feed** | `FACTORY.LAYOUT` | Within reach of the button and the seller, so a toss needs no walk; where the prompt desk stood is open floor |
+| **Timings**: 0.9 s for the next log, 1 s out-feed, 0.35 s drop, 0.6 s to toss something in the recycle bin; "near" is 0.6 m; walk 1.7 m/s, robots 1.3 m/s | `FACTORY.CFG` | The CD fixed only the 4 s |
+| **The log mix**: 55% good, 20% gnarled, 25% small | `CFG.logs` | Bad logs common enough that an uninstructed operator shows both mistakes within a minute or two |
+| **What a robot does without an instruction**: sap 20% a cycle, thinking 25% a cycle, every bad log fed in, every bad cut binned; a plank given away 25% / let go cheap 35%; a non-plank passed off as a plank 50% | `CFG.uninstructed` | Close to the CD's first-build 25 / 35 / 40 at the start (measured over 5.5 simulated hours with every jam cleaned at once: operator 34 / 27 / 38, seller 46 / 19 / 35), so the first playtest feels like the last one before instructions |
+| **The slip is 5%** and a slip means "does what it would have done anyway" (so with the sap instruction the sap mistake falls from 20% to 1% of cycles; with the gnarled one, from every gnarled log to 1 in 20) | `CFG.slip`, `follows()` | The CD's "about 1 job in 20" |
+| **Stopping to think has no instruction** | `operate()` | None of the CD's six covers it; it stays as a robot's cost of doing business until the CD adds one |
+| **You always get it right**: you toss bad and sapped logs yourself and never press one | `work()` | The CD's "you never get it wrong", carried over; it also shows the player what a gnarled log looks like before a robot feeds one |
+| **The first log of a new factory is good** | `newGame()` | The CD's first press makes a plank |
+| **Slots open once both robots are on staff**, are bought in order, and an instruction is free to put in, take out or swap | `buySlot()`, `setRule()` | The CD: "the next step (after buying the 2 robots)"; the CD priced slots, not rules |
+| **The same instruction may sit on both robots**, once per robot | `setRule()` | "Each robot has a distinct set": distinct per robot, not exclusive between them |
+| **Default names** Bolt and Sprocket, 16 characters at most | `CFG.names`, `CFG.nameMax` | Something to tell them apart before the CD names them |
+| **The robot's page opens from a clipboard in its bubble**, which keeps the jobs one tap away; buying a slot opens the list for it | `options()`, `openRobot()` | The CD: "tap a robot to add instructions" |
+| **The output check happens at the machine's exit** (the bad cut never reaches the sale bin), and **"only sell planks" drops a non-plank in the recycle bin** rather than leaving it in the sale bin | `stepMachine()`, `vend()` | Both rules say what not to do; the recycle bin is the only other place for the thing |
+| **Recycled things are worth nothing** | `recycle()` | Nothing buys them yet |
+| **"new instruction"** floats over the robot the first time it makes a kind of mistake | `drain()` | A consequence shown when it happens; the list is behind the clipboard |
+| **The antenna bulb counts instructions** (it counted prompt levels) | `bulbOf()` | The robot's own progress, visible on the floor |
+| **A save from the prompt-level factory (version 1) is not loaded**: the factory starts fresh | `CFG.version = 2` | The mechanics changed under it; a fresh start is the playtest the CD asked for |
+| **Customer satisfaction**: -15 per mislabelled sale, +1 per fair one, floor 10%, heals 0.5% of the gap a second | `CFG.sat*` | Without the healing an uninstructed seller drives satisfaction to the floor and every price (yours too) falls to about $1; with it, uninstructed robots sit near 30% and instructed ones at 100% (measured, below) |
 | **Rest** as a third job, and **swap** when a job is taken | `choose()` | A way to stop a robot that is costing you customer satisfaction, and no two operators on one button |
 | **Robots never clean a jam** | `operate()` | The CD: "you have to manually do maintenance" |
 | **Two robots at most** until the factory grows | `CFG.hire` | Two jobs exist |
@@ -441,16 +521,18 @@ from the formal mode.
 
 ### Open questions for the CD (factory)
 
-1. **What comes after prompt engineering?** Ideas in the factory's own terms (assumed, not
-   asked for): a **work-instructions binder** at each station that robots read (fewer so-so
-   outcomes); a **filter on the in-feed** so sap cannot go in at all and a **price list at
-   the bin** so dowels cannot be sold as planks; a **maintenance robot** that cleans jams, or
-   robots that check their own work before it reaches a customer.
-2. **What do the bays hold next?** A second machine (logs to dowels on purpose, or planks to
-   furniture) would give the dowels a real market and the operators a second line.
-3. **Should a jam cost more than time** (a repair bill, a lost log)? Today it only stops
+1. **How should instructions grow more nuanced?** The CD: "More on that later." Ideas in the
+   factory's own terms (assumed, not asked for): instructions that conflict or need an order
+   (a long list a robot reads more slowly, the way a long prompt costs); instructions with a
+   condition ("only on Tuesdays", "unless the bin is full"); products where the right
+   instruction depends on the order (a customer who wants dowels).
+2. **Should stopping to think have an instruction** (it is the one mistake none of the six
+   covers), or stay as the price of an agent?
+3. **What do the bays hold next?** A second machine (logs to dowels on purpose, or planks to
+   furniture) would give dowels and gnarled logs a real use and the operators a second line.
+4. **Should a jam cost more than time** (a repair bill, a lost log)? Today it only stops
    the line until you scrub it.
-4. ~~Should the factory and the formal mode share anything?~~ **Answered 2026-10-13: not
+5. ~~Should the factory and the formal mode share anything?~~ **Answered 2026-10-13: not
    for now.** The CD is working on the factory separately for a different perspective (see
    Customer satisfaction, above); independent rules, copy and saves.
 
@@ -461,12 +543,22 @@ Three script blocks join the page, in this order after the formal engine:
 1. **`const FACTORY = (function () { ... })()`**, the factory engine: pure functions over one
    plain state object, no DOM, ending `if (typeof module !== 'undefined') module.exports =
    FACTORY;` (the suites lift exactly that span, so keep both lines). It owns the layout,
-   pathing, the avatar's tasks and acts, the machine, belt and bin, the robots' state
-   machines, outcomes (`grade()`, `operatorPlan()`), prices and customer satisfaction (`settle()`), the
-   chat bubble's options (`options()` / `choose()`) and saving. Its dice are a mulberry32 on
-   `s.seed`, so **a save resumes the same luck**; `s.force.operate|sell` is a test queue that
-   forces the next outcome. The engine emits `s.events` (press, made, binned, jam, cleaned,
-   sold, hired, assigned, prompt, outcome, arrive) that the page drains for sound and effects.
+   pathing, the avatar's tasks and acts (`work()`: you always get it right), the machine,
+   belt, bin and recycle bin, the robots' state machines (`operate()`, `vend()`), the
+   instructions (`RULES`, `BASE`, `follows()`, `see()`, `known()`, `slotsOpen()`,
+   `slotPrice()`, `buySlot()`, `setRule()`, `rename()`), prices and customer satisfaction
+   (`settle()`), the chat bubble's options (`options()` / `choose()`) and saving.
+   - **Every roll is named** and goes through `roll()`: `log`, `sap`, `think`, `slip`,
+     `price`, `mislabel`. The dice are a mulberry32 on `s.seed`, so **a save resumes the same
+     luck**, and `s.force[name]` is a test queue: what the next rolls of that name come up.
+     A robot only rolls where it has a choice to make, so an instruction it does not hold, or
+     one about another job, changes nothing, down to the dice.
+   - **An instruction is three things**: a `RULES` row (id, job, the CD's text), a
+     `follows(s, r, id)` call in its own job's code where the mistake would happen, and a
+     `see(s, id, by)` where the mistake shows (which puts it on the list and emits `rule`).
+   - The engine emits `s.events` (press, made, binned, jam, cleaned, sapped, recycled, sold,
+     hired, assigned, outcome, rule, slot, instructed, notes, arrive) that the page drains
+     for sound and effects; `notes` opens the robot's page.
 2. **`SND` and `MODE`**, shared by both modes: one AudioContext (formal's sounds moved here
    unchanged, plus the factory's), two music tracks switched by the mode, the mute button;
    and the mode switch, a native `<select id="mode-btn">` dressed as the third chrome
@@ -486,77 +578,110 @@ Three script blocks join the page, in this order after the formal engine:
      scale, dpr and offset), and blitted on **whole device pixels**; the floor is one baked
      canvas keyed on the robots hired (the pads light). Everything else is drawn live in
      **depth order** (sorted by each thing's front edge): belt tops, the machine's window
-     (a spinning blade, sap drips), the button and beacon, items, the avatar, robots.
+     (a spinning blade, sap drips), the button and beacon, items (each log by its kind), the
+     recycle bin's contents, the avatar, robots. Flights (a sale to the hatch, anything into
+     the recycle bin) are arcs drawn over the scene.
    - **The avatar** is a joint chain of matrices (hips, torso, head with hair and hard hat,
      arms, two-segment legs and boots) with a walk cycle **driven by distance walked** (a
      0.62 m stride, so feet do not slide), arms counter-swinging, a bob, and acts: press,
-     scrub (with a sponge), hold a sale overhead. Facing turns through an exponential spring.
-     Its painter-side state lives in a WeakMap, off the sim objects.
+     toss, scrub (with a sponge), hold a sale overhead. Facing turns through an exponential
+     spring. Its painter-side state lives in a WeakMap, off the sim objects.
    - **Robots** hover and bob, lean into motion, and pose per state (press, think, scoop,
-     pour, reach, pitch the item); their face screen draws eyes by mood.
+     pour, toss a log, flick a cut, reach, pitch, drop); their face screen draws eyes by mood.
    - **Input**: touch and mouse on the canvas; past 10 px of travel it is a scroll (with a
      little fling), otherwise a tap, resolved by `hitTest()` against the drawn sprites'
      boxes (front-most wins), robots' projected boxes, then the floor. **One coordinate
      space**: the canvas is sized from its own `getBoundingClientRect()`, re-measured every
      frame, on resize, and on the way back into the mode.
    - **The bubble, HUD and panel are DOM** over the canvas, so they stay crisp and are
-     testable; the bubble follows its anchor every frame and is clamped on screen.
-   - **Saving**: `localStorage['taas.factory.v' + CFG.version]`, every 2 s while running, on
-     `pagehide`, on hiding and on leaving the mode. A save from another version is ignored;
-     a hand-edited one is clamped.
+     testable; the bubble follows its anchor every frame and is clamped on screen. The panel
+     has two modes: the i reference (`renderPanel()`) and **a robot's page** (`openRobot()`,
+     `renderRobot()`): the name field is built once and never re-rendered while typing; the
+     rest re-renders only when its signature changes. **A robot's name is the player's
+     text**: it goes in through `textContent` or `esc()`, never raw into `innerHTML`.
+   - **Saving**: `localStorage['taas.factory.v' + CFG.version]` (now `v2`), every 2 s while
+     running, on `pagehide`, on hiding and on leaving the mode. A save from another version
+     is ignored; a hand-edited one is clamped (money, satisfaction, slots, unknown or
+     repeated instructions, the name, an unknown log), and an instruction a robot holds
+     counts as seen.
    - **Test hook**: `window.TAAS_FACTORY` (`s`, `view`, `tick`, `paused`, `hitTest`,
-     `spriteRect`, `screen`, `save`, `layout`): the suites step exact frames and find where
-     things are drawn.
+     `spriteRect`, `screen`, `save`, `layout`, `openRobot`, `closePanel`, `page`): the suites
+     step exact frames, find where things are drawn, and read which page is open.
 
-### Measured (2026-10-13)
+### Measured (2026-10-14)
 
-`node .claude/tests/eval-taas-factory.cjs` (30 simulated minutes, every action walked):
+`node .claude/tests/eval-taas-factory.cjs` (30 simulated minutes, every action walked, the
+robot's page included):
 
-| Persona | $20 | robot 1 | robot 2 | prompt 1 | prompt 2 | prompt 3 | earned | $/min, last 5 | satisfaction end/min |
-|---|---|---|---|---|---|---|---|---|---|
-| hands-on | 0.5m | 0.5m | 1.7m | 4.3m | 11.5m | 19.7m | 953 | 44.6 | 100/51 |
-| supervisor (cleans jams 10 s late) | 0.5m | 0.5m | 1.7m | 4.8m | 13.8m | 22.5m | 826 | 44.4 | 100/52 |
-| walks away after hiring | 0.5m | 0.5m | 1.7m | - | - | - | 86 | 0.0 | 100/85 |
-| supervisor, never prompts | 0.5m | 0.5m | 1.7m | - | - | - | 308 | 6.4 | 61/26 |
+| Persona | $20 | robot 1 | robot 2 | first instruction | operator holds all 4 | earned | $/min, last 5 | satisfaction end/min |
+|---|---|---|---|---|---|---|---|---|
+| hands-on | 0.5m | 0.6m | 2.4m | 3.1m | 4.1m | 1133 | 37.6 | 100/100 |
+| supervisor (cleans jams 10 s late) | 0.5m | 0.6m | 3.3m | 4.4m | 5.4m | 1073 | 35.6 | 100/100 |
+| walks away after hiring | 0.5m | 0.6m | 3.3m | - | - | 61 | 0.0 | 100/100 |
+| uninstructed (the supervisor, never instructing) | 0.5m | 0.6m | 3.3m | - | - | 377 | 7.8 | 30/23 |
+| crossed (each robot given the other's instructions) | 0.5m | 0.6m | 3.3m | 4.4m | - | 377 | 7.8 | 30/23 |
 
 The shape it asserts: the first robot inside a minute and a half, both inside five minutes,
-the top prompt level inside 25; robots left alone stall on their first jam; prompt
-engineering pays (over 3x the unprompted line); an unprompted seller wears customer satisfaction down and a
-prompted one wins it back; unprompted robots barely beat a person working alone.
+the operator holding all four of its instructions inside 10; robots left alone stall on
+their first jam; instructions pay (over 3x the uninstructed line); an uninstructed seller
+wears customer satisfaction down and an instructed one wins it back; crossed instructions
+earn exactly what none do; an instructed operator can keep the seller from ever meeting the
+mistake its instruction prevents; uninstructed robots barely beat a person working alone.
+Robot 2 comes later than in the prompt-level build (2.4 vs 1.7 minutes) because you now toss
+the bad logs yourself. **Instructions are cheap next to the prompt levels** ($50 for the
+operator's four and $5-15 for the seller's one or two, against $420 for three prompt levels) and the whole arc takes
+about five minutes: the CD's slot prices, kept as given for the playtest.
 
-Frame cost (`.claude/scripts/frame-budget.cjs` at 390x844, dpr 3, the busy pose in
-`.claude/scripts/poses/taas-factory-busy.js`): **16.7 ms median, 0 of 149 frames over** after
-three fixes, in order of effect: blitting baked sprites on whole device pixels (fractional
-offsets during a scroll forced resampling), capping the canvas at 2x, and baking the floor.
-Before them: 26-57 of 149 over, run to run.
+Frame cost (`.claude/scripts/frame-budget.cjs games/taas/index.html
+select=#mode-btn:robot-factory evalFile=.claude/scripts/poses/taas-factory-busy.js`, 390x844,
+the busy pose now with the recycle bin full and a gnarled log rolling in): **16.7 ms median,
+0 of 149 frames over** (2026-10-14). The 2026-10-13 fixes still carry it: blitting baked
+sprites on whole device pixels (fractional offsets during a scroll forced resampling),
+capping the canvas at 2x, and baking the floor; before them, 26-57 of 149 were over.
 
 ### Negative tests (factory)
 
-`.claude/tests/negtests/taas-factory-engine.json` (43 breaks) and `taas-factory-ui.json` (28):
-42 and 26 caught (after the customer-satisfaction rename, which re-anchored the lists and
-added breaks for a game that starts below 100%, an old save that loses its number, a HUD
-still labelled trust, a bar that never turns red, and a panel that leans on formal terms).
-The misses are **equivalent changes**, recorded rather than tested:
+`.claude/tests/negtests/taas-factory-engine.json` (69 breaks, against
+`drive-taas-factory.cjs`) and `taas-factory-ui.json` (40, against
+`drive-taas-factory-ui.cjs`): **68 and 38 caught** (2026-10-14, rebuilt for
+instructions: every instruction ignored, never slipping, an operator instruction leaking into
+selling, slots before both robots / free / flat-priced / shared between robots, an unseen or
+repeated instruction allowed, a mistake never or always announced, you pressing bad or
+sapped logs, a toss that keeps the log, the robot's page never opening, a name read as
+markup, the picker offering unseen instructions or a repeat, the wall sign back, the recycle
+bin gone). The misses are **equivalent changes**, recorded rather than tested:
 `bubbleOpen()`'s arrival check (every `tap()` clears the bubble first, so nothing can show it
 early), the console's own tap box (the machine's box covers it), and the `pagehide` save (in
 Chromium the `visibilitychange` save fires on the same navigation; on iOS Safari `pagehide`
-is the reliable one, so both stay). The first passes found rows that could not fail: the
-"near the button" row started the avatar on the spot itself, the "walking away" row looked
-while it was still walking, the slow-operator row could time out and pass, the scroll-clamp
-row was rescued by the fling's own clamp, and the save row was rescued by `pagehide`.
+is the reliable one, so both stay). **One break showed a check was redundant, not a row
+missing**: `follows()` used to ask whether the instruction was about the robot's job, and
+deleting that check changed nothing, because each job's code only ever asks about its own
+instructions. The check went; the property is now structural, and its break became "an
+operator instruction leaks into selling", which the crossed-wires row catches. Earlier passes
+found rows that could not fail: the "near the button" row started the avatar on the spot
+itself, the "walking away" row looked while it was still walking, the slow-operator row
+could time out and pass, the scroll-clamp row was rescued by the fling's own clamp, and the
+save row was rescued by `pagehide`.
 
 ### How to change it (factory)
 
 - **Retune**: `FACTORY.CFG` only. Then `.claude/scripts/gates.sh games/taas/index.html` and
   `node .claude/tests/eval-taas-factory.cjs`, and bump `CFG.version` if a save would now
   mean something else.
+- **Add an instruction**: a `RULES` row (id, job, the CD's words); in its job's code, a
+  `follows(s, r, id)` where the robot would make the mistake, choosing what it does instead;
+  a `see(s, id, by)` where the mistake shows; a `DOING` line in the UI if it adds something
+  new to a robot's record; and rows in the suite's § 7 (it prevents its mistake, it slips, it
+  joins the list only when seen). The page and the list pick it up from `RULES`.
+- **A new kind of log or item**: `LOGS` and `MAKES` (what it becomes), its odds in
+  `CFG.logs`, a model in `ITEM_MODEL` and a resting height in `LIFT`, and `ITEMS` if it can
+  be sold.
 - **Move or add a thing on the floor**: its footprint in `LAYOUT.SOLID` (pathing reads it),
   its model in `sceneObjects()` (key = its front edge's y), a tap target in `hitTest()` if
   it does something, and a spot in `LAYOUT.SPOT`. The suite walks every spot to every other.
-- **A new outcome**: a row in `operatorPlan()` or `settle()`, an item model in `ITEM_MODEL`
-  if it makes a new thing (and `ITEMS` if it can be sold), and a row in the suite's § 6.
 - **A new job or machine**: a state machine beside `operate()`/`vend()`, a branch in
-  `homeOf()`, a bubble option in `options()`, and an icon in `ICON`.
+  `homeOf()`, a bubble option in `options()`, an icon in `ICON`, a base prompt in `BASE`,
+  and its instructions as above.
 
 
 ## How to change it (formal)
@@ -588,6 +713,12 @@ row was rescued by the fling's own clamp, and the save row was rescued by `pageh
   build): the mode dropdown, the factory engine, the Canvas 2D toon renderer, shared audio,
   three suites and two break lists. Formal mode unchanged apart from its sounds moving into
   `SND`.
+- 2026-10-14: **instructions instead of prompt levels** (the CD's second factory brief and four
+  answers): logs in three kinds and a recycle bin, mistakes from causes, each robot's own
+  named page with its base prompt and five bought slots, the CD's six instructions joining
+  the list as their mistakes are seen, a 1-in-20 slip, off-task instructions doing nothing;
+  the wall sign and the prompt lab removed; save version 2. Suites rebuilt (rules 97 checks,
+  page 45, eval 9) and both break lists rebuilt.
 - 2026-10-13 (later): the factory's **trust** became **customer satisfaction** (CD: how much
   the customers trust the company, not formal's Trust in the AI tool), shown as a labelled
   percentage on the HUD, and the factory is developed **separately from formal** for now:

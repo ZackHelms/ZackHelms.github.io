@@ -42,12 +42,6 @@
   "new": "    a.act = null; /* @negtest */\n    a.task = Object.assign"
  },
  {
-  "name": "sell-keeps-item",
-  "file": "games/taas/index.html",
-  "old": "      s.bin.splice(k, 1);\n      settle(s, item, 'good', 'player');",
-  "new": "       /* @negtest */\n      settle(s, item, 'good', 'player');"
- },
- {
   "name": "choose-ignores-enabled",
   "file": "games/taas/index.html",
   "old": "    if (!o || !o.enabled) return false;\n    const b = s.bubble, a = s.avatar;",
@@ -84,24 +78,6 @@
   "new": "     /* @negtest */"
  },
  {
-  "name": "slow-no-dawdle",
-  "file": "games/taas/index.html",
-  "old": "          if (p.plan === 'slow') r.state = 'dawdle';",
-  "new": "          if (p.plan === 'slow') r.state = 'press'; /* @negtest */"
- },
- {
-  "name": "rough-is-plank",
-  "file": "games/taas/index.html",
-  "old": "const result = r.plan === 'rough' ? 'rough' : r.plan === 'dowels' ? 'dowels' : 'plank';",
-  "new": "const result = r.plan === 'dowels' ? 'dowels' : 'plank'; /* @negtest */"
- },
- {
-  "name": "dowels-are-planks",
-  "file": "games/taas/index.html",
-  "old": "const result = r.plan === 'rough' ? 'rough' : r.plan === 'dowels' ? 'dowels' : 'plank';",
-  "new": "const result = r.plan === 'rough' ? 'rough' : 'plank'; /* @negtest */"
- },
- {
   "name": "sap-never-jams",
   "file": "games/taas/index.html",
   "old": "if (m.result === 'sap' && m.t >= CFG.jamAt) {",
@@ -126,94 +102,16 @@
   "new": "    a.act = null; s.bubble = null; if (s.machine.phase === 'jam') s.machine.dirt = 1; /* @negtest */\n    a.task = Object.assign"
  },
  {
-  "name": "soso-full-price",
-  "file": "games/taas/index.html",
-  "old": "else if (g === 'soso') { ask = CFG.soso[item]; kind = 'cheap'; }",
-  "new": "else if (g === 'soso') { ask = CFG.price[item]; kind = 'cheap'; } /* @negtest */"
- },
- {
-  "name": "bad-sells-fair",
-  "file": "games/taas/index.html",
-  "old": "    else { ask = 0; kind = 'free'; }",
-  "new": "    else { ask = CFG.price[item]; kind = 'free'; } /* @negtest */"
- },
- {
-  "name": "mislabel-no-hit",
-  "file": "games/taas/index.html",
-  "old": "if (kind === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);",
-  "new": "; /* @negtest */"
- },
- {
-  "name": "mislabel-cheap",
-  "file": "games/taas/index.html",
-  "old": "else if (item === 'dowels') { ask = CFG.mislabel; kind = 'mislabel'; }",
-  "new": "else if (item === 'dowels') { ask = CFG.price.dowels; kind = 'mislabel'; } /* @negtest */"
- },
- {
   "name": "price-ignores-sat",
   "file": "games/taas/index.html",
   "old": "function paid(s, ask) { return Math.round(ask * s.satisfaction / 100); }",
   "new": "function paid(s, ask) { return ask; } /* @negtest */"
  },
  {
-  "name": "no-sat-floor",
-  "file": "games/taas/index.html",
-  "old": "if (kind === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);",
-  "new": "if (kind === 'mislabel') s.satisfaction = s.satisfaction - CFG.satHit; /* @negtest */"
- },
- {
-  "name": "no-sat-up",
-  "file": "games/taas/index.html",
-  "old": "if (kind === 'fair') s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);",
-  "new": "; /* @negtest */"
- },
- {
   "name": "no-sat-heal",
   "file": "games/taas/index.html",
   "old": "      s.satisfaction = Math.min(100, s.satisfaction + (100 - s.satisfaction) * CFG.satHeal * h);",
   "new": "       /* @negtest */"
- },
- {
-  "name": "player-rolls-odds",
-  "file": "games/taas/index.html",
-  "old": "      settle(s, item, 'good', 'player');",
-  "new": "      settle(s, item, grade(s, 'sell'), 'player'); /* @negtest */"
- },
- {
-  "name": "odds-ignore-prompt",
-  "file": "games/taas/index.html",
-  "old": "function odds(s) { return s.prompt ? CFG.prompt[s.prompt - 1].odds : CFG.baseOdds; }",
-  "new": "function odds(s) { return CFG.baseOdds; } /* @negtest */"
- },
- {
-  "name": "odds-columns-swapped",
-  "file": "games/taas/index.html",
-  "old": "return u < o[0] ? 'good' : u < o[0] + o[1] ? 'soso' : 'bad';",
-  "new": "return u < o[2] ? 'good' : u < o[2] + o[1] ? 'soso' : 'bad'; /* @negtest */"
- },
- {
-  "name": "seller-copies-operator",
-  "file": "games/taas/index.html",
-  "old": "r.carry = s.bin.shift(); r.grade = grade(s, 'sell');",
-  "new": "r.carry = s.bin.shift(); r.grade = (s.robots.find(x => x.job === 'operate' && x.grade) || {}).grade || grade(s, 'sell'); /* @negtest */"
- },
- {
-  "name": "prompt-unlocked",
-  "file": "games/taas/index.html",
-  "old": "      if (s.hired < CFG.hire.length) return [{ id: 'prompt', icon: 'prompt', enabled: false, locked: true, need: CFG.hire.length }];",
-  "new": "       /* @negtest */"
- },
- {
-  "name": "prompt-price-index",
-  "file": "games/taas/index.html",
-  "old": "function promptPrice(s) { return s.prompt < CFG.prompt.length ? CFG.prompt[s.prompt].price : null; }",
-  "new": "function promptPrice(s) { return s.prompt < CFG.prompt.length ? CFG.prompt[0].price : null; } /* @negtest */"
- },
- {
-  "name": "save-drops-seed",
-  "file": "games/taas/index.html",
-  "old": "    const o = Object.assign({}, s, { events: [], force: { operate: [], sell: [] } });",
-  "new": "    const o = Object.assign({}, s, { seed: 1, events: [], force: { operate: [], sell: [] } }); /* @negtest */"
  },
  {
   "name": "load-any-version",
@@ -240,21 +138,279 @@
   "new": "    const goal = nearestFree(s, to.x, to.y); /* @negtest */"
  },
  {
-  "name": "no-credit",
-  "file": "games/taas/index.html",
-  "old": "    r.tally[g]++; r.mood = g; r.moodT = 2.4;",
-  "new": "    r.mood = g; r.moodT = 2.4; /* @negtest */"
- },
- {
   "name": "sat-starts-low",
   "file": "games/taas/index.html",
   "old": "    satStart: 100, satMin: 10,",
   "new": "    satStart: 90, satMin: 10, /* @negtest */"
  },
  {
-  "name": "old-save-loses-sat",
+  "name": "sell-keeps-item",
   "file": "games/taas/index.html",
-  "old": "      if (d.satisfaction === undefined && d.trust !== undefined) s.satisfaction = d.trust;",
+  "old": "      s.bin.splice(k, 1);\n      settle(s, item, 'fair', 'player');",
+  "new": "      /* @negtest */\n      settle(s, item, 'fair', 'player');"
+ },
+ {
+  "name": "think-no-dawdle",
+  "file": "games/taas/index.html",
+  "old": "        else r.state = r.think ? 'dawdle' : 'press';",
+  "new": "        else r.state = 'press'; /* @negtest */"
+ },
+ {
+  "name": "rough-is-plank",
+  "file": "games/taas/index.html",
+  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels' };",
+  "new": "  const MAKES = { log: 'plank', gnarled: 'plank', small: 'dowels' }; /* @negtest */"
+ },
+ {
+  "name": "dowels-are-planks",
+  "file": "games/taas/index.html",
+  "old": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels' };",
+  "new": "  const MAKES = { log: 'plank', gnarled: 'rough', small: 'plank' }; /* @negtest */"
+ },
+ {
+  "name": "cheap-full-price",
+  "file": "games/taas/index.html",
+  "old": "sale === 'cheap' ? CFG.cheapPlank :",
+  "new": "sale === 'cheap' ? CFG.price.plank /* @negtest */ :"
+ },
+ {
+  "name": "free-sells-fair",
+  "file": "games/taas/index.html",
+  "old": ": sale === 'mislabel' ? CFG.mislabel : 0;",
+  "new": ": sale === 'mislabel' ? CFG.mislabel : CFG.price[item]; /* @negtest */"
+ },
+ {
+  "name": "mislabel-no-hit",
+  "file": "games/taas/index.html",
+  "old": "    if (sale === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "mislabel-cheap",
+  "file": "games/taas/index.html",
+  "old": "sale === 'mislabel' ? CFG.mislabel :",
+  "new": "sale === 'mislabel' ? CFG.price[item] /* @negtest */ :"
+ },
+ {
+  "name": "no-sat-floor",
+  "file": "games/taas/index.html",
+  "old": "    if (sale === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);",
+  "new": "    if (sale === 'mislabel') s.satisfaction = s.satisfaction - CFG.satHit; /* @negtest */"
+ },
+ {
+  "name": "no-sat-up",
+  "file": "games/taas/index.html",
+  "old": "    if (sale === 'fair') s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "player-unfair",
+  "file": "games/taas/index.html",
+  "old": "      settle(s, item, 'fair', 'player');",
+  "new": "      settle(s, item, roll(s, 'price', [['free', 0.5]], 'fair'), 'player'); /* @negtest */"
+ },
+ {
+  "name": "save-drops-seed",
+  "file": "games/taas/index.html",
+  "old": "    const o = Object.assign({}, s, { events: [], force: {} });",
+  "new": "    const o = Object.assign({}, s, { events: [], force: {}, seed: 1 }); /* @negtest */"
+ },
+ {
+  "name": "no-credit",
+  "file": "games/taas/index.html",
+  "old": "    r.tally[g]++; r.record[what] = (r.record[what] || 0) + 1; r.mood = g; r.moodT = 2.4;",
+  "new": "    r.mood = g; r.moodT = 2.4; /* @negtest */"
+ },
+ {
+  "name": "seller-copies-operator",
+  "file": "games/taas/index.html",
+  "old": "          if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');",
+  "new": "          if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' : s.robots.some(x => x.job === 'operate' && x.mood === 'bad' && x.moodT > 0) ? 'free' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair'); /* @negtest */"
+ },
+ {
+  "name": "first-log-bad",
+  "file": "games/taas/index.html",
+  "old": "      machine: { phase: 'ready', t: 0, staged: 1, log: 'log', sap: false,",
+  "new": "      machine: { phase: 'ready', t: 0, staged: 1, log: 'small', /* @negtest */ sap: false,"
+ },
+ {
+  "name": "you-press-bad-logs",
+  "file": "games/taas/index.html",
+  "old": "    else if (m.log !== 'log' || m.sap) a.act = { kind: 'toss', t: 0, item: m.log, done: false };",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "you-press-sapped-logs",
+  "file": "games/taas/index.html",
+  "old": "    else if (m.log !== 'log' || m.sap) a.act = { kind: 'toss', t: 0, item: m.log, done: false };",
+  "new": "    else if (m.log !== 'log') a.act = { kind: 'toss', t: 0, item: m.log, done: false }; /* @negtest */"
+ },
+ {
+  "name": "toss-keeps-log",
+  "file": "games/taas/index.html",
+  "old": "    recycle(s, s.machine.log, by, 'in');\n    restage(s);",
+  "new": "    recycle(s, s.machine.log, by, 'in'); /* @negtest */\n    s.machine.staged = 0;"
+ },
+ {
+  "name": "recycle-not-kept",
+  "file": "games/taas/index.html",
+  "old": "    s.recycled.push(item);\n",
+  "new": "    /* @negtest */\n"
+ },
+ {
+  "name": "gnarled-rule-ignored",
+  "file": "games/taas/index.html",
+  "old": "        if (m.log !== 'log' && follows(s, r, m.log)) { r.state = 'reject'; r.t = 0; return; }",
+  "new": "        /* @negtest */"
+ },
+ {
+  "name": "sap-rule-ignored",
+  "file": "games/taas/index.html",
+  "old": "        const sap = !m.sap && !follows(s, r, 'sap') && chance(s, 'sap', U.sap);",
+  "new": "        const sap = !m.sap && chance(s, 'sap', U.sap); /* @negtest */"
+ },
+ {
+  "name": "output-rule-ignored",
+  "file": "games/taas/index.html",
+  "old": "      if (r && r.check && item !== 'plank') {",
+  "new": "      if (false) { /* @negtest */"
+ },
+ {
+  "name": "sellonly-rule-ignored",
+  "file": "games/taas/index.html",
+  "old": "          else r.sale = follows(s, r, 'sellOnly') ? 'recycle' :",
+  "new": "          else r.sale = false ? 'recycle' : /* @negtest */"
+ },
+ {
+  "name": "price-rule-ignored",
+  "file": "games/taas/index.html",
+  "old": "          if (item === 'plank') r.sale = follows(s, r, 'price') ? 'fair' :",
+  "new": "          if (item === 'plank') r.sale = false ? 'fair' : /* @negtest */"
+ },
+ {
+  "name": "never-slips",
+  "file": "games/taas/index.html",
+  "old": "  function follows(s, r, id) { return has(r, id) && !chance(s, 'slip', CFG.slip); }",
+  "new": "  function follows(s, r, id) { return has(r, id); /* @negtest */ }"
+ },
+ {
+  "name": "operator-rule-leaks-into-selling",
+  "file": "games/taas/index.html",
+  "old": "          else r.sale = follows(s, r, 'sellOnly') ? 'recycle' :",
+  "new": "          else r.sale = follows(s, r, 'sellOnly') || has(r, 'output') ? 'recycle' : /* @negtest */"
+ },
+ {
+  "name": "slots-before-both",
+  "file": "games/taas/index.html",
+  "old": "    if (!r || p === null || !slotsOpen(s) || s.money < p) return false;",
+  "new": "    if (!r || p === null || s.money < p) return false; /* @negtest */"
+ },
+ {
+  "name": "slots-free",
+  "file": "games/taas/index.html",
+  "old": "    if (!r || p === null || !slotsOpen(s) || s.money < p) return false;",
+  "new": "    if (!r || p === null || !slotsOpen(s)) return false; /* @negtest */"
+ },
+ {
+  "name": "slot-price-flat",
+  "file": "games/taas/index.html",
+  "old": "return r && r.slots < CFG.slots.length ? CFG.slots[r.slots] : null; }",
+  "new": "return r && r.slots < CFG.slots.length ? CFG.slots[0] : null; /* @negtest */ }"
+ },
+ {
+  "name": "slots-shared",
+  "file": "games/taas/index.html",
+  "old": "    s.money -= p; r.slots++; r.rules.push(null);",
+  "new": "    s.money -= p; s.robots.forEach(x => { x.slots++; x.rules.push(null); }); /* @negtest */"
+ },
+ {
+  "name": "unseen-rule-allowed",
+  "file": "games/taas/index.html",
+  "old": "      if (!RULE[rule] || !s.seen[rule]) return false;",
+  "new": "      if (!RULE[rule]) return false; /* @negtest */"
+ },
+ {
+  "name": "duplicate-rule-allowed",
+  "file": "games/taas/index.html",
+  "old": "      if (at >= 0 && at !== slot) return false;   // once per robot",
   "new": "      /* @negtest */"
+ },
+ {
+  "name": "never-seen",
+  "file": "games/taas/index.html",
+  "old": "  function see(s, id, by) { if (!s.seen[id]) { s.seen[id] = true; ev(s, 'rule', { id, by }); } }",
+  "new": "  function see(s, id, by) { /* @negtest */ }"
+ },
+ {
+  "name": "seen-every-time",
+  "file": "games/taas/index.html",
+  "old": "  function see(s, id, by) { if (!s.seen[id]) { s.seen[id] = true; ev(s, 'rule', { id, by }); } }",
+  "new": "  function see(s, id, by) { s.seen[id] = true; ev(s, 'rule', { id, by }); /* @negtest */ }"
+ },
+ {
+  "name": "output-seen-on-plank",
+  "file": "games/taas/index.html",
+  "old": "        if (it.item !== 'plank' && typeof it.by === 'number') see(s, 'output', it.by);",
+  "new": "        if (typeof it.by === 'number') see(s, 'output', it.by); /* @negtest */"
+ },
+ {
+  "name": "jam-not-seen",
+  "file": "games/taas/index.html",
+  "old": "      if (typeof m.by === 'number') { see(s, 'sap', m.by); credit(s, m.by, 'sap'); }",
+  "new": "      if (typeof m.by === 'number') { credit(s, m.by, 'sap'); /* @negtest */ }"
+ },
+ {
+  "name": "mislabel-not-seen",
+  "file": "games/taas/index.html",
+  "old": "          if (sale === 'mislabel') see(s, 'sellOnly', r.id);",
+  "new": "          /* @negtest */"
+ },
+ {
+  "name": "reject-no-credit",
+  "file": "games/taas/index.html",
+  "old": "        if (r.t >= CFG.tossSec) { if (rejectLog(s, r.id)) credit(s, r.id, 'reject'); r.state = 'idle'; r.t = 0; }",
+  "new": "        if (r.t >= CFG.tossSec) { rejectLog(s, r.id); r.state = 'idle'; r.t = 0; } /* @negtest */"
+ },
+ {
+  "name": "drop-sells",
+  "file": "games/taas/index.html",
+  "old": "          recycle(s, r.carry, r.id, 'bin'); credit(s, r.id, 'recycle');",
+  "new": "          settle(s, r.carry, 'fair', r.id); credit(s, r.id, 'recycle'); /* @negtest */"
+ },
+ {
+  "name": "no-small-logs",
+  "file": "games/taas/index.html",
+  "old": "return roll(s, 'log', [['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small]], 'log'); }",
+  "new": "return roll(s, 'log', [['gnarled', CFG.logs.gnarled]], 'log'); /* @negtest */ }"
+ },
+ {
+  "name": "name-no-cap",
+  "file": "games/taas/index.html",
+  "old": "replace(/\\s+/g, ' ').trim().slice(0, CFG.nameMax);",
+  "new": "replace(/\\s+/g, ' ').trim(); /* @negtest */"
+ },
+ {
+  "name": "blank-name-kept",
+  "file": "games/taas/index.html",
+  "old": "    r.name = n || CFG.names[r.id];",
+  "new": "    r.name = n; /* @negtest */"
+ },
+ {
+  "name": "notes-keeps-bubble",
+  "file": "games/taas/index.html",
+  "old": "      ev(s, 'notes', { id: b.id });\n      s.bubble = null;",
+  "new": "      ev(s, 'notes', { id: b.id }); /* @negtest */"
+ },
+ {
+  "name": "load-unknown-rules",
+  "file": "games/taas/index.html",
+  "old": "          const id = RULE[was[k]] && rules.indexOf(was[k]) < 0 ? was[k] : null;",
+  "new": "          const id = was[k] === undefined ? null : was[k]; /* @negtest */"
+ },
+ {
+  "name": "load-no-slot-clamp",
+  "file": "games/taas/index.html",
+  "old": "        r.slots = Math.max(0, Math.min(CFG.slots.length, r.slots | 0));",
+  "new": "        r.slots = r.slots | 0; /* @negtest */"
  }
 ]

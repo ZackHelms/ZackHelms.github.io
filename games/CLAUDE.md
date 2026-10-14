@@ -1020,10 +1020,13 @@ beside the mute button switches to **Robot factory**: the same story played by h
 **Canvas 2D** scene of hand-written low-poly meshes in toon bands and ink outlines, seen
 Zelda-style from 50 degrees up. A chibi in a hard hat walks where you tap (an A* over the
 floor, a walk cycle driven by distance), presses machine01's glowing red button, and sells
-planks from a bin through a chat bubble; then robots hired as **AI agents** run the button
-and the selling, each job rolling good / so-so / bad (sap that jams the machine until you
-scrub it, dowels, planks given away, dowels sold as planks at the cost of **customer satisfaction**, which starts at 100% and sets what customers pay),
-until prompt engineering buys better odds. Static scenery is baked per scale and blitted on
+planks from a bin through a chat bubble, tossing gnarled and small logs in a recycle bin; then
+robots hired as **AI agents** run the button and the selling and make mistakes with causes
+(sap that jams the machine until you scrub it, gnarled logs cut rough, small ones cut into
+dowels, planks given away, dowels sold as planks at the cost of **customer satisfaction**,
+which starts at 100% and sets what customers pay). Each mistake you see adds an instruction to
+a list, and each robot has its own named page: its base prompt, then five instruction slots
+bought with cash ($5-$25), which it follows but for a 1-in-20 slip. Static scenery is baked per scale and blitted on
 whole device pixels, the canvas is capped at 2x, and the busy scene holds 60 fps.
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`
 (rules, pure node), `drive-taas-ui.cjs` (the page in Chromium) and `eval-taas.cjs` (balance

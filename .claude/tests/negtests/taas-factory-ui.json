@@ -72,12 +72,6 @@
   "new": "    VW.maxY = Math.max(VW.minY, 12 * SE * S - h); /* @negtest */"
  },
  {
-  "name": "bill-is-robot",
-  "file": "games/taas/index.html",
-  "old": "        bubbleEl.innerHTML = opts.map(o => {\n          let inner = ICON[o.icon] || '';",
-  "new": "        bubbleEl.innerHTML = opts.map(o => {\n          let inner = ICON.robot; /* @negtest */"
- },
- {
   "name": "hud-money-stale",
   "file": "games/taas/index.html",
   "old": "      moneyEl.textContent = '$' + s.money.toLocaleString('en-US');",
@@ -138,12 +132,6 @@
   "new": "       /* @negtest */"
  },
  {
-  "name": "panel-no-odds",
-  "file": "games/taas/index.html",
-  "old": "      '<h3>The odds, by prompt level</h3><div class=\"fx-scroll\"><table><thead><tr><th></th><th>Good</th><th>So-so</th><th>Bad</th></tr></thead><tbody>' + rows + '</tbody></table></div>' +",
-  "new": "       /* @negtest */"
- },
- {
   "name": "no-pagehide-save",
   "file": "games/taas/index.html",
   "old": "  window.addEventListener('pagehide', () => { if (s) save(); });",
@@ -166,5 +154,89 @@
   "file": "games/taas/index.html",
   "old": "      '<p>Machine 01 is a task.",
   "new": "      /* @negtest */ '<p>The same story as the formal mode. Machine 01 is a task."
+ },
+ {
+  "name": "bill-is-robot",
+  "file": "games/taas/index.html",
+  "old": "          let inner = ICON[o.icon] || '';",
+  "new": "          let inner = ICON.robot; /* @negtest */"
+ },
+ {
+  "name": "panel-says-prompt",
+  "file": "games/taas/index.html",
+  "old": "      '<li><b>Instructions</b>: tap a robot, then its clipboard.",
+  "new": "      '<li><b>Prompt engineering</b> /* @negtest */: tap a robot, then its clipboard."
+ },
+ {
+  "name": "bubble-no-name",
+  "file": "games/taas/index.html",
+  "old": "        if (bot) { bubbleEl.innerHTML = '<div class=\"fx-bname\"></div><div class=\"fx-bopts\">' + btns + '</div>'; bubbleEl.firstChild.textContent = bot.name; }",
+  "new": "        if (bot) { bubbleEl.innerHTML = btns; /* @negtest */ }"
+ },
+ {
+  "name": "name-as-markup",
+  "file": "games/taas/index.html",
+  "old": "        if (bot) { bubbleEl.innerHTML = '<div class=\"fx-bname\"></div><div class=\"fx-bopts\">' + btns + '</div>'; bubbleEl.firstChild.textContent = bot.name; }",
+  "new": "        if (bot) { bubbleEl.innerHTML = '<div class=\"fx-bname\">' + bot.name + '</div><div class=\"fx-bopts\">' + btns + '</div>'; /* @negtest */ }"
+ },
+ {
+  "name": "page-never-opens",
+  "file": "games/taas/index.html",
+  "old": "        case 'notes': SND.sfx('pop'); openRobot(e.id); break;",
+  "new": "        case 'notes': SND.sfx('pop'); /* @negtest */ break;"
+ },
+ {
+  "name": "buy-no-picker",
+  "file": "games/taas/index.html",
+  "old": "    if (act === 'buy') { if (F.buySlot(s, id)) { pickSlot = r.slots - 1; save(); } }",
+  "new": "    if (act === 'buy') { if (F.buySlot(s, id)) { save(); } } /* @negtest */"
+ },
+ {
+  "name": "picker-shows-unseen",
+  "file": "games/taas/index.html",
+  "old": "      else h += '<div class=\"fx-rules\">' + known.map(q => {",
+  "new": "      else h += '<div class=\"fx-rules\">' + F.RULES.map(q => { /* @negtest */"
+ },
+ {
+  "name": "no-base-prompt",
+  "file": "games/taas/index.html",
+  "old": "    const base = F.BASE[r.job];",
+  "new": "    const base = null; /* @negtest */"
+ },
+ {
+  "name": "name-not-kept",
+  "file": "games/taas/index.html",
+  "old": "    inp.addEventListener('input', () => F.rename(s, id, inp.value));\n    inp.addEventListener('change', () => { F.rename(s, id, inp.value); inp.value = s.robots[id].name; save(); });",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "page-too-wide",
+  "file": "games/taas/index.html",
+  "old": ".fx-slot { flex: 1; min-height: 44px;",
+  "new": ".fx-slot { flex: 0 0 420px; min-height: 44px; /* @negtest */"
+ },
+ {
+  "name": "no-recycle-bin",
+  "file": "games/taas/index.html",
+  "old": "    add('recycle', 4.35, [",
+  "new": "    if (0) add('recycle', 4.35, [ /* @negtest */"
+ },
+ {
+  "name": "sign-back",
+  "file": "games/taas/index.html",
+  "old": "      xf(cyl(0, 0, 0, 0.06, 6, 8, '#8a96a3'), chain(Mt(0, 0.55, 2.5), My(Math.PI / 2)))\n    ]);",
+  "new": "      box(2.0, 0.45, 1.45, 4.0, 0.5, 2.15, COL.yellow), /* @negtest */\n      xf(cyl(0, 0, 0, 0.06, 6, 8, '#8a96a3'), chain(Mt(0, 0.55, 2.5), My(Math.PI / 2)))\n    ]);"
+ },
+ {
+  "name": "slots-say-open",
+  "file": "games/taas/index.html",
+  "old": "(open ? 'Unlock this slot: $' + C.slots[k] : '$' + C.slots[k] + ' once both robots are on staff')",
+  "new": "('Unlock this slot: $' + C.slots[k]) /* @negtest */"
+ },
+ {
+  "name": "picker-allows-repeat",
+  "file": "games/taas/index.html",
+  "old": "        return '<button class=\"fx-rule' + (here ? ' on' : '') + '\" data-panel=\"rule:' + q.id + '\"' + (other ? ' disabled' : '') + '>'",
+  "new": "        return '<button class=\"fx-rule' + (here ? ' on' : '') + '\" data-panel=\"rule:' + q.id + '\"' + '>' /* @negtest */"
  }
 ]
