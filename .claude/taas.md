@@ -890,16 +890,24 @@ hour (a quieter scene): inside budget.
 
 ### Negative tests (factory)
 
-`.claude/tests/negtests/taas-factory-engine.json` (101 breaks, against `drive-taas-factory.cjs`)
-and `taas-factory-ui.json` (50, against `drive-taas-factory-ui.cjs`), both rebuilt for the
-storefront: **100 and @UICAUGHT@ caught**. The first engine run caught 92: nine misses were rows not
-yet written (a customer walking in counted as waiting, a wrong sale's money, the second in line
-paying early, one tap putting in only one of a kind, the extractor's bin taking clean logs, the
-output bin always reached from the floor, a robot double-pressing a planer you started, a stocker
-overfilling a stall that filled while it carried), and one was caught only by a crash (a row that
-read an event before checking one existed, made null-safe). **The engine's one miss is the known
-equivalent change**: `bubbleOpen()`'s arrival check, which every `tap()` already makes redundant by
-clearing the bubble. @UIMISSES@
+`.claude/tests/negtests/taas-factory-engine.json` (101 breaks, against `drive-taas-factory.cjs`) and
+`taas-factory-ui.json` (50, against `drive-taas-factory-ui.cjs`), both rebuilt for the storefront:
+**100 and 49 caught**. The first engine run caught 92: eight of its nine misses were rows not yet
+written (a customer walking in counted as waiting, a wrong sale's money, the second in line paying
+early, one tap putting in only one of a kind, the extractor's bin taking clean logs, the output bin
+always reached from the floor, a robot double-pressing a planer you started, a stocker overfilling a
+stall that filled while it carried), and one was caught only by a crash (a row that read an event
+before checking one existed, made null-safe). **The engine's one miss is the known equivalent
+change**: `bubbleOpen()`'s arrival check, which every `tap()` already makes redundant by clearing
+the bubble. The page list's first runs caught 44 of 50: five misses were rows not yet written or
+rows that could not fail (a tap where the planer's box overlaps the recycle bin's, which only the
+depth key settles; the money board drawn one frame late, since `draw()` runs before `renderHud()`;
+the saw-blade row, which passed on the sliding plank and the dust with the blade frozen; the planks
+on the stall; the count badge over your arms), and all five are caught now. **The page's one miss is
+an equivalent change**: `enter()`'s `VW.w = 0`, since `layout()` only runs while the factory shows
+and compares against the size it last measured, so a resize made in formal mode is still caught on
+the way back; its only visible effect is that coming back from formal mode scrolls the view to the
+top.
 
 ### How to change it (factory)
 
@@ -973,7 +981,7 @@ clearing the bubble. @UIMISSES@
   saw, sap extractor, hand crafting bench), worked by hand; robots on the planer or stocking only.
   Save version 3 (older factory saves ignored). Items and waiting customers baked to sprites to
   hold the frame budget. Rules suite 156 checks, page 86, eval 19 with an eighth persona (operator
-  first, the trap it found); break lists 101 and 50 (100 and @UICAUGHT@ caught).
+  first, the trap it found); break lists 101 and 50 (100 and 49 caught).
 - 2026-10-14 (night): **the menu, a reload button and scoreboards on the wall** (the CD's
   note from a phone screenshot, and three answers). The back, mute and i buttons gave way to a
   menu (Info for the mode in front of you, a sound switch, Music / Ambient sounds / Sound

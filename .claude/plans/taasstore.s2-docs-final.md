@@ -1,6 +1,6 @@
 # taasstore step 2 - docs final
 
-**Status:** open
+**Status:** DONE 2026-10-16 (results in the arc)
 **Arc:** `.claude/plans/taasstore.storefront-arc.md` (read its Results first: they hold the
 numbers this step writes).
 **Scope:** `.claude/taas.md`, `.claude/tests/README.md`, `CLAUDE.md`, `games/CLAUDE.md`.

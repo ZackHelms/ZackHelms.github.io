@@ -1,6 +1,6 @@
 # taasstore - TAAS robot factory: the storefront brief (plan arc)
 
-**Status:** IN PROGRESS (step 1 done; steps 2-4 open)
+**Status:** IN PROGRESS (steps 1-2 done; steps 3-4 open)
 **Requested:** 2026-10-15 (the CD's storefront brief, two answers: customers "Across the
 counter", a full room "Room fills up").
 **Scope:** `games/taas/index.html` (the `FACTORY` engine and the factory UI),
@@ -25,7 +25,7 @@ step 4).
 |---|---|---|---|
 | 0 | Brief, engine v3, rules suite, UI, page suite, eval, busy pose and frame budget, engine break list, docs spliced | (this session, before the arc) | DONE - WIP commit `b1d9838` on `taas-storefront` |
 | 1 | Finish the page's break list: classify every miss, add rows, re-run the misses | `taasstore.s1-page-break-list.md` | DONE - 49 of 50 caught |
-| 2 | Docs final: fill the placeholders from step 1's results, check every count | `taasstore.s2-docs-final.md` | open |
+| 2 | Docs final: fill the placeholders from step 1's results, check every count | `taasstore.s2-docs-final.md` | DONE - no placeholder, counts match |
 | 3 | Gates: every suite, smoke, games-sync, no break left in the page | `taasstore.s3-gates.md` | open |
 | 4 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasstore.s4-ship.md` | open |
 
@@ -107,3 +107,12 @@ step 4).
     every log at $1 while you still carry every plank); moving it to stocking recovers.
     Also overproduction and fixed demand (`.claude/taas.md` § Open questions for the CD
     (factory), 1-3).
+- **Docs final (step 2 done, 2026-10-16):** the three placeholders filled (`grep -rn "@UI"`
+  over `.claude`, `CLAUDE.md`, `games/CLAUDE.md` finds only this arc's own notes); counts checked
+  against the suites' own last lines: rules `CHECKS=156` GREEN, eval `CHECKS=19` GREEN, page 86
+  (step 1's GREEN run). No stale count near "factory" (the only hits for the old numbers were
+  "2026-10-15)"). The factory sections read end to end: machine01 and "seller" appear only in
+  the CD's quoted briefs, the change history and the assumed table's "what changed" rows. One
+  wording fix: the engine list's "nine misses were rows" listed eight (the ninth is the
+  equivalent); now "eight of its nine misses were rows". `CLAUDE.md` and `games/CLAUDE.md`
+  read true.
