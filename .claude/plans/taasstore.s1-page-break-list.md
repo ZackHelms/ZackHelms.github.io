@@ -1,6 +1,6 @@
 # taasstore step 1 - finish the page's break list
 
-**Status:** IN PROGRESS
+**Status:** DONE 2026-10-16 (49 of 50 caught; results in the arc)
 **Arc:** `.claude/plans/taasstore.storefront-arc.md` (read its Results first).
 **Scope:** `.claude/tests/drive-taas-factory-ui.cjs` (rows only), the arc's Results.
 **Do not edit `games/taas/index.html` while a break-list run is going**: the runner copies

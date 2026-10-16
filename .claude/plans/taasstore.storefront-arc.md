@@ -1,6 +1,6 @@
 # taasstore - TAAS robot factory: the storefront brief (plan arc)
 
-**Status:** IN PROGRESS (steps 1-4 below; everything before them is built and committed)
+**Status:** IN PROGRESS (step 1 done; steps 2-4 open)
 **Requested:** 2026-10-15 (the CD's storefront brief, two answers: customers "Across the
 counter", a full room "Room fills up").
 **Scope:** `games/taas/index.html` (the `FACTORY` engine and the factory UI),
@@ -24,7 +24,7 @@ step 4).
 | # | Step | Plan file | Status |
 |---|---|---|---|
 | 0 | Brief, engine v3, rules suite, UI, page suite, eval, busy pose and frame budget, engine break list, docs spliced | (this session, before the arc) | DONE - WIP commit `b1d9838` on `taas-storefront` |
-| 1 | Finish the page's break list: classify every miss, add rows, re-run the misses | `taasstore.s1-page-break-list.md` | IN PROGRESS |
+| 1 | Finish the page's break list: classify every miss, add rows, re-run the misses | `taasstore.s1-page-break-list.md` | DONE - 49 of 50 caught |
 | 2 | Docs final: fill the placeholders from step 1's results, check every count | `taasstore.s2-docs-final.md` | open |
 | 3 | Gates: every suite, smoke, games-sync, no break left in the page | `taasstore.s3-gates.md` | open |
 | 4 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasstore.s4-ship.md` | open |
@@ -70,6 +70,30 @@ step 4).
     two or three add a white badge (~600 px; 0 on the copy).
   - **Page suite now 86 checks** (82 + overlap + same-frame money + stall + badge). Both new
     rows verified: page GREEN 86/86, each copy RED on its own row only.
+  - `no-remeasure` (`enter()`'s `VW.w = 0;` deleted): **equivalent for its purpose**.
+    `layout()` runs only while the factory shows (`frame()` and the resize listener both
+    check `on`) and compares against the last size it measured, so a resize made in formal
+    mode is still caught on the way back in. Its only visible effect: coming back from
+    formal mode no longer scrolls the view to the top (`first` resets `camY`). Not pinned
+    by a row, since nobody asked for either behaviour.
+- **Page break list, final (step 1 done):** **49 of 50 caught** (first run 31 of 34 before
+  the restart, then 13 of 16, then the 5 fixed misses re-run with `--only`, all caught,
+  `<scratchpad>/v3/neg/ui3.out`). The one miss is `no-remeasure`, equivalent (above).
+  Page suite **86 checks**, GREEN.
+- **Fill text for step 2:**
+  - `@UICAUGHT@` -> `49`
+  - `@UIROW@` -> `49 of 50 breaks caught (`negtests/taas-factory-ui.json`); five misses
+    became rows, and the one left is an equivalent change, recorded in `.claude/taas.md`.`
+  - `@UIMISSES@` -> "The page list's first runs caught 44 of 50: five misses were rows not
+    yet written or rows that could not fail (a tap where the planer's box overlaps the
+    recycle bin's, which only the depth key settles; the money board drawn one frame late,
+    since `draw()` runs before `renderHud()`; the saw-blade row, which passed on the
+    sliding plank and the dust with the blade frozen; the planks on the stall; the count
+    badge over your arms), and all five are caught now. **The page's one miss is an
+    equivalent change**: `enter()`'s `VW.w = 0`, since `layout()` only runs while the
+    factory shows and compares against the size it last measured, so a resize made in
+    formal mode is still caught on the way back; its only visible effect is that coming
+    back from formal mode scrolls the view to the top." 
 - **Placeholders left in the docs for step 2:** `@UICAUGHT@` (twice in `.claude/taas.md`),
   `@UIMISSES@` (once in `.claude/taas.md`), `@UIROW@` (once in `.claude/tests/README.md`).
 - **For the report (step 4):**
