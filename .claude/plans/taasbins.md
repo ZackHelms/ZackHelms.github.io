@@ -125,3 +125,17 @@ between a finger going down and coming up swaps the button under it.
   path; a new row (without the delay it takes over twice as long); plan-clears-floor and evals rows on
   the paced persona; operator-first "loses money" summed; stocker-only's satisfaction rider replaced by
   "pays for every jam"; money compared to the cent. **24** GREEN.
+- **Step 2 (2026-10-16), the page:** the robot page in three `[data-part]`s via `part(name, sig,
+  html)` (scroll kept, `holdPart` while a finger is down; a touch held until `touchend`); the bins'
+  bubble `binHalves()` (`.fx-mine` column-reverse, `.fx-bins`, `.fx-line`, `binLay` only growing,
+  faded `.fx-ph` tile in an empty half); the rack's baked pile gone, up to six logs drawn
+  (`RACK_AT`); `cash()` with cents, `usd()`; restock float; Info rewritten. Page suite **110** (99 + 11
+  in section 18: the picker kept under twenty seconds of robot work, rebuilt where it was by a new
+  instruction, held by a touch; the recycle bin's halves, both corners, the line never moving over
+  sixteen taps both ways; the saw's plank back out; the rack's logs; the planer's bin's takes; the
+  restock float read off `fillText`) plus six rows changed for cents and the starting bin (two
+  setups now fill the bin with `s.rack`, not `force.log`, which only feeds restocks). Screenshots
+  looked at: the bubble at 390 and 320, before and after taps; the rack; the robot page's picker.
+- **Step 3 (2026-10-16), break lists and the eval:** engine list **143** (19 `bins-*` new, 12
+  re-anchored) **142 caught** (the miss `bubble-before-arrival`, the known equivalent); eval list
+  **5** (`ev-logs-free` new) **5 caught**; page list 84 (13 `bins-ui-*` new, 6 re-anchored): see below.

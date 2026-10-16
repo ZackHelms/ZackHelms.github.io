@@ -11,7 +11,12 @@ backlog entry here.
 
 ## Now
 
-- (none)
+- [taas] **Four stalls and eight robots in the robot factory** (the CD, 2026-10-16):
+  stalls 2-4 bought for $50 / $100 / $150 and set by tapping (unsold stock to your
+  arms), customers picking a stall at random, one stocking robot per stall with an
+  "Only stock X" per item, robots for slots 02-04 that make no mistakes yet, robots
+  $20 to $160. The CD's brief and four answers are recorded; run it one step a turn:
+  "Run the next open step of `.claude/plans/taasstalls.stalls-arc.md`".
 
 ## Needs Zack
 

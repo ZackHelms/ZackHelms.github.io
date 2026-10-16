@@ -1,6 +1,6 @@
 # TAAS (Team AI Adoption Simulator) - context
 
-`games/taas/index.html` (single file, ~4,100 lines) holds **two modes**, picked from a
+`games/taas/index.html` (single file, ~4,400 lines) holds **two modes**, picked from a
 dropdown beside the menu button (2026-10-13; the menu replaced the back and mute buttons on
 2026-10-14): **Formal** (everything in this file down to §
 Robot factory mode; the default) and **Robot factory** (§ Robot factory mode, a playful
@@ -19,7 +19,7 @@ nine protected games). Suites: `.claude/tests/drive-taas.cjs` (the engine's rule
 checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 39 checks, Chromium at
 phone width) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in); both drive suites
 are negative-tested (§ Negative tests). The robot factory has its own three
-(`drive-taas-factory.cjs`, 180 checks; `drive-taas-factory-ui.cjs`, 99; `eval-taas-factory.cjs`, 23). It is a
+(`drive-taas-factory.cjs`, 194 checks; `drive-taas-factory-ui.cjs`, 110; `eval-taas-factory.cjs`, 24). It is a
 **first draft the CD is still designing**; most numbers below are guesses waiting for the
 CD's tuning.
 
@@ -748,6 +748,74 @@ head's, so facing the camera the head drew over it. The hair is now the old elli
 facets in front of the head's centre and below a hairline 0.1 m up (`hairOver()`), sorted as the
 head with a small bias: the face shows through and the back and sides are as they were.
 
+### Bins you can take from, logs bought by the ten, and $0.10 a machine run (CD, 2026-10-16) - stated
+
+The CD, after playing the delay build (quotes made straight): "**Fix this bug where I am scrolling
+in the list of instructions to select one and it unexpectedly (frequently) moves back to the top of
+the list.**" "**Enable removing items from the input bins.** For example I might put a plank in the
+table saw input bin but then change my mind and decide to sell it." "**Allow adding/removing logs
+to/from the planer input bin.** This way I can add logs output by the sap extractor. **Start new
+game with 10 logs in the slot01 input bin. When I run out, auto restock it with 10 more that cost
+me $10. No limit to how many items are in any bin.**" And the bins' bubble: "**top half** of the
+white list area shows items I hold but could put in the bin; **lower half** lists items I could
+move from the bin into my inventory; **the horizontal line dividing top from bottom should not
+move** as items are moved between my inventory and bin; the listed items on the top should
+**settle into the lower left corner** of the top section (so that I could repeatedly tap that lower
+left item tile spot to move everything from me to the bin); items on the bottom should **settle
+into the upper left corner** of the bottom section."
+
+Three answers before any code:
+
+| Question | CD's answer |
+|---|---|
+| Logs cost $1 each when bought: does the planer still charge a press too? | **Keep both** (then changed, below) |
+| Which logs can go in the planer's input bin? | **Any log**, sap and gnarled too; the planer treats them as before |
+| When does the restock happen? | **When the planer needs a log** and the bin is empty; emptying it by hand costs nothing until then |
+
+Measured before going on (the eval, below): with $1 a log and $1 a press a good medium plank cost
+about $3.05 to make and sold for $4, and an attentive line lost money. Shown that, **the CD changed
+the costs**: "**Reduce machine operating cost from $1/input to $0.10/input.** This represents
+electricity and general wear and tear. **Ensure minimum sale price of any item never decreases below
+the material+labor cost** (I think this would be **$1.10 min sale price for any plank, $1.20 for two
+2"x4"**, ...) where sale price decreases as customer satisfaction decreases. This should ensure I can
+always recover my operating costs and slowly restore customer satisfaction given enough time." The
+same answer asked for **up to four stalls** ($50, $100, $150), set by tapping, with one stocking
+robot each, and **robots for slots 02 to 04**; four answers on those (customers pick a stall at
+random; slot robots make no mistakes yet; robots +$20 each, $20 to $160; an "Only stock X" per
+item) are recorded with their plan, `.claude/plans/taasstalls.stalls-arc.md`, not built here.
+
+**What was built.**
+- **The list that jumped** (traced): the robot's page was rebuilt whole whenever its signature
+  changed, and the signature held the robot's evals, so every log it finished rebuilt the picker's
+  list, which scrolls by itself, back at the top, and could swap the button under a finger. The page
+  is now **three parts** (base prompt and slots, the picker, the evals), each rebuilt only when what
+  it shows changes, never while a finger is down in it, and keeping where its lists were scrolled.
+- **Every bin you put things in gives them back**: the planer's, the table saw's, the sap
+  extractor's and the bench's input bins as well as the recycle bin. **Its bubble** is two halves of
+  the same height with an ink line between them: what you carry that the bin takes on top, settled
+  into the lower left; what is in the bin below, settled into the upper left; one tap moves every
+  one of a kind; an empty half shows a faded tile where the next would be. The halves are sized when
+  the bubble opens to hold every kind on either side (and only grow), so moving things never moves
+  the line, and tapping one spot again and again moves everything across.
+- **The planer's input bin** (its rack): a new factory starts with **10 logs** in it, drawn as logs
+  are bought (the first log on the in-feed is still a normal medium one, as it always was); any
+  log goes in; logs you put in roll in before the ones bought, and you press any normal log you put
+  in yourself; when the planer needs its next log and the bin is empty, **10 more arrive for $10**
+  ("-$10, 10 logs bought" floats up over the rack). The rack shows up to six of its logs. No bin has
+  a limit.
+- **$0.10 a machine run** (the planer, the table saw, the sap extractor; fixing a jam stays $5).
+  Money is kept **to the cent** and the wall board shows the cents.
+- **The price floor**: what a customer pays is the list price times customer satisfaction, now to
+  the cent, and **never less than the thing cost to make** (`CFG.floor`): any plank $1.10 and any
+  cut $1.20 (the CD's numbers), a log $1, sap $0.10, a carving $1.
+
+**Measured** (the eval, seed 7, an hour; § Measured, the bins): a person alone has $20 at 1.6 min
+and the second robot at 7.7 (4.7 before logs cost money). An instructed operator handles about 18
+logs a minute against 5 customers, so **a line without the delay now buys logs it never sells**:
+its plan of four instructions comes at 50 / 45 minutes. With the delay put in the moment the
+operator is hired, the plans come at 23 / 17 minutes, the line clears $11.50 a minute, and that is
+the new optimal path.
+
 ### Assumed, not decided (Claude's choices; the CD has not ruled on these)
 
 | Assumption | Where it lives | Why |
@@ -756,14 +824,14 @@ head with a small bias: the face shows through and the back and sides are as the
 | **The look**: a chibi in a yellow hard hat; white robots on a hover base; customers in their own shirts and hair, no hat; a grey concrete floor, a wooden shop floor and counter, steel-blue planer, grey input bins, blue output bins, a green recycle bin, a white table saw with an orange guard, a green extractor with a glass tank, a wooden bench | `COL`, `AV`, `RB`, `custParts()` | Taste |
 | **Camera**: orthographic, 50 degrees above the floor, no yaw | `ELEV` | Zelda-like |
 | **Timings**: 0.9 s for the next log, 0.8 s out-feed, 0.35 s drop, 0.6 s to toss, 0.4 s to empty a bin into your arms, 0.45 s to stock the counter, 3 s a cut, 4 s an extraction, 5 s a carving, 2.5 s for a customer to pay; walk 1.7 m/s, robots 1.3, customers 1.1 | `FACTORY.CFG` | The CD fixed only the 4 s and "within a few seconds" |
-| **Storefront: "Fix sap jam costs $5" means scrubbing a jam clean costs $5**, charged when it is clean (inferred), on top of the log's $1 | `CFG.fixCost`, `stepAvatar()` | The open question "should a jam cost more than time" had asked exactly that |
+| **Storefront: "Fix sap jam costs $5" means scrubbing a jam clean costs $5**, charged when it is clean (inferred), on top of the press | `CFG.fixCost`, `stepAvatar()` | The open question "should a jam cost more than time" had asked exactly that |
 | **Storefront: the customer in the CD's stocking example pays $4**, not $5 (inferred: the CD's "$5" there is the old price; the stall is "$4 medium plank") | `buy()` | The brief cut the price to $4 |
 | **Storefront: satisfaction already set prices** ($ times satisfaction since the first build); kept, now what customers pay at the stall, and **shown on the counter's label** (green at full price, amber or red below) | `paid()`, `drawPlate()` | The CD asked for it as if new: making it visible is the change |
 | **Storefront: the goal is a dark board across the top of the wall**, drawn live from the stall's price; the wall grew to 3.3 m for it | `drawBoards()`, `BOARD.goal` | "Add to the rear wall"; under the boards the shop's customers would cover it |
-| **Storefront: the log mix**: 20 / 65 / 15% by size, 75 / 15 / 10% by quality, one named roll over the nine kinds | `CFG.logs`, `nextLog()` | About half normal medium logs, as before |
+| **Storefront: the log mix**: 20 / 65 / 15% by size, 75 / 15 / 10% by quality, one named roll over the nine kinds, now rolled as logs are bought | `CFG.logs`, `buyLogs()` | About half normal medium logs, as before |
 | **Storefront: the three lengths drawn 0.55, 0.85, 1.1 m** | `LEN` | 2', 4', 8' would not fit the belts |
-| **Storefront: you at the planer press a normal medium log, or any normal log you racked yourself, and toss the rest** | `yours()`, `work()` | "Always correct" for the goal; a log you put on the rack is your choice, and the CD wants extracted logs to go back to the planer |
-| **Storefront: a tap on an output bin takes everything** (no bubble); input bins and the recycle bin open a bubble, one button a kind, one tap moving all of that kind; arms hold any number | `arrive()`, `options()`, `choose()` | The CD's flow (pick up, deliver, keep the rest, recycle the extras) in the fewest taps |
+| **Storefront: you at the planer press a normal medium log, or any normal log you put in its bin yourself, and toss the rest** (a sap or gnarled log you put in is tossed too) | `yours()`, `work()`, `s.rackMine` | "Always correct" for the goal; a log you put on the rack is your choice, and the CD wants extracted logs to go back to the planer |
+| **Storefront: a tap on an output bin takes everything** (no bubble); input bins and the recycle bin open a bubble, one button a kind, one tap moving all of that kind (in or out, since 2026-10-16); arms hold any number | `arrive()`, `options()`, `choose()` | The CD's flow (pick up, deliver, keep the rest, recycle the extras) in the fewest taps |
 | **Storefront: the stall holds 6**, shown as a stack on a teal tray; one stall, `CFG.stalls`, ready for more | `CFG.stallCap`, `CFG.stalls` | "Initially one slot" |
 | **Storefront: customers**: the first after 12 s, then every 8, 10, 12, 14 or 16 s (a named roll, `arrive`); they pay 2.5 s after reaching a stocked stall; **waiting** means standing in line, at an empty stall or behind someone, not walking in and not paying; they leave by the door they came in | `CFG.shop`, `stepShop()` | Demand a person alone can just keep up with (measured, below): faster and the line fills, satisfaction hits the floor, prices with it, and no persona ever affords the second robot |
 | **Storefront: a wrong sale still pays $4 times satisfaction** and costs the old 15 points | `buy()`, `CFG.satHit` | The CD: "customer paying [$4] ... getting something else (customer satisfaction decreases)" |
@@ -790,9 +858,20 @@ head with a small bias: the face shows through and the back and sides are as the
 | **Delay: `setWait()` refuses** anything but a whole number 0-60 (no rounding); allowed with the instruction in no slot | `setWait()` | The slider and steppers only give whole numbers; a fraction can only be a bug |
 | **Delay: Evals** "Waited between tasks" (green) and "Went straight on, against its instructions" (yellow), written as lines (no tally, no face, no outcome) | `GRADE`, `DOING`, `note()` | The fourth brief's rules: a slip is a yellow line of its own |
 | **Delay: saves** keep version 3: `load()` puts the delay on the list and clamps `r.wait` (anything not a number -> 5) | `startSeen()`, `load()` | A bump would wipe every player's factory |
-| **Delay: the controls**: a slider (0-60, step 1) with - and + under the slot and the figure "N s"; at 360 px and under the row drops its indent; never redrawn while a finger holds the slider | `renderRobot()`, `holdWait` | The CD's "configurable value"; a 60 fps redraw would stop a drag |
+| **Delay: the controls**: a slider (0-60, step 1) with - and + under the slot and the figure "N s"; at 360 px and under the row drops its indent; never redrawn while a finger holds the slider | `renderRobot()`, `part()`, `holdPart` | The CD's "configurable value"; a 60 fps redraw would stop a drag |
 | **Delay: the pause sign**: a white disc, two bars, a teal ring that empties, beside the mood badge while it is up; a calm face; a slip draws nothing | `pauseSign()`, `drawRobot()` | The wait has to be seen, or a robot told to wait looks broken |
 | **Hair: a hairline 0.1 m up**, the facets in front of the head's centre and below it cut away, the rest as it was | `hairOver()`, `hairCap()` | The CD asked for hair, not this shape; a cap of the facets outside the head was tried first and left a bald patch seen from behind |
+| **Bins: the first log on the in-feed is not one of the 10**: a new factory has a normal medium log on the planer, as always, and 10 in the bin | `newGame()` | "Start new game with 10 logs in the slot01 input bin", read literally |
+| **Bins: the 10 to start are free**; a restock is 10 more drawn the same way | `newGame()`, `restock()` | Money starts at $0 |
+| **Bins: logs you put in the planer's bin roll in first** and you press the normal ones whatever their size (`s.rackMine` counts them, always the front of the bin); taking a kind out takes yours and the bought ones alike | `choose()`, `nextLog()` | As the rack worked before; the CD wants the extractor's clean logs to go back to the planer |
+| **Bins: a save from before** keeps its rack as yours and gets the 10 a new factory starts with, free; no version bump | `load()` | A bump would wipe every player's factory |
+| **Bins: the bubble** for the five bins (planer, saw, extractor, bench, recycle): one tile a kind (all of that kind per tap, as before), two halves of the same height sized at open for every kind on either side and only growing, a faded tile where an empty half's first would be, each half scrolling once it has more rows than half the screen | `binHalves()`, `binLay` | The CD's layout; one tap per kind keeps "tap the same spot until it is all across" to a few taps |
+| **Bins: the rack draws up to six of its logs**, three, two and one, the next to roll in on top; the old painted pile is gone | `RACK_AT`, the item pass | A bin of bought logs has to look like what is in it |
+| **Bins: the robot's page in three parts**, each with its own signature; a finger down in a part holds it (a touch until it ends, since a browser cancels a pointer when a touch starts to scroll); a rebuild keeps every list's scroll | `part()`, `holdPart` | The jump the CD reported, traced to the whole page being rebuilt on every robot action |
+| **Bins: $0.10 a machine run is per thing processed** (a log pressed, a plank sawn, a sap log extracted); the bench is by hand and free; fixing a jam stays $5 | `CFG.logCost`, `sawCost`, `extractCost` | "$0.10/input" |
+| **Bins: money to the cent** (every change rounded to the cent); the wall board always shows cents ($12.30), a price or a cost only when it has some ($4, $3.41, -$0.10) | `cents()`, `cash()`, `usd()` | A $0.10 run makes cents everywhere |
+| **Bins: prices to the cent** ($4 at 85% is $3.40; it was a whole $3) and **the floors**: a log $1, any plank $1.10, any cut $1.20 (the CD's), sap $0.10 (one extractor run; the log comes back clean, so it carries the log's cost), a carving $1 (a gnarled log, by hand); a wrong sale's floor is the stall's thing's | `CFG.floor`, `floorOf()`, `paid()` | "material+labor cost"; only medium planks sell today, so only the plank floor shows |
+| **Bins: the eval's player** presses the planer only while fewer than eight medium planks wait (logs cost money now), every persona plays an hour, and the paced persona puts the delay in the moment its operator is hired | `eval-taas-factory.cjs` | A player who keeps pressing logs nobody buys loses money; measured, below |
 
 ### Open questions for the CD (factory)
 
@@ -827,6 +906,12 @@ head with a small bias: the face shows through and the back and sides are as the
    4 of 8; **3 s keeps 100% on all eight** and the bin at 6-37; 2 s still overproduces (45-67 in the
    bin). A player who leaves the slider alone at 5 s learns the lesson the hard way, as with the
    operator-first trap. Not changed: the CD's call.
+11. **The economy since logs cost money** (2026-10-16). With logs at $1 and a run at $0.10, a robot
+   line without the delay buys about twice the logs the customers can use, so its instructions come
+   slowly (the plan of four at about 50 minutes; 23 with the delay put in first) and the delay is
+   now the first instruction a player needs. Is that the lesson you want, or should demand, the log
+   price or the restock size move? (The four stalls planned next add demand only by splitting the
+   same customers between stalls.)
 
 Answered by this brief: what the bays hold (slots 02 to 04), whether a jam should cost more than
 time ($5 to fix), how what is not a plank leaves the bin (your arms, and the stocker's recycle
@@ -844,11 +929,18 @@ Three script blocks join the page, in this order after the formal engine:
      carvings (`carving.bowl` ...). `kindOf()`, `sizeOf()`, `isItem()`, `makes(log)` (what the
      planer makes of it, or `'jam'`), `priceOf()` (the CD's prices; `null` for what has none) and
      `ACCEPTS` (what each bin you put things in takes) are the vocabulary.
-   - **State**: the planer (`machine`, its `rack` queue of logs you put there, `belt`, `bin`), the
+   - **State**: the planer (`machine`, its input bin `rack` with `rackMine` of them yours at the front,
+     `belt`, `bin`), the
      `recycle` bin (everything in it), the `saw` and `extract` mills (`in`, `phase`, `belt`, `out`),
      the `bench`, the `stalls`, the `shop` (its people, the next arrival, how many served and how
      many sold something else), the avatar with its `inv`, the robots, and `spent` with its parts
-     in `costs` (logs, fixes, saw, extract).
+     in `costs` (logs pressed, fixes, saw, extract, and logs `bought`). **Money is kept to the cent**:
+     every change goes through `cents()` (`spend()`, a sale, a hire, a slot), and `load()` rounds too.
+   - **The planer's input bin** (2026-10-16): `newGame()` puts `CFG.startLogs` logs in it
+     (`buyLogs()`, the `log` dice); `nextLog()` takes the front one, and only when the bin is empty
+     calls `restock()` (`CFG.restock`: 10 logs for $10, cost `bought`, event `restock`). What a
+     customer pays is `paid(s, item)`: the price times satisfaction to the cent, never below
+     `floorOf(item)` (`CFG.floor`).
    - **Every roll is named** (`log`, `think`, `slip`, `find`, `turnup`, `arrive`, `carve`) and goes
      through `roll()`; `s.force[name]` is a test queue. A robot rolls only where it has a choice,
      so an instruction it does not hold, or one about another job, changes nothing, down to the dice.
@@ -867,7 +959,9 @@ Three script blocks join the page, in this order after the formal engine:
      `pause()` leaves after `r.wait` seconds or once the instruction is out of its slot.
    - **The avatar's places** (`PLACES`): the planer (`work()`), output bins (`pick`), the counter
      (`stock`), the extractor (a press), the bench (`carve`), and bubbles for the rack, the input
-     bins, the recycle bin, the saw, the dock and robots. `store(s, place)` is the array behind a
+     bins, the recycle bin, the saw, the dock and robots. **A bin's bubble** (`options()` for any
+     `ACCEPTS` place) offers a `put:` for each kind in your arms it takes and a `take:` for each kind
+     in it (`take:` from the rack keeps `rackMine` right); `F.SAMPLE` is the picture an empty half shows. `store(s, place)` is the array behind a
      bin. The planer's output bin is reached from the nearer of two spots (`pathLen()`).
    - **The shop** is `stepShop()`: arrivals while fewer than `CFG.shop.max` are inside, the line
      (place 0 at the stall, each place `gap` further west), paying (`buy()`, the price times
@@ -909,14 +1003,23 @@ Three script blocks join the page, in this order after the formal engine:
    - **Boards**: `drawBoards()` writes the goal, the money and customer satisfaction on the wall;
      `drawPlate()` writes the stall's label and its price now. `boardRect(k)` is where each is drawn
      (`cash`, `sat`, `goal`, `plate`).
-   - **The bubble** groups put and take buttons into two rows (arrows say which); a thing's picture
-     comes from `mini(id)` and its name from `NAME(id)`.
+   - **The bubble**: a bin's (`binHalves()`) is two halves, `.fx-mine` (a `column-reverse` of rows,
+     so the first tile sits lower left) and `.fx-bins` (rows from the upper left), each the height of
+     `binLay.rows` rows and `binLay.cols` wide: `binLay` remembers every kind seen since the bubble
+     opened, so the halves only grow and the line between them (`.fx-line`) stays put. Other bubbles
+     are a row of buttons. A thing's picture comes from `mini(id)` and its name from `NAME(id)`.
    - **Input**: `hitTest()` walks the `TAPS` table (sprite id to place), robots first, the front-most
      sprite next, then the floor.
-   - **The robot's page** (`renderRobot()`) redraws only when `pageSig` changes; a slot holding
-     the delay grows `.fx-wait` (-, the slider `#fx-wait`, +, the figure), and while a finger holds
-     the slider (`holdWait`) the page is never redrawn, or the drag would stop. A robot in `pause`
-     wears `pauseSign()`.
+   - **The robot's page** (`renderRobot()`) is three parts, `[data-part]` `slots`, `pick` and
+     `evals`, each written by `part(name, sig, html)` only when its own signature changes, never while
+     a finger is down in it (`holdPart`: set on pointerdown or touchstart, released when the touch
+     ends or, for a mouse, the pointer comes up), and keeping the scroll of each `.fx-rules` and
+     `.fx-scroll` in it. One whole-page signature holding the evals rebuilt the picker's own scroller
+     on every robot action, back at the top (the CD's jumping list, 2026-10-16). A slot holding the
+     delay grows `.fx-wait` (-, the slider `#fx-wait`, +, the figure). A robot in `pause` wears
+     `pauseSign()`.
+   - **Money on screen**: `cash()` (the wall board and the screen-reader line, always with cents) and
+     `usd()` (prices and costs, cents only when there are some).
    - **Test hook**: `window.TAAS_FACTORY` as before (`s`, `view`, `tick`, `paused`, `hitTest`,
      `spriteRect`, `screen`, `board`, `showInfo`, `save`, `layout`, `openRobot`, `closePanel`, `page`),
      and `person(who, face)`, one person baked alone (`bakePerson()`).
@@ -1010,12 +1113,46 @@ delay put in at the same moment and then left alone at one value:
 So the delay ends overproduction and pays, inside a narrow band (about 3 s against today's
 demand), and the 5 s it starts at starves the line (open question 10).
 
+### Measured (2026-10-16, the bins: logs bought, $0.10 a run)
+
+`node .claude/tests/eval-taas-factory.cjs`, seed 7. First with the CD's first answer, **$1 a log
+bought and $1 a press**: a medium plank cost about $3.05 to make (about two logs bought for each
+normal medium one, plus the press) and sold for $4; the attentive player never reached the first
+$20 in 30 minutes while it pressed whenever the planer was ready, and with a player who stops at
+eight planks waiting, the second robot came at 14.9 minutes and an instructed line lost about $1 a
+minute. With **$0.10 a run** (the CD's change) and every persona playing an hour:
+
+| Persona, an hour | $20 | robot 2 | plan of four (op / stock) | $/min, last 5 | money |
+|---|---|---|---|---|---|
+| hands-on (presses while < 8 wait) | 1.6 min | 7.8 | - / - | 2.4 | $2 |
+| supervisor | 1.6 | 7.7 | 50.4 / 45.2 | 2.4 | $39 |
+| **paced** (the delay at the operator's hire) | 1.6 | 7.7 | **23.4 / 16.6** | **11.5** | **$60** |
+| operator first | 1.6 | 10.5 | - | 11.5 | $450 |
+
+An instructed operator handles about 18 logs a minute (a toss is 1.5 s, a press about 5) against
+about 5 customers a minute, so without the delay it buys about twice the logs the counter can use:
+the supervisor's hour spent $780 on logs and $140 on 28 jams (its operator's plan, the sap
+instruction among it, was whole only at 50 minutes). The paced line spent $590 and $25. Before this change (a
+press $1, logs free) the plans came at 11 and 14 minutes. "Operator first" ends rich for a traced
+reason that is the persona's, not the game's: its second robot is given the stocking job, which
+swaps the first one (already moved to stocking) to rest, so nobody but the person runs the planer,
+and the person never presses a log nobody will buy.
+
 ### Negative tests (factory)
 
-`.claude/tests/negtests/taas-factory-engine.json` (**124** breaks, against `drive-taas-factory.cjs`),
-`taas-factory-ui.json` (**71**, against `drive-taas-factory-ui.cjs`) and `taas-factory-eval.json`
-(**4**, against `eval-taas-factory.cjs`): **123, 70 and 4 caught** (2026-10-16, the whole of each
-list re-run on copies). The delay added 23 engine breaks (`delay-*`), 16 page breaks
+`.claude/tests/negtests/taas-factory-engine.json` (**143** breaks, against `drive-taas-factory.cjs`),
+`taas-factory-ui.json` (**84**, against `drive-taas-factory-ui.cjs`) and `taas-factory-eval.json`
+(**5**, against `eval-taas-factory.cjs`; `ev-logs-free` added 2026-10-16): NEG_COUNTS. The bins brief (2026-10-16, later) added 19
+engine breaks (`bins-*`: no starting logs or billed ones, a free restock, one every pull, five not
+ten, yours at the back or never yours, takes only at the recycle bin, a take that forgets yours,
+the rack taking only normal logs, $1 a press or a saw run, money not to the cent, no floor, whole
+dollars, a plank floor of $1, a cut floored as a plank, an old save with no logs, an unclamped
+count of yours) and 13 page breaks (`bins-ui-*`: the picker rebuilt on every robot action, no
+scroll kept, a hold that never lets go, the halves flowing the wrong way or sized by their content,
+no faded tile, no take half, a rack drawn empty, money and prices in whole dollars, no restock
+float), and re-anchored 12 engine and 6 page breaks to the new code (`rack-takes-sap` became
+`rack-takes-planks`, since any log now goes in). Before the bins brief:
+**123, 70 and 4 caught** of 124, 71 and 4 (2026-10-16, the whole of each list re-run on copies). The delay added 23 engine breaks (`delay-*`), 16 page breaks
 (`delay-ui-*`) and the eval's four (demand doubled, a robot that never pauses, every wait at 60 s,
 a wait that costs money); the hair added five page breaks (`hair-*`). All were caught; on the way,
 two rows were widened or tightened (a load row that only loaded a save already holding the delay;
@@ -1043,17 +1180,19 @@ top.
   `node .claude/tests/eval-taas-factory.cjs` (it prints the table above), and bump `CFG.version` if
   a save would now mean something else. The customers' rate is a balance lever with a cliff: see
   Measured.
-- **A new stall** (another thing on sale): a `CFG.stalls` row with its `want`, its price in
-  `CFG.price`, a spot on the counter, a second label, and customers who want it (`stepShop()`
-  serves one stall today; give each customer a `stall` and a line per stall).
+- **A new stall** (another thing on sale): planned with the CD's four answers in
+  `.claude/plans/taasstalls.stalls-arc.md` (up to four, bought, each set by tapping, one stocking
+  robot each). Its price is in `CFG.price` and its floor in `CFG.floor`.
+- **A bin you put things in**: an `ACCEPTS` row, a `store()` case, a `SAMPLE` picture, a `BUBBLES`
+  entry and a `TAPS` entry; its bubble comes in two halves by itself.
 - **Add an instruction**: a `RULES` row (an operator one with `rejects: { quality, size }`, a stocker
   one with `recycles: { kind, size }`, a look-alike with `joins`); in its job's code a `follows()`
   where the robot would make the mistake (the data rows need none: `operate()` and `stocker()` ask
   every row that matches); a `see()` where the mistake shows; a `DOING` line if it adds a new
   action; rows in the rules suite's § 8. **An instruction with a value**, like the delay: a field
   on the robot (`r.wait`), a `CFG` range, a setter that refuses what the control cannot give
-  (`setWait()`), a clamp in `load()`, `pageSig` holding it, and a control under the slot in
-  `renderRobot()` kept out of the redraw while held (`holdWait`). A row with `job: null` is
+  (`setWait()`), a clamp in `load()`, the `slots` part's signature holding it, and a control under the
+  slot in `renderRobot()` (a part is never rebuilt while a finger is down in it). A row with `job: null` is
   consulted by every job, so give it a place in each (`done()`); `start: true` puts it on the
   list from the start.
 - **A new kind of thing**: a size or quality goes in `SIZES` or the `LOGS` list and `CFG.logs`; a
@@ -1095,6 +1234,16 @@ top.
 
 ## History
 
+- 2026-10-16 (later): **bins you can take from, logs bought by the ten, $0.10 a run** (the CD's
+  bins brief, three answers, then a change of costs once the first answer was measured): the
+  robot's page in three parts so the instruction list stops jumping to the top; every input bin and
+  the recycle bin give things back through a bubble in two halves whose line never moves; the
+  planer's input bin starts with 10 logs and buys 10 more for $10 when the planer needs one; a
+  machine run costs $0.10; money and prices are kept to the cent; nothing sells below what it cost
+  to make. The eval's players stop pressing at eight planks waiting and play an hour, and the paced
+  one puts the delay in first (the new optimal path). Rules 194, page 110, eval 24; break lists
+  NEG_SUMMARY. The four stalls and eight robots asked in the same answer are planned in
+  `.claude/plans/taasstalls.stalls-arc.md`.
 - 2026-10-16: **a delay between tasks** (the CD's answer to overproduction, and four answers):
   "Wait between tasks" on every robot's list from the start, a slider 0-60 s (5 to begin with)
   under its slot, a wait after each log handled and each thing stocked or recycled under a pause

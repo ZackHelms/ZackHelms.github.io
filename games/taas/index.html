@@ -1754,7 +1754,8 @@ const FACTORY = (function () {
       // a save from before the bin of bought logs (2026-10-16): its rack was all yours, and it gets
       // the logs a new factory starts with behind them
       if (typeof d.rackMine === 'number' && Number.isFinite(d.rackMine)) s.rackMine = Math.max(0, Math.min(s.rack.length, Math.floor(d.rackMine)));
-      else { s.rackMine = s.rack.length; s.rack = s.rack.concat(buyLogs(s, CFG.startLogs)); } s.recycle = items(d.recycle); s.belt = belt(d.belt);
+      else { s.rackMine = s.rack.length; s.rack = s.rack.concat(buyLogs(s, CFG.startLogs)); }
+      s.recycle = items(d.recycle); s.belt = belt(d.belt);
       ['saw', 'extract'].forEach(key => {
         const m = Object.assign(newMill(), d[key] && typeof d[key] === 'object' ? d[key] : {});
         m.in = items(m.in, ACCEPTS[key + 'In']); m.out = items(m.out); m.belt = belt(m.belt);

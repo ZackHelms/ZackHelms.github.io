@@ -1005,6 +1005,18 @@ const server = http.createServer((req, res) => {
     const s4 = await S();
     ok(rb.join() === 'take:log.m|Take a medium log out,take:sappy.m|Take a medium sap log out, 2' && s4.avatar.inv.join() === 'sappy.m,sappy.m' && s4.rack.join() === 'log.m',
       'the planer\'s input bin gives its logs back too: take the sap logs out for the sap extractor', JSON.stringify(rb) + ' / ' + s4.avatar.inv.join());
+    // a restock says what it cost, over the rack (what the canvas writes, read off fillText)
+    const said = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s, g = document.getElementById('fx-canvas').getContext('2d'), out = [], fill = g.fillText;
+      s.bubble = null; s.rack = []; s.rackMine = 0; s.machine.log = 'log.m'; s.machine.staged = 1;
+      FACTORY.tap(s, { kind: 'machine' });
+      for (let i = 0; i < 400 && !s.events.some(e => e.kind === 'restock'); i++) FACTORY.step(s, 0.05);
+      g.fillText = function (txt) { out.push(String(txt)); return fill.apply(this, arguments); };
+      T.tick(1 / 60);
+      g.fillText = fill;
+      return out;
+    });
+    ok(said.includes('-$10') && said.includes('10 logs bought') && said.includes('-$0.10'), 'when the planer\'s bin runs out and restocks, "-$10" and "10 logs bought" float up over it (and each press says its "-$0.10")', JSON.stringify(said.filter(x => /\$|logs/.test(x))));
   });
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
   await section('12. badge', async () => {
