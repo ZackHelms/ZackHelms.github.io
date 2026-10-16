@@ -1,25 +1,29 @@
 #!/usr/bin/env node
 /**
- * drive-taas-factory-ui.cjs — TAAS's robot factory page, in Chromium (~20 s).
+ * drive-taas-factory-ui.cjs — TAAS's robot factory page, in Chromium (~40 s).
  *
  * drive-taas-factory.cjs proves the engine. This proves the page: the mode dropdown (its name
  * on the button, ?mode=, the remembered choice, the factory's loop stopping in formal mode),
- * that a tap at the pixel where a thing is DRAWN reaches that thing at every viewport (the
- * canvas-space rule in games/CLAUDE.md), that the red button glows when ready and goes dark
- * while it runs, the whole first loop played with real touches (walk, press, the log's $1 in
- * red below zero, plank, bubble, $5), a drag that scrolls and never walks, hiring and a job
- * through the bubble, a robot's page (its name, its base prompt, buying a slot and giving it an
- * instruction, all by real taps, the seller's "looking for plank" count, its Evals with their
- * colours and a real tap on Reset evals), the recycle bin drawn, the wall sign and the sap barrel
- * gone, a sap log that shows its sap, a gnarled log's holes in the same places on its plank (read
- * off pixels), a large plank's own sell button, the build badge in the bottom right corner in
- * both modes (the CD's call for this page), the info panel opened from the menu, saves that
+ * that a tap at the pixel where a thing is DRAWN reaches that thing at every viewport and scroll,
+ * and where two overlap the one in front (the canvas-space rule in games/CLAUDE.md), the red button that glows when ready and goes dark
+ * while it runs, the first loop played with real touches (walk, press, the log's $1 in red below
+ * zero, the plank into your arms from the output bin, round to the counter, a customer who walks
+ * in at the door and buys it, $4), a drag that scrolls and never walks, hiring and the stocking
+ * job through the bubble, a robot's page (its name, its base prompt, buying a slot and giving it
+ * an instruction, all by real taps, the stocker's "looking for plank" count, its Evals with their
+ * colours and words for every size and quality, a real tap on Reset evals), the scene read off
+ * pixels (the recycle bin, a gnarled log's holes in the same places on its plank, sap logs, three
+ * lengths of plank, the slots' numbers, the saw's blade spinning only while it cuts, the
+ * extractor's tank filling), the wall (money, customer satisfaction, a window in the middle and
+ * the goal across the top) and the counter's label (the price a customer pays, falling with
+ * customer satisfaction), the shop in real time (a customer at the door, waiting at the stall
+ * with an hourglass, satisfaction falling 0.1% a second, paying, leaving), your arms and the
+ * bubbles (the recycle bin's put and take, an input bin, the saw's three cuts), the build badge
+ * in the bottom right corner in both modes, the info panel opened from the menu, saves that
  * survive a reload without touching the formal mode's, re-measuring after a resize while hidden,
- * the chrome and bubble all on screen at phone, landscape and desktop sizes, and money and
- * customer satisfaction as scoreboards on the back wall (read off pixels: red below zero, green
- * as money comes in, scrolling with the floor, a window between them, the avatar passing in
- * front). Frames are stepped through the page's own test hook (TAAS_FACTORY,
- * paused), so time is exact; input goes through real touch events.
+ * and the chrome and bubble all on screen at phone, landscape and desktop sizes. Frames are
+ * stepped through the page's own test hook (TAAS_FACTORY, paused), so time is exact; input goes
+ * through real touch events.
  *
  * Usage:
  *   node .claude/tests/drive-taas-factory-ui.cjs     (playwright-core on NODE_PATH; gates.sh finds it)
@@ -94,6 +98,12 @@ const server = http.createServer((req, res) => {
     return o;
   }, [k, grow || 0]);
 
+  // the colour at a world point, averaged over a few pixels; and at a screen point
+  const px = (x, y, z) => H(([x, y, z]) => { const T = window.TAAS_FACTORY, p = T.screen(x, y, z), k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const d = g.getImageData(Math.round(p[0] * k) - 4, Math.round(p[1] * k) - 4, 9, 9).data; let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } return [r / n, gg / n, b / n].map(Math.round); }, [x, y, z]);
+  const px2 = p => H(([x, y]) => { const c = document.getElementById('fx-canvas'), g = c.getContext('2d'), k = window.TAAS_FACTORY.view.dpr; const d = g.getImageData(Math.round(x * k) - 3, Math.round(y * k) - 3, 7, 7).data; let r = 0, gg = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; n++; } return [r / n, gg / n]; }, p);
+  // the counter label's bright pixels, as a mask: what the figure says
+  const plateBits = () => H(() => { const T = window.TAAS_FACTORY, r = T.board('plate'), d = T.view.dpr; const im = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data; let bits = ''; for (let i = 0; i < im.length; i += 4) bits += im[i] + im[i + 1] + im[i + 2] > 360 ? '1' : '0'; return bits; });
+
   /* ---------- 1. the mode dropdown ---------- */
   await section('1. mode', async () => {
     await go(); await H(() => localStorage.clear()); await go();
@@ -120,41 +130,53 @@ const server = http.createServer((req, res) => {
   /* ---------- 2. the first loop, with real touches on drawn pixels ---------- */
   await section('2. first loop', async () => {
     await fresh(1);
-    const btn = await H(() => window.TAAS_FACTORY.screen(2.8, 3.71, 0.88));
-    const lit = await H(([x, y]) => { const c = document.getElementById('fx-canvas'), g = c.getContext('2d'), k = window.TAAS_FACTORY.view.dpr; const d = g.getImageData(Math.round(x * k) - 3, Math.round(y * k) - 3, 7, 7).data; let r = 0, gg = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; n++; } return [r / n, gg / n]; }, btn);
+    await H(() => { window.TAAS_FACTORY.s.shop.next = 1e9; });   // nobody comes in until the suite says so
+    const btn = await H(() => { const q = FACTORY.LAYOUT.SOLID.console; return window.TAAS_FACTORY.screen((q[0] + q[2]) / 2, (q[1] + q[3]) / 2, 0.88); });
+    const lit = await px2(btn);
     await page.touchscreen.tap(btn[0], btn[1]);
     const t1 = await S();
-    ok(t1.avatar.task && t1.avatar.task.kind === 'machine' && t1.avatar.path.length > 0, 'a tap on the drawn red button sends the avatar walking to machine 01', JSON.stringify(t1.avatar.task));
+    ok(t1.avatar.task && t1.avatar.task.kind === 'machine' && t1.avatar.path.length > 0, 'a tap on the drawn red button sends the avatar walking to the planer', JSON.stringify(t1.avatar.task));
     let pressedAt = -1;
     for (let i = 0; i < 40 && pressedAt < 0; i++) { await step(0.1); if ((await H(() => window.TAAS_FACTORY.s.machine.phase)) === 'run') pressedAt = i; }
-    const dark = await H(([x, y]) => { const c = document.getElementById('fx-canvas'), g = c.getContext('2d'), k = window.TAAS_FACTORY.view.dpr; const d = g.getImageData(Math.round(x * k) - 3, Math.round(y * k) - 3, 7, 7).data; let r = 0, gg = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; n++; } return [r / n, gg / n]; }, btn);
+    const dark = await px2(btn);
     ok(lit[0] > 200 && lit[0] - lit[1] > 120 && dark[0] < lit[0] - 70, 'the button glows red while ready and goes dark once pressed', 'ready rgb ' + lit.map(Math.round) + ', pressed ' + dark.map(Math.round));
     ok(pressedAt > 2, 'the avatar walked first and pressed on arrival', pressedAt);
     await step(5.6);
     const t2 = await S();
-    ok(t2.bin.join() === 'plank' && t2.money === -1, 'four seconds later a plank is in the bin, and the log cost $1', t2.bin.join() + ' / ' + t2.money);
+    ok(t2.bin.join() === 'plank.m' && t2.money === -1, 'four seconds later a medium plank is in the planer\'s output bin, and the log cost $1', t2.bin.join() + ' / ' + t2.money);
     const neg = await boardInk('cash'), said = await H(() => document.getElementById('fx-score').textContent);
     ok(neg.red > 40 && neg.white < 5 && /^Money -\$1\./.test(said), 'below zero the money board on the wall reads -$1, in red', JSON.stringify(neg) + ' ' + said);
-    const bin = await rectOf('binBack');
-    await page.touchscreen.tap(centre(bin)[0], centre(bin)[1]);
-    let open = false;
-    for (let i = 0; i < 40 && !open; i++) { await step(0.1); open = await H(() => !document.getElementById('fx-bubble').hidden); }
-    const opts = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => ({ id: b.dataset.opt, dis: b.disabled, svg: !!b.querySelector('svg rect[fill="#3fb26a"]') })));
-    ok(open && opts.length === 1 && opts[0].id === 'sell:plank' && !opts[0].dis && opts[0].svg, 'a tap on the bin walks over and opens a white bubble with one green dollar bill', JSON.stringify(opts));
-    await page.tap('#fx-bubble [data-opt="sell:plank"]');
+    const bin = await rectOf('binFront');
+    await page.touchscreen.tap(centre(bin)[0], bin.y + bin.h * 0.4);
+    for (let i = 0; i < 40 && !(await H(() => window.TAAS_FACTORY.s.avatar.inv.length)); i++) await step(0.1);
+    await step(0.5);
+    const t3 = await S();
+    ok(t3.avatar.inv.join() === 'plank.m' && !t3.bin.length && await H(() => document.getElementById('fx-bubble').hidden), 'a tap on the drawn output bin walks over and takes the plank into your arms (no bubble to answer)', t3.avatar.inv.join());
+    const counter = await rectOf('counter');
+    await page.touchscreen.tap(counter.x + counter.w * 0.85, counter.y + counter.h * 0.7);
+    for (let i = 0; i < 80 && !(await H(() => window.TAAS_FACTORY.s.stalls[0].stock.length)); i++) await step(0.1);
+    const t4 = await S();
+    ok(t4.stalls[0].stock.map(g => g.item).join() === 'plank.m' && !t4.avatar.inv.length, 'a tap on the drawn counter walks round to it and stocks the stall', JSON.stringify(t4.stalls[0].stock));
+    // a customer walks in from the door on the left, buys it, and the money comes in
+    await H(() => { window.TAAS_FACTORY.s.shop.next = window.TAAS_FACTORY.s.t; });
     await step(0.1);
-    const t3 = await S(), bump = await boardInk('cash');
+    const c0 = await H(() => window.TAAS_FACTORY.s.shop.people.map(c => c.x));
+    let sold = false;
+    for (let i = 0; i < 120 && !sold; i++) { await step(0.1); sold = await H(() => window.TAAS_FACTORY.s.shop.served > 0); }
+    await H(() => { window.TAAS_FACTORY.s.shop.next = 1e9; });
+    await step(0.05);
+    const t5 = await S(), bump = await boardInk('cash');
     await step(0.5);
     const after = await boardInk('cash'), said3 = await H(() => document.getElementById('fx-score').textContent);
-    ok(t3.money === 4 && !t3.bin.length && bump.green > 40 && bump.red === 0 && after.white > 40 && after.green === 0 && after.red === 0 && /^Money \$4\./.test(said3),
-      'tapping the bill sells the plank: the money board flashes green, then reads $4 in white, out of the red', JSON.stringify([bump, after]) + ' ' + said3);
-    // customer satisfaction: how much customers trust us and our products, from 100%, on its own board
+    ok(c0.length === 1 && c0[0] < 0.2 && sold && t5.money === 3 && !t5.stalls[0].stock.length && bump.green > 40 && bump.red === 0 && after.white > 40 && after.green === 0 && after.red === 0 && /^Money \$3\./.test(said3),
+      'a customer comes in at the door on the left and buys it for $4: the money board flashes green, then reads $3 in white, out of the red', JSON.stringify([c0, bump, after]) + ' ' + said3);
+    await step(1.5);   // the sale's "+$4" floats up past the board first
     const sat0 = await boardInk('sat');
     await H(() => { window.TAAS_FACTORY.s.satisfaction = 70; window.TAAS_FACTORY.tick(1 / 60); });
     const sat70 = await boardInk('sat');
     await H(() => { window.TAAS_FACTORY.s.satisfaction = 55; window.TAAS_FACTORY.tick(1 / 60); });
     const sat1 = await boardInk('sat'), said4 = await H(() => document.getElementById('fx-score').textContent);
-    ok(sat0.green > 60 && !sat0.red && !sat0.amber && sat70.amber > 60 && !sat70.green && sat1.red > 60 && !sat1.green && !sat1.amber && /Customer satisfaction 55%\.$/.test(said4),
+    ok(sat0.green > 60 && !sat0.red && !sat0.amber && sat70.amber > 60 && !sat70.green && sat1.red > 60 && !sat1.green && !sat1.amber && /Customer satisfaction 55%\./.test(said4),
       'the customer satisfaction board starts green at 100%, turns amber, then red as it falls', JSON.stringify([sat0, sat70, sat1]) + ' ' + said4);
   });
 
@@ -165,85 +187,112 @@ const server = http.createServer((req, res) => {
     const cdp = await page.context().newCDPSession(page);
     const touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] });
     await touch('touchStart', 200, 700);
-    for (let y = 690; y >= 300; y -= 30) await touch('touchMove', 200, y);
+    for (let y = 690; y >= 450; y -= 30) await touch('touchMove', 200, y);
     await touch('touchEnd');
     await step(0.05);
     const v1 = await H(() => ({ cam: window.TAAS_FACTORY.view.camY, task: window.TAAS_FACTORY.s.avatar.task }));
-    ok(v0.max > v0.min + 100 && v1.cam > v0.cam + 300 && !v1.task, 'dragging up scrolls the floor (it is taller than the screen) and does not walk the avatar', JSON.stringify([v0.min, v0.max, v1.cam]));
-    // slow drags (no fling), checked before any frame: the drag itself has to stop at the end
+    ok(v0.max > v0.min + 100 && v1.cam > v0.cam + 150 && !v1.task, 'dragging up scrolls the floor (it is taller than the screen) and does not walk the avatar', JSON.stringify([v0.min, v0.max, v1.cam]));
     for (let k = 0; k < 4; k++) { await touch('touchStart', 200, 750); for (let y = 740; y >= 100; y -= 4) await touch('touchMove', 200, y); await page.waitForTimeout(120); await touch('touchMove', 200, 100); await touch('touchEnd'); }
     const v2 = await H(() => window.TAAS_FACTORY.view.camY);
     ok(Math.abs(v2 - v0.max) < 0.5, 'and stops at the end of the floor', v2.toFixed(1) + ' vs ' + v0.max.toFixed(1));
     await step(1);
-    const cones = await rectOf('cones');
-    ok(cones && cones.y > 0 && cones.y + cones.h < 844, 'the far bays come into view');
+    const dock = await rectOf('dockPanel');
+    ok(dock && dock.y > 0 && dock.y + dock.h < 844, 'the robot dock at the bottom comes into view');
   });
 
   /* ---------- 4. hire and give a job, through the bubble ---------- */
   await section('4. hire', async () => {
     await fresh(3);
-    await H(() => { window.TAAS_FACTORY.s.money = 20; });
+    await H(() => { window.TAAS_FACTORY.s.money = 20; window.TAAS_FACTORY.s.shop.next = 1e9; window.TAAS_FACTORY.view.camY = window.TAAS_FACTORY.view.maxY; window.TAAS_FACTORY.tick(0); });
     const dock = await rectOf('dockPanel');
     await page.touchscreen.tap(centre(dock)[0], centre(dock)[1]);
     let open = false;
-    for (let i = 0; i < 50 && !open; i++) { await step(0.1); open = await H(() => !document.getElementById('fx-bubble').hidden); }
+    for (let i = 0; i < 160 && !open; i++) { await step(0.1); open = await H(() => !document.getElementById('fx-bubble').hidden); }
     const o = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt + ':' + b.disabled + ':' + b.textContent.trim()));
     ok(open && o.length === 1 && o[0] === 'hire:false:$20', 'the dock offers a robot for $20', JSON.stringify(o));
     await page.tap('#fx-bubble [data-opt="hire"]');
     await step(0.2);
-    const jobs = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt));
+    const jobs = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt + '=' + b.getAttribute('aria-label')));
     const nm = await H(() => document.querySelector('#fx-bubble .fx-bname') && document.querySelector('#fx-bubble .fx-bname').textContent);
-    ok(jobs.join() === 'job:operate,job:sell,job:rest,notes' && nm === 'Bolt' && (await S()).robots.length === 1, 'hiring it turns the bubble to the new robot: its name, its jobs and its clipboard', nm + ': ' + jobs.join());
-    await page.tap('#fx-bubble [data-opt="job:operate"]');
-    await step(8);   // out of the crate, round the dock panel, up to the machine
-    const r = (await S()).robots[0];
-    ok(r.job === 'operate' && Math.hypot(r.x - 2.25, r.y - 4.25) < 0.1, 'a tap on the button icon sends the robot to machine 01', r.x.toFixed(2) + ',' + r.y.toFixed(2));
-    // a tap on the drawn robot opens its bubble
+    ok(jobs.join() === 'job:operate=Run the planer,job:stock=Stock the sales counter,job:rest=Rest,notes=Instructions' && nm === 'Bolt' && (await S()).robots.length === 1, 'hiring it turns the bubble to the new robot: its name, its two jobs (the planer and the counter), rest and its clipboard', nm + ': ' + jobs.join());
+    await page.tap('#fx-bubble [data-opt="job:stock"]');
+    await step(16);   // out of the crate, up the floor, round the planer's output bin to the walkway
+    const r = (await S()).robots[0], sp = await H(() => FACTORY.LAYOUT.SPOT.stock);
+    ok(r.job === 'stock' && Math.hypot(r.x - sp.x, r.y - sp.y) < 0.1, 'a tap on the stocking icon sends the robot to the walkway by the counter', r.x.toFixed(2) + ',' + r.y.toFixed(2));
+    await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(0); });
     const rp = await H(() => { const r = window.TAAS_FACTORY.s.robots[0]; return window.TAAS_FACTORY.screen(r.x, r.y, 0.55); });
     await page.touchscreen.tap(rp[0], rp[1]);
     let ro = false;
-    for (let i = 0; i < 40 && !ro; i++) { await step(0.1); ro = await H(() => !!document.querySelector('#fx-bubble [data-opt="job:sell"]')); }
+    for (let i = 0; i < 160 && !ro; i++) { await step(0.1); ro = await H(() => !!document.querySelector('#fx-bubble [data-opt="job:operate"]')); }
     const on = await H(() => document.querySelector('#fx-bubble .fx-opt.on') && document.querySelector('#fx-bubble .fx-opt.on').dataset.opt);
-    ok(ro && on === 'job:operate', 'a tap on the drawn robot walks over and shows its jobs, its own one marked', on);
+    ok(ro && on === 'job:stock', 'a tap on the drawn robot walks over and shows its jobs, its own one marked', on);
   });
 
   /* ---------- 5. taps land where things are drawn, at every size ---------- */
   await section('5. hit tests', async () => {
     const sizes = [[390, 844], [320, 640], [430, 932], [844, 390], [1280, 800], [768, 1024]];
-    const bad = [];
+    const want = { machine: 'machine', console: 'machine', rack: 'rack', binBack: 'bin', binFront: 'bin', recycle: 'recycle', counter: 'counter', stall: 'counter',
+      sawInFront: 'sawIn', saw: 'saw', sawConsole: 'saw', sawOutFront: 'sawOut', extractInFront: 'extractIn', extract: 'extract', extractConsole: 'extract', extractOutFront: 'extractOut',
+      benchInFront: 'benchIn', bench: 'bench', benchOutFront: 'benchOut', dockPanel: 'dock' };
+    const bad = [], front = [];
+    let seen = 0, pairs = 0;
     for (const [w, h] of sizes) {
       await page.setViewportSize({ width: w, height: h });
       await fresh(4);
-      await H(() => { const s = window.TAAS_FACTORY.s; s.money = 60; });
-      const res = await H(() => {
-        const T = window.TAAS_FACTORY, out = [];
-        const want = { machine: 'machine', console: 'machine', binBack: 'bin', binFront: 'bin', dockPanel: 'dock' };
-        if (T.spriteRect('desk')) out.push('the prompt lab desk is still drawn');
-        Object.keys(want).forEach(id => {
-          const r = T.spriteRect(id);
-          if (!r) { out.push(id + ' not drawn'); return; }
-          const x = r.x + r.w / 2, y = r.y + r.h * 0.6;
-          if (y < 0 || y > T.view.h) return;   // off screen at this size: the scroll row covers it
-          const t = T.hitTest(x, y);
-          if (!t || t.kind !== want[id]) out.push(id + '->' + (t && t.kind));
-        });
-        const fp = T.screen(3, 5.5, 0), fl = T.hitTest(fp[0], fp[1]);   // open floor between the line and the dock
-        if (!fl || fl.kind !== 'floor' || Math.abs(fl.x - 3) > 0.05 || Math.abs(fl.y - 5.5) > 0.05) out.push('floor ' + JSON.stringify(fl));
-        const box = document.getElementById('fx-canvas').getBoundingClientRect(), c = document.getElementById('fx-canvas');
-        if (Math.abs(c.width / T.view.dpr - box.width) > 1 || Math.abs(c.height / T.view.dpr - box.height) > 1) out.push('canvas ' + c.width + 'x' + c.height + ' for a ' + box.width + 'x' + box.height + ' box');
-        return out;
-      });
-      // and through the real input path: a touch on the drawn console presses it
+      for (const cam of ['min', 'max']) {
+        const res = await H(([want, cam]) => {
+          const T = window.TAAS_FACTORY, out = [], hits = [];
+          T.view.camY = T.view[cam + 'Y']; T.tick(0);
+          Object.keys(want).forEach(id => {
+            const r = T.spriteRect(id);
+            if (!r) { out.push(id + ' not drawn'); return; }
+            // the counter is tapped at the stall's end: elsewhere along it the tall planer's box stands in front
+            const st = FACTORY.LAYOUT.STALL, x = id === 'counter' ? T.screen((st.x0 + st.x1) / 2, 0, 0)[0] : r.x + r.w / 2, y = r.y + r.h * (id.indexOf('Front') > 0 ? 0.5 : id === 'counter' ? 0.75 : 0.6);
+            if (y < 50 || y > T.view.h) return;   // off screen (or under the chrome) at this size and scroll
+            const t = T.hitTest(x, y);
+            if (!t || t.kind !== want[id]) out.push(id + '->' + (t && t.kind)); else hits.push(id);
+          });
+          // where two things of different kinds overlap on screen, a tap there reaches the one standing in
+          // front: the one whose footprint's front edge is nearer (the layout's numbers, not the page's sort keys)
+          const ids = ['machine', 'console', 'rack', 'binBack', 'binFront', 'recycle', 'counter', 'stall', 'sawInBack', 'sawInFront', 'saw', 'sawConsole', 'sawOutBack', 'sawOutFront',
+            'extractInBack', 'extractInFront', 'extract', 'extractConsole', 'extractOutBack', 'extractOutFront', 'benchInBack', 'benchInFront', 'bench', 'benchOutBack', 'benchOutFront', 'dockPanel'];
+          const foot = id => FACTORY.LAYOUT.SOLID[id === 'stall' ? 'counter' : id.replace(/(Back|Front)$/, '')];
+          const kind = id => want[id] || want[id.replace(/Back$/, 'Front')];
+          const pairs = [];
+          ids.forEach((a, i) => ids.slice(i + 1).forEach(b => {
+            if (kind(a) === kind(b)) return;
+            const ra = T.spriteRect(a), rb = T.spriteRect(b);
+            if (!ra || !rb) return;
+            const x0 = Math.max(ra.x, rb.x), x1 = Math.min(ra.x + ra.w, rb.x + rb.w), y0 = Math.max(ra.y, rb.y), y1 = Math.min(ra.y + ra.h, rb.y + rb.h);
+            if (x1 - x0 < 3 || y1 - y0 < 3 || (y0 + y1) / 2 < 50 || (y0 + y1) / 2 > T.view.h) return;
+            const fa = foot(a), fb = foot(b);
+            if (!fa || !fb) { out.push('no footprint for ' + a + ' or ' + b); return; }
+            const near = fa[3] > fb[3] ? a : b, t = T.hitTest((x0 + x1) / 2, (y0 + y1) / 2);
+            pairs.push(a + '/' + b);
+            if (!t || t.kind !== kind(near)) out.push(a + ' over ' + b + ' -> ' + (t && t.kind) + ', not the ' + near + ' in front');
+          }));
+          const fp = T.screen(5.4, 6.0, 0);   // open floor in the lane east of the recycle bin
+          if (fp[1] > 60 && fp[1] < T.view.h) { const fl = T.hitTest(fp[0], fp[1]); if (!fl || fl.kind !== 'floor' || Math.abs(fl.x - 5.4) > 0.05 || Math.abs(fl.y - 6.0) > 0.05) out.push('floor ' + JSON.stringify(fl)); }
+          const box = document.getElementById('fx-canvas').getBoundingClientRect(), c = document.getElementById('fx-canvas');
+          if (Math.abs(c.width / T.view.dpr - box.width) > 1 || Math.abs(c.height / T.view.dpr - box.height) > 1) out.push('canvas ' + c.width + 'x' + c.height + ' for a ' + box.width + 'x' + box.height + ' box');
+          return { out, hits: hits.length, pairs };
+        }, [want, cam]);
+        seen += res.hits;
+        res.pairs.forEach(x => { pairs++; if (front.indexOf(x) < 0) front.push(x); });
+        res.out.forEach(x => bad.push(w + 'x' + h + ' ' + cam + ': ' + x));
+      }
+      await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(0); });
       const con = await rectOf('console');
-      if (con && con.y > 0 && con.y + con.h < h) {
+      if (con && con.y > 60 && con.y + con.h < h) {
         await page.touchscreen.tap(con.x + con.w / 2, con.y + con.h * 0.4);
         const t = await S();
-        if (!t.avatar.task || t.avatar.task.kind !== 'machine') res.push('touch on console -> ' + JSON.stringify(t.avatar.task));
+        if (!t.avatar.task || t.avatar.task.kind !== 'machine') bad.push(w + 'x' + h + ' touch on console -> ' + JSON.stringify(t.avatar.task));
       }
-      res.forEach(x => bad.push(w + 'x' + h + ': ' + x));
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    ok(!bad.length, 'at six sizes a tap on each drawn thing reaches that thing, and the floor maps back to the metre', bad.join('; '));
+    ok(!bad.length && seen > 60, 'at six sizes, scrolled to the top and the bottom, a tap on each drawn thing reaches that thing (the planer, its rack and bins, the counter, every slot\'s machine and bins, the dock), and the floor maps back to the metre', bad.join('; ') + ' (' + seen + ' hits)');
+    ok(!bad.some(x => / over /.test(x)) && front.indexOf('machine/recycle') >= 0 && front.indexOf('machine/counter') >= 0,
+      'where two things overlap on screen, a tap there reaches the one standing in front (the recycle bin before the planer\'s box, the planer before the counter)', front.join(', ') + ' (' + pairs + ' overlaps)');
   });
 
   /* ---------- 6. chrome and bubble all on screen ---------- */
@@ -253,25 +302,29 @@ const server = http.createServer((req, res) => {
     for (const [w, h] of sizes) {
       await page.setViewportSize({ width: w, height: h });
       await fresh(5);
-      await H(() => { const s = window.TAAS_FACTORY.s; s.bin.push('plank', 'rough', 'dowels'); FACTORY.tap(s, { kind: 'bin' }); });
+      // the busiest bubble there is: the recycle bin with six kinds in your arms and four in it
+      await H(() => { const s = window.TAAS_FACTORY.s; s.shop.next = 1e9; s.avatar.inv.push('plank.s', 'rough.m', 'log.l', 'b2x4.m', 'sap', 'carving.owl'); s.recycle.push('gnarled.m', 'sappy.l', 'log.s', 'plank.l'); FACTORY.tap(s, { kind: 'recycle' }); });
       await step(4);
       const r = await H(() => {
         const box = id => { const e = document.getElementById(id); const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, hidden: e.hidden }; };
         const ids = ['menu-btn', 'mode-btn', 'reload-btn', 'fx-bubble'];
         const o = {}; ids.forEach(i => { o[i] = box(i); });
         o.vw = innerWidth; o.vh = innerHeight; o.sw = document.scrollingElement.scrollWidth;
+        o.opts = [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => { const q = b.getBoundingClientRect(); return [q.left, q.right, q.top, q.bottom]; });
         return o;
       });
       const inside = k => r[k].l >= 0 && r[k].r <= r.vw + 0.5 && r[k].t >= 0 && r[k].b <= r.vh + 0.5;
       const overlap = (a, b) => !(r[a].r <= r[b].l || r[b].r <= r[a].l || r[a].b <= r[b].t || r[b].b <= r[a].t);
       ['menu-btn', 'mode-btn', 'reload-btn', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
       if (r['fx-bubble'].hidden) bad.push(w + 'x' + h + ' bubble did not open');
+      if (r.opts.length !== 10) bad.push(w + 'x' + h + ' ' + r.opts.length + ' choices in the bubble');
+      if (r.opts.some(o => o[0] < 0 || o[1] > r.vw || o[2] < 0 || o[3] > r.vh)) bad.push(w + 'x' + h + ' a choice off screen');
       [['menu-btn', 'mode-btn'], ['mode-btn', 'reload-btn'], ['fx-bubble', 'menu-btn'], ['fx-bubble', 'mode-btn'], ['fx-bubble', 'reload-btn']].forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
       if (!(r['menu-btn'].r <= r['mode-btn'].l && r['mode-btn'].r <= r['reload-btn'].l && r.vw - r['reload-btn'].r < 24)) bad.push(w + 'x' + h + ' chrome order (menu, mode, then reload in the top right corner)');
       if (r.sw > r.vw) bad.push(w + 'x' + h + ' sideways scroll');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    ok(!bad.length, 'at four sizes: menu and mode on the left, reload in the top right corner, the bubble on screen, nothing on top of anything', bad.join('; '));
+    ok(!bad.length, 'at four sizes: menu and mode on the left, reload in the top right corner, the recycle bin\'s ten choices all on screen, nothing on top of anything', bad.join('; '));
   });
 
   /* ---------- 7. the info panel ---------- */
@@ -283,9 +336,10 @@ const server = http.createServer((req, res) => {
     const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, menu: !document.getElementById('menu').hidden, rows: [...document.querySelectorAll('#fx-panel-body tbody tr')].map(r => r.textContent) }));
     ok(p.open && !p.menu && sub === 'How the factory works' && p.rows.length === 1 && /No robots yet/.test(p.rows[0]), 'Info in the menu ("How the factory works") closes the menu and opens the explanation, with the measured table (no robots yet)', JSON.stringify(p) + ' ' + sub);
     const words = await H(() => document.getElementById('fx-panel-body').textContent);
-    ok(/Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it explains customer satisfaction on its own terms, without leaning on the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
-    ok(/Instructions/.test(words) && /\$5, \$10, \$15, \$20 and \$25/.test(words) && /recycle bin/.test(words) && !/prompt engineering|prompt level/i.test(words), 'and explains instructions (slot prices, the recycle bin), with nothing left of the prompt levels', (words.match(/prompt (engineering|level).{0,20}/i) || [''])[0]);
-    ok(/costs \$1 for every log/.test(words) && /below zero/.test(words) && /sap logs/.test(words) && /looking for plank/.test(words) && !/sap poured|barrel/i.test(words), 'and the third brief: $1 a log (below zero is allowed), sap logs, the seller hunting for planks; no sap poured from a barrel', (words.match(/sap poured.{0,20}|barrel.{0,20}/i) || [''])[0]);
+    ok(/Sell medium planks for \$4/.test(words) && /Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it starts from the goal and explains customer satisfaction on its own terms, without the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
+    ok(/costs \$1 for every log/.test(words) && /fixing a jam costs \$5/.test(words) && /every second each one waits costs 0.1%/.test(words) && /Satisfaction sets what customers pay/.test(words), 'and the storefront\'s rules: $1 a log, $5 to fix a jam, 0.1% a second for each customer waiting, satisfaction setting the price');
+    ok(/three sizes/.test(words) && /table saw/.test(words) && /sap extractor/.test(words) && /bench/.test(words) && /\$2 \/ \$4 \/ \$8/.test(words) && /\$3 \/ \$6 \/ \$12/.test(words) && /Instructions/.test(words) && /\$5, \$10, \$15, \$20 and \$25/.test(words),
+      'and wood\'s sizes and qualities, slots 02 to 04, the CD\'s prices, and instructions');
     await H(() => { window.TAAS_FACTORY.s.money = 33; });
     await page.tap('[data-panel="restart"]');
     const once = await S();
@@ -293,15 +347,14 @@ const server = http.createServer((req, res) => {
     const twice = await S();
     ok(once.money === 33 && twice.money === 0 && await H(() => document.getElementById('fx-panel').hidden), 'Start over asks first, and the second tap starts a new factory');
   });
-
   /* ---------- 8. saves ---------- */
   await section('8. saves', async () => {
     await fresh(7);
-    await H(() => { const s = window.TAAS_FACTORY.s; s.money = 20; FACTORY.tap(s, { kind: 'dock' }); });
-    await step(5);
+    await H(() => { const s = window.TAAS_FACTORY.s; s.money = 20; s.shop.next = 1e9; FACTORY.tap(s, { kind: 'dock' }); });
+    await step(9);
     await page.tap('#fx-bubble [data-opt="hire"]');
     await step(0.1);
-    await page.tap('#fx-bubble [data-opt="job:sell"]');
+    await page.tap('#fx-bubble [data-opt="job:stock"]');
     await H(() => { window.TAAS_FACTORY.s.money = 17; });
     await step(2.2);   // the page's own autosave, every 2 s
     // read it from a second tab: a reload would also save on pagehide and hide a dead autosave
@@ -310,7 +363,7 @@ const server = http.createServer((req, res) => {
     await p2.waitForFunction(() => window.TAAS_FACTORY && window.TAAS_FACTORY.on);
     const tab2 = await p2.evaluate(() => ({ money: window.TAAS_FACTORY.s.money, robots: window.TAAS_FACTORY.s.robots.map(r => r.job) }));
     await p2.close();
-    ok(tab2.money === 17 && tab2.robots.join() === 'sell', 'the factory saves itself every few seconds while it runs', JSON.stringify(tab2));
+    ok(tab2.money === 17 && tab2.robots.join() === 'stock', 'the factory saves itself every few seconds while it runs', JSON.stringify(tab2));
     // a real formal-mode run, one quarter in: the factory must not touch it
     await H(() => { const st = TAAS.commit(TAAS.newGame(), { opp: true, inv: { train: 4 } }); localStorage.setItem('taas.v' + TAAS.CFG.version, JSON.stringify({ state: st, plan: { opp: true, inv: {} } })); });
     await H(() => { window.TAAS_FACTORY.s.money = 23; });   // no frame runs: only leaving the page can save this
@@ -318,7 +371,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(() => window.TAAS_FACTORY && window.TAAS_FACTORY.on);
     ok(await H(() => window.TAAS_FACTORY.s.money) === 23, 'and saves on the way out, so a reload loses nothing');
     const back = await H(() => { const f = JSON.parse(localStorage.getItem('taas.v' + TAAS.CFG.version)); return { money: window.TAAS_FACTORY.s.money, robots: window.TAAS_FACTORY.s.robots.map(r => r.job), formal: f.state.q + '/' + f.state.history.length + '/' + f.plan.opp }; });
-    ok(back.robots.join() === 'sell' && back.formal === '1/1/true', 'a reload brings the factory back (money, the robot and its job) and leaves the formal save alone', JSON.stringify(back));
+    ok(back.robots.join() === 'stock' && back.formal === '1/1/true', 'a reload brings the factory back (money, the robot and its job) and leaves the formal save alone', JSON.stringify(back));
     // doctor the save on the way in, after the outgoing page's pagehide save and before any script
     await page.addInitScript(() => {
       if (sessionStorage.getItem('fx-bump') !== '1') return;
@@ -355,22 +408,21 @@ const server = http.createServer((req, res) => {
   /* ---------- 10. a robot's page, by real taps ---------- */
   await section('10. robot page', async () => {
     await fresh(9);
-    // two robots by the engine's own route, the first at the button; two mistakes already seen
     await H(() => {
       const T = window.TAAS_FACTORY, s = T.s;
-      s.money = 60;
-      ['operate', 'sell'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
-      s.force.log = Array(80).fill('log'); s.force.think = Array(80).fill(false); s.force.price = Array(80).fill('fair');
-      for (let i = 0; i < 200; i++) FACTORY.step(s, 0.05);
-      s.robots[1].job = null; s.robots[1].state = 'idle'; s.robots[1].carry = null;   // the seller rests: no sales to move the money
+      s.money = 60; s.shop.next = 1e9;
+      ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      s.force.log = Array(80).fill('log.m'); s.force.think = Array(80).fill(false);
+      for (let i = 0; i < 300; i++) FACTORY.step(s, 0.05);
+      s.robots[1].job = null; s.robots[1].state = 'idle'; s.robots[1].carry = null;
       s.events = []; s.money = 100; s.seen.sap = true; s.seen.gnarled = true;
-      T.tick(1 / 60);
+      T.view.camY = T.view.minY; T.tick(1 / 60);
     });
     const tapRobot = async id => {
       const rp = await H(id => { const r = window.TAAS_FACTORY.s.robots[id]; return window.TAAS_FACTORY.screen(r.x, r.y, 0.55); }, id);
       await page.touchscreen.tap(rp[0], rp[1]);
       let ro = false;
-      for (let i = 0; i < 50 && !ro; i++) { await step(0.1); ro = await H(() => !!document.querySelector('#fx-bubble [data-opt="notes"]')); }
+      for (let i = 0; i < 160 && !ro; i++) { await step(0.1); ro = await H(() => !!document.querySelector('#fx-bubble [data-opt="notes"]')); }
       return ro;
     };
     const opened = await tapRobot(0);
@@ -379,12 +431,12 @@ const server = http.createServer((req, res) => {
     await page.tap('#fx-bubble [data-opt="notes"]');
     await step(0.05);
     const pg = await H(() => ({ open: !document.getElementById('fx-panel').hidden, mode: window.TAAS_FACTORY.page.mode, name: document.getElementById('fx-rp-name').value, base: document.querySelector('.fx-base').textContent, slots: document.querySelectorAll('.fx-slots li').length, buy: document.querySelector('[data-panel="buy"]').textContent, dis: document.querySelector('[data-panel="buy"]').disabled }));
-    ok(pg.open && pg.mode === 'robot' && pg.name === 'Bolt' && pg.base === 'Use machine01 to refine raw materials.' && pg.slots === 5 && pg.buy === 'Unlock this slot: $5' && !pg.dis,
-      'the clipboard opens its page: its name, its base prompt on top, five slots, the first for $5', JSON.stringify(pg));
-    const before = await H(() => window.TAAS_FACTORY.s.money + window.TAAS_FACTORY.s.spent);   // the operator's presses cost too
+    ok(pg.open && pg.mode === 'robot' && pg.name === 'Bolt' && pg.base === 'Use the planer to refine raw materials.' && pg.slots === 5 && pg.buy === 'Unlock this slot: $5' && !pg.dis,
+      'the clipboard opens its page: its name, its base prompt on top (the planer now), five slots, the first for $5', JSON.stringify(pg));
+    const before = await H(() => window.TAAS_FACTORY.s.money + window.TAAS_FACTORY.s.spent - window.TAAS_FACTORY.s.earned);
     await page.tap('[data-panel="buy"]');
     await step(0.05);
-    const pk = await H(() => ({ money: window.TAAS_FACTORY.s.money + window.TAAS_FACTORY.s.spent, slots: window.TAAS_FACTORY.s.robots[0].slots, rules: [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent), pick: window.TAAS_FACTORY.page.pick }));
+    const pk = await H(() => ({ money: window.TAAS_FACTORY.s.money + window.TAAS_FACTORY.s.spent - window.TAAS_FACTORY.s.earned, slots: window.TAAS_FACTORY.s.robots[0].slots, rules: [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent), pick: window.TAAS_FACTORY.page.pick }));
     ok(pk.money === before - 5 && pk.slots === 1 && pk.pick === 0 && pk.rules.join('|') === 'Never put sap on input log|Put gnarled logs in recycle bin', 'unlocking a slot takes $5 and opens the list straight away: only the instructions for mistakes already seen', JSON.stringify(pk));
     await page.tap('[data-panel="rule:sap"]');
     await step(0.05);
@@ -395,7 +447,6 @@ const server = http.createServer((req, res) => {
     ok(dup.length === 2 && /slot 1\):true$/.test(dup[0]) && /:false$/.test(dup[1]), 'in the next slot\'s list, the instruction it already holds is greyed and says where', JSON.stringify(dup));
     await page.tap('[data-panel="cancel"]'); await step(0.05);
     ok(!(await H(() => !!document.querySelector('.fx-picker'))) && (await H(() => window.TAAS_FACTORY.s.robots[0].rules.join())) === 'sap,', 'Cancel closes the list and leaves the slot empty');
-    // a name: typed, trimmed, and shown as text wherever it appears
     await page.fill('#fx-rp-name', '  <b>Planky</b>  ');
     await H(() => document.getElementById('fx-rp-name').dispatchEvent(new Event('change')));
     await step(0.05);
@@ -407,7 +458,6 @@ const server = http.createServer((req, res) => {
     await tapRobot(0);
     const b1 = await H(() => ({ name: document.querySelector('#fx-bubble .fx-bname').textContent, html: document.querySelector('#fx-bubble .fx-bname').innerHTML, note: document.querySelector('#fx-bubble [data-opt="notes"]').textContent.trim() }));
     ok(b1.name === '<b>Planky</b>' && /&lt;b&gt;/.test(b1.html) && b1.note === '1/2', 'its bubble wears the new name (as text) and its clipboard says 1 of 2 slots filled', JSON.stringify(b1));
-    // the page fits a small phone, scrolls, and its top is reachable
     await page.setViewportSize({ width: 320, height: 568 });
     await page.tap('#fx-bubble [data-opt="notes"]'); await step(0.05);
     await page.tap('[data-panel="pick:1"]'); await step(0.05);
@@ -415,64 +465,65 @@ const server = http.createServer((req, res) => {
     ok(fit.top >= 0 && !fit.wide && fit.scrolls, 'at 320x568 the page scrolls, its top is reachable, and nothing runs off sideways', JSON.stringify(fit));
     await H(() => window.TAAS_FACTORY.closePanel());
     await page.setViewportSize({ width: 390, height: 844 });
-    // with one robot the slots wait for the second
     await fresh(10);
     await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.money = 20; FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); s.money = 500; FACTORY.choose(s, 'notes'); T.tick(1 / 60); });
     const one = await H(() => ({ open: !document.getElementById('fx-panel').hidden, buy: document.querySelector('[data-panel="buy"]').textContent, dis: document.querySelector('[data-panel="buy"]').disabled, base: document.querySelector('.fx-base').textContent }));
     ok(one.open && one.dis && /once both robots are on staff/.test(one.buy) && /No job/.test(one.base), 'with one robot its page is there (name, no job yet), but slots wait for the second robot', JSON.stringify(one));
     await H(() => window.TAAS_FACTORY.closePanel());
-    // the seller, told to sell only planks, at a bin of things that are not planks: its page counts the looking
+    // the stocker, told to stock only medium planks, at a bin of other things: its page counts the looking
     await fresh(12);
     await H(() => {
       const T = window.TAAS_FACTORY, s = T.s;
-      s.money = 60;
-      ['operate', 'sell'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      s.money = 60; s.shop.next = 1e9;
+      ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
       s.robots[0].job = null; s.robots[0].state = 'idle';
-      s.money = 100; s.seen.sellOnly = true; FACTORY.buySlot(s, 1); FACTORY.setRule(s, 1, 0, 'sellOnly');
-      for (let i = 0; i < 200; i++) FACTORY.step(s, 0.05);
-      s.force.slip = [false]; s.bin.push('dowels', 'rough', 'dowels');
+      s.money = 100; s.seen.stockOnly = true; FACTORY.buySlot(s, 1); FACTORY.setRule(s, 1, 0, 'stockOnly');
+      for (let i = 0; i < 400; i++) FACTORY.step(s, 0.05);
+      s.force.slip = [false]; s.bin.push('plank.s', 'rough.m', 'plank.l');
       T.tick(1 / 60);
     });
     await step(6);
-    const hunt = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1]; T.openRobot(1); const row = [...document.querySelectorAll('.fx-rec tr')].find(tr => /Looking for plank/.test(tr.textContent)); return { n: r.record.looking, row: row && row.textContent, bin: T.s.bin.join(), dot: row && row.querySelector('.fx-dot').className }; });
-    ok(hunt.n >= 3 && hunt.row === 'Looking for plank' + hunt.n && /soso/.test(hunt.dot) && hunt.bin === 'dowels,rough,dowels', 'the seller\'s page counts each reach that came up with something other than a plank: "Looking for plank" and how often', JSON.stringify(hunt));
-    // the evals: the section's name, a line per action and thing, a dot per grade, and the CD's
-    // example: a gnarled plank sold for its price is green, and yellow (a line of its own) once
-    // sold against "only sell medium planks"
+    const hunt = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1]; T.openRobot(1); const row = [...document.querySelectorAll('.fx-rec tr')].find(tr => /Looking for plank/.test(tr.textContent)); return { n: r.record.looking, row: row && row.textContent, bin: T.s.bin.join(), dot: row && row.querySelector('.fx-dot').className, base: document.querySelector('.fx-base').textContent }; });
+    ok(hunt.n >= 3 && hunt.row === 'Looking for plank' + hunt.n && /soso/.test(hunt.dot) && hunt.bin === 'plank.s,rough.m,plank.l' && hunt.base === 'Stock the sales counter with the items in this bin.',
+      'the stocker\'s page (its base prompt: stock the sales counter) counts each reach that came up with something other than a medium plank: "Looking for plank" and how often', JSON.stringify(hunt));
     const ev = await H(() => {
       const T = window.TAAS_FACTORY, r = T.s.robots[1];
-      r.record = { fair: 4, 'honest:rough': 2, 'honest:rough!': 1, 'mislabel:dowels!': 1, 'recycle:largePlank': 2, looking: 3 };
+      r.record = { stock: 4, 'misstock:plank.s': 2, 'misstock:rough.m!': 1, 'recycle:plank.l': 2, looking: 3 };
       T.openRobot(1); T.tick(1 / 60);
       const sec = document.querySelector('.fx-evals');
-      return { head: sec && sec.querySelector('.fx-h span').textContent, old: /has done/.test(document.getElementById('fx-panel-body').textContent),
-        rows: [...sec.querySelectorAll('.fx-rec tr')].map(tr => tr.querySelector('.fx-dot').className.replace('fx-dot ', '') + '|' + tr.textContent) };
+      return { head: sec && sec.querySelector('.fx-h span').textContent, rows: [...sec.querySelectorAll('.fx-rec tr')].map(tr => tr.querySelector('.fx-dot').className.replace('fx-dot ', '') + '|' + tr.textContent) };
     });
-    const want = ['good|Sold a medium plank for its price4', 'good|Sold a gnarled plank for its price2', 'soso|Sold a gnarled plank for its price, against its instructions1',
-      'bad|Sold dowel rods as a medium plank, against its instructions1', 'soso|Looking for plank3', 'good|Put a large plank in the recycle bin2'];
-    ok(ev.head === 'Evals' && !ev.old && JSON.stringify(ev.rows) === JSON.stringify(want), 'the bottom of a robot\'s page is its Evals: a gnarled plank sold for its price is green, sold against "only sell medium planks" a yellow line of its own, passed off as a medium plank red', JSON.stringify(ev));
+    const want = ['good|Put a medium plank in the stall4', 'bad|Put a small plank in the medium plank stall2', 'bad|Put a medium gnarled plank in the medium plank stall, against its instructions1',
+      'soso|Looking for plank3', 'good|Put a large plank in the recycle bin2'];
+    ok(ev.head === 'Evals' && JSON.stringify(ev.rows) === JSON.stringify(want), 'its Evals: a medium plank stocked green, anything else put in the medium plank stall red (against its instructions a line of its own), looking yellow, recycling green', JSON.stringify(ev));
+    const op = await H(() => {
+      const T = window.TAAS_FACTORY, r = T.s.robots[0];
+      r.record = { plank: 3, 'cut:log.s': 1, 'jam:sappy.l': 1, 'reject:gnarled.m': 2, 'caught:rough.s': 1 };
+      T.openRobot(0); T.tick(1 / 60);
+      return [...document.querySelectorAll('.fx-evals .fx-rec tr')].map(tr => tr.querySelector('.fx-dot').className.replace('fx-dot ', '') + '|' + tr.textContent);
+    });
+    ok(JSON.stringify(op) === JSON.stringify(['good|Medium log, medium plank3', 'soso|Cut a small log: a small plank1', 'bad|Fed in a large sap log: a jam1', 'good|Put a medium gnarled log in the recycle bin2', 'good|Caught a small gnarled plank at the exit: into the recycle bin1']),
+      'and the operator\'s name every log by its size and quality', JSON.stringify(op));
     await page.tap('[data-panel="evals-reset"]');
     await step(0.05);
-    const rs = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1], sec = document.querySelector('.fx-evals'); return { keys: Object.keys(r.record).length, since: r.since === T.s.t || T.s.t - r.since < 0.2, rows: sec.querySelectorAll('.fx-rec tr').length, empty: /Nothing yet/.test(sec.textContent), dis: sec.querySelector('[data-panel="evals-reset"]').disabled, mins: sec.querySelector('.fx-h span:last-child').textContent }; });
-    ok(!rs.keys && rs.since && !rs.rows && rs.empty && rs.dis && rs.mins === 'under a minute', 'Reset evals empties them and starts the count again (and greys itself until there is something to reset)', JSON.stringify(rs));
+    const rs = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[0], sec = document.querySelector('.fx-evals'); return { keys: Object.keys(r.record).length, rows: sec.querySelectorAll('.fx-rec tr').length, empty: /Nothing yet/.test(sec.textContent), dis: sec.querySelector('[data-panel="evals-reset"]').disabled }; });
+    ok(!rs.keys && !rs.rows && rs.empty && rs.dis, 'Reset evals empties them and greys itself until there is something to reset', JSON.stringify(rs));
     await H(() => window.TAAS_FACTORY.closePanel());
   });
 
-  /* ---------- 11. the wall and the recycle bin, read off pixels ---------- */
+  /* ---------- 11. the scene, read off pixels ---------- */
   await section('11. scene', async () => {
     await fresh(11);
-    await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(1 / 60); });
-    const px = (x, y, z) => H(([x, y, z]) => { const T = window.TAAS_FACTORY, p = T.screen(x, y, z), k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const d = g.getImageData(Math.round(p[0] * k) - 4, Math.round(p[1] * k) - 4, 9, 9).data; let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; } return [r / n, gg / n, b / n].map(Math.round); }, [x, y, z]);
-    // the sign hung at x 3.0, where the window over machine01 is now; the gap beside that window is plain wall
-    const wall = await px(2.16, 0.45, 1.8), bin = await px(3.8, 4.32, 0.3);
-    ok(wall[0] - wall[2] < 30 && Math.abs(wall[0] - wall[1]) < 30, 'the back wall carries no sign: beside the window over machine01 is plain wall', 'rgb ' + wall);
-    ok(bin[1] > bin[0] + 30 && bin[1] > bin[2], 'the recycle bin is drawn, green, in front of the out-feed', 'rgb ' + bin);
-    const was = await px(1.53, 4.2, 0.35), floor = await px(1.53, 5.2, 0);
-    ok(Math.abs(was[0] - floor[0]) < 25 && Math.abs(was[2] - floor[2]) < 25, 'the sap barrel is gone: where it stood is bare floor', 'rgb ' + was + ' vs floor ' + floor);
-    // the holes: a gnarled log on the in-feed and a plank with holes in the bin, each scanned for
+    await H(() => { const T = window.TAAS_FACTORY; T.s.shop.next = 1e9; T.view.camY = T.view.minY; T.tick(1 / 60); });
+    const R = await H(() => FACTORY.LAYOUT);
+    const bin = await px(R.RECYCLE.x, R.SOLID.recycle[3] - 0.02, 0.3);
+    ok(bin[1] > bin[0] + 30 && bin[1] > bin[2], 'the recycle bin is drawn, green, in front of the planer\'s out-feed', 'rgb ' + bin);
+    const wall = await px(2.16, 0.45, 1.8);
+    ok(wall[0] - wall[2] < 30 && Math.abs(wall[0] - wall[1]) < 30, 'beside the window is plain wall', 'rgb ' + wall);
+    // the holes: a gnarled log on the in-feed and its gnarled plank in the output bin, scanned for
     // hole-coloured pixels column by column, the hole centres put back into metres from the item's middle
-    const holes = (kind) => H(([kind]) => {
-      const T = window.TAAS_FACTORY, s = T.s, V = T.view, k = V.dpr, g = document.getElementById('fx-canvas').getContext('2d');
-      const at = kind === 'gnarled' ? [1.7, 2.9, 0.66] : [5.22, 2.62, 0.06];
+    const holes = (at) => H(([at]) => {
+      const T = window.TAAS_FACTORY, V = T.view, k = V.dpr, g = document.getElementById('fx-canvas').getContext('2d');
       const a = T.screen(at[0] - 0.5, at[1] + 0.16, at[2] - 0.15), b = T.screen(at[0] + 0.5, at[1] - 0.16, at[2] + 0.2);
       const x0 = Math.round(a[0] * k), x1 = Math.round(b[0] * k), y0 = Math.round(Math.min(a[1], b[1]) * k), y1 = Math.round(Math.max(a[1], b[1]) * k);
       const d = g.getImageData(x0, y0, x1 - x0, y1 - y0).data, w = x1 - x0, cols = [];
@@ -480,19 +531,207 @@ const server = http.createServer((req, res) => {
       const out = [];
       for (let x = 0; x < w; x++) if (cols[x] && !cols[x - 1]) { let e = x; while (cols[e + 1]) e++; out.push(+(((x0 + (x + e) / 2) / k - V.ox) / V.S - at[0]).toFixed(3)); x = e; }
       return out;
-    }, [kind]);
-    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.machine.phase = 'ready'; s.machine.staged = 1; s.machine.log = 'gnarled'; s.bin = ['rough']; T.tick(0); });
-    const logH = await holes('gnarled'), plankH = await holes('rough');
+    }, [at]);
+    const logAt = await H(() => { const T = window.TAAS_FACTORY, s = T.s, L = FACTORY.LAYOUT; s.machine.phase = 'ready'; s.machine.staged = 1; s.machine.log = 'gnarled.m'; s.bin = ['rough.m']; T.tick(0); return [L.SOLID.inBelt[2] - 0.425 - 0.02, L.ROW.planer, 0.53 + 0.12]; });
+    const binAt = await H(() => { const q = FACTORY.LAYOUT.SOLID.bin; return [(q[0] + q[2]) / 2, q[1] + 0.15, 0.06]; });
+    const logH = await holes(logAt), plankH = await holes(binAt);
     ok(logH.length === 3 && plankH.length === 3 && logH.every((x, i) => Math.abs(x - plankH[i]) < 0.04), 'a gnarled log\'s plank has its holes in the same places as the log (the CD\'s ask), read off the drawn pixels', 'log ' + logH.join() + ' / plank ' + plankH.join());
-    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.machine.log = 'sappy'; s.bin = []; T.tick(0); });
-    const sap = await H(() => { const T = window.TAAS_FACTORY, V = T.view, k = V.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const a = T.screen(1.2, 3.05, 0.5), b = T.screen(2.2, 2.75, 0.85); const d = g.getImageData(Math.round(a[0] * k), Math.round(b[1] * k), Math.round((b[0] - a[0]) * k), Math.round((a[1] - b[1]) * k)).data; let n = 0, all = 0; for (let i = 0; i < d.length; i += 4) { all++; if (d[i + 1] > d[i] + 40 && d[i + 1] > d[i + 2] + 60) n++; } return n / all; });
-    ok(sap > 0.04, 'a sap log rolls in green with sap', (sap * 100).toFixed(1) + '% green');
-    // a large plank in the bin: its own button, its own icon, its own price
-    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.bin = ['largePlank', 'plank']; s.avatar.x = 5.25; s.avatar.y = 4.1; FACTORY.tap(s, { kind: 'bin' }); T.tick(1 / 60); });
-    const lp = await H(() => { const b = document.querySelector('#fx-bubble [data-opt="sell:largePlank"]'); return b && { price: b.querySelector('.fx-lbl').textContent, icon: !!b.querySelector('svg[viewBox="0 0 34 14"]'), aria: b.getAttribute('aria-label') }; });
-    ok(lp && lp.price === '$' + (await H(() => FACTORY.CFG.price.largePlank)) && lp.icon && lp.aria === 'Sell a large plank', 'a large plank in the bin has its own button to sell it by hand, with its own icon and price', JSON.stringify(lp));
+    const green = (x0, x1, y, z0, z1) => H(([x0, x1, y, z0, z1]) => { const T = window.TAAS_FACTORY, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const a = T.screen(x0, y, z0), b = T.screen(x1, y, z1); const d = g.getImageData(Math.round(a[0] * k), Math.round(b[1] * k), Math.round((b[0] - a[0]) * k), Math.round((a[1] - b[1]) * k)).data; let n = 0, all = 0; for (let i = 0; i < d.length; i += 4) { all++; if (d[i + 1] > d[i] + 40 && d[i + 1] > d[i + 2] + 60) n++; } return n / all; }, [x0, x1, y, z0, z1]);
+    for (const z of ['s', 'l']) {
+      await H(z => { const T = window.TAAS_FACTORY, s = T.s; s.machine.log = 'sappy.' + z; s.bin = []; T.tick(0); }, z);
+      const sap = await green(0.5, 1.75, logAt[1] + 0.2, 0.45, 0.95);
+      ok(sap > 0.025, 'a ' + (z === 's' ? 'small' : 'large') + ' sap log rolls in green with sap', (sap * 100).toFixed(1) + '% green');
+    }
+    // sizes: a small, a medium and a large plank are drawn at three lengths
+    const lens = await H(() => { const T = window.TAAS_FACTORY, s = T.s, q = FACTORY.LAYOUT.SOLID.bin, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); s.machine.log = 'log.m';
+      return ['plank.s', 'plank.m', 'plank.l'].map(p => { s.bin = [p]; T.tick(0); const y = T.screen(0, q[1] + 0.15, 0.09)[1], x0 = T.screen((q[0] + q[2]) / 2, 0, 0)[0], x1 = T.screen(q[2] + 0.4, 0, 0)[0];   // the right half: the left end of a long one runs under the out-feed
+        const w = Math.round((x1 - x0) * k), d = g.getImageData(Math.round(x0 * k), Math.round(y * k) - 6, w, 12).data; let n = 0;
+        for (let x = 0; x < w; x++) { let hit = false; for (let r = 0; r < 12 && !hit; r++) { const i = (r * w + x) * 4; hit = d[i] > 200 && d[i + 1] > 150 && d[i + 2] < 175 && d[i] - d[i + 2] > 60; } if (hit) n++; } return n; }); });
+    ok(lens[0] > 10 && lens[1] > lens[0] * 1.3 && lens[2] > lens[1] * 1.15, 'a small, a medium and a large plank are drawn at three lengths (2\', 4\', 8\' in the CD\'s words)', lens.join(' < '));
+    // the four slots, numbered on the floor at the left, the middle and the right of each row
+    const nums = await H(() => { const T = window.TAAS_FACTORY, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'), L = FACTORY.LAYOUT; T.s.avatar.x = 3; T.s.avatar.y = 16.8; T.s.avatar.path = []; T.s.avatar.task = null;
+      const out = [];
+      [[3.05, 5.65], [L.ROW.saw - 0.75, L.ROW.saw + 1.45], [L.ROW.extract - 0.75, L.ROW.extract + 1.45], [12.1, 14.05]].forEach(([y0, y1]) => {
+        const y = y1 - 0.3; T.view.camY = Math.min(T.view.maxY, Math.max(T.view.minY, T.screen(0, y, 0)[1] + T.view.camY - 300)); T.tick(0);
+        out.push([0.45, 3.0, 5.52].map(x => { const p = T.screen(x, y, 0), d = g.getImageData(Math.round(p[0] * k) - 10, Math.round(p[1] * k) - 6, 20, 12).data; let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 175 && Math.abs(d[i] - d[i + 2]) < 40) n++; return n; }));
+      });
+      T.view.camY = T.view.minY; T.tick(0);
+      return out; });
+    ok(nums.length === 4 && nums.every(row => row.every(n => n > 15)), 'slots 01 to 04 each have their number painted on the floor at the left, the middle and the right', JSON.stringify(nums));
+    // the saw's blade spins only while it cuts; the extractor's tank fills as it runs
+    const sawPx = () => H(() => { const T = window.TAAS_FACTORY, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'), y = FACTORY.LAYOUT.ROW.saw; const a = T.screen(2.15, y, 1.0), b = T.screen(2.75, y, 0.77); return Array.from(g.getImageData(Math.round(a[0] * k), Math.round(a[1] * k), Math.round((b[0] - a[0]) * k), Math.round((b[1] - a[1]) * k)).data); });
+    const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) n++; return n; };
+    await H(() => { const T = window.TAAS_FACTORY, y = FACTORY.LAYOUT.ROW.saw; T.view.camY = T.screen(0, y, 0)[1] + T.view.camY - 400; T.tick(0); });
+    const i1 = await sawPx(); await step(0.05); const i2 = await sawPx();
+    await H(() => { const s = window.TAAS_FACTORY.s; s.saw.in.push('plank.m'); s.saw.phase = 'idle'; });
+    await H(() => { const s = window.TAAS_FACTORY.s; s.avatar.x = FACTORY.LAYOUT.SPOT.saw.x; s.avatar.y = FACTORY.LAYOUT.SPOT.saw.y; FACTORY.tap(s, { kind: 'saw' }); FACTORY.choose(s, 'cut:b2x4'); });
+    await step(0.5);
+    // between the two frames only the blade may move: the engine is held (so the plank on the table stays put) and no
+    // dust is made, after a second and a half for the dust already in the air to clear (the first version of this row
+    // passed on the plank and the dust alone, with the blade frozen)
+    const held = await H(() => { const T = window.TAAS_FACTORY; window.__step = FACTORY.step; window.__rnd = Math.random;
+      FACTORY.step = () => {}; Math.random = () => 0.999; for (let i = 0; i < 90; i++) T.tick(1 / 60); return T.s.saw.phase; });
+    const r1 = await sawPx(); await H(() => { window.TAAS_FACTORY.tick(1 / 30); }); const r2 = await sawPx();
+    await H(() => { FACTORY.step = window.__step; Math.random = window.__rnd; });
+    ok(held === 'run' && diff(i1, i2) < 5 && diff(r1, r2) > 30, 'the table saw\'s blade stands still until it cuts, then spins (with nothing else in view moving)', held + ': ' + diff(i1, i2) + ' vs ' + diff(r1, r2) + ' px changed between frames');
+    await H(() => { const T = window.TAAS_FACTORY, y = FACTORY.LAYOUT.ROW.extract; T.view.camY = T.screen(0, y, 0)[1] + T.view.camY - 400; T.tick(0); });
+    const ey = await H(() => FACTORY.LAYOUT.ROW.extract);
+    const tankAt = () => green(1.95, 2.45, ey - 0.05 + 0.28, 0.9, 1.45);
+    const t0 = await tankAt();
+    await H(() => { const s = window.TAAS_FACTORY.s; s.extract.in.push('sappy.l'); s.avatar.x = FACTORY.LAYOUT.SPOT.extract.x; s.avatar.y = FACTORY.LAYOUT.SPOT.extract.y; FACTORY.tap(s, { kind: 'extract' }); });
+    await step(3.4);
+    const t1 = await tankAt();
+    ok(t1 > t0 * 2 && t1 > 0.15, 'the sap extractor\'s tank fills with sap as it runs', (t0 * 100).toFixed(0) + '% to ' + (t1 * 100).toFixed(0) + '% sap-green');
   });
 
+  /* ---------- 13. the wall: money, customer satisfaction and the goal (the CD, 2026-10-14 and 15) ---------- */
+  await section('13. wall boards', async () => {
+    await fresh(14);
+    const gone = await H(() => ['fx-hud', 'fx-info', 'fx-cash', 'fx-money', 'fx-sat', 'back-btn', 'mute-btn'].filter(id => document.getElementById(id)));
+    ok(!gone.length, 'the money and satisfaction pills, the i button, the back button and the mute button are gone from the screen', gone.join());
+    const g = await H(() => {
+      const T = window.TAAS_FACTORY, c = T.board('cash'), s = T.board('sat'), gl = T.board('goal'), m = document.getElementById('menu-btn').getBoundingClientRect();
+      const win = [T.screen(2.3, 0.45, 2.35)[0], T.screen(3.4, 0.45, 2.35)[0]];
+      return { c, s, gl, chrome: m.bottom, win, mid: T.screen(3, 0, 0)[0], vw: innerWidth, vh: innerHeight, cam: T.view.camY, min: T.view.minY };
+    });
+    const onScreen = r => r.x >= 0 && r.x + r.w <= g.vw && r.y >= g.chrome && r.y + r.h <= g.vh;
+    ok(g.cam === g.min && onScreen(g.c) && onScreen(g.s) && onScreen(g.gl) && g.c.w > 60 && g.s.w > 80 && g.c.h > 30 && g.gl.y + g.gl.h <= g.c.y && g.gl.w > g.c.w + g.s.w,
+      'scrolled to the top, the goal across the top of the wall and both boards under it are on screen below the chrome', JSON.stringify(g));
+    const glass = await H(() => { const T = window.TAAS_FACTORY, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      return [[2.6, 1.8], [3.1, 1.8], [1.1, 1.65], [4.8, 1.65]].map(([x, z]) => { const p = T.screen(x, 0.48, z), d = g.getImageData(Math.round(p[0] * k), Math.round(p[1] * k), 1, 1).data; return d[2] > 240 && d[1] > 215 && d[0] > 170 && d[0] < 215; }); });
+    ok(g.c.x + g.c.w < g.win[0] && g.win[1] < g.s.x && Math.abs((g.win[0] + g.win[1]) / 2 - g.mid) < 20 && glass.join() === 'true,true,false,false',
+      'money on the left, a window in the middle (glass on screen there, not over the boards), customer satisfaction on the right', JSON.stringify(g) + ' glass ' + glass);
+    const cap = await boardInk('sat');
+    ok(cap.caption > 150, 'the right-hand board is captioned in full: customer satisfaction', JSON.stringify(cap));
+    // the goal (the CD, 2026-10-15): a yellow GOAL tag, then the goal in white, and it is what the screen reader hears too
+    const goal = await boardInk('goal'), heard = await H(() => document.getElementById('fx-score').textContent);
+    ok(goal.amber > 150 && goal.white > 300 && /Goal: Sell medium planks for \$4\.$/.test(heard), 'the rear wall says the goal: a yellow GOAL tag and "Sell medium planks for $4"', JSON.stringify(goal) + ' ' + heard);
+    await H(() => { const T = window.TAAS_FACTORY; T.view.camY += 100; T.tick(0); });
+    const moved = await H(() => window.TAAS_FACTORY.board('cash'));
+    ok(Math.abs(moved.y - (g.c.y - 100)) < 0.01, 'they scroll with the floor, so a long way down they are out of sight', moved.y + ' vs ' + (g.c.y - 100));
+    await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(0); });
+    const figures = async (n) => H(n => { const T = window.TAAS_FACTORY; T.s.money = n; for (let i = 0; i < 3; i++) T.tick(1); const r = T.board('cash'), d = T.view.dpr;
+      const im = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data;
+      let bits = ''; for (let i = 0; i < im.length; i += 4) bits += im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225 ? '1' : '0'; return bits; }, n);
+    const f4 = await figures(4), f7 = await figures(7777);
+    let fd = 0; for (let i = 0; i < f4.length; i++) if (f4[i] !== f7[i]) fd++;
+    ok(fd > 200 && f4.indexOf('1') >= 0, 'the money board draws the sum it is given ($4 and $7,777 come out as different figures)', fd + ' px differ');
+    // and on the very frame the sum changes: the board draws from the state, never from what the last frame showed.
+    // Down from $7,777 to $4, so no swell; the second draw is at dt 0, so nothing else on the wall has moved.
+    const sameFrame = await H(() => { const T = window.TAAS_FACTORY, d = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      const bits = () => { const r = T.board('cash'), im = g.getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data;
+        let b = ''; for (let i = 0; i < im.length; i += 4) b += im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225 ? '1' : '0'; return b; };
+      const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+      T.s.money = 7777; for (let i = 0; i < 3; i++) T.tick(1); const was = bits();
+      T.s.money = 4; T.tick(1 / 60); const first = bits(); T.tick(0); const next = bits();
+      return { first: diff(first, next), changed: diff(was, next) }; });
+    ok(sameFrame.first < 20 && sameFrame.changed > 200, 'and it shows a new sum on the very frame the money changes, not a frame late', JSON.stringify(sameFrame));
+    await H(() => { const T = window.TAAS_FACTORY; T.s.money = 98765432; for (let i = 0; i < 3; i++) T.tick(1); });
+    const big = await boardInk('cash', 0.05);
+    ok(big.white > 60 && big.edge === 0, 'a very large sum shrinks to fit inside the money board', JSON.stringify(big));
+    // the stall's label on the counter: MEDIUM PLANKS and what a customer pays now, green at full price
+    // and amber once customer satisfaction has brought it down (the CD: satisfaction affects the price)
+    await H(() => { const T = window.TAAS_FACTORY; T.s.satisfaction = 100; T.tick(0); });
+    const full = await boardInk('plate'), r100 = await plateBits();
+    await H(() => { const T = window.TAAS_FACTORY; T.s.satisfaction = 72; T.tick(0); });
+    const low = await boardInk('plate'), r72 = await plateBits();
+    let pd = 0; for (let i = 0; i < r100.length; i++) if (r100[i] !== r72[i]) pd++;
+    ok(full.green > 40 && full.white > 60 && !full.amber && low.amber > 40 && !low.green && low.white > 60 && pd > 30, 'the counter\'s label reads MEDIUM PLANKS and the price a customer pays: $4 in green at 100%, $3 in amber at 72%', JSON.stringify([full, low]) + ' ' + pd + ' px of the figure changed');
+    // what is on the stall is drawn on it: one plank, then three (nobody in the shop, and every redraw at dt 0)
+    const onStall = await H(() => { const T = window.TAAS_FACTORY, s = T.s, st = FACTORY.LAYOUT.STALL, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      const grab = () => { const a = T.screen(st.x0, st.y0, st.z + 0.4), b = T.screen(st.x1, st.y1, st.z - 0.02); return g.getImageData(Math.round(a[0] * k), Math.round(a[1] * k), Math.round((b[0] - a[0]) * k), Math.round((b[1] - a[1]) * k)).data; };
+      const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) n++; return n; };
+      s.shop.next = 1e9; s.shop.people = []; s.stalls[0].stock = []; T.tick(0); const s0 = grab();
+      s.stalls[0].stock.push({ item: 'plank.m', by: 'player' }); T.tick(0); const s1 = grab();
+      s.stalls[0].stock.push({ item: 'plank.m', by: 'player' }, { item: 'plank.m', by: 'player' }); T.tick(0); const s3 = grab();
+      return { one: diff(s0, s1), three: diff(s1, s3) }; });
+    ok(onStall.one > 400 && onStall.three > 400, 'the planks on the stall are drawn on the counter: one, then more as it fills', JSON.stringify(onStall) + ' px changed');
+  });
+
+  /* ---------- 14. the shop, with real time ---------- */
+  await section('14. shop', async () => {
+    await fresh(15);
+    await H(() => { const T = window.TAAS_FACTORY; T.s.shop.next = T.s.t; T.view.camY = T.view.minY; T.tick(0); });
+    const shopInk = () => H(() => { const T = window.TAAS_FACTORY, L = FACTORY.LAYOUT, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      const a = T.screen(0.3, L.SHOP.lineY, 1.25), b = T.screen(5.8, L.SHOP.lineY, 0.75); return Array.from(g.getImageData(Math.round(a[0] * k), Math.round(a[1] * k), Math.round((b[0] - a[0]) * k), Math.round((b[1] - a[1]) * k)).data); });
+    const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) n++; return n; };
+    const empty = await shopInk();
+    await step(1.5);
+    const one = await S();
+    ok(one.shop.people.length === 1 && one.shop.people[0].x > 0 && one.shop.people[0].x < 2.5 && one.shop.people[0].state === 'in', 'a customer walks in from the door on the left', JSON.stringify(one.shop.people));
+    await H(() => { window.TAAS_FACTORY.s.shop.next = 1e9; });
+    await step(5);
+    const there = await S(), drawn = await shopInk();
+    ok(there.shop.people[0].state === 'wait' && Math.abs(there.shop.people[0].x - (await H(() => FACTORY.LAYOUT.SHOP.x0))) < 0.05 && diff(empty, drawn) > 150, 'and stands at the stall, drawn in the shop behind the counter, waiting', diff(empty, drawn) + ' px');
+    // a waiting customer thinks of an hourglass
+    const glassAt = () => H(() => { const T = window.TAAS_FACTORY, c = T.s.shop.people[0], k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'); const p = T.screen(c.x, c.y, 1.2); const d = g.getImageData(Math.round(p[0] * k) - 20, Math.round(p[1] * k) - 60, 40, 60).data; let w = 0, a = 0; for (let i = 0; i < d.length; i += 4) { if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) w++; if (d[i] > 200 && d[i + 1] > 130 && d[i + 1] < 190 && d[i + 2] < 90) a++; } return [w, a]; });
+    const hg = await glassAt();
+    ok(hg[0] > 60 && hg[1] > 4, 'over a waiting customer, an hourglass (white bubble, running sand)', JSON.stringify(hg));
+    const sat0 = await H(() => window.TAAS_FACTORY.s.satisfaction);
+    await step(10);
+    const sat1 = await H(() => window.TAAS_FACTORY.s.satisfaction);
+    ok(sat0 - sat1 > 0.85 && sat0 - sat1 < 1.05, 'and customer satisfaction falls about 0.1% a second while it waits (ten seconds, about 1%)', (sat0 - sat1).toFixed(3));
+    await H(() => { const s = window.TAAS_FACTORY.s; s.stalls[0].stock.push({ item: 'plank.m', by: 'player' }); });
+    await step(1.2);
+    const pay = await H(() => window.TAAS_FACTORY.s.shop.people[0].state);
+    await step(2);
+    const left = await S();
+    ok(pay === 'pay' && left.shop.served === 1 && left.shop.people[0].state === 'out' && left.shop.people[0].item === 'plank.m', 'stocked, it taps its card and walks off with the plank', pay + ' / ' + JSON.stringify(left.shop.people));
+    await step(8);
+    ok(!(await S()).shop.people.length, 'out the door it came in by');
+  });
+
+  /* ---------- 15. your arms, the recycle bin and the slots, through the bubbles ---------- */
+  await section('15. bubbles', async () => {
+    await fresh(16);
+    // with more than one thing in your arms, a white badge says how many
+    const badge = await H(() => { const T = window.TAAS_FACTORY, a = T.s.avatar, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      T.s.shop.next = 1e9; T.view.camY = T.view.minY;
+      const white = () => { const p = T.screen(a.x - 0.5, a.y, 1.5), q = T.screen(a.x + 0.5, a.y, 0.3), d = g.getImageData(Math.round(p[0] * k), Math.round(p[1] * k), Math.round((q[0] - p[0]) * k), Math.round((q[1] - p[1]) * k)).data;
+        let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) n++; return n; };
+      const out = {}; [[], ['plank.s'], ['plank.s', 'rough.m'], ['plank.s', 'rough.m', 'plank.s']].forEach(inv => { a.inv = inv; T.tick(0); out[inv.length] = white(); });
+      a.inv = []; T.tick(0); return out; });
+    ok(badge[1] - badge[0] < 20 && badge[2] - badge[1] > 200 && badge[3] - badge[1] > 200, 'with more than one thing in your arms a white badge counts them; one thing has none', JSON.stringify(badge) + ' white px by things held');
+    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.shop.next = 1e9; s.avatar.inv.push('plank.s', 'rough.m', 'plank.s'); s.recycle.push('sappy.l'); T.view.camY = T.view.minY; T.tick(0); });
+    const rec = await rectOf('recycle');
+    await page.touchscreen.tap(rec.x + rec.w / 2, rec.y + rec.h * 0.6);
+    let open = false;
+    for (let i = 0; i < 40 && !open; i++) { await step(0.1); open = await H(() => !document.getElementById('fx-bubble').hidden); }
+    const o = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt + '|' + b.getAttribute('aria-label') + '|' + b.querySelector('.fx-lbl').textContent + '|' + (b.querySelector('.fx-arr path').getAttribute('stroke'))));
+    ok(open && JSON.stringify(o) === JSON.stringify(['put:plank.s|Put a small plank in, 2|x2|#16b3a5', 'put:rough.m|Put a medium gnarled plank in|x1|#16b3a5', 'take:sappy.l|Take a large sap log out|x1|#f2862e']),
+      'a tap on the drawn recycle bin opens its bubble: each kind in your arms to put in (a teal arrow down), each kind in the bin to take out (an orange arrow up)', JSON.stringify(o));
+    await page.tap('#fx-bubble [data-opt="put:plank.s"]'); await step(0.05);
+    await page.tap('#fx-bubble [data-opt="take:sappy.l"]'); await step(0.05);
+    const st = await S();
+    ok(st.recycle.join() === 'plank.s,plank.s' && st.avatar.inv.slice().sort().join() === 'rough.m,sappy.l', 'a tap puts both small planks in; another takes the sap log out into your arms', st.recycle.join() + ' / ' + st.avatar.inv.join());
+    // the sap extractor's input bin takes it; the bench's takes the gnarled plank
+    await H(() => { const T = window.TAAS_FACTORY, y = FACTORY.LAYOUT.ROW.extract; T.view.camY = Math.min(T.view.maxY, T.screen(0, y, 0)[1] + T.view.camY - 300); T.tick(0); });
+    const ei = await rectOf('extractInFront');
+    await page.touchscreen.tap(ei.x + ei.w / 2, ei.y + ei.h / 2);
+    open = false;
+    for (let i = 0; i < 80 && !open; i++) { await step(0.1); open = await H(() => !!document.querySelector('#fx-bubble [data-opt="put:sappy.l"]')); }
+    ok(open && (await H(() => document.querySelectorAll('#fx-bubble [data-opt]').length)) === 1, 'the sap extractor\'s input bin offers just the sap log');
+    await page.tap('#fx-bubble [data-opt="put:sappy.l"]'); await step(0.05);
+    const ex = await H(() => window.TAAS_FACTORY.s.extract.in.join());
+    ok(ex === 'sappy.l', 'and takes it', ex);
+    // the saw: three cuts, greyed with nothing to cut, a real tap cuts the next plank
+    await H(() => { const T = window.TAAS_FACTORY, s = T.s, y = FACTORY.LAYOUT.ROW.saw; s.avatar.inv.push('plank.l'); T.view.camY = Math.min(T.view.maxY, T.screen(0, y, 0)[1] + T.view.camY - 300); T.tick(0); });
+    const sc = await rectOf('sawConsole');
+    await page.touchscreen.tap(sc.x + sc.w / 2, sc.y + sc.h * 0.5);
+    open = false;
+    for (let i = 0; i < 80 && !open; i++) { await step(0.1); open = await H(() => !!document.querySelector('#fx-bubble [data-opt="cut:b2x4"]')); }
+    const cuts = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt + '|' + b.disabled + '|' + b.textContent.trim()));
+    ok(open && cuts.join() === 'cut:b2x4|true|2x4,cut:b2x2|true|2x2,cut:dowels|true|dowels', 'a tap on the drawn table saw offers its three cuts, greyed with nothing in its input bin', cuts.join());
+    await H(() => { const s = window.TAAS_FACTORY.s; s.saw.in.push(s.avatar.inv.pop()); });
+    await step(0.1);
+    const lit = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.disabled + '|' + b.getAttribute('aria-label')));
+    ok(lit.join() === 'false|Cut into two large 2"x4"s,false|Cut into four large 2"x2"s,false|Cut into sixteen large dowel rods', 'with a large plank in, they light, named for what each makes of it', lit.join());
+    const m0 = await H(() => window.TAAS_FACTORY.s.money);
+    await page.tap('#fx-bubble [data-opt="cut:b2x2"]');
+    await step(4.5);
+    const cut = await S();
+    ok(cut.saw.out.join() === 'b2x2.l' && cut.money === m0 - 1, 'a tap on a cut presses the saw ($1), and four large 2"x2"s land in its output bin', cut.saw.out.join() + ' / ' + (m0 - cut.money));
+  });
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
   await section('12. badge', async () => {
     const bad = [], stamp = (SRC.match(/id="build-badge"[^>]*>([^<]*)</) || [])[1];
@@ -504,50 +743,6 @@ const server = http.createServer((req, res) => {
     }
     await page.setViewportSize({ width: 390, height: 844 });
     ok(!bad.length, 'the build badge sits in the bottom right corner in both modes, keeping the stamp it was given', bad.join('; ') + ' file: ' + stamp);
-  });
-
-  /* ---------- 13. money and customer satisfaction, as scoreboards on the wall (the CD, 2026-10-14) ---------- */
-  await section('13. wall boards', async () => {
-    await fresh(14);
-    const gone = await H(() => ['fx-hud', 'fx-info', 'fx-cash', 'fx-money', 'fx-sat', 'back-btn', 'mute-btn'].filter(id => document.getElementById(id)));
-    ok(!gone.length, 'the money and satisfaction pills, the i button, the back button and the mute button are gone from the screen', gone.join());
-    const g = await H(() => {
-      const T = window.TAAS_FACTORY, c = T.board('cash'), s = T.board('sat'), m = document.getElementById('menu-btn').getBoundingClientRect();
-      const win = [T.screen(2.3, 0.45, 2.35)[0], T.screen(3.4, 0.45, 2.35)[0]], mac = [T.screen(2.1, 3, 0)[0], T.screen(3.6, 3, 0)[0]];
-      return { c, s, chrome: m.bottom, win, mac, vw: innerWidth, vh: innerHeight, cam: T.view.camY, min: T.view.minY };
-    });
-    const onScreen = r => r.x >= 0 && r.x + r.w <= g.vw && r.y >= g.chrome && r.y + r.h <= g.vh;
-    ok(g.cam === g.min && onScreen(g.c) && onScreen(g.s) && g.c.w > 60 && g.s.w > 80 && g.c.h > 30,
-      'scrolled to the top, both boards are on screen below the chrome', JSON.stringify(g));
-    const glass = await H(() => { const T = window.TAAS_FACTORY, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
-      return [[2.6, 1.8], [3.1, 1.8], [1.1, 1.65], [4.8, 1.65]].map(([x, z]) => { const p = T.screen(x, 0.48, z), d = g.getImageData(Math.round(p[0] * k), Math.round(p[1] * k), 1, 1).data; return d[2] > 240 && d[1] > 215 && d[0] > 170 && d[0] < 215; }); });
-    ok(g.c.x + g.c.w < g.win[0] && g.win[1] < g.s.x && g.win[0] >= g.mac[0] && g.win[1] <= g.mac[1] && glass.join() === 'true,true,false,false',
-      'money on the left, a window in the middle over machine01 (glass on screen there, not over the boards), customer satisfaction on the right', JSON.stringify(g) + ' glass ' + glass);
-    const cap = await boardInk('sat');
-    ok(cap.caption > 150, 'the right-hand board is captioned in full: customer satisfaction', JSON.stringify(cap));
-    await H(() => { const T = window.TAAS_FACTORY; T.view.camY += 100; T.tick(0); });
-    const moved = await H(() => window.TAAS_FACTORY.board('cash'));
-    ok(Math.abs(moved.y - (g.c.y - 100)) < 0.01, 'they scroll with the floor, so a long way down they are out of sight', moved.y + ' vs ' + (g.c.y - 100));
-    await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(0); });
-    // the board draws the sum it is given, not a stale one: two sums, two different sets of figures
-    const figures = async (n) => H(n => { const T = window.TAAS_FACTORY; T.s.money = n; for (let i = 0; i < 3; i++) T.tick(1); const r = T.board('cash'), d = T.view.dpr;
-      const im = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data;
-      let bits = ''; for (let i = 0; i < im.length; i += 4) bits += im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225 ? '1' : '0'; return bits; }, n);
-    const f4 = await figures(4), f7 = await figures(7777);
-    let fd = 0; for (let i = 0; i < f4.length; i++) if (f4[i] !== f7[i]) fd++;
-    ok(fd > 200 && f4.indexOf('1') >= 0, 'the money board draws the sum it is given ($4 and $7,777 come out as different figures)', fd + ' px differ');
-    // a big number shrinks to fit its board rather than spilling onto the frame
-    await H(() => { const T = window.TAAS_FACTORY; T.s.money = 98765432; for (let i = 0; i < 3; i++) T.tick(1); });
-    const big = await boardInk('cash', 0.05);
-    ok(big.white > 60 && big.edge === 0, 'a very large sum shrinks to fit inside the money board', JSON.stringify(big));
-    // the avatar walking by the wall passes in front of the board, not behind it
-    const face = async () => H(() => { const T = window.TAAS_FACTORY, r = T.board('cash'), d = T.view.dpr; return Array.from(document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data); });
-    await H(() => { const T = window.TAAS_FACTORY; T.s.avatar.x = 4; T.s.avatar.y = 9; T.s.avatar.path = []; T.tick(0); });
-    const away = await face();
-    await H(() => { const T = window.TAAS_FACTORY; T.s.avatar.x = 1.08; T.s.avatar.y = 0.62; T.tick(0); });
-    const near = await face();
-    let diff = 0; for (let i = 0; i < away.length; i += 4) if (Math.abs(away[i] - near[i]) + Math.abs(away[i + 1] - near[i + 1]) + Math.abs(away[i + 2] - near[i + 2]) > 60) diff++;
-    ok(diff > 40, 'the avatar standing at the wall is drawn over the money board, as someone in front of it', diff + ' px changed');
   });
 
   ok(!errors.length, 'no page errors or console errors over the whole drive', errors.slice(0, 3).join(' | '));

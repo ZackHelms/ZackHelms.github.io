@@ -261,7 +261,10 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 .fx-count { color: #586663; font-weight: 500; }
 .fx-bubble.robot { flex-direction: column; gap: 4px; padding-top: 4px; }
 .fx-bname { font: 800 13px/1.15 var(--display); text-align: center; max-width: 270px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.fx-bopts { display: flex; gap: 6px; }
+.fx-bopts { display: flex; gap: 6px; flex-wrap: wrap; }
+.fx-bubble.grouped { flex-direction: column; gap: 6px; max-width: calc(100% - 12px); }
+.fx-bubble { max-width: calc(100% - 12px); flex-wrap: wrap; }
+.fx-arr { position: absolute; top: 3px; right: 3px; }
 #fx-panel { position: absolute; inset: 0; z-index: 40; background: rgba(15,20,28,.55); display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
   overflow-y: auto; padding: calc(48px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom)); }
 #fx-panel > :first-child { margin-top: auto; }
@@ -315,7 +318,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-14 21:47 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-16 03:06 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -629,121 +632,195 @@ if (typeof module !== 'undefined') module.exports = TAAS;
    what this says; the suites drive it in node. Every tunable number is in CFG. */
 const FACTORY = (function () {
   const CFG = {
-    version: 2,
+    version: 3,
     walk: 1.7,              // avatar, m/s
     robotSpeed: 1.3,        // robots, m/s
     near: 0.6,              // m: an avatar this close to a spot acts without walking
-    processSec: 4,          // machine01: press to finished plank
-    stageSec: 0.9,          // the next log rolls from the rack to the machine's mouth
-    outSec: 1.0,            // a finished item rides the out-feed belt
-    dropSec: 0.35,          // ...and falls into the bin
-    jamAt: 1.3,             // seconds into a sap log's run when the machine gums up
+    processSec: 4,          // the planer: press to finished plank
+    stageSec: 0.9,          // the next log rolls from the rack to the planer's mouth
+    outSec: 0.8,            // a finished thing rides an out-feed belt
+    dropSec: 0.35,          // ...and falls into the output bin
+    jamAt: 1.3,             // seconds into a sap log's run when the planer gums up
     cleanSec: 2.5,          // scrubbing a jam clean
-    pressSec: 0.45,         // reach and press the button
+    pressSec: 0.45,         // reach and press a button
     tossSec: 0.6,           // lift a bad log (or a bad cut) and toss it in the recycle bin
     dawdleSec: 3,           // an operator stands and thinks before pressing
-    reachSec: 0.45, pitchSec: 0.75, coolSec: 0.35,   // a robot sale
-    lookSec: 0.8,           // a seller rummaging through the bin for a plank and coming up with something else
+    reachSec: 0.45, placeSec: 0.6, coolSec: 0.35,   // a robot stocking the sales counter
+    lookSec: 0.8,           // a stocker rummaging through the bin for a medium plank and coming up with something else
     unboxSec: 0.9,
+    pickSec: 0.4, putSec: 0.35, stockSec: 0.45,     // you: empty an output bin into your arms, put things in a bin, stock the counter
+    sawSec: 3, extractSec: 4, carveSec: 5,          // slot 02's table saw, slot 03's sap extractor, slot 04's bench
     hire: [20, 40],         // the first robot, the second
     names: ['Bolt', 'Sprocket'],     // until you name them
     nameMax: 16,
     slots: [5, 10, 15, 20, 25],      // instruction slots: each robot's own, bought in order (the CD's prices)
-    logs: { gnarled: 0.15, small: 0.15, large: 0.1, sappy: 0.1 },   // what rolls off the rack; the rest are good medium logs
-    logCost: 1,             // machine01 costs $1 for every log it processes, yours included (the CD, 2026-10-14)
+    // what rolls off the planer's rack: every log has a size and a quality (the CD, 2026-10-15)
+    logs: { size: { s: 0.2, m: 0.65, l: 0.15 }, quality: { log: 0.75, gnarled: 0.15, sappy: 0.1 } },
+    logCost: 1,             // the planer costs $1 for every log it processes, yours included (the CD, 2026-10-14)
+    fixCost: 5,             // scrubbing a sap jam clean costs $5 (the CD, 2026-10-15)
+    sawCost: 1, extractCost: 1,      // the table saw and the sap extractor: $1 for each thing they process (the CD)
     // what a robot does when no instruction covers it (each robot rolls its own dice)
-    uninstructed: {
-      think: 0.25,          // an operator stops to think first (no instruction covers this yet)
-      free: 0.25,           // a seller gives a plank away...
-      cheap: 0.35,          // ...or lets it go cheap
-      mislabel: 0.5         // a seller passes something that is not a medium plank off as one
-    },
+    uninstructed: { think: 0.25 },   // an operator stops to think first (no instruction covers this yet)
     slip: 0.05,             // a robot ignores an instruction it has 1 time in 20, and does what it would have done without it
-    price: { plank: 5, rough: 3, dowels: 1, largePlank: 3 },   // the right price for each thing (plank: a medium plank)
-    cheapPlank: 3,          // what a careless seller lets a plank go for
-    mislabel: 5,            // what it asks for anything else passed off as a medium plank
+    // the right price of each thing (the CD, 2026-10-15); for now only medium planks are sold.
+    // cut: two 2"x4"s, four 2"x2"s or sixteen dowel rods, by the length of the plank they came from
+    price: { plank: { s: 2, m: 4, l: 8 }, sap: 1, cut: { s: 3, m: 6, l: 12 } },
+    stalls: [{ want: 'plank.m' }],   // the sales counter: one stall, for medium planks, to begin with
+    stallCap: 6,
+    sapUnits: { s: 1, m: 2, l: 4 },  // the sap a small, medium and large sap log gives up in the extractor
+    // customers: the first walks in after `first` seconds, the next after one of `every`; once `max`
+    // are inside, nobody else comes in until someone leaves (the CD, 2026-10-15)
+    shop: { first: 12, every: [8, 10, 12, 14, 16], max: 6, gap: 0.62, speed: 1.1, paySec: 2.5 },
     // customer satisfaction: how much our customers trust us and our products (not the formal
     // mode's Trust, which is how much the team trusts the AI tool). It starts at 100%.
     satStart: 100, satMin: 10, satUp: 1, satHit: 15,
+    satWait: 0.1,           // each customer waiting in line costs 0.1% a second (the CD, 2026-10-15)
     satHeal: 0.005          // customers forget: each second closes this share of the gap to 100
   };
 
+  /* ---------- things: wood has a size and a quality (the CD, 2026-10-15) ---------- */
+  // an id is kind.size: 'log.m' is a normal medium log, 'gnarled.s' a small gnarled one, 'sappy.l' a
+  // large sap log; 'plank.l' a large plank, 'rough.m' a medium gnarled plank (its holes kept);
+  // 'b2x4.m' two 2"x4"s, 'b2x2.m' four 2"x2"s and 'dowels.m' sixteen dowel rods cut from a medium
+  // plank; 'sap' one unit of sap; 'carving.bird' something carved by hand at the bench
+  const SIZES = ['s', 'm', 'l'];
+  const LOGS = [], PRODUCTS = [];
+  ['log', 'gnarled', 'sappy'].forEach(q => SIZES.forEach(z => LOGS.push(q + '.' + z)));
+  ['plank', 'rough'].forEach(k => SIZES.forEach(z => PRODUCTS.push(k + '.' + z)));
+  const CUTS = ['b2x4', 'b2x2', 'dowels'];
+  const DESIGNS = ['bowl', 'bird', 'spoon', 'owl'];
+  const ITEMS = LOGS.concat(PRODUCTS, ['sap'], [].concat.apply([], CUTS.map(c => SIZES.map(z => c + '.' + z))), DESIGNS.map(d => 'carving.' + d));
+  const kindOf = id => String(id).split('.')[0];
+  const sizeOf = id => String(id).split('.')[1];
+  const isItem = id => typeof id === 'string' && ITEMS.indexOf(id) >= 0;
+  // what the planer makes of a log: a normal log a plank of its size, a gnarled one a gnarled
+  // plank of its size, and a sap log of any size jams it
+  const makes = log => kindOf(log) === 'log' ? 'plank.' + sizeOf(log) : kindOf(log) === 'gnarled' ? 'rough.' + sizeOf(log) : 'jam';
+  function priceOf(item) {
+    const k = kindOf(item), z = sizeOf(item), P = CFG.price;
+    if (k === 'plank') return P.plank[z];
+    if (k === 'sap') return P.sap;
+    if (CUTS.indexOf(k) >= 0) return P.cut[z];
+    return null;   // gnarled planks and carvings have no price yet
+  }
+  // what each bin you can put things into takes from your arms
+  const ACCEPTS = {
+    rack: id => kindOf(id) === 'log',                              // the planer's: normal logs
+    sawIn: id => kindOf(id) === 'plank',                           // the table saw's: planks
+    extractIn: id => kindOf(id) === 'sappy',                       // the sap extractor's: sap logs
+    benchIn: id => kindOf(id) === 'gnarled' || kindOf(id) === 'rough',   // the bench's: gnarled wood
+    recycle: isItem                                                // the recycle bin: anything
+  };
+
   // The instruction pool, in the CD's words: six on 2026-10-14, the sap-log one with the third
-  // brief, and with the fourth the size ones and the seller's recycle ones, with 1"x4"x4' renamed
-  // "medium". Each belongs to one job: on a robot doing another job it is never consulted, so it
-  // does nothing. Each joins the list the first time a robot makes the mistake it prevents. An
-  // operator's log instruction names the logs it keeps out of machine01 (`rejects`); a seller's
-  // recycle instruction the thing it takes out of the sale bin (`recycles`). A row with `joins`
-  // rides onto the list with others and prevents no mistake: "Never put sap on input log" (no robot
-  // pours sap since the barrel went) and "Put medium logs in recycle bin" (for a factory that
-  // wants dowels; on a plank line it throws the good logs away). Gnarled and sap logs are
-  // medium-sized.
+  // brief, the size ones with the fourth, and with the storefront (2026-10-15) the stocker's. Each
+  // belongs to one job: on a robot doing another job it is never consulted, so it does nothing. Each
+  // joins the list the first time a robot makes the mistake it prevents. An operator's log
+  // instruction names the logs it keeps out of the planer (`rejects`, by quality and by size); a
+  // stocker's recycle instruction the things it takes out of the planer's output bin (`recycles`).
+  // A row with `joins` rides onto the list with others and prevents no mistake: "Never put sap on
+  // input log" (no robot pours sap), "Put medium logs in recycle bin" (for a factory that wants
+  // something else; on a plank line it throws the good logs away) and "Sell medium wood planks for
+  // $4" (the stall sets the price; a stocker never names one).
   const RULES = [
     { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: ['sappy'] },
-    { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin', rejects: ['sappy'] },
-    { id: 'gnarled', job: 'operate', text: 'Put gnarled logs in recycle bin', rejects: ['gnarled'] },
-    { id: 'medium', job: 'operate', text: 'Only input medium logs', rejects: ['small', 'large'] },
-    { id: 'smallLog', job: 'operate', text: 'Put small logs in recycle bin', rejects: ['small'] },
-    { id: 'largeLog', job: 'operate', text: 'Put large logs in recycle bin', rejects: ['large'] },
-    { id: 'mediumLog', job: 'operate', text: 'Put medium logs in recycle bin', rejects: ['log', 'gnarled', 'sappy'], joins: ['smallLog', 'largeLog'] },
+    { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin', rejects: { quality: ['sappy'] } },
+    { id: 'gnarled', job: 'operate', text: 'Put gnarled logs in recycle bin', rejects: { quality: ['gnarled'] } },
+    { id: 'medium', job: 'operate', text: 'Only input medium logs', rejects: { size: ['s', 'l'] } },
+    { id: 'smallLog', job: 'operate', text: 'Put small logs in recycle bin', rejects: { size: ['s'] } },
+    { id: 'largeLog', job: 'operate', text: 'Put large logs in recycle bin', rejects: { size: ['l'] } },
+    { id: 'mediumLog', job: 'operate', text: 'Put medium logs in recycle bin', rejects: { size: ['m'] }, joins: ['smallLog', 'largeLog'] },
     { id: 'output', job: 'operate', text: 'Only output medium wood planks' },
-    { id: 'sellOnly', job: 'sell', text: 'Only sell medium wood planks' },
-    { id: 'price', job: 'sell', text: 'Sell medium wood planks for $5' },
-    { id: 'dowelsOut', job: 'sell', text: 'Put dowel rods in recycle bin', recycles: 'dowels' },
-    { id: 'largeOut', job: 'sell', text: 'Put large planks in recycle bin', recycles: 'largePlank' },
-    { id: 'roughOut', job: 'sell', text: 'Put gnarled planks in recycle bin', recycles: 'rough' }
+    { id: 'stockOnly', job: 'stock', text: 'Only stock medium planks' },
+    { id: 'price', job: 'stock', text: 'Sell medium wood planks for $4', joins: ['stockOnly'] },
+    { id: 'smallOut', job: 'stock', text: 'Put small planks in recycle bin', recycles: { kind: ['plank'], size: ['s'] } },
+    { id: 'largeOut', job: 'stock', text: 'Put large planks in recycle bin', recycles: { kind: ['plank'], size: ['l'] } },
+    { id: 'roughOut', job: 'stock', text: 'Put gnarled planks in recycle bin', recycles: { kind: ['rough'] } }
   ];
-  const RENAMED = { small: 'medium' };   // "Only input logs bigger than 1x4x4'" became "Only input medium logs"
   const RULE = {};
   RULES.forEach(q => { RULE[q.id] = q; });
-  // each job's base prompt, shown above a robot's own instructions (the CD's words)
-  const BASE = { operate: 'Use machine01 to refine raw materials.', sell: 'Sell the items in this bin.' };
+  const matches = (m, id) => !!m && (!m.quality || m.quality.indexOf(kindOf(id)) >= 0) && (!m.kind || m.kind.indexOf(kindOf(id)) >= 0) && (!m.size || m.size.indexOf(sizeOf(id)) >= 0);
+  const rejectsLog = (q, log) => matches(q.rejects, log);
+  const recyclesItem = (q, item) => matches(q.recycles, item);
+  // the instructions that would have kept a log out of the planer (the look-alikes aside): these
+  // join the list when an operator cuts it, or jams the planer with it
+  const keepers = log => RULES.filter(q => q.job === 'operate' && !q.joins && rejectsLog(q, log)).map(q => q.id);
+  // each job's base prompt, shown above a robot's own instructions
+  const BASE = { operate: 'Use the planer to refine raw materials.', stock: 'Stock the sales counter with the items in this bin.' };
 
   /* ---------- the floor (metres; x right, y toward the camera, z up) ---------- */
-  const W = 6, H = 26;
+  // From the back: the wall; the shop, where customers come in through a door on the left and
+  // queue for the counter's stall (the CD, 2026-10-15: they face you across the counter); the
+  // counter; a walkway on the factory side, where the counter is stocked; then four slots, each a
+  // row: 01 the planer (once machine01), 02 the table saw, 03 the sap extractor, 04 the hand
+  // crafting bench; then the robot dock. Every row is open at its east end, so the floor is one
+  // piece: the walkway is reached round the planer's output bin.
+  const W = 6, H = 18;
+  const ROW = { planer: 4.0, saw: 7.3, extract: 10.1, bench: 12.75 };   // each slot's centre line (y)
+  const mill = y => ({ in: [0.2, y - 0.55, 0.95, y + 0.55], inBelt: [0.95, y - 0.3, 1.75, y + 0.3], body: [1.75, y - 0.55, 3.15, y + 0.55],
+    console: [2.65, y + 0.55, 3.1, y + 0.85], outBelt: [3.15, y - 0.3, 3.95, y + 0.3], out: [3.95, y - 0.55, 4.95, y + 0.55] });
+  const SAW = mill(ROW.saw), EXT = mill(ROW.extract);
   const SOLID = {
     wall: [0, 0, W, 0.45],
-    rack: [0.15, 2.15, 1.0, 3.6],
-    inBelt: [1.0, 2.6, 2.15, 3.2],
-    machine: [2.15, 2.25, 3.55, 3.55],
-    console: [2.55, 3.55, 3.05, 3.85],
-    outBelt: [3.55, 2.6, 4.7, 3.2],
-    bin: [4.7, 2.3, 5.75, 3.5],   // 0.5 high: lower than the belt, so a plank drops in over the rim
-    recycle: [3.55, 3.85, 4.05, 4.35],
-    dockPanel: [0.4, 7.15, 2.8, 7.45],
-    pallets: [0.4, 13.0, 1.6, 14.2],
-    tarp: [2.2, 14.0, 4.0, 15.5],
-    stack: [4.5, 19.2, 5.6, 20.4],
-    cones: [2.6, 23.0, 3.4, 23.4]
+    counter: [0, 1.7, W, 2.25],
+    rack: [0.15, 3.25, 0.9, 4.7],
+    inBelt: [0.9, 3.7, 1.75, 4.3],
+    machine: [1.75, 3.35, 3.15, 4.65],
+    console: [2.2, 4.65, 2.7, 4.98],
+    outBelt: [3.15, 3.7, 3.95, 4.3],
+    bin: [3.95, 3.4, 4.95, 4.6],
+    recycle: [3.2, 4.95, 3.7, 5.45],
+    sawIn: SAW.in, sawInBelt: SAW.inBelt, saw: SAW.body, sawConsole: SAW.console, sawOutBelt: SAW.outBelt, sawOut: SAW.out,
+    extractIn: EXT.in, extractInBelt: EXT.inBelt, extract: EXT.body, extractConsole: EXT.console, extractOutBelt: EXT.outBelt, extractOut: EXT.out,
+    benchIn: [0.3, 12.35, 1.1, 13.25], bench: [1.8, 12.35, 3.9, 13.15], benchOut: [4.4, 12.35, 5.2, 13.25],
+    dockPanel: [0.4, 15.2, 2.8, 15.5]
   };
-  const CRATES = [[0.65, 7.65, 1.35, 8.35], [1.85, 7.65, 2.55, 8.35]];
+  const CRATES = [[0.65, 15.7, 1.35, 16.4], [1.85, 15.7, 2.55, 16.4]];
   const N = -Math.PI / 2, E = 0, S = Math.PI / 2;
   const SPOT = {
-    start: { x: 3.0, y: 5.6, face: S },
-    press: { x: 2.8, y: 4.3, face: N },
-    operate: { x: 2.25, y: 4.25, face: N },
-    sell: { x: 4.35, y: 3.95, face: N },
-    bin: { x: 5.25, y: 4.1, face: N },
-    dock: { x: 1.6, y: 9.3, face: N },
-    rest: [{ x: 1.0, y: 8.0, face: S }, { x: 2.2, y: 8.0, face: S }]
+    start: { x: 3.0, y: 6.1, face: S },
+    press: { x: 2.75, y: 5.45, face: N },        // the planer's button, for you
+    operate: { x: 2.05, y: 5.4, face: N },       // ...and for a robot
+    rack: { x: 0.55, y: 5.1, face: N },          // the planer's rack: logs you put there go in next
+    bin: { x: 4.45, y: 5.05, face: N },          // the planer's output bin, from the floor
+    binN: { x: 5.35, y: 3.05, face: S },         // ...and from the walkway by the counter
+    counter: { x: 5.6, y: 2.8, face: N },        // the stall, for you
+    stock: { x: 3.75, y: 2.85, face: N },        // ...and for a robot: the bin behind it, the stall in front (both a little to its east)
+    recycle: { x: 3.45, y: 5.9, face: N },
+    sawIn: { x: 0.58, y: ROW.saw + 0.95, face: N }, saw: { x: 2.9, y: ROW.saw + 1.25, face: N }, sawOut: { x: 4.45, y: ROW.saw + 0.95, face: N },
+    extractIn: { x: 0.58, y: ROW.extract + 0.95, face: N }, extract: { x: 2.9, y: ROW.extract + 1.25, face: N }, extractOut: { x: 4.45, y: ROW.extract + 0.95, face: N },
+    benchIn: { x: 0.7, y: 13.7, face: N }, bench: { x: 2.85, y: 13.6, face: N }, benchOut: { x: 4.8, y: 13.7, face: N },
+    dock: { x: 1.6, y: 17.35, face: N },
+    rest: [{ x: 1.0, y: 16.05, face: S }, { x: 2.2, y: 16.05, face: S }]
   };
-  const HATCH = { x: 6.0, y: 4.1 };          // where sold goods leave, through the east wall
-  const RECYCLE = { x: 3.8, y: 4.1, z: 0.62 };   // the recycle bin's mouth
-  const LAYOUT = { W, H, SOLID, CRATES, SPOT, HATCH, RECYCLE };
+  // the shop: customers come in at the door, queue along the counter for the stall (place 0 at
+  // the stall, each place behind it `gap` further west) and leave along the wall
+  const SHOP = { door: { x: -0.4, y: 1.15 }, lineY: 1.15, walkY: 0.8, x0: 4.8 };
+  const STALL = { x0: 4.15, x1: 5.45, y0: 1.75, y1: 2.2, z: 0.75 };
+  const RECYCLE = { x: 3.45, y: 5.2, z: 0.62 };   // the recycle bin's mouth
+  const LAYOUT = { W, H, SOLID, CRATES, SPOT, SHOP, STALL, RECYCLE, ROW };
 
   /* ---------- state ---------- */
+  function newMill() { return { in: [], phase: 'idle', t: 0, item: null, cut: null, by: null, belt: [], out: [] }; }
   function newGame(seed) {
     return {
       version: CFG.version, t: 0, seed: (seed === undefined ? 20261013 : seed) >>> 0,
-      money: 0, earned: 0, spent: 0, satisfaction: CFG.satStart, hired: 0,   // spent: on logs
-      // log: what is on the in-feed (the first is always a good one)
-      machine: { phase: 'ready', t: 0, staged: 1, log: 'log', result: null, by: null, what: null, dirt: 0 },
-      belt: [], bin: [],
-      recycled: [], recycledN: 0,   // the last few things in the recycle bin (newest last), and how many in all
+      money: 0, earned: 0, satisfaction: CFG.satStart, hired: 0,
+      spent: 0, costs: { logs: 0, fixes: 0, saw: 0, extract: 0 },   // spent: running the machines (logs, fixes, cuts)
+      // the planer (slot 01). log: what is on the in-feed (the first is always a normal medium
+      // log); mine: you put it on the rack yourself
+      machine: { phase: 'ready', t: 0, staged: 1, log: 'log.m', mine: false, result: null, by: null, what: null, dirt: 0 },
+      rack: [],                     // logs you put on the planer's rack: they roll in before the pile's
+      belt: [], bin: [],            // the planer's out-feed and its output bin
+      recycle: [],                  // everything in the recycle bin, newest last
+      saw: newMill(), extract: newMill(),
+      bench: { in: [], out: [], item: null, t: 0, design: null },
+      stalls: CFG.stalls.map(q => ({ want: q.want, stock: [] })),
+      shop: { people: [], next: CFG.shop.first, n: 0, served: 0, wrong: 0 },
       seen: {},                     // rule id -> true once a robot has made the mistake it prevents
-      avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0 },
+      avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0, inv: [] },
       robots: [], bubble: null,
-      tally: { player: { made: 0, sold: 0, pressed: 0, tossed: 0 } },
+      tally: { player: { made: 0, pressed: 0, tossed: 0, stocked: 0, fixed: 0, sawn: 0, extracted: 0, carved: 0 } },
       force: {}, events: []
     };
   }
@@ -767,6 +844,9 @@ const FACTORY = (function () {
   const chance = (s, name, p) => roll(s, name, [[true, p]], false);
   function ev(s, kind, data) { s.events.push(Object.assign({}, data || {}, { kind, t: s.t })); }
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const count = (arr, k) => arr.reduce((n, x) => n + (x === k ? 1 : 0), 0);
+  // the kinds in a heap, in ITEMS order, with how many of each
+  const kindsIn = arr => ITEMS.filter(k => arr.indexOf(k) >= 0).map(k => ({ item: k, n: count(arr, k) }));
 
   /* ---------- instructions ---------- */
   const has = (r, id) => r.rules.indexOf(id) >= 0;
@@ -814,20 +894,11 @@ const FACTORY = (function () {
   }
 
   /* ---------- prices ---------- */
+  // customer satisfaction sets what customers pay (the CD, 2026-10-15): the stall's price times it
   function paid(s, ask) { return Math.round(ask * s.satisfaction / 100); }
-  function priceNow(s, item) { return paid(s, CFG.price[item]); }
+  function priceNow(s, item) { const p = priceOf(item); return p === null ? null : paid(s, p); }
   function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }
-  // one sale, whoever makes it. fair: the thing at its own price; cheap: a plank let go for less;
-  // free: a plank given away; mislabel: anything else sold as a medium plank
-  function settle(s, item, sale, by) {
-    const ask = sale === 'fair' ? CFG.price[item] : sale === 'cheap' ? CFG.cheapPlank : sale === 'mislabel' ? CFG.mislabel : 0;
-    const p = paid(s, ask);
-    s.money += p; s.earned += p;
-    if (sale === 'fair') s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);
-    if (sale === 'mislabel') s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit);
-    ev(s, 'sold', { by, item, paid: p, sale });
-    return p;
-  }
+  function spend(s, what, n) { s.money -= n; s.spent += n; s.costs[what] += n; }
 
   /* ---------- pathing: an A* over 0.2 m cells, then string-pulled ---------- */
   const CELL = 0.2, GW = Math.round(W / CELL), GH = Math.round(H / CELL), PAD = 0.22, EDGE = 0.25;
@@ -847,8 +918,8 @@ const FACTORY = (function () {
       for (let k = 0; !b && k < rs.length; k++) { const q = rs[k]; b = x > q[0] - PAD && x < q[2] + PAD && y > q[1] - PAD && y < q[3] + PAD; }
       g[j * GW + i] = b ? 1 : 0;
     }
-    // label the floor's connected areas, so a walk only ever aims at floor it can reach
-    // (the strip behind the production line is closed off at both ends)
+    // label the floor's connected areas, so a walk only ever aims at floor it can reach (the
+    // shop behind the counter is the customers' own)
     const lab = new Int32Array(GW * GH).fill(-1);
     let n = 0;
     for (let i0 = 0; i0 < GW * GH; i0++) {
@@ -930,6 +1001,12 @@ const FACTORY = (function () {
     if (start.x !== from.x || start.y !== from.y) out.unshift(start);
     return out;
   }
+  function pathLen(s, from, to) {
+    const p = path(s, from, to);
+    let d = 0, q = from;
+    p.forEach(w => { d += dist(q, w); q = w; });
+    return d;
+  }
   function moveAlong(e, dt, speed) {
     let left = speed * dt;
     while (left > 1e-9 && e.path.length) {
@@ -941,46 +1018,44 @@ const FACTORY = (function () {
     return e.path.length === 0;
   }
 
-  /* ---------- machine01 ---------- */
-  const LOGS = ['log', 'gnarled', 'small', 'large', 'sappy'];   // 'log': a good medium log
-  // what a press makes of each: a medium plank, a gnarled plank (the log's holes kept: 'rough'),
-  // dowel rods, a large plank; a sap log makes nothing ('sap'): it jams the machine
-  const MAKES = { log: 'plank', gnarled: 'rough', small: 'dowels', large: 'largePlank', sappy: 'sap' };
-  // the instructions that join the list when an operator cuts each wrong log
-  const FED = { rough: ['gnarled'], dowels: ['medium', 'smallLog'], largePlank: ['medium', 'largeLog'] };
+  /* ---------- the planer (slot 01, once machine01) ---------- */
   // How each thing a robot does is graded in its evals (the CD, fourth brief): red only for a
-  // blocker (a jam) or a hit to customer satisfaction (something passed off as a medium plank);
-  // anything unexpected or wasteful yellow; the rest green. A key is the action, then ':' and the
-  // thing it was done to; a trailing '!' means it was done against the robot's own instructions
-  // (it slipped), which turns a green action yellow and leaves red red.
-  const GRADE = { plank: 'good', think: 'soso', rough: 'soso', dowels: 'soso', largePlank: 'soso', sap: 'bad', reject: 'good',
-    caught: 'good', fair: 'good', honest: 'good', cheap: 'soso', free: 'soso', mislabel: 'bad', looking: 'soso', recycle: 'good' };
+  // blocker (a jam) or a hit to customer satisfaction (anything but a medium plank put in the
+  // medium plank stall); anything unexpected or wasteful yellow; the rest green. A key is the
+  // action, then ':' and the thing it was done to; a trailing '!' means it was done against the
+  // robot's own instructions (it slipped), which turns a green action yellow and leaves red red.
+  const GRADE = { plank: 'good', think: 'soso', cut: 'soso', jam: 'bad', reject: 'good', caught: 'good',
+    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good' };
   function gradeOf(key) {
     const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
     return against && g === 'good' ? 'soso' : g;
   }
-  function nextLog(s) { return roll(s, 'log', [['gnarled', CFG.logs.gnarled], ['small', CFG.logs.small], ['large', CFG.logs.large], ['sappy', CFG.logs.sappy]], 'log'); }
+  // the next log: one you put on the rack, or else one off the pile, a size and a quality
+  function nextLog(s) {
+    if (s.rack.length) return { log: s.rack.shift(), mine: true };
+    const Z = CFG.logs.size, Q = CFG.logs.quality;
+    return { log: roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * Z[sizeOf(id)]]), 'log.m'), mine: false };
+  }
   function ready(s) { const m = s.machine; return m.phase === 'ready' && m.staged >= 1; }
-  // a press cuts whatever is on the in-feed, and machine01 charges for the log whatever it is
+  // a press cuts whatever is on the in-feed, and the planer charges for the log whatever it is
   // (money may go below zero)
   function press(s, by) {
     const m = s.machine;
     if (!ready(s)) return false;
     m.phase = 'run'; m.t = 0; m.by = by;
-    m.result = m.what = MAKES[m.log];
-    s.money -= CFG.logCost; s.spent += CFG.logCost;
-    ev(s, 'press', { by, cost: CFG.logCost });
+    m.result = makes(m.log);
+    m.what = m.result === 'jam' ? 'jam:' + m.log : m.result === 'plank.m' ? 'plank' : 'cut:' + m.log;
+    spend(s, 'logs', CFG.logCost);
+    ev(s, 'press', { by, at: 'planer', cost: CFG.logCost, log: m.log });
     return true;
   }
-  // the machine is free again: the next log starts rolling in from the rack
+  // the planer is free again: the next log starts rolling in
   function restage(s) {
-    const m = s.machine;
-    m.phase = 'ready'; m.t = 0; m.staged = 0; m.log = nextLog(s); m.result = null; m.by = null; m.what = null;
+    const m = s.machine, n = nextLog(s);
+    m.phase = 'ready'; m.t = 0; m.staged = 0; m.log = n.log; m.mine = n.mine; m.result = null; m.by = null; m.what = null;
   }
   function recycle(s, item, by, from) {
-    s.recycled.push(item);
-    if (s.recycled.length > 6) s.recycled.shift();
-    s.recycledN++;
+    s.recycle.push(item);
     ev(s, 'recycled', { item, by, from });
   }
   // the log on the in-feed goes in the recycle bin, and the next one rolls in
@@ -1014,20 +1089,20 @@ const FACTORY = (function () {
     if (m.phase === 'ready') { if (m.staged < 1) m.staged = Math.min(1, m.staged + dt / CFG.stageSec); return; }
     if (m.phase !== 'run') return;
     m.t += dt;
-    if (m.result === 'sap' && m.t >= CFG.jamAt) {
+    if (m.result === 'jam' && m.t >= CFG.jamAt) {
       m.phase = 'jam'; m.t = 0; m.dirt = 1;
-      ev(s, 'jam', { by: m.by });
-      if (typeof m.by === 'number' && s.robots[m.by]) { see(s, 'sappy', m.by); credit(s, m.by, 'sap', s.robots[m.by].against); }
-    } else if (m.result !== 'sap' && m.t >= CFG.processSec) {
+      ev(s, 'jam', { by: m.by, log: m.log });
+      if (typeof m.by === 'number' && s.robots[m.by]) { see(s, keepers(m.log), m.by); credit(s, m.by, m.what, s.robots[m.by].against); }
+    } else if (m.result !== 'jam' && m.t >= CFG.processSec) {
       const item = m.result, by = m.by, r = typeof by === 'number' ? s.robots[by] : null;
       ev(s, 'made', { item, by });
       if (by === 'player') s.tally.player.made++;
       if (r) {
-        if (FED[item]) see(s, FED[item], by);
-        credit(s, by, m.what, r.against || (r.outSlip && item !== 'plank'));
+        if (item !== 'plank.m') see(s, keepers(m.log), by);
+        credit(s, by, m.what, r.against || (r.outSlip && item !== 'plank.m'));
       }
       // an operator told to check its output catches anything that is not a medium plank on its way out
-      if (r && r.check && item !== 'plank') {
+      if (r && r.check && item !== 'plank.m') {
         recycle(s, item, by, 'out');
         note(r, 'caught:' + item);
         r.state = 'flick'; r.t = 0;
@@ -1042,29 +1117,146 @@ const FACTORY = (function () {
       it.t += dt;
       if (it.t >= CFG.outSec + CFG.dropSec) {
         s.belt.splice(k, 1); s.bin.push(it.item);
-        ev(s, 'binned', { item: it.item });
-        if (it.item !== 'plank' && typeof it.by === 'number') see(s, 'output', it.by);
+        ev(s, 'binned', { at: 'planer', item: it.item });
+        if (it.item !== 'plank.m' && typeof it.by === 'number') see(s, 'output', it.by);
       }
     }
   }
 
+  /* ---------- slots 02 and 03: the table saw and the sap extractor (yours to run, for now) ---------- */
+  // a press takes the first thing in the input bin: the saw cuts a plank into two 2"x4"s, four
+  // 2"x2"s or sixteen dowel rods of its length, as you choose; the extractor takes a sap log's sap
+  // (1 / 2 / 4 units by its size) and gives back a clean log of the same size. $1 a press each.
+  function canMill(s, key) { const m = s[key]; return m.phase === 'idle' && m.in.length > 0; }
+  function startMill(s, key, cut, by) {
+    const m = s[key];
+    if (!canMill(s, key) || (key === 'saw' && CUTS.indexOf(cut) < 0)) return false;
+    m.item = m.in.shift(); m.cut = key === 'saw' ? cut : null; m.by = by; m.phase = 'run'; m.t = 0;
+    const cost = key === 'saw' ? CFG.sawCost : CFG.extractCost;
+    spend(s, key, cost);
+    ev(s, 'press', { by, at: key, cost, item: m.item, cut: m.cut });
+    return true;
+  }
+  function millOut(key, m) {
+    const z = sizeOf(m.item);
+    if (key === 'saw') return [m.cut + '.' + z];
+    const out = ['log.' + z];
+    for (let i = 0; i < CFG.sapUnits[z]; i++) out.push('sap');
+    return out;
+  }
+  function stepMill(s, key, dt) {
+    const m = s[key];
+    if (m.phase === 'run') {
+      m.t += dt;
+      if (m.t >= (key === 'saw' ? CFG.sawSec : CFG.extractSec)) {
+        const outs = millOut(key, m);
+        outs.forEach((item, i) => m.belt.push({ item, t: -i * 0.3 }));   // one after another down the out-feed
+        if (m.by === 'player') s.tally.player[key === 'saw' ? 'sawn' : 'extracted']++;
+        ev(s, 'milled', { at: key, item: m.item, outs });
+        m.phase = 'idle'; m.t = 0; m.item = null; m.cut = null; m.by = null;
+      }
+    }
+    for (let k = m.belt.length - 1; k >= 0; k--) {
+      const it = m.belt[k];
+      it.t += dt;
+      if (it.t >= CFG.outSec + CFG.dropSec) { m.belt.splice(k, 1); m.out.push(it.item); ev(s, 'binned', { at: key, item: it.item }); }
+    }
+  }
+
+  /* ---------- the sales counter and its customers ---------- */
+  // Nobody needs to stand at the counter: a customer walks in from the left, queues for the stall
+  // and, when there is something in it, taps a card and carries it away. With nothing in it they
+  // wait, and every second each one waits costs 0.1% (the CD, 2026-10-15). What they pay is the
+  // stall's price times customer satisfaction; anything but a medium plank in the medium plank
+  // stall still sells, as one, and costs satisfaction.
+  const waitingNow = s => s.shop.people.filter(c => c.state === 'wait').length;
+  function towards(c, x, y, d) {
+    const dx = x - c.x, dy = y - c.y, l = Math.hypot(dx, dy);
+    if (l <= d) { c.x = x; c.y = y; return true; }
+    c.x += dx / l * d; c.y += dy / l * d;
+    return false;
+  }
+  function buy(s, c) {
+    const st = s.stalls[c.stall] || s.stalls[0], fair = c.item === st.want, p = paid(s, priceOf(st.want));
+    s.money += p; s.earned += p;
+    if (fair) s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);
+    else { s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit); s.shop.wrong++; }
+    s.shop.served++;
+    c.state = 'out'; c.t = 0; c.wrong = !fair;
+    ev(s, 'sold', { item: c.item, paid: p, sale: fair ? 'fair' : 'wrong', by: c.by, id: c.id, x: c.x, y: c.y });
+  }
+  function stepShop(s, dt) {
+    const P = CFG.shop, sh = s.shop, st = s.stalls[0];
+    let line = sh.people.filter(c => c.state !== 'out');
+    if (s.t >= sh.next && line.length < P.max) {
+      const c = { id: sh.n, x: SHOP.door.x, y: SHOP.lineY, state: 'in', t: 0, stall: 0, item: null, by: null, wrong: false };
+      sh.people.push(c); line.push(c); sh.n++;
+      sh.next = s.t + roll(s, 'arrive', P.every.map(v => [v, 1 / P.every.length]), P.every[P.every.length - 1]);
+      ev(s, 'customer', { id: c.id });
+    }
+    let waiting = 0;
+    line.forEach((c, k) => {
+      if (c.state === 'pay') { c.t += dt; if (c.t >= P.paySec) buy(s, c); return; }
+      if (!towards(c, SHOP.x0 - k * P.gap, SHOP.lineY, P.speed * dt)) { c.state = 'in'; c.t = 0; return; }
+      if (k === 0 && st.stock.length) {
+        const g = st.stock.shift();
+        c.state = 'pay'; c.t = 0; c.item = g.item; c.by = g.by;
+        ev(s, 'paying', { id: c.id, item: g.item });
+        return;
+      }
+      c.t = c.state === 'wait' ? c.t + dt : 0;   // how long it has been standing there
+      c.state = 'wait'; waiting++;
+    });
+    // leaving: back from the counter to the wall, and along it to the door
+    for (let k = sh.people.length - 1; k >= 0; k--) {
+      const c = sh.people[k];
+      if (c.state !== 'out') continue;
+      c.t += dt;
+      const d = P.speed * dt;
+      if (c.y > SHOP.walkY + 1e-6) towards(c, c.x - 0.25, SHOP.walkY, d);
+      else if (towards(c, SHOP.door.x, SHOP.walkY, d)) sh.people.splice(k, 1);
+    }
+    if (waiting) s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satWait * waiting * dt);
+  }
+  const room = s => CFG.stallCap - s.stalls[0].stock.length;
+
   /* ---------- the avatar ---------- */
+  // where you put things down and pick them up: the bins your arms fill from and empty into
+  function store(s, place) {
+    switch (place) {
+      case 'rack': return s.rack;
+      case 'bin': return s.bin;
+      case 'recycle': return s.recycle;
+      case 'sawIn': return s.saw.in;
+      case 'sawOut': return s.saw.out;
+      case 'extractIn': return s.extract.in;
+      case 'extractOut': return s.extract.out;
+      case 'benchIn': return s.bench.in;
+      case 'benchOut': return s.bench.out;
+    }
+    return null;
+  }
+  const OUTS = ['bin', 'sawOut', 'extractOut', 'benchOut'];
+  const BUBBLES = ['rack', 'sawIn', 'extractIn', 'benchIn', 'recycle', 'saw', 'dock'];
+  const PLACES = ['machine', 'counter', 'extract', 'bench', 'robot', 'floor'].concat(OUTS, BUBBLES);
   function spotFor(s, task) {
+    const a = s.avatar;
     switch (task.kind) {
       case 'machine': return SPOT.press;
-      case 'bin': return SPOT.bin;
-      case 'dock': return SPOT.dock;
+      case 'bin': return pathLen(s, a, SPOT.binN) < pathLen(s, a, SPOT.bin) ? SPOT.binN : SPOT.bin;   // whichever side is nearer
       case 'robot': {
-        const r = s.robots[task.id], a = s.avatar;
+        const r = s.robots[task.id];
         const dx = a.x - r.x, dy = a.y - r.y, d = Math.hypot(dx, dy) || 1;
         const p = nearestFree(s, r.x + dx / d * 0.75, r.y + dy / d * 0.75);
         return { x: p.x, y: p.y, face: Math.atan2(r.y - p.y, r.x - p.x) };
       }
-      default: return nearestFree(s, task.x, task.y);
+      case 'floor': return nearestFree(s, task.x, task.y);
+      default: return SPOT[task.kind] || nearestFree(s, a.x, a.y);
     }
   }
   function tap(s, task) {
     const a = s.avatar;
+    if (!task || PLACES.indexOf(task.kind) < 0) return;
     if (task.kind === 'robot' && !s.robots[task.id]) return;
     a.act = null; s.bubble = null;
     a.task = Object.assign({ arrived: false }, task);
@@ -1079,21 +1271,35 @@ const FACTORY = (function () {
     t.arrived = true;
     if (t.spot && t.spot.face !== undefined) a.yawT = t.spot.face;
     if (t.kind === 'machine') work(s);
+    else if (OUTS.indexOf(t.kind) >= 0) a.act = { kind: 'pick', t: 0, from: t.kind, done: false };
+    else if (t.kind === 'counter') a.act = { kind: 'stock', t: 0, done: false };
+    else if (t.kind === 'extract') pressMill(s, 'extract');
+    else if (t.kind === 'bench') carve(s);
     else if (t.kind === 'robot') {
       const r = s.robots[t.id];
       if (r) { a.yawT = Math.atan2(r.y - a.y, r.x - a.x); s.bubble = { kind: 'robot', id: t.id }; }
     } else if (t.kind !== 'floor') s.bubble = { kind: t.kind };
     ev(s, 'arrive', { place: t.kind });
   }
-  // you at machine 01 always get it right: you scrub a jam, toss a bad log (gnarled, small or
-  // sappy) in the recycle bin and wait for the next, and press on a good one
+  // you at the planer always get it right: you scrub a jam, press a normal medium log (or any
+  // normal log you put on the rack yourself), and toss anything else in the recycle bin
+  const yours = m => m.log === 'log.m' || (m.mine && kindOf(m.log) === 'log');
   function work(s) {
     const a = s.avatar, m = s.machine;
     if (m.phase === 'jam') a.act = { kind: 'clean', t: 0 };
     else if (m.phase !== 'ready') a.act = null;
     else if (m.staged < 1) a.act = { kind: 'wait', t: 0 };
-    else if (m.log !== 'log') a.act = { kind: 'toss', t: 0, item: m.log, done: false };
-    else a.act = { kind: 'press', t: 0, done: false };
+    else if (!yours(m)) a.act = { kind: 'toss', t: 0, item: m.log, done: false };
+    else a.act = { kind: 'press', t: 0, on: 'planer', done: false };
+  }
+  function pressMill(s, key, cut) {
+    const a = s.avatar;
+    a.act = canMill(s, key) ? { kind: 'press', t: 0, on: key, cut: cut || null, done: false } : null;
+  }
+  // the bench: carve the first piece of gnarled wood in its input bin into something to keep
+  function carve(s) {
+    const b = s.bench;
+    s.avatar.act = b.item || b.in.length ? { kind: 'carve', t: 0 } : null;
   }
   function stepAvatar(s, dt) {
     const a = s.avatar;
@@ -1103,8 +1309,11 @@ const FACTORY = (function () {
       if (k.kind === 'press') {
         if (!k.done && k.t >= CFG.pressSec * 0.55) {
           k.done = true;
-          if (m.phase === 'ready' && m.log !== 'log') { work(s); return; }   // it changed under your hand
-          if (press(s, 'player')) s.tally.player.pressed++;
+          if (k.on && k.on !== 'planer') { startMill(s, k.on, k.cut, 'player'); }
+          else {
+            if (m.phase === 'ready' && !yours(m)) { work(s); return; }   // it changed under your hand
+            if (press(s, 'player')) s.tally.player.pressed++;
+          }
         }
         if (k.t >= CFG.pressSec) a.act = null;
       } else if (k.kind === 'toss') {
@@ -1115,7 +1324,44 @@ const FACTORY = (function () {
       } else if (k.kind === 'clean') {
         if (m.phase !== 'jam') { a.act = null; return; }
         m.dirt = Math.max(0, m.dirt - dt / CFG.cleanSec);
-        if (m.dirt <= 0) { restage(s); a.act = null; ev(s, 'cleaned'); }
+        if (m.dirt <= 0) {
+          restage(s); a.act = null;
+          spend(s, 'fixes', CFG.fixCost); s.tally.player.fixed++;
+          ev(s, 'cleaned', { cost: CFG.fixCost });
+        }
+      } else if (k.kind === 'pick') {
+        if (!k.done && k.t >= CFG.pickSec * 0.5) {
+          k.done = true;
+          const from = store(s, k.from), got = from.splice(0, from.length);
+          a.inv.push.apply(a.inv, got);
+          k.n = got.length;
+          ev(s, 'picked', { from: k.from, items: got });
+        }
+        if (k.t >= CFG.pickSec) a.act = null;
+      } else if (k.kind === 'stock') {
+        if (!k.done && k.t >= CFG.stockSec * 0.5) {
+          k.done = true;
+          const st = s.stalls[0], got = [];
+          for (let i = a.inv.length - 1; i >= 0 && room(s) - got.length > 0; i--) if (a.inv[i] === st.want) got.push(a.inv.splice(i, 1)[0]);
+          got.forEach(item => st.stock.push({ item, by: 'player' }));
+          s.tally.player.stocked += got.length;
+          k.n = got.length;
+          if (got.length) ev(s, 'stocked', { by: 'player', item: st.want, n: got.length });
+        }
+        if (k.t >= CFG.stockSec) a.act = null;
+      } else if (k.kind === 'carve') {
+        const b = s.bench;
+        if (!b.item) {
+          if (!b.in.length) { a.act = null; return; }
+          b.item = b.in.shift(); b.t = 0; b.design = roll(s, 'carve', DESIGNS.map(d => [d, 1 / DESIGNS.length]), DESIGNS[DESIGNS.length - 1]);
+        }
+        b.t += dt;
+        if (b.t >= CFG.carveSec) {
+          const made = 'carving.' + b.design;
+          b.out.push(made); s.tally.player.carved++;
+          ev(s, 'carved', { from: b.item, item: made });
+          b.item = null; b.t = 0; b.design = null; a.act = null;
+        }
       } else if (k.t >= (k.dur || 0.3)) a.act = null;
       return;
     }
@@ -1126,15 +1372,15 @@ const FACTORY = (function () {
   function newRobot(s) {
     const i = s.robots.length, r = SPOT.rest[i];
     return { id: i, name: CFG.names[i], x: r.x, y: r.y, yawT: r.face, path: [], dist: 0, job: null, state: 'unbox', t: 0,
-      goal: null, think: false, check: false, sale: null, hunt: null, carry: null, mood: null, moodT: 0,
+      goal: null, think: false, check: false, hunt: null, carry: null, mood: null, moodT: 0,
       against: false, outSlip: false, huntSlip: false,
       slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {}, since: s.t };
   }
-  function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'sell' ? SPOT.sell : SPOT.rest[r.id]; }
-  // a robot taken off a job lets go of what the job had it holding
+  function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'stock' ? SPOT.stock : SPOT.rest[r.id]; }
+  // a robot taken off a job lets go of what the job had it holding (back in the bin it came from)
   function release(s, r) {
     if (r.carry) s.bin.unshift(r.carry);
-    r.carry = null; r.think = false; r.check = false; r.sale = null; r.hunt = null; r.against = false; r.outSlip = false; r.huntSlip = false;
+    r.carry = null; r.think = false; r.check = false; r.hunt = null; r.against = false; r.outSlip = false; r.huntSlip = false;
     r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;
   }
   function stepRobot(s, r, dt) {
@@ -1152,9 +1398,9 @@ const FACTORY = (function () {
       r.yawT = home.face; r.goal = key;
     }
     if (r.job === 'operate') operate(s, r, dt);
-    else if (r.job === 'sell') vend(s, r, dt);
+    else if (r.job === 'stock') stocker(s, r, dt);
   }
-  // the operator's turn at machine 01: look at the log (one it holds an instruction about goes in
+  // the operator's turn at the planer: look at the log (one it holds an instruction about goes in
   // the recycle bin; each such instruction gets its own chance to be followed), then (perhaps) a
   // think, then a press. Cutting a log one of its instructions was about is against its instructions
   function operate(s, r, dt) {
@@ -1163,7 +1409,7 @@ const FACTORY = (function () {
       case 'idle': {
         if (m.phase === 'jam') { r.mood = 'stuck'; r.moodT = 0.5; return; }
         if (!ready(s)) return;
-        const held = RULES.filter(q => q.rejects && q.rejects.indexOf(m.log) >= 0 && has(r, q.id));
+        const held = RULES.filter(q => rejectsLog(q, m.log) && has(r, q.id));
         if (held.some(q => follows(s, r, q.id))) { r.state = 'reject'; r.t = 0; return; }
         r.against = held.length > 0;
         r.think = chance(s, 'think', U.think);
@@ -1191,84 +1437,82 @@ const FACTORY = (function () {
       case 'wait':
         if (m.phase !== 'run' || m.by !== r.id) { r.state = 'idle'; r.t = 0; r.think = false; }
         return;
-      case 'flick':   // tossing a bad item from the out-feed into the recycle bin
+      case 'flick':   // tossing a bad cut from the out-feed into the recycle bin
         r.yawT = 0.2; r.t += dt;
         if (r.t >= CFG.tossSec) { r.state = 'idle'; r.t = 0; r.think = false; }
         return;
     }
   }
-  // the seller's turn at the bin: "sell the items in this bin". It reaches in and sells what it
-  // takes out. Without an instruction it takes the next thing, whatever it is. Told to sell only
-  // medium planks, it hunts for one through each sale (deciding once a sale, so a slip is 1 sale
-  // in 20): every reach turns up a plank with the chance planks / everything in the bin (the CD's
-  // rule, 2026-10-14), and one that turns up something else picks it in proportion to what is
-  // there. Whatever it turns up that it holds a recycle instruction for goes in the recycle bin
-  // (the fourth brief); anything else turned up on a hunt goes back, a "looking for plank".
-  function vend(s, r, dt) {
-    const U = CFG.uninstructed;
+  // the stocker's turn between the planer's output bin and the stall: "stock the sales counter with
+  // the items in this bin" (the CD, 2026-10-15). Without an instruction it takes the next thing and
+  // puts it in the stall, whatever it is (a red mark in its evals for anything but a medium plank:
+  // a customer will pay for a medium plank and get it). Told to stock only medium planks, it hunts
+  // for one through each stocking (deciding once, so a slip is 1 stocking in 20): every reach turns
+  // one up with the chance medium planks / everything in the bin, and one that turns up something
+  // else picks it in proportion to what is there. Whatever it turns up that it holds a recycle
+  // instruction for goes in the recycle bin; anything else turned up on a hunt goes back, a
+  // "looking for plank".
+  function stocker(s, r, dt) {
+    const st = s.stalls[0];
     switch (r.state) {
       case 'idle':
-        if (s.bin.length) { r.state = 'reach'; r.t = 0; }
+        if (s.bin.length && room(s) > 0) { r.state = 'reach'; r.t = 0; }
         return;
       case 'reach': {
-        r.yawT = 0.3; r.t += dt;
+        r.yawT = S; r.t += dt;
         if (r.t < CFG.reachSec) return;
         if (!s.bin.length) { r.state = 'idle'; return; }
-        if (r.hunt === null) { r.hunt = follows(s, r, 'sellOnly'); r.huntSlip = has(r, 'sellOnly') && !r.hunt; }
+        if (r.hunt === null) { r.hunt = follows(s, r, 'stockOnly'); r.huntSlip = has(r, 'stockOnly') && !r.hunt; }
+        const want = st.want;
         let at = 0;
         if (r.hunt) {
-          const planks = s.bin.filter(k => k === 'plank').length;
-          if (planks && chance(s, 'find', planks / s.bin.length)) at = s.bin.indexOf('plank');
+          const hits = count(s.bin, want);
+          if (hits && chance(s, 'find', hits / s.bin.length)) at = s.bin.indexOf(want);
           else {
-            const kinds = ITEMS.filter(k => k !== 'plank' && s.bin.indexOf(k) >= 0), n = s.bin.length - planks;
-            at = s.bin.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, s.bin.filter(x => x === k).length / n]), kinds[kinds.length - 1]) : kinds[0]);
+            const kinds = ITEMS.filter(k => k !== want && s.bin.indexOf(k) >= 0), n = s.bin.length - hits;
+            at = s.bin.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, count(s.bin, k) / n]), kinds[kinds.length - 1]) : kinds[0]);
           }
         }
         const kind = s.bin[at];
         r.against = false;
-        const out = RULES.find(q => q.recycles === kind);
+        const out = RULES.find(q => q.recycles && recyclesItem(q, kind));
         if (out && !has(r, out.id)) see(s, out.id, r.id);
         else if (out) {
           if (follows(s, r, out.id)) { r.carry = s.bin.splice(at, 1)[0]; r.state = 'drop'; r.t = 0; return; }
           r.against = true;   // it slipped: the thing stays in its hands
         }
-        if (r.hunt && kind !== 'plank') {
+        if (r.hunt && kind !== want) {
           note(r, 'looking' + (r.against ? '!' : ''));
           ev(s, 'looking', { by: r.id, of: s.bin.length, item: kind });
           r.state = 'look'; r.t = 0;
           return;
         }
-        if (kind !== 'plank' && r.huntSlip) r.against = true;
+        if (kind !== want && r.huntSlip) r.against = true;
         r.hunt = null;
-        const item = r.carry = s.bin.splice(at, 1)[0];
-        if (item === 'plank') {
-          const told = follows(s, r, 'price');
-          r.sale = told ? 'fair' : roll(s, 'price', [['free', U.free], ['cheap', U.cheap]], 'fair');
-          r.against = has(r, 'price') && !told && r.sale !== 'fair';
-        } else r.sale = chance(s, 'mislabel', U.mislabel) ? 'mislabel' : 'honest';
-        r.state = 'pitch'; r.t = 0;
+        r.carry = s.bin.splice(at, 1)[0];
+        r.state = 'place'; r.t = 0;
         return;
       }
-      case 'look':   // what it turned up was not a plank: back it goes, and it reaches again
-        r.yawT = 0.3; r.t += dt;
+      case 'look':   // what it turned up was not a medium plank: back it goes, and it reaches again
+        r.yawT = S; r.t += dt;
         if (r.t >= CFG.lookSec) { r.state = 'idle'; r.t = 0; }
         return;
-      case 'drop':   // into the recycle bin, just to its left
-        r.yawT = 2.9; r.t += dt;
+      case 'drop':   // over the out-feed into the recycle bin
+        r.yawT = 2.0; r.t += dt;
         if (r.t >= CFG.tossSec) {
-          recycle(s, r.carry, r.id, 'bin'); credit(s, r.id, 'recycle:' + r.carry);
+          recycle(s, r.carry, r.id, 'robot'); credit(s, r.id, 'recycle:' + r.carry);
           r.carry = null; r.state = 'cool'; r.t = 0;
         }
         return;
-      case 'pitch':
-        r.yawT = 0; r.t += dt;
-        if (r.t >= CFG.pitchSec) {
-          const sale = r.sale, item = r.carry;
-          settle(s, item, sale === 'honest' ? 'fair' : sale, r.id);
-          if (sale === 'free' || sale === 'cheap') see(s, 'price', r.id);
-          if (sale === 'mislabel') see(s, 'sellOnly', r.id);
-          credit(s, r.id, item === 'plank' ? sale : sale + ':' + item, r.against);
-          r.carry = null; r.sale = null; r.against = false; r.state = 'cool'; r.t = 0;
+      case 'place':   // into the stall, once there is room in it
+        r.yawT = N; r.t += dt;
+        if (r.t >= CFG.placeSec && room(s) > 0) {
+          const item = r.carry, right = item === st.want;
+          st.stock.push({ item, by: r.id });
+          ev(s, 'stocked', { by: r.id, item, n: 1 });
+          if (!right) see(s, 'stockOnly', r.id);
+          credit(s, r.id, right ? 'stock' : 'misstock:' + item, r.against);
+          r.carry = null; r.against = false; r.state = 'cool'; r.t = 0;
         }
         return;
       case 'cool':
@@ -1278,8 +1522,8 @@ const FACTORY = (function () {
   }
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
-  const ITEMS = ['plank', 'rough', 'dowels', 'largePlank'];   // plank: a medium plank; rough: a gnarled plank
-  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'pitch', 'cool'];
+  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'place', 'cool'];
+  const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m' };
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
     if (!b || !a.task || !a.task.arrived || a.path.length) return null;
@@ -1287,12 +1531,17 @@ const FACTORY = (function () {
     return b;
   }
   function options(s) {
-    const b = bubbleOpen(s);
+    const b = bubbleOpen(s), a = s.avatar;
     if (!b) return [];
-    if (b.kind === 'bin') {
-      const have = ITEMS.filter(k => s.bin.indexOf(k) >= 0);
-      if (!have.length) return [{ id: 'sell:plank', icon: 'bill', item: 'plank', enabled: false, price: priceNow(s, 'plank') }];
-      return have.map(k => ({ id: 'sell:' + k, icon: 'bill', item: k, enabled: true, price: priceNow(s, k), count: s.bin.filter(x => x === k).length }));
+    if (ACCEPTS[b.kind]) {   // a bin you put things in: what in your arms it takes, and the recycle bin's own things
+      const opts = kindsIn(a.inv.filter(ACCEPTS[b.kind])).map(q => ({ id: 'put:' + q.item, icon: 'put', item: q.item, count: q.n, enabled: true, group: 'put' }));
+      if (b.kind === 'recycle') kindsIn(s.recycle).forEach(q => opts.push({ id: 'take:' + q.item, icon: 'take', item: q.item, count: q.n, enabled: true, group: 'take' }));
+      if (!opts.length) opts.push({ id: 'none', icon: 'put', item: SAMPLE[b.kind], count: 0, enabled: false, group: 'put' });
+      return opts;
+    }
+    if (b.kind === 'saw') {   // which cut: the next plank in the input bin, three ways
+      const can = canMill(s, 'saw'), z = s.saw.in.length ? sizeOf(s.saw.in[0]) : 'm';
+      return CUTS.map(c => ({ id: 'cut:' + c, icon: 'cut', item: c + '.' + z, enabled: can, count: s.saw.in.length }));
     }
     if (b.kind === 'dock') {
       const p = hirePrice(s);
@@ -1302,7 +1551,7 @@ const FACTORY = (function () {
       const r = s.robots[b.id];
       return [
         { id: 'job:operate', icon: 'button', enabled: true, on: r.job === 'operate' },
-        { id: 'job:sell', icon: 'bill', enabled: true, on: r.job === 'sell' },
+        { id: 'job:stock', icon: 'stock', enabled: true, on: r.job === 'stock' },
         { id: 'job:rest', icon: 'rest', enabled: true, on: r.job === null },
         { id: 'notes', icon: 'notes', enabled: true, filled: r.rules.filter(Boolean).length, slots: r.slots }
       ];
@@ -1313,15 +1562,25 @@ const FACTORY = (function () {
     const o = options(s).find(x => x.id === id);
     if (!o || !o.enabled) return false;
     const b = s.bubble, a = s.avatar;
-    if (id.indexOf('sell:') === 0) {
-      const item = id.slice(5), k = s.bin.indexOf(item);
-      if (k < 0) return false;
-      s.bin.splice(k, 1);
-      settle(s, item, 'fair', 'player');
-      s.tally.player.sold++;
-      a.act = { kind: 'sell', t: 0, dur: 0.3, item };
+    if (id.indexOf('put:') === 0) {   // everything of that kind in your arms goes in
+      const item = id.slice(4), to = store(s, b.kind);
+      let n = 0;
+      for (let i = a.inv.length - 1; i >= 0; i--) if (a.inv[i] === item) { a.inv.splice(i, 1); n++; }
+      for (let i = 0; i < n; i++) { if (b.kind === 'recycle') recycle(s, item, 'player', 'hands'); else to.push(item); }
+      if (b.kind !== 'recycle') ev(s, 'put', { at: b.kind, item, n });
+      a.act = { kind: 'put', t: 0, dur: CFG.putSec, item };
       return true;
     }
+    if (id.indexOf('take:') === 0) {   // and back out of the recycle bin into your arms
+      const item = id.slice(5);
+      let n = 0;
+      for (let i = s.recycle.length - 1; i >= 0; i--) if (s.recycle[i] === item) { s.recycle.splice(i, 1); n++; }
+      for (let i = 0; i < n; i++) a.inv.push(item);
+      ev(s, 'took', { item, n });
+      a.act = { kind: 'put', t: 0, dur: CFG.putSec, item };
+      return true;
+    }
+    if (id.indexOf('cut:') === 0) { pressMill(s, 'saw', id.slice(4)); return true; }
     if (id === 'hire') {
       s.money -= o.price; s.hired++;
       const r = newRobot(s);
@@ -1359,6 +1618,9 @@ const FACTORY = (function () {
       s.robots.forEach(r => stepRobot(s, r, h));
       stepMachine(s, h);
       stepBelt(s, h);
+      stepMill(s, 'saw', h);
+      stepMill(s, 'extract', h);
+      stepShop(s, h);
       dt -= h;
     }
     return s;
@@ -1369,50 +1631,84 @@ const FACTORY = (function () {
     const o = Object.assign({}, s, { events: [], force: {} });
     return JSON.stringify(o);
   }
+  const ACTS = ['press', 'toss', 'wait', 'clean', 'pick', 'stock', 'carve', 'put'];
   function load(text) {
     try {
       const d = JSON.parse(text);
       if (!d || d.version !== CFG.version || !d.machine || !Array.isArray(d.robots)) return null;
       const s = Object.assign(newGame(), d, { events: [], force: {} });
+      const items = (v, ok) => (Array.isArray(v) ? v : []).filter(x => isItem(x) && (!ok || ok(x)));
+      const belt = v => (Array.isArray(v) ? v : []).filter(it => it && isItem(it.item)).map(it => ({ item: it.item, t: Math.min(CFG.outSec + CFG.dropSec, +it.t || 0), by: it.by }));
+      s.rack = items(d.rack, ACCEPTS.rack); s.bin = items(d.bin); s.recycle = items(d.recycle); s.belt = belt(d.belt);
+      ['saw', 'extract'].forEach(key => {
+        const m = Object.assign(newMill(), d[key] && typeof d[key] === 'object' ? d[key] : {});
+        m.in = items(m.in, ACCEPTS[key + 'In']); m.out = items(m.out); m.belt = belt(m.belt);
+        if (m.phase !== 'run' || !isItem(m.item) || !ACCEPTS[key + 'In'](m.item) || (key === 'saw' && CUTS.indexOf(m.cut) < 0)) { m.phase = 'idle'; m.item = null; m.cut = null; m.by = null; }
+        m.t = Math.max(0, +m.t || 0);
+        s[key] = m;
+      });
+      const b = Object.assign({ in: [], out: [], item: null, t: 0, design: null }, d.bench && typeof d.bench === 'object' ? d.bench : {});
+      b.in = items(b.in, ACCEPTS.benchIn); b.out = items(b.out);
+      if (!isItem(b.item) || !ACCEPTS.benchIn(b.item) || DESIGNS.indexOf(b.design) < 0) { b.item = null; b.design = null; b.t = 0; }
+      b.t = Math.max(0, Math.min(CFG.carveSec, +b.t || 0));
+      s.bench = b;
+      s.stalls = CFG.stalls.map((q, i) => {
+        const was = d.stalls && d.stalls[i] && Array.isArray(d.stalls[i].stock) ? d.stalls[i].stock : [];
+        return { want: q.want, stock: was.filter(g => g && isItem(g.item)).slice(0, CFG.stallCap).map(g => ({ item: g.item, by: g.by })) };
+      });
+      const sh = d.shop && typeof d.shop === 'object' ? d.shop : {};
+      s.shop = {
+        people: (Array.isArray(sh.people) ? sh.people : []).filter(c => c && ['in', 'wait', 'pay', 'out'].indexOf(c.state) >= 0 && Number.isFinite(+c.x) && Number.isFinite(+c.y))
+          .slice(0, CFG.shop.max * 2).map(c => ({ id: c.id | 0, x: +c.x, y: +c.y, state: c.state === 'pay' && !isItem(c.item) ? 'in' : c.state, t: +c.t || 0, stall: 0,
+            item: isItem(c.item) ? c.item : null, by: c.by, wrong: !!c.wrong })),
+        next: Number.isFinite(+sh.next) ? +sh.next : s.t + CFG.shop.first, n: Math.max(0, sh.n | 0), served: Math.max(0, sh.served | 0), wrong: Math.max(0, sh.wrong | 0)
+      };
       s.robots = s.robots.slice(0, CFG.hire.length);
       s.hired = s.robots.length;
       s.seen = {};
-      const seenWas = {};
-      Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true) seenWas[RENAMED[k] || k] = true; });
-      RULES.forEach(q => { if (seenWas[q.id]) s.seen[q.id] = true; });
+      Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true && RULE[k]) s.seen[k] = true; });
       s.robots.forEach((r, i) => {
         r.id = i;
         r.name = typeof r.name === 'string' && r.name.trim() ? r.name.trim().slice(0, CFG.nameMax) : CFG.names[i];
         r.slots = Math.max(0, Math.min(CFG.slots.length, r.slots | 0));
-        const was = (Array.isArray(r.rules) ? r.rules : []).map(id => RENAMED[id] || id), rules = [];
+        const was = Array.isArray(r.rules) ? r.rules : [], rules = [];
         for (let k = 0; k < r.slots; k++) {
           const id = RULE[was[k]] && rules.indexOf(was[k]) < 0 ? was[k] : null;
           rules.push(id);
           if (id) s.seen[id] = true;   // an instruction a robot holds has been seen
         }
         r.rules = rules;
+        if (r.job !== 'operate' && r.job !== 'stock') r.job = null;
         r.record = r.record && typeof r.record === 'object' ? r.record : {};
+        r.tally = r.tally && typeof r.tally === 'object' ? { good: r.tally.good | 0, soso: r.tally.soso | 0, bad: r.tally.bad | 0 } : { good: 0, soso: 0, bad: 0 };
         r.since = Number.isFinite(+r.since) ? Math.min(+r.since, s.t) : 0;
         r.against = !!r.against; r.outSlip = !!r.outSlip; r.huntSlip = !!r.huntSlip;
-        // a state this build does not have (the old sap run) or a held thing that is not an item:
-        // back to idle, anything sellable it held back in the bin
-        if (ITEMS.indexOf(r.carry) < 0) r.carry = null;
+        if (!isItem(r.carry)) r.carry = null;
         if (typeof r.hunt !== 'boolean') r.hunt = null;
-        if (STATES.indexOf(r.state) < 0) release(s, r);
+        if (STATES.indexOf(r.state) < 0 || ((r.state === 'drop' || r.state === 'place') && !r.carry)) release(s, r);
       });
-      if (s.machine.sap) s.machine.log = 'sappy';   // sap poured on it, before sap came in on the logs
-      delete s.machine.sap;
-      if (LOGS.indexOf(s.machine.log) < 0) s.machine.log = 'log';
-      s.recycled = Array.isArray(s.recycled) ? s.recycled.slice(-6) : [];
+      const m = s.machine;
+      if (LOGS.indexOf(m.log) < 0) m.log = 'log.m';
+      m.mine = !!m.mine && kindOf(m.log) === 'log';
+      if (m.phase === 'run') { m.result = makes(m.log); if (!m.what) m.what = m.result === 'plank.m' ? 'plank' : 'cut:' + m.log; }
+      else if (m.phase !== 'ready' && m.phase !== 'jam') { m.phase = 'ready'; m.staged = 1; }
+      const a = s.avatar;
+      a.inv = items(a.inv);
+      if (a.act && ACTS.indexOf(a.act.kind) < 0) a.act = null;
+      if (a.task && PLACES.indexOf(a.task.kind) < 0) { a.task = null; a.path = []; }
       s.satisfaction = Math.max(CFG.satMin, Math.min(100, +s.satisfaction || CFG.satStart));
       s.money = Math.round(+s.money) || 0;   // money may be below zero (logs cost money)
       s.spent = Math.max(0, Math.round(+s.spent) || 0);
+      const c = d.costs && typeof d.costs === 'object' ? d.costs : {};
+      s.costs = { logs: Math.max(0, c.logs | 0), fixes: Math.max(0, c.fixes | 0), saw: Math.max(0, c.saw | 0), extract: Math.max(0, c.extract | 0) };
+      s.tally.player = Object.assign(newGame().tally.player, s.tally && s.tally.player);
       return s;
     } catch (e) { return null; }
   }
 
-  return { CFG, LAYOUT, ITEMS, LOGS, MAKES, RULES, BASE, GRADE, gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice,
-    known, slotsOpen, slotPrice, buySlot, setRule, rename, resetEvals, ready, path, free, nearestFree, grid, save, load, rects, CELL };
+  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, RULES, BASE, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, keepers,
+    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, known, slotsOpen, slotPrice, buySlot, setRule, rename,
+    resetEvals, ready, canMill, store, waitingNow, kindsIn, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
 if (typeof module !== 'undefined') module.exports = FACTORY;
 </script>
@@ -1497,7 +1793,9 @@ const SND = (function () {
     good: () => { tone(784, 0.07, 0.07, 'square'); tone(1047, 0.1, 0.07, 'square', 0.06); },
     meh: () => tone(523, 0.14, 0.07, 'square'),
     bad: () => { tone(330, 0.1, 0.08, 'square'); tone(247, 0.16, 0.08, 'square', 0.08); },
-    toss: () => { noise(0.12, 0.22, 900, 'bandpass', 0, 2); tone(150, 0.12, 0.14, 'sine', 0.2, 80); }
+    toss: () => { noise(0.12, 0.22, 900, 'bandpass', 0, 2); tone(150, 0.12, 0.14, 'sine', 0.2, 80); },
+    bell: () => { tone(1319, 0.45, 0.05, 'sine'); tone(988, 0.6, 0.045, 'sine', 0.13); },
+    card: () => { tone(1760, 0.06, 0.06, 'sine'); tone(2349, 0.09, 0.05, 'sine', 0.08); }
   };
   function sfx(name) { if (FX[name]) FX[name](); }
   // machine01 running: a buzz under a filtered noise, for as long as the cut takes. It is the
@@ -2093,7 +2391,7 @@ const MODE = (function () {
     const S = clamp(Math.min((w - 32) / L.W, h / ((h < 500 ? 9.5 : 13) * SE)), 34, 110);
     VW.S = S;
     VW.ox = Math.round((w - L.W * S) / 2);
-    VW.minY = -(58 + 2.75 * CE * S);
+    VW.minY = -(58 + (WALL_H + 0.05) * CE * S);
     VW.maxY = Math.max(VW.minY, (L.H * SE + 0.3 * CE) * S + 24 - h);
     VW.camY = first ? VW.minY : clamp(VW.camY, VW.minY, VW.maxY);
     VW.gen++;
@@ -2276,110 +2574,178 @@ const MODE = (function () {
     floor: '#cdd5dc', tile: '#bcc6cf', zone: '#c2cbd3', stripe: '#f2c230', back: '#26303c',
     wall: '#c8d2db', wallTop: '#9eacb9', kick: '#66788a', glass: '!#bfe6ff', mullion: '#55697c',
     board: '#3b4450', boardTop: '#56616f', boardFace: '!#1c2430',
+    shopFloor: '#dcc29c', shopLine: '#c9aa80', counter: '#8a5a38', counterTop: '#c99460', counterFront: '#74492c', door: '#f2c230', doorTop: '#2b3139',
     steel: '#5d8fb8', steelTop: '#83b4da', hood: '#4a789f', plinth: '#47525e', dark: '#2b3139',
     rail: '#5c6672', bed: '#2d333b', yellow: '#f2c230', panel: '#e8ecf0', panelTop: '#f5f7f9',
     bark: '#7a4a2a', woodEnd: '#e0b072', plank: '#ebc77f', plankTop: '#f3d595', rough: '#c99a58', roughTop: '#d7ab6c', dowel: '#e6c58c', band: '#d0453b',
-    sap: '#8fc21f', hole: '#22140a',
-    bin: '#3d7cc4', binTop: '#8fc0f0', crate: '#d7a15d', crateTop: '#e9bc7f', slat: '#b98443',
-    desk: '#8a6a4c', deskTop: '#a8835f', monitor: '#2a3038', key: '#d9dee3',
+    sap: '#8fc21f', hole: '#22140a', jar: '#bfe7a0', jarTop: '#d9f5c2', lid: '#6b7682',
+    bin: '#3d7cc4', binTop: '#8fc0f0', binFloor: '#24507e', binFloorTop: '#2b5d92',
+    inBin: '#7d8a97', inBinTop: '#a9b6c2', inFloor: '#4a5561', inFloorTop: '#56616d',
+    crate: '#d7a15d', crateTop: '#e9bc7f', slat: '#b98443',
+    saw: '#9aa6b2', sawTop: '#d9dfe5', guard: '#f2862e',
+    ext: '#5f9147', extTop: '#86b86a', tank: '!#d6f3bf', tankRim: '#7d8a97',
+    bench: '#a8794c', benchTop: '#c99a64', tool: '#56606b', handle: '#d0453b',
     dockPanel: '#e3e8ec', accent0: '#16b3a5', accent1: '#f2862e',
     skin: '#f6c8a2', hair: '#5a3a22', shirt: '#3d7fd9', pants: '#3b4350', boot: '#6b4a2e', hat: '#ffc928', hatBrim: '#f0b414',
-    robot: '#eef2f5', robotDark: '#3b4450', limb: '#9aa5b1', face: '!#13202b', cone: '#ff7a2e', tarp: '#7fb2d9', pallet: '#c49a63',
+    robot: '#eef2f5', robotDark: '#3b4450', limb: '#9aa5b1', face: '!#13202b',
     gnarl: '#5b3a22', recycle: '#2e9e5b', recycleIn: '#173d27', recycleRim: '#46b874', recycleRimTop: '#5fcb88'
   };
   // the antenna bulb: how many instructions the robot holds (none, 1-2, 3-4, all five)
   const BULB_COL = ['#e05a4f', '#f2a33a', '#f2d23a', '#4fd07a'];
   const bulbOf = r => { const n = r.rules.filter(Boolean).length; return n === 0 ? 0 : n <= 2 ? 1 : n <= 4 ? 2 : 3; };
-  // the two scoreboards' faces on the back wall, in metres: x spans, then the height and the face's depth
-  const BOARD = { cash: [0.2, 1.95], sat: [3.75, 5.85], z0: 0.95, z1: 2.35, y: 0.5 };
+  // the back wall's boards, in metres: the scoreboards' x spans, their height and the face's depth,
+  // and the goal across the top (the CD, 2026-10-15)
+  const WALL_H = 3.3;
+  const BOARD = { cash: [0.2, 1.95], sat: [3.75, 5.85], z0: 0.95, z1: 2.35, y: 0.5, goal: [0.2, 5.85], g0: 2.55, g1: 3.15 };
+  // the stall's label, a plate on the counter's front under the stall
+  const PLATE = { x0: L.STALL.x0 - 0.05, x1: L.STALL.x1 - 0.1, z0: 0.16, z1: 0.66, y: SO.counter[3] + 0.02 };
+  const ROWY = L.ROW;
 
   /* ---------- the scene's static objects (world coordinates) ---------- */
-  function beltFrame(x0, x1) {
+  function beltFrame(x0, x1, yc) {
+    const a = yc - 0.3, b = yc + 0.3;
     return [
-      box(x0 + 0.05, 2.68, 0, x0 + 0.13, 3.12, 0.45, COL.dark), box(x1 - 0.13, 2.68, 0, x1 - 0.05, 3.12, 0.45, COL.dark),
-      box(x0, 2.66, 0.42, x1, 3.14, 0.52, COL.bed),
-      box(x0, 2.6, 0.42, x1, 2.66, 0.6, COL.rail), box(x0, 3.14, 0.42, x1, 3.2, 0.6, COL.rail)
+      box(x0 + 0.05, a + 0.08, 0, x0 + 0.13, b - 0.08, 0.45, COL.dark), box(x1 - 0.13, a + 0.08, 0, x1 - 0.05, b - 0.08, 0.45, COL.dark),
+      box(x0, a + 0.06, 0.42, x1, b - 0.06, 0.52, COL.bed),
+      box(x0, a, 0.42, x1, a + 0.06, 0.6, COL.rail), box(x0, b - 0.06, 0.42, x1, b, 0.6, COL.rail)
     ];
   }
-  function logPrim(len, r) { return xf(cyl(0, 0, -len / 2, r, len, 9, COL.bark, COL.woodEnd), My(Math.PI / 2)); }
+  // an open bin: its floor, back and sides (baked behind what is in it) and its front (in front of it)
+  function binBack(q, c, top, fl, flTop) {
+    return [box(q[0] + 0.02, q[1] + 0.02, 0, q[2] - 0.02, q[3] - 0.02, 0.05, fl, flTop),
+      box(q[0], q[1], 0, q[2], q[1] + 0.08, 0.5, c, top), box(q[0], q[1], 0, q[0] + 0.08, q[3], 0.5, c, top), box(q[2] - 0.08, q[1], 0, q[2], q[3], 0.5, c, top)];
+  }
+  const binFront = (q, c, top) => [box(q[0], q[3] - 0.08, 0, q[2], q[3], 0.5, c, top)];
+  const outBin = q => ({ back: binBack(q, COL.bin, COL.binTop, COL.binFloor, COL.binFloorTop), front: binFront(q, COL.bin, COL.binTop) });
+  const inBin = q => ({ back: binBack(q, COL.inBin, COL.inBinTop, COL.inFloor, COL.inFloorTop), front: binFront(q, COL.inBin, COL.inBinTop) });
+  function console3(q, x) {   // a machine's console: a plinth, a panel, the button's plate (the button itself is live)
+    const cx = (q[0] + q[2]) / 2, cy = (q[1] + q[3]) / 2;
+    return [box(q[0] + 0.07, q[1] + 0.05, 0, q[2] - 0.07, q[3] - 0.06, 0.72, COL.plinth), box(q[0], q[1], 0.72, q[2], q[3], 0.82, COL.panel, COL.panelTop),
+      cyl(x === undefined ? cx : x, cy, 0.82, 0.15, 0.03, 12, '#bfc5cc', '#d5dade')];
+  }
   function sceneObjects() {
     const o = [];
     const add = (id, key, prims, extra) => o.push(Object.assign({ id, key, prims }, extra || {}));
-    // back wall: the money board, a window over machine01, the customer satisfaction board, a pipe
-    // (the CD, 2026-10-14). The boards' faces are baked dark; drawBoards() writes on them live.
-    const board = k => { const b = BOARD[k]; return [
-      box(b[0] - 0.06, 0.45, BOARD.z0 - 0.06, b[1] + 0.06, BOARD.y - 0.01, BOARD.z1 + 0.06, COL.board, COL.boardTop),
-      box(b[0], BOARD.y - 0.01, BOARD.z0, b[1], BOARD.y, BOARD.z1, COL.boardFace, COL.boardFace, COL.boardFace, { ol: 0 })
-    ]; };
+    // back wall: the money board, a window, the customer satisfaction board (the CD, 2026-10-14),
+    // and the goal across the top (the CD, 2026-10-15). The faces are baked dark; drawBoards() writes on them live.
+    const board = (x0, x1, z0, z1) => [
+      box(x0 - 0.06, 0.45, z0 - 0.06, x1 + 0.06, BOARD.y - 0.01, z1 + 0.06, COL.board, COL.boardTop),
+      box(x0, BOARD.y - 0.01, z0, x1, BOARD.y, z1, COL.boardFace, COL.boardFace, COL.boardFace, { ol: 0 })
+    ];
     add('wall', 0.5, [
-      box(0, 0, 0, 6, 0.45, 2.7, COL.wall, COL.wallTop),
+      box(0, 0, 0, 6, 0.45, WALL_H, COL.wall, COL.wallTop),
       box(0, 0.45, 0, 6, 0.52, 0.22, COL.kick),
-      ...board('cash'),
+      ...board(BOARD.cash[0], BOARD.cash[1], BOARD.z0, BOARD.z1),
       box(2.3, 0.45, 1.25, 3.4, 0.47, 2.35, COL.mullion, COL.mullion, COL.mullion, { ol: 0 }),
       box(2.35, 0.47, 1.3, 2.83, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }), box(2.87, 0.47, 1.3, 3.35, 0.48, 2.3, COL.glass, COL.glass, COL.glass, { ol: 0 }),
-      ...board('sat'),
-      xf(cyl(0, 0, 0, 0.06, 6, 8, '#8a96a3'), chain(Mt(0, 0.55, 2.5), My(Math.PI / 2)))
+      ...board(BOARD.sat[0], BOARD.sat[1], BOARD.z0, BOARD.z1),
+      ...board(BOARD.goal[0], BOARD.goal[1], BOARD.g0, BOARD.g1)
     ]);
-    const endLog = (x, z, r, bark) => xf(cyl(0, 0, -0.6, r || 0.12, 1.2, 9, bark || COL.bark, COL.woodEnd), chain(Mt(x, 2.88, z), Mx(Math.PI / 2)));
-    add('rack', 3.6, [
-      box(0.15, 2.2, 0, 1.0, 2.3, 0.7, COL.desk), box(0.15, 3.48, 0, 1.0, 3.58, 0.18, COL.desk),
-      endLog(0.31, 0.12), endLog(0.57, 0.12, 0.12, COL.gnarl), endLog(0.83, 0.12),
-      endLog(0.44, 0.34), endLog(0.71, 0.3, 0.07), endLog(0.57, 0.56)
+    // the shop's door, in the west wall: customers come in here (the CD, 2026-10-15)
+    add('door', 1.72, [
+      box(-0.07, 0.5, 0, 0.05, 0.62, 2.25, COL.door), box(-0.07, 1.6, 0, 0.05, 1.72, 2.25, COL.door),
+      box(-0.07, 0.5, 2.25, 0.05, 1.72, 2.4, COL.doorTop)
     ]);
-    add('inBelt', 3.2, beltFrame(1.0, 2.15));
-    add('outBelt', 3.2, beltFrame(3.55, 4.7));
-    add('machine', 3.58, [
-      box(2.1, 2.2, 0, 3.6, 3.6, 0.18, COL.plinth),
-      box(2.15, 2.25, 0.18, 3.55, 3.55, 1.2, COL.steel, COL.steelTop),
-      box(2.3, 2.4, 1.2, 3.4, 3.4, 1.42, COL.hood),
-      cyl(3.12, 2.65, 1.42, 0.12, 0.36, 9, '#8895a1', '#56606b'),
-      cyl(2.45, 2.7, 1.42, 0.09, 0.06, 9, COL.dark),
-      box(2.35, 3.55, 0.5, 3.35, 3.58, 1.04, '#1c2b38', '#1c2b38', '#1c2b38', { ol: 0.7 }),
-      box(2.45, 3.55, 1.08, 3.25, 3.58, 1.17, COL.yellow)
-    ], { decal: decalMachine, shake: true });
-    add('console', 3.88, [
-      box(2.62, 3.6, 0, 2.98, 3.82, 0.72, COL.plinth),
-      box(2.55, 3.55, 0.72, 3.05, 3.88, 0.82, COL.panel, COL.panelTop),
-      cyl(2.8, 3.71, 0.82, 0.15, 0.03, 12, '#bfc5cc', '#d5dade')
+    // the sales counter, its length of the floor, with the stall's tray on top at the east end
+    const ct = SO.counter, st = L.STALL;
+    add('counter', ct[3] + 0.05, [
+      box(ct[0] + 0.04, ct[1] + 0.03, 0, ct[2] - 0.04, ct[3] - 0.03, st.z - 0.08, COL.counter, COL.counter, COL.counterFront),
+      box(ct[0], ct[1] - 0.04, st.z - 0.08, ct[2], ct[3] + 0.05, st.z, COL.counter, COL.counterTop),
+      box(PLATE.x0 - 0.04, ct[3] - 0.03, PLATE.z0 - 0.04, PLATE.x1 + 0.04, PLATE.y - 0.005, PLATE.z1 + 0.04, COL.board, COL.boardTop),
+      box(PLATE.x0, PLATE.y - 0.006, PLATE.z0, PLATE.x1, PLATE.y, PLATE.z1, COL.boardFace, COL.boardFace, COL.boardFace, { ol: 0 })
     ]);
-    add('binBack', 2.3, [
-      box(4.72, 2.32, 0, 5.73, 3.48, 0.05, '#24507e', '#2b5d92'),
-      box(4.7, 2.3, 0, 5.75, 2.38, 0.5, COL.bin, COL.binTop),
-      box(4.7, 2.3, 0, 4.78, 3.5, 0.5, COL.bin, COL.binTop), box(5.67, 2.3, 0, 5.75, 3.5, 0.5, COL.bin, COL.binTop)
+    add('stall', st.y1 + 0.06, [
+      box(st.x0, st.y0, st.z, st.x1, st.y1, st.z + 0.03, '#d9dee3', '#eef1f4'),
+      box(st.x0, st.y0, st.z, st.x1, st.y0 + 0.05, st.z + 0.2, COL.accent0, '#5fd6ca'),
+      box(st.x0, st.y0, st.z, st.x0 + 0.05, st.y1, st.z + 0.14, COL.accent0, '#5fd6ca'), box(st.x1 - 0.05, st.y0, st.z, st.x1, st.y1, st.z + 0.14, COL.accent0, '#5fd6ca'),
+      box(st.x0, st.y1 - 0.04, st.z, st.x1, st.y1, st.z + 0.08, COL.accent0, '#5fd6ca')
     ]);
-    add('binFront', 3.51, [box(4.7, 3.42, 0, 5.75, 3.5, 0.5, COL.bin, COL.binTop)], { decal: decalBin });
-    add('recycle', 4.35, [
-      box(3.58, 3.88, 0, 4.02, 4.32, 0.6, COL.recycle, COL.recycleIn),
-      box(3.55, 3.85, 0.54, 4.05, 3.93, 0.64, COL.recycleRim, COL.recycleRimTop), box(3.55, 4.27, 0.54, 4.05, 4.35, 0.64, COL.recycleRim, COL.recycleRimTop),
-      box(3.55, 3.93, 0.54, 3.63, 4.27, 0.64, COL.recycleRim, COL.recycleRimTop), box(3.97, 3.93, 0.54, 4.05, 4.27, 0.64, COL.recycleRim, COL.recycleRimTop)
+    // slot 01: the planer (once machine01), its rack of logs, its belts, its output bin
+    const yc = ROWY.planer;
+    const endLog = (x, z, r, bark) => xf(cyl(0, 0, -0.65, r || 0.11, 1.3, 9, bark || COL.bark, COL.woodEnd), chain(Mt(x, yc - 0.03, z), Mx(Math.PI / 2)));
+    add('rack', SO.rack[3], [
+      box(SO.rack[0], SO.rack[1] - 0.05, 0, SO.rack[2], SO.rack[1] + 0.05, 0.7, '#8a6a4c', '#a8835f'), box(SO.rack[0], SO.rack[3] - 0.1, 0, SO.rack[2], SO.rack[3], 0.18, '#8a6a4c', '#a8835f'),
+      endLog(0.29, 0.11), endLog(0.52, 0.11, 0.11, COL.gnarl), endLog(0.75, 0.11),
+      endLog(0.4, 0.31), endLog(0.64, 0.28, 0.07), endLog(0.52, 0.5)
+    ]);
+    add('inBelt', yc + 0.3, beltFrame(SO.inBelt[0], SO.inBelt[2], yc));
+    add('outBelt', yc + 0.3, beltFrame(SO.outBelt[0], SO.outBelt[2], yc));
+    const mq = SO.machine;
+    add('machine', mq[3] + 0.03, [
+      box(mq[0] - 0.05, mq[1] - 0.05, 0, mq[2] + 0.05, mq[3] + 0.05, 0.18, COL.plinth),
+      box(mq[0], mq[1], 0.18, mq[2], mq[3], 1.2, COL.steel, COL.steelTop),
+      box(mq[0] + 0.15, mq[1] + 0.15, 1.2, mq[2] - 0.15, mq[3] - 0.15, 1.42, COL.hood),
+      cyl(mq[0] + 0.97, mq[1] + 0.4, 1.42, 0.12, 0.36, 9, '#8895a1', '#56606b'),
+      cyl(mq[0] + 0.3, mq[1] + 0.45, 1.42, 0.09, 0.06, 9, COL.dark),
+      box(mq[0] + 0.2, mq[3], 0.5, mq[2] - 0.2, mq[3] + 0.03, 1.04, '#1c2b38', '#1c2b38', '#1c2b38', { ol: 0.7 }),
+      box(mq[0] + 0.3, mq[3], 1.08, mq[2] - 0.3, mq[3] + 0.03, 1.17, COL.yellow)
+    ], { decal: (g, ox, oy, S) => frontText(g, ox, oy, S, (mq[0] + mq[2]) / 2, mq[3] + 0.03, 1.125, 'PLANER', 0.075, INK, 800), shake: 'planer' });
+    add('console', SO.console[3], console3(SO.console));
+    const bq = outBin(SO.bin);
+    add('binBack', SO.bin[1], bq.back);
+    add('binFront', SO.bin[3] + 0.01, bq.front, { decal: (g, ox, oy, S) => binLabel(g, ox, oy, S, SO.bin) });
+    const R = SO.recycle;
+    add('recycle', R[3], [
+      box(R[0] + 0.03, R[1] + 0.03, 0, R[2] - 0.03, R[3] - 0.03, 0.6, COL.recycle, COL.recycleIn),
+      box(R[0], R[1], 0.54, R[2], R[1] + 0.08, 0.64, COL.recycleRim, COL.recycleRimTop), box(R[0], R[3] - 0.08, 0.54, R[2], R[3], 0.64, COL.recycleRim, COL.recycleRimTop),
+      box(R[0], R[1] + 0.08, 0.54, R[0] + 0.08, R[3] - 0.08, 0.64, COL.recycleRim, COL.recycleRimTop), box(R[2] - 0.08, R[1] + 0.08, 0.54, R[2], R[3] - 0.08, 0.64, COL.recycleRim, COL.recycleRimTop)
     ], { decal: decalRecycle });
-    add('hatch', 4.72, [
-      box(5.88, 3.5, 0, 6.0, 3.62, 1.6, COL.yellow), box(5.88, 4.58, 0, 6.0, 4.7, 1.6, COL.yellow),
-      box(5.88, 3.5, 1.6, 6.0, 4.7, 1.74, COL.dark)
+    // slots 02 and 03: an input bin, the in-feed, the machine, its console, the out-feed, an output bin
+    [['saw', ROWY.saw], ['extract', ROWY.extract]].forEach(([k, y]) => {
+      const ib = inBin(SO[k + 'In']), ob = outBin(SO[k + 'Out']);
+      add(k + 'InBack', SO[k + 'In'][1], ib.back);
+      add(k + 'InFront', SO[k + 'In'][3] + 0.01, ib.front);
+      add(k + 'InBelt', y + 0.3, beltFrame(SO[k + 'InBelt'][0], SO[k + 'InBelt'][2], y));
+      add(k + 'OutBelt', y + 0.3, beltFrame(SO[k + 'OutBelt'][0], SO[k + 'OutBelt'][2], y));
+      add(k + 'Console', SO[k + 'Console'][3], console3(SO[k + 'Console']));
+      add(k + 'OutBack', SO[k + 'Out'][1], ob.back);
+      add(k + 'OutFront', SO[k + 'Out'][3] + 0.01, ob.front, { decal: (g, ox, oy, S) => binLabel(g, ox, oy, S, SO[k + 'Out']) });
+    });
+    const sq = SO.saw, sy = ROWY.saw;
+    add('saw', sq[3] + 0.02, [
+      box(sq[0] + 0.05, sq[1] + 0.05, 0, sq[0] + 0.15, sq[1] + 0.15, 0.66, COL.dark), box(sq[2] - 0.15, sq[1] + 0.05, 0, sq[2] - 0.05, sq[1] + 0.15, 0.66, COL.dark),
+      box(sq[0] + 0.05, sq[3] - 0.15, 0, sq[0] + 0.15, sq[3] - 0.05, 0.66, COL.dark), box(sq[2] - 0.15, sq[3] - 0.15, 0, sq[2] - 0.05, sq[3] - 0.05, 0.66, COL.dark),
+      box(sq[0] + 0.2, sq[1] + 0.2, 0.12, sq[2] - 0.2, sq[3] - 0.2, 0.62, COL.saw, COL.saw),
+      box(sq[0], sq[1], 0.62, sq[2], sq[3], 0.76, COL.saw, COL.sawTop),
+      box(sq[0] + 0.05, sq[1] + 0.06, 0.76, sq[2] - 0.05, sq[1] + 0.12, 0.88, COL.rail),
+      box(1.94, sy - 0.035, 0.75, 2.96, sy + 0.035, 0.765, '#3d444d', '#3d444d', '#3d444d', { ol: 0 }),
+      box(2.43, sq[1] + 0.12, 0.76, 2.47, sy - 0.02, 1.12, COL.tool), box(2.22, sy - 0.1, 1.08, 2.68, sy + 0.1, 1.16, COL.guard, COL.guard),
+      box(sq[0] + 0.15, sq[3], 0.64, 2.55, sq[3] + 0.02, 0.75, COL.yellow)
+    ], { decal: (g, ox, oy, S) => frontText(g, ox, oy, S, (sq[0] + 0.15 + 2.55) / 2, sq[3] + 0.02, 0.695, 'TABLE SAW', 0.07, INK, 800) });
+    const eq = SO.extract, ey = ROWY.extract;
+    add('extract', eq[3] + 0.02, [
+      box(eq[0] - 0.05, eq[1] - 0.05, 0, eq[2] + 0.05, eq[3] + 0.05, 0.15, COL.plinth),
+      box(eq[0] + 0.05, eq[1] + 0.05, 0.15, eq[2] - 0.05, eq[3] - 0.05, 0.82, COL.ext, COL.extTop),
+      cyl(2.2, ey - 0.05, 0.82, 0.33, 0.06, 14, COL.tankRim, COL.tankRim),
+      cyl(2.2, ey - 0.05, 0.88, 0.3, 0.62, 14, COL.tank, COL.tank, undefined, { ol: 1 }),
+      cyl(2.2, ey - 0.05, 1.5, 0.33, 0.08, 14, COL.tankRim, '#a9b6c2'),
+      cyl(2.2, ey - 0.05, 1.58, 0.06, 0.12, 8, COL.tool),
+      cyl(2.82, ey, 0.82, 0.13, 0.32, 10, COL.jar, COL.sap), cyl(2.82, ey, 1.14, 0.135, 0.05, 10, COL.lid),
+      box(2.47, ey - 0.03, 1.25, 2.84, ey + 0.03, 1.3, COL.tool), box(2.79, ey - 0.03, 1.1, 2.85, ey + 0.03, 1.3, COL.tool),
+      box(eq[0] + 0.15, eq[3] - 0.05, 0.5, 2.55, eq[3] - 0.03, 0.66, COL.yellow)
+    ], { decal: (g, ox, oy, S) => frontText(g, ox, oy, S, (eq[0] + 0.15 + 2.55) / 2, eq[3] - 0.03, 0.58, 'SAP EXTRACTOR', 0.062, INK, 800), shake: 'extract' });
+    // slot 04: a hand crafting bench between an input bin and an output bin, and no machine (the CD)
+    const hi = inBin(SO.benchIn), ho = outBin(SO.benchOut), hq = SO.bench;
+    add('benchInBack', SO.benchIn[1], hi.back);
+    add('benchInFront', SO.benchIn[3] + 0.01, hi.front);
+    add('benchOutBack', SO.benchOut[1], ho.back);
+    add('benchOutFront', SO.benchOut[3] + 0.01, ho.front, { decal: (g, ox, oy, S) => binLabel(g, ox, oy, S, SO.benchOut) });
+    add('bench', hq[3] + 0.02, [
+      box(hq[0] + 0.06, hq[1] + 0.06, 0, hq[0] + 0.16, hq[1] + 0.16, 0.78, COL.bench), box(hq[2] - 0.16, hq[1] + 0.06, 0, hq[2] - 0.06, hq[1] + 0.16, 0.78, COL.bench),
+      box(hq[0] + 0.06, hq[3] - 0.16, 0, hq[0] + 0.16, hq[3] - 0.06, 0.78, COL.bench), box(hq[2] - 0.16, hq[3] - 0.16, 0, hq[2] - 0.06, hq[3] - 0.06, 0.78, COL.bench),
+      box(hq[0] + 0.1, hq[1] + 0.1, 0.18, hq[2] - 0.1, hq[3] - 0.1, 0.24, COL.bench, COL.benchTop),
+      box(hq[0], hq[1], 0.78, hq[2], hq[3], 0.88, COL.bench, COL.benchTop),
+      box(hq[0] + 0.12, hq[3] - 0.02, 0.62, hq[0] + 0.42, hq[3] + 0.1, 0.92, COL.tool), box(hq[0] + 0.24, hq[3] + 0.1, 0.72, hq[0] + 0.3, hq[3] + 0.18, 0.78, COL.handle),
+      box(hq[2] - 0.62, hq[1] + 0.12, 0.88, hq[2] - 0.5, hq[1] + 0.42, 0.94, COL.handle, COL.handle), box(hq[2] - 0.6, hq[1] + 0.42, 0.89, hq[2] - 0.52, hq[1] + 0.56, 0.92, '#c9d2db'),
+      box(hq[2] - 0.42, hq[1] + 0.12, 0.88, hq[2] - 0.32, hq[1] + 0.36, 0.93, '#7a4a2a'), box(hq[2] - 0.4, hq[1] + 0.36, 0.89, hq[2] - 0.34, hq[1] + 0.5, 0.92, '#c9d2db'),
+      box(hq[2] - 0.25, hq[1] + 0.1, 0.88, hq[2] - 0.12, hq[1] + 0.2, 1.0, COL.tool), box(hq[2] - 0.2, hq[1] + 0.2, 0.92, hq[2] - 0.17, hq[1] + 0.48, 0.95, '#7a4a2a')
     ]);
-    add('dockPanel', 7.45, [
-      box(0.4, 7.15, 0, 2.8, 7.45, 1.25, COL.dockPanel, '#c7cfd6'),
-      box(0.4, 7.45, 0.95, 2.8, 7.48, 1.05, COL.accent0, COL.accent0, COL.accent0, { ol: 0 }),
-      box(0.85, 7.45, 0.55, 1.15, 7.62, 0.85, '#9aa5b1'), box(2.05, 7.45, 0.55, 2.35, 7.62, 0.85, '#9aa5b1')
+    add('dockPanel', SO.dockPanel[3], [
+      box(SO.dockPanel[0], SO.dockPanel[1], 0, SO.dockPanel[2], SO.dockPanel[3], 1.25, COL.dockPanel, '#c7cfd6'),
+      box(SO.dockPanel[0], SO.dockPanel[3], 0.95, SO.dockPanel[2], SO.dockPanel[3] + 0.03, 1.05, COL.accent0, COL.accent0, COL.accent0, { ol: 0 }),
+      box(0.85, SO.dockPanel[3], 0.55, 1.15, SO.dockPanel[3] + 0.17, 0.85, '#9aa5b1'), box(2.05, SO.dockPanel[3], 0.55, 2.35, SO.dockPanel[3] + 0.17, 0.85, '#9aa5b1')
     ], { decal: decalDock });
     CRATES_DEF.forEach((c, i) => add('crate' + i, c[3], cratePrims(c), { crate: i }));
-    // the bays further down: room to grow
-    add('pallets', 14.2, [
-      box(0.4, 13.0, 0, 1.6, 14.2, 0.14, COL.pallet),
-      box(0.5, 13.1, 0.14, 1.0, 13.6, 0.6, COL.crate, COL.crateTop), box(1.05, 13.1, 0.14, 1.5, 13.6, 0.5, COL.crate, COL.crateTop),
-      box(0.5, 13.65, 0.14, 1.5, 14.1, 0.45, COL.crate, COL.crateTop), box(0.6, 13.15, 0.6, 1.0, 13.55, 0.95, COL.crate, COL.crateTop)
-    ]);
-    add('tarp', 15.5, [
-      box(2.2, 14.0, 0, 4.0, 15.5, 0.12, COL.plinth),
-      ell(3.1, 14.75, 0.12, 0.88, 0.72, 0.85, 12, 7, COL.tarp, 0.6),
-      box(2.25, 14.7, 0, 3.95, 14.8, 0.5, '#5c8db5', '#5c8db5', '#5c8db5', { ol: 0.6 }),
-      cyl(2.45, 15.3, 0, 0.05, 0.14, 6, COL.dark), cyl(3.75, 15.3, 0, 0.05, 0.14, 6, COL.dark)
-    ]);
-    add('stack', 20.4, [
-      box(4.5, 19.2, 0, 5.6, 20.4, 0.14, COL.pallet),
-      box(4.55, 19.25, 0.14, 5.55, 20.35, 0.7, COL.crate, COL.crateTop), box(4.7, 19.4, 0.7, 5.4, 20.2, 1.15, COL.crate, COL.crateTop)
-    ]);
-    add('cones', 23.4, [0, 1, 2].map(i => cyl(2.72 + i * 0.28, 23.2, 0, 0.11, 0.42, 8, COL.cone, '#ffffff', 0.02)));
     return o;
   }
   const CRATES_DEF = L.CRATES.map(c => [c[0], c[1], c[2], c[3]]);
@@ -2402,16 +2768,17 @@ const MODE = (function () {
     g.fillText(text, 0, 0);
     g.restore();
   }
-  function decalMachine(g, ox, oy, S) { frontText(g, ox, oy, S, 2.85, 3.58, 1.125, 'MACHINE 01', 0.075, INK, 800); }
-  function decalBin(g, ox, oy, S) {
-    g.save(); g.translate(ox + 5.22 * S, oy + (3.5 * SE - 0.26 * CE) * S); g.scale(1, CE);
+  // a white card on an output bin's front
+  function binLabel(g, ox, oy, S, q) {
+    g.save(); g.translate(ox + (q[0] + q[2]) / 2 * S, oy + (q[3] * SE - 0.26 * CE) * S); g.scale(1, CE);
     g.fillStyle = '#ffffff'; g.globalAlpha = 0.85;
     g.fillRect(-0.28 * S, -0.06 * S, 0.56 * S, 0.12 * S);
     g.restore();
   }
   // three chasing arrows on the recycle bin's front
   function decalRecycle(g, ox, oy, S) {
-    g.save(); g.translate(ox + 3.8 * S, oy + (4.33 * SE - 0.29 * CE) * S); g.scale(1, CE);
+    const R = SO.recycle;
+    g.save(); g.translate(ox + (R[0] + R[2]) / 2 * S, oy + ((R[3] - 0.02) * SE - 0.29 * CE) * S); g.scale(1, CE);
     const r = 0.13 * S, hd = 0.055 * S;
     g.strokeStyle = '#ffffff'; g.fillStyle = '#ffffff'; g.lineWidth = Math.max(2, 0.032 * S); g.lineCap = 'round';
     for (let i = 0; i < 3; i++) {
@@ -2425,7 +2792,7 @@ const MODE = (function () {
   }
   function decalDock(g, ox, oy, S) {
     [1.0, 2.2].forEach(x => {
-      g.save(); g.translate(ox + x * S, oy + (7.45 * SE - 0.3 * CE) * S); g.scale(1, CE);
+      g.save(); g.translate(ox + x * S, oy + (SO.dockPanel[3] * SE - 0.3 * CE) * S); g.scale(1, CE);
       g.fillStyle = COL.accent0;
       bolt(g, 0, 0, 0.1 * S);
       g.restore();
@@ -2465,49 +2832,107 @@ const MODE = (function () {
   const outlinePx = () => clamp(VW.S * 0.05, 2, 4.4);
   function spriteRect(id) { const sp = (sprites || []).find(q => q.id === id); return sp ? { x: sp.x, y: sp.y - VW.camY, w: sp.w, h: sp.h } : null; }
 
-  /* ---------- live models ---------- */
-  const M_LOG = logPrim(0.9, 0.12);
-  const M_PLANK = [box(-0.45, -0.13, 0, 0.45, 0.13, 0.06, COL.plank, COL.plankTop),
-    box(-0.3, -0.06, 0.06, 0.25, -0.05, 0.062, '#c9a160', '#c9a160', '#c9a160', { ol: 0 }), box(-0.1, 0.04, 0.06, 0.38, 0.05, 0.062, '#c9a160', '#c9a160', '#c9a160', { ol: 0 })];
-  // a gnarled log's holes, [along, across] in metres; its plank has them in the same places (the CD,
-  // 2026-10-14), since the log runs along x on the belt and the plank comes out along x
+  /* ---------- live models: every thing in the factory, by kind and size ---------- */
+  // how long each size is drawn: 2', 4' and 8' in the CD's words, squeezed onto the belts
+  const LEN = { s: 0.55, m: 0.85, l: 1.1 }, LOG_R = { s: 0.085, m: 0.12, l: 0.16 };
+  // a gnarled log's holes, [along, across] in metres on a medium log; its plank has them in the
+  // same places (the CD, 2026-10-14), since the log runs along x on the belt and the plank comes
+  // out along x. A longer or shorter one has them spread to its length.
   const HOLES = [[-0.25, 0.05], [0.03, -0.06], [0.26, 0.03]];
-  const M_ROUGH = [box(-0.45, -0.13, 0, 0.45, 0.13, 0.06, COL.rough, COL.roughTop)]
-    .concat(HOLES.map(([x, y]) => ell(x, y, 0.05, 0.045, 0.04, 0.014, 8, 3, COL.hole, 1, { ol: 0.5, bias: 0.1 })));   // over the board, wherever they sit on it
-  const M_DOWELS = [0, 1, 2, 3, 4].map(i => xf(cyl(0, 0, -0.45, 0.035, 0.9, 7, COL.dowel, COL.woodEnd), chain(Mt(0, -0.1 + (i % 3) * 0.07 + (i > 2 ? 0.035 : 0), 0.035 + (i > 2 ? 0.06 : 0)), My(Math.PI / 2))))
-    .concat([xf(cyl(0, 0, -0.03, 0.15, 0.06, 8, COL.band), chain(Mt(0, -0.03, 0.06), My(Math.PI / 2), Ms(0.95, 1.1, 1)))]);
-  const M_SPONGE = [box(-0.05, -0.04, -0.03, 0.05, 0.04, 0.03, '#ffd94a')];
+  const holesFor = z => HOLES.map(([x, y]) => [x * LEN[z] / LEN.m, y * Math.min(1, LOG_R[z] / LOG_R.m)]);
   // a hole in a log's upper surface: a dark cap sunk into the bark where [along, across] says
-  const logHole = (x, y, R, w) => ell(x, y, Math.sqrt(R * R - y * y) - 0.012, w, w * 0.85, 0.025, 8, 3, COL.hole, 1, { ol: 0.5 });
-  const M_GNARLED = [xf(cyl(0, 0, -0.42, 0.13, 0.84, 9, COL.gnarl, COL.woodEnd), My(Math.PI / 2))]
-    .concat(HOLES.map(([x, y]) => logHole(x, y, 0.13, 0.05)));
-  // a sap log: holes, and green sap oozing out of them, pooled along its top and running down its
-  // front in drips (a blob at a point `th` radians round from the top toward the camera)
+  const logHole = (x, y, R, w) => ell(x, y, Math.sqrt(Math.max(0, R * R - y * y)) - 0.012, w, w * 0.85, 0.025, 8, 3, COL.hole, 1, { ol: 0.5 });
+  // sap oozing out: a blob at a point `th` radians round from the top toward the camera
   const sapAt = (x, th, R, r, k) => ell(x, R * Math.sin(th), R * Math.cos(th), r, r * (k || 1), r * 0.8, 7, 4, COL.sap, 1.1);
-  const M_SAPPY = [xf(cyl(0, 0, -0.43, 0.125, 0.86, 9, COL.bark, COL.woodEnd), My(Math.PI / 2)),
-    logHole(-0.31, 0.02, 0.125, 0.04), logHole(0.12, -0.05, 0.125, 0.045), logHole(0.33, 0.04, 0.125, 0.035),
-    ell(-0.05, 0.01, 0.118, 0.21, 0.075, 0.035, 10, 4, COL.sap, 1.3), ell(0.15, -0.04, 0.122, 0.07, 0.055, 0.03, 8, 3, COL.sap, 1.2),
-    sapAt(-0.13, 0.6, 0.125, 0.04), sapAt(-0.13, 0.95, 0.125, 0.033), sapAt(-0.13, 1.25, 0.125, 0.04),
-    sapAt(0.08, 0.6, 0.125, 0.035), sapAt(0.08, 0.95, 0.125, 0.042),
-    sapAt(0.3, 0.45, 0.125, 0.03), sapAt(-0.31, 0.45, 0.125, 0.03),
-    ell(-0.1, -0.01, 0.152, 0.07, 0.022, 0.01, 6, 3, '!#efffc4', 1, { ol: 0 }), ell(0.14, -0.05, 0.15, 0.025, 0.014, 0.008, 6, 3, '!#efffc4', 1, { ol: 0 })];
-  const M_SMALL = [xf(cyl(0, 0, -0.36, 0.065, 0.72, 8, COL.bark, COL.woodEnd), My(Math.PI / 2))];
-  // a large log: fatter and longer than a good one, and the plank it makes is wider, longer and thicker
-  const M_LARGE = [xf(cyl(0, 0, -0.52, 0.17, 1.04, 10, COL.bark, COL.woodEnd), My(Math.PI / 2)),
-    xf(cyl(0, 0, -0.005, 0.12, 0.01, 10, '#c99a58', '#c99a58', 0, { ol: 0 }), chain(Mt(0.522, 0, 0), My(Math.PI / 2)))];
-  const M_LPLANK = [box(-0.52, -0.17, 0, 0.52, 0.17, 0.09, COL.plank, COL.plankTop),
-    box(-0.36, -0.08, 0.09, 0.3, -0.07, 0.092, '#c9a160', '#c9a160', '#c9a160', { ol: 0 }), box(-0.12, 0.06, 0.09, 0.44, 0.07, 0.092, '#c9a160', '#c9a160', '#c9a160', { ol: 0 })];
-  // log kinds and the things a press makes share this table ('large' is the log, 'largePlank' its plank)
-  const ITEM_MODEL = { log: [M_LOG], gnarled: M_GNARLED, small: M_SMALL, large: M_LARGE, sappy: M_SAPPY,
-    plank: M_PLANK, rough: M_ROUGH, dowels: M_DOWELS, largePlank: M_LPLANK };
-  const LIFT = { log: 0.65, gnarled: 0.66, small: 0.6, large: 0.7, sappy: 0.655 };   // a log's centre, resting on the belt
+  function logModel(q, z) {
+    const len = LEN[z], R = LOG_R[z], k = len / LEN.m, rk = R / LOG_R.m;
+    const ps = [xf(cyl(0, 0, -len / 2, R, len, z === 'l' ? 10 : 9, q === 'gnarled' ? COL.gnarl : COL.bark, COL.woodEnd), My(Math.PI / 2))];
+    if (q === 'gnarled') holesFor(z).forEach(([x, y]) => ps.push(logHole(x, y, R, 0.05 * rk)));
+    if (q === 'sappy') {
+      ps.push(logHole(-0.31 * k, 0.02 * rk, R, 0.04 * rk), logHole(0.12 * k, -0.05 * rk, R, 0.045 * rk), logHole(0.33 * k, 0.04 * rk, R, 0.035 * rk),
+        ell(-0.05 * k, 0.01, R - 0.007, 0.21 * k, 0.075 * rk, 0.035 * rk, 10, 4, COL.sap, 1.3), ell(0.15 * k, -0.04 * rk, R - 0.003, 0.07 * k, 0.055 * rk, 0.03 * rk, 8, 3, COL.sap, 1.2),
+        sapAt(-0.13 * k, 0.6, R, 0.04 * rk), sapAt(-0.13 * k, 0.95, R, 0.033 * rk), sapAt(-0.13 * k, 1.25, R, 0.04 * rk),
+        sapAt(0.08 * k, 0.6, R, 0.035 * rk), sapAt(0.08 * k, 0.95, R, 0.042 * rk), sapAt(0.3 * k, 0.45, R, 0.03 * rk), sapAt(-0.31 * k, 0.45, R, 0.03 * rk),
+        ell(-0.1 * k, -0.01, R + 0.027 * rk, 0.07 * k, 0.022, 0.01, 6, 3, '!#efffc4', 1, { ol: 0 }), ell(0.14 * k, -0.05 * rk, R + 0.025 * rk, 0.025, 0.014, 0.008, 6, 3, '!#efffc4', 1, { ol: 0 }));
+    }
+    return ps;
+  }
+  function plankModel(kind, z) {
+    const h = LEN[z] / 2, k = LEN[z] / LEN.m;
+    if (kind === 'plank') return [box(-h, -0.13, 0, h, 0.13, 0.06, COL.plank, COL.plankTop),
+      box(-0.3 * k, -0.06, 0.06, 0.25 * k, -0.05, 0.062, '#c9a160', '#c9a160', '#c9a160', { ol: 0 }), box(-0.1 * k, 0.04, 0.06, 0.38 * k, 0.05, 0.062, '#c9a160', '#c9a160', '#c9a160', { ol: 0 })];
+    return [box(-h, -0.13, 0, h, 0.13, 0.06, COL.rough, COL.roughTop)]
+      .concat(holesFor(z).map(([x, y]) => ell(x, y, 0.05, 0.045, 0.04, 0.014, 8, 3, COL.hole, 1, { ol: 0.5, bias: 0.1 })));   // over the board, wherever they sit on it
+  }
+  // what the table saw makes of a plank, banded: two 2"x4"s, four 2"x2"s or sixteen dowel rods
+  function bundleModel(cut, z) {
+    const h = LEN[z] / 2, ps = [];
+    if (cut === 'b2x4') [-1, 1].forEach(sg => ps.push(box(-h, sg > 0 ? 0.005 : -0.125, 0, h, sg > 0 ? 0.125 : -0.005, 0.07, COL.plank, COL.plankTop)));
+    else if (cut === 'b2x2') [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(([i, j]) => ps.push(box(-h, -0.065 + i * 0.068, j * 0.064, h, -0.003 + i * 0.068, 0.06 + j * 0.064, COL.plank, COL.plankTop)));
+    else [0, 1, 2, 3, 4].forEach(i => ps.push(xf(cyl(0, 0, -h, 0.032, 2 * h, 7, COL.dowel, COL.woodEnd), chain(Mt(0, -0.09 + (i % 3) * 0.065 + (i > 2 ? 0.032 : 0), 0.032 + (i > 2 ? 0.055 : 0)), My(Math.PI / 2)))));
+    const top = cut === 'b2x4' ? 0.07 : cut === 'b2x2' ? 0.124 : 0.12;
+    ps.push(box(-0.035, -0.14, -0.005, 0.035, 0.14, top + 0.01, COL.band, COL.band, COL.band, { ol: 0.6 }));
+    return ps;
+  }
+  const M_SAP = [cyl(0, 0, 0, 0.075, 0.15, 10, COL.jar, COL.sap), cyl(0, 0, 0.15, 0.08, 0.035, 10, COL.lid), ell(0, 0, 0.075, 0.05, 0.05, 0.04, 6, 3, COL.sap, 1, { ol: 0, bias: 0.05 })];
+  // what you carve at the bench (gnarled wood, holes and all)
+  const CARVE = {
+    bowl: [cyl(0, 0, 0, 0.09, 0.1, 12, COL.rough, COL.hole, 0.17), ell(0.06, 0.05, 0.1, 0.02, 0.02, 0.006, 6, 3, COL.hole, 1, { ol: 0, bias: 0.05 })],
+    bird: [box(-0.09, -0.06, 0, 0.09, 0.06, 0.04, COL.rough, COL.roughTop), ell(0, 0, 0.12, 0.13, 0.065, 0.075, 8, 5, COL.rough, 1), ell(0.11, 0, 0.21, 0.055, 0.05, 0.055, 8, 5, COL.roughTop, 1),
+      box(0.15, -0.012, 0.2, 0.21, 0.012, 0.22, '#9a6a38'), box(-0.21, -0.03, 0.14, -0.1, 0.03, 0.17, COL.rough)],
+    spoon: [box(-0.2, -0.022, 0, 0.04, 0.022, 0.025, COL.rough, COL.roughTop), ell(0.11, 0, 0.022, 0.08, 0.055, 0.025, 8, 4, COL.roughTop, 1)],
+    owl: [ell(0, 0, 0.13, 0.085, 0.085, 0.13, 8, 6, COL.rough, 1), cyl(-0.01, 0.045, 0.23, 0.025, 0.06, 6, COL.rough, COL.rough, 0.002), cyl(-0.01, -0.045, 0.23, 0.025, 0.06, 6, COL.rough, COL.rough, 0.002),
+      ell(0.07, 0.03, 0.17, 0.02, 0.025, 0.025, 6, 4, '!#f3d595', 1, { ol: 0.5, bias: 0.05 }), ell(0.07, -0.03, 0.17, 0.02, 0.025, 0.025, 6, 4, '!#f3d595', 1, { ol: 0.5, bias: 0.05 })]
+  };
+  const M_SPONGE = [box(-0.05, -0.04, -0.03, 0.05, 0.04, 0.03, '#ffd94a')];
+  const M_CHISEL = [box(-0.015, -0.015, -0.12, 0.015, 0.015, 0, COL.handle), box(-0.008, -0.012, -0.2, 0.008, 0.012, -0.12, '#c9d2db')];
+  const M_CARD = [box(-0.05, -0.035, -0.003, 0.05, 0.035, 0.003, '!#4a8ad9', '!#6aa6ee', '!#4a8ad9', { ol: 0.6 })];
+  const ITEM_MODEL = {};
+  F.ITEMS.forEach(id => {
+    const k = F.kindOf(id), z = F.sizeOf(id);
+    ITEM_MODEL[id] = k === 'log' || k === 'gnarled' || k === 'sappy' ? logModel(k, z) : k === 'plank' || k === 'rough' ? plankModel(k, z) : k === 'sap' ? M_SAP : k === 'carving' ? CARVE[z] : bundleModel(k, z);
+  });
+  const isLog = id => F.LOGS.indexOf(id) >= 0;
+  // where a thing's origin sits, resting on a belt: a log on its centre line, the rest on their bottoms
+  const LIFT = id => isLog(id) ? 0.53 + LOG_R[F.sizeOf(id)] : 0.53;
 
   function drawItem(kind, M, extra) {
-    const ps = ITEM_MODEL[kind].map(p => ({ p, M }));
+    const ps = (ITEM_MODEL[kind] || []).map(p => ({ p, M }));
     if (extra) ps.push.apply(ps, extra);
     drawParts(ps, outlinePx() * 0.8);
   }
-
+  // Things lying in bins, on belts and on the counter are baked once per kind, turn and scale and
+  // blitted: the camera is orthographic with no yaw, so a thing looks the same wherever it lies and
+  // only its position on screen moves (the same parts in the same order as drawItem draws them).
+  // A busy floor holds dozens of them, and drawing each live put the busy scene over budget.
+  const ITEM_BAKE = new Map();
+  let itemBakeGen = -1;
+  function itemSprite(kind, turn, sc) {
+    if (itemBakeGen !== VW.gen) { ITEM_BAKE.clear(); itemBakeGen = VW.gen; }
+    const key = kind + '|' + (turn || 0).toFixed(3) + '|' + (sc || 1).toFixed(3);
+    let sp = ITEM_BAKE.get(key);
+    if (sp) return sp;
+    const M = chain(turn ? Mz(turn) : I3, sc && sc !== 1 ? Ms(sc, sc, sc) : I3), S = VW.S, parts = ITEM_MODEL[kind] || [];
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    parts.forEach(p => { for (let i = 0; i < p.v.length; i += 3) { const q = apply(M, p.v[i], p.v[i + 1], p.v[i + 2]), X = q[0] * S, Y = (q[1] * SE - q[2] * CE) * S; x0 = Math.min(x0, X); x1 = Math.max(x1, X); y0 = Math.min(y0, Y); y1 = Math.max(y1, Y); } });
+    const m = 4;
+    x0 = Math.floor(x0 - m); y0 = Math.floor(y0 - m); x1 = Math.ceil(x1 + m); y1 = Math.ceil(y1 + m);
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round((x1 - x0) * VW.dpr)); c.height = Math.max(1, Math.round((y1 - y0) * VW.dpr));
+    const g = c.getContext('2d');
+    g.scale(VW.dpr, VW.dpr);
+    const ps = parts.map(p => { const cc = apply(M, p.cx, p.cy, p.cz); return { p, d: cc[1] * CE + cc[2] * SE + (p.bias || 0) }; }).sort((a, b) => a.d - b.d);
+    ps.forEach(q => drawPrim(g, q.p, M, -x0, -y0, S, outlinePx() * 0.8));
+    sp = { c, x0, y0 };
+    ITEM_BAKE.set(key, sp);
+    return sp;
+  }
+  function blitItem(kind, x, y, z, turn, sc) {
+    const sp = itemSprite(kind, turn, sc), k = VW.dpr;
+    const X = PX(x) + sp.x0, Y = PY(y, z) + sp.y0;
+    if (Y > VW.h || Y + sp.c.height / k < 0) return;
+    ctx.drawImage(sp.c, Math.round(X * k) / k, Math.round(Y * k) / k, sp.c.width / k, sp.c.height / k);
+  }
   /* the avatar: a chibi in a hard hat, joints as matrices, a walk cycle driven by distance */
   const AV = (function () {
     const P = {
@@ -2525,10 +2950,26 @@ const MODE = (function () {
     };
     return P;
   })();
+  // customers: the same build in their own clothes and hair, and no hard hat
+  const CUST_SHIRT = ['#e0565b', '#5bb37a', '#9b6bd6', '#f2a23a', '#3fb3c9', '#d96aa3', '#7a8a3a'];
+  const CUST_HAIR = ['#2b1d14', '#7a4a22', '#e3c06b', '#3a3a3a', '#b0502a'];
+  const CUST_PANTS = ['#3b4350', '#4b5d7a', '#5a4636', '#2f3a2f'];
+  const CUST = [];
+  function custParts(n) {
+    const k = n % (CUST_SHIRT.length * 5);
+    if (CUST[k]) return CUST[k];
+    const shirt = CUST_SHIRT[k % CUST_SHIRT.length], hair = CUST_HAIR[(k * 3) % CUST_HAIR.length], pants = CUST_PANTS[(k * 5) % CUST_PANTS.length];
+    // the avatar's shapes with fewer facets: there can be seven customers on screen at once
+    return (CUST[k] = { torso: ell(0, 0, 0.17, 0.12, 0.15, 0.18, 7, 4, shirt, 0.85), hips: ell(0, 0, 0.02, 0.11, 0.14, 0.08, 6, 3, pants, 0.8),
+      head: ell(0, 0, 0, 0.22, 0.23, 0.21, 8, 5, COL.skin, 1), hair: ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, 8, 5, hair, 1),
+      bun: k % 3 === 1 ? ell(-0.2, 0, 0.1, 0.09, 0.09, 0.09, 6, 3, hair, 1) : null,
+      arm: ell(0, 0, -0.09, 0.05, 0.05, 0.11, 5, 3, shirt, 1), hand: ell(0, 0, -0.205, 0.055, 0.055, 0.055, 5, 3, COL.skin, 1),
+      thigh: ell(0, 0, -0.065, 0.058, 0.058, 0.08, 5, 3, pants, 1), shin: ell(0, 0, -0.06, 0.05, 0.05, 0.075, 5, 3, pants, 1), boot: AV.boot });
+  }
   const VS = new WeakMap();   // painter-side motion state, kept off the sim objects
   function visOf(e) {
     let v = VS.get(e);
-    if (!v) { v = { yaw: e.yawT, walk: 0, px: e.x, py: e.y, phaseD: e.dist, pop: 0 }; VS.set(e, v); }
+    if (!v) { v = { yaw: e.yawT !== undefined ? e.yawT : Math.PI / 2, walk: 0, px: e.x, py: e.y, phaseD: e.dist || 0, pop: 0, d: 0 }; VS.set(e, v); }
     return v;
   }
   function turn(v, target, dt, rate) {
@@ -2537,69 +2978,147 @@ const MODE = (function () {
     while (d < -Math.PI) d += Math.PI * 2;
     v.yaw += d * (1 - Math.exp(-dt * rate));
   }
-  function drawAvatar(a, dt) {
-    const v = visOf(a);
-    turn(v, a.yawT, dt, 14);
-    const moving = a.path.length > 0;
-    v.walk += ((moving ? 1 : 0) - v.walk) * (1 - Math.exp(-dt * 10));
-    const ph = a.dist / 0.62 * Math.PI * 2, w = v.walk;
+  // one person: the avatar or a customer. o: the pose, built by the caller
+  function drawPerson(e, P, v, o) {
+    const w = v.walk, ph = v.d / 0.62 * Math.PI * 2;
     const amp = 0.48 * w;
-    let hipL = amp * Math.sin(ph), hipR = -amp * Math.sin(ph);
-    let kneeL = 0.8 * w * Math.max(0, Math.cos(ph)), kneeR = 0.8 * w * Math.max(0, -Math.cos(ph));
-    let armL = -0.6 * w * Math.sin(ph), armR = 0.6 * w * Math.sin(ph), abL = 0.12, abR = 0.12;
-    let lean = 0.1 * w, bob = -0.022 * w * (1 - Math.cos(2 * ph)) / 2, headP = 0, twist = 0;
-    const breathe = Math.sin(clock * 2.2) * 0.012 * (1 - w);
-    let hold = null;
-    const act = a.act;
-    if (act) {
-      const k = act.t;
-      if (act.kind === 'press') {
-        const d = C.pressSec, u = clamp(k / (d * 0.55), 0, 1), back = clamp((k - d * 0.6) / (d * 0.4), 0, 1);
-        armR = 1.45 * Math.sin(u * Math.PI / 2) * (1 - back) - 0.05; abR = 0.05; lean = 0.18 * (1 - back);
-        headP = 0.15;
-      } else if (act.kind === 'clean') {
-        const sw = Math.sin(clock * 14);
-        armR = 1.15 + 0.12 * sw; armL = 1.0 - 0.1 * sw; abR = 0.05 + 0.25 * sw; abL = 0.05 - 0.2 * sw;
-        lean = 0.2; twist = 0.12 * sw; headP = 0.2;
-        hold = { side: 'R', parts: M_SPONGE };
-      } else if (act.kind === 'toss') {
-        const u = clamp(k / C.tossSec, 0, 1), heave = Math.sin(Math.min(1, u * 1.8) * Math.PI / 2);
-        armR = armL = 1.1 + 1.3 * heave; abR = abL = 0.12; lean = 0.18 - 0.3 * heave; headP = -0.12;
-      } else if (act.kind === 'sell') {
-        const u = clamp(k / (act.dur || 0.3), 0, 1);
-        armR = 2.7 * Math.sin(Math.min(1, u * 1.6) * Math.PI / 2); abR = 0.1; headP = -0.15;
-        if (u < 0.6 && act.item) hold = { side: 'R', parts: ITEM_MODEL[act.item], scale: 0.55, up: true };
-      }
-    }
-    const base = chain(Mt(a.x, a.y, 0), Mz(v.yaw));
-    const rootM = chain(base, Mt(0, 0, 0.29 + bob), Mz(twist), My(lean));
+    const hipL = amp * Math.sin(ph), hipR = -amp * Math.sin(ph);
+    const kneeL = 0.8 * w * Math.max(0, Math.cos(ph)), kneeR = 0.8 * w * Math.max(0, -Math.cos(ph));
+    const bob = -0.022 * w * (1 - Math.cos(2 * ph)) / 2;
+    const breathe = Math.sin(clock * 2.2 + (e.id || 0)) * 0.012 * (1 - w);
+    const base = chain(Mt(e.x, e.y, 0), Mz(v.yaw));
+    const rootM = chain(base, Mt(0, 0, 0.29 + bob), Mz(o.twist || 0), My(o.lean));
     const parts = [];
-    parts.push({ p: AV.hips, M: rootM });
-    parts.push({ p: AV.torso, M: chain(rootM, Ms(1, 1, 1 + breathe * 3)) });
-    const headM = chain(rootM, Mt(0, 0, 0.55 + breathe), My(headP));
-    parts.push({ p: AV.head, M: headM });
-    parts.push({ p: AV.hair, M: headM, bias: -0.004 });
-    parts.push({ p: AV.hat, M: headM, bias: 0.002 });
-    parts.push({ p: AV.brim, M: headM, bias: 0.001 });
-    [['L', 1, armL, abL, hipL, kneeL], ['R', -1, armR, abR, hipR, kneeR]].forEach(([side, sgn, arm, ab, hip, knee]) => {
+    parts.push({ p: P.hips, M: rootM });
+    parts.push({ p: P.torso, M: chain(rootM, Ms(1, 1, 1 + breathe * 3)) });
+    const headM = chain(rootM, Mt(0, 0, 0.55 + breathe), My(o.headP || 0));
+    parts.push({ p: P.head, M: headM }, { p: P.hair, M: headM, bias: -0.004 });
+    if (P.hat) parts.push({ p: P.hat, M: headM, bias: 0.002 }, { p: P.brim, M: headM, bias: 0.001 });
+    if (P.bun) parts.push({ p: P.bun, M: headM, bias: -0.006 });
+    [['L', 1, o.armL, o.abL, hipL, kneeL], ['R', -1, o.armR, o.abR, hipR, kneeR]].forEach(([side, sgn, arm, ab, hip, knee]) => {
       const sh = chain(rootM, Mt(0, 0.17 * sgn, 0.28), My(-arm), Mx(ab * sgn));
-      parts.push({ p: AV.arm, M: sh }, { p: AV.hand, M: sh });
-      if (hold && hold.side === side) {
+      parts.push({ p: P.arm, M: sh }, { p: P.hand, M: sh });
+      const hold = o.hold && o.hold.side === side ? o.hold : null;
+      if (hold) {
         const hm = chain(sh, Mt(0, 0, -0.25), hold.up ? Mz(Math.PI / 2) : I3, Ms(hold.scale || 1, hold.scale || 1, hold.scale || 1));
         hold.parts.forEach(p => parts.push({ p, M: hm, bias: 0.01 }));
       }
       const th = chain(rootM, Mt(0, 0.075 * sgn, 0), My(-hip));
       const sn = chain(th, Mt(0, 0, -0.13), My(knee));
-      parts.push({ p: AV.thigh, M: th }, { p: AV.shin, M: sn }, { p: AV.boot, M: sn });
+      parts.push({ p: P.thigh, M: th }, { p: P.shin, M: sn }, { p: P.boot, M: sn });
+    });
+    // a stack in both arms, across the body: up to four things, the last ones picked up on top
+    if (o.stack && o.stack.length) o.stack.forEach((k, i) => {
+      const M = chain(rootM, Mt(0.25, 0, 0.2 + i * 0.065), Mz(Math.PI / 2), Ms(0.45, 0.45, 0.45));
+      (ITEM_MODEL[k] || []).forEach(p => parts.push({ p, M, bias: 0.02 }));
     });
     drawParts(parts, outlinePx());
-    drawFace(headM, a, v);
+    drawFace(headM, v);
+    return rootM;
+  }
+  function drawAvatar(a, dt) {
+    const v = visOf(a);
+    turn(v, a.yawT, dt, 14);
+    const moving = a.path.length > 0;
+    v.walk += ((moving ? 1 : 0) - v.walk) * (1 - Math.exp(-dt * 10));
+    v.d = a.dist;
+    const w = v.walk, ph = a.dist / 0.62 * Math.PI * 2;
+    const carry = a.inv.length > 0;
+    const o = { armL: -0.6 * w * Math.sin(ph), armR: 0.6 * w * Math.sin(ph), abL: 0.12, abR: 0.12, lean: 0.1 * w, headP: 0, twist: 0, hold: null, stack: null };
+    if (carry) { o.armL = o.armR = 0.95; o.abL = o.abR = 0.02; o.stack = a.inv.slice(-4); }
+    const act = a.act;
+    if (act) {
+      const k = act.t;
+      if (act.kind === 'press') {
+        const d = C.pressSec, u = clamp(k / (d * 0.55), 0, 1), back = clamp((k - d * 0.6) / (d * 0.4), 0, 1);
+        o.armR = 1.45 * Math.sin(u * Math.PI / 2) * (1 - back) - 0.05; o.abR = 0.05; o.lean = 0.18 * (1 - back); o.headP = 0.15;
+      } else if (act.kind === 'clean') {
+        const sw = Math.sin(clock * 14);
+        o.armR = 1.15 + 0.12 * sw; o.armL = 1.0 - 0.1 * sw; o.abR = 0.05 + 0.25 * sw; o.abL = 0.05 - 0.2 * sw;
+        o.lean = 0.2; o.twist = 0.12 * sw; o.headP = 0.2; o.hold = { side: 'R', parts: M_SPONGE }; o.stack = null;
+      } else if (act.kind === 'toss') {
+        const u = clamp(k / C.tossSec, 0, 1), heave = Math.sin(Math.min(1, u * 1.8) * Math.PI / 2);
+        o.armR = o.armL = 1.1 + 1.3 * heave; o.abR = o.abL = 0.12; o.lean = 0.18 - 0.3 * heave; o.headP = -0.12;
+      } else if (act.kind === 'pick' || act.kind === 'stock' || act.kind === 'put') {
+        const dur = act.kind === 'pick' ? C.pickSec : act.kind === 'stock' ? C.stockSec : (act.dur || C.putSec), reach = Math.sin(clamp(k / dur, 0, 1) * Math.PI);
+        o.armL = o.armR = 0.95 + 0.65 * reach; o.abL = o.abR = 0.04; o.lean = 0.28 * reach; o.headP = 0.18 * reach;
+      } else if (act.kind === 'carve') {
+        const sw = Math.sin(clock * 16);
+        o.armR = 1.05 + 0.3 * sw; o.armL = 0.95; o.abR = 0.05; o.abL = 0.2; o.lean = 0.24; o.headP = 0.28;
+        o.hold = { side: 'R', parts: M_CHISEL }; o.stack = null;
+      }
+    }
+    const rootM = drawPerson(a, AV, v, o);
+    if (a.inv.length > 1) {   // how many things are in your arms
+      const c = apply(rootM, 0.25, 0, 0.62 + Math.min(4, a.inv.length) * 0.065), x = PX(c[0]), y = PY(c[1], c[2]) - 4;
+      ctx.save();
+      ctx.font = '800 11px system-ui, sans-serif';
+      const t = String(a.inv.length), bw = Math.max(18, ctx.measureText(t).width + 9);
+      ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+      rrect(ctx, x - bw / 2, y - 9, bw, 18, 9); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = INK; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(t, x, y + 0.5);
+      ctx.restore();
+    }
+  }
+  // a customer: walks in, waits facing the stall (or across the counter at it), taps a card, and
+  // carries what they bought out the door
+  function drawCustomer(c, dt) {
+    const v = visOf(c), dx = c.x - v.px, dy = c.y - v.py, moved = Math.hypot(dx, dy);
+    v.px = c.x; v.py = c.y; v.d += moved;
+    const moving = moved > 1e-4;
+    v.walk += ((moving ? 1 : 0) - v.walk) * (1 - Math.exp(-dt * 10));
+    const atStall = Math.abs(c.x - L.SHOP.x0) < 0.05 && (c.state === 'wait' || c.state === 'pay');
+    const face = moving ? Math.atan2(dy, dx) : atStall ? Math.PI / 2 : c.state === 'out' ? Math.PI : 0;
+    turn(v, face, dt, 10);
+    const w = v.walk, ph = v.d / 0.62 * Math.PI * 2;
+    const o = { armL: -0.55 * w * Math.sin(ph), armR: 0.55 * w * Math.sin(ph), abL: 0.12, abR: 0.12, lean: 0.08 * w, headP: 0, hold: null };
+    if (c.state === 'pay') {
+      const u = clamp(c.t / C.shop.paySec, 0, 1);
+      if (u < 0.55) { o.armR = 1.2 * Math.sin(Math.min(1, u * 4) * Math.PI / 2); o.abR = 0.1; o.hold = { side: 'R', parts: M_CARD }; o.headP = 0.15; }
+      else { o.armL = o.armR = 0.9; o.abL = o.abR = 0.04; }
+    } else if (c.state === 'wait') { o.headP = -0.02; o.armL = o.armR = 0.12; o.abL = o.abR = 0.32; }
+    if (c.item && (c.state === 'out' || (c.state === 'pay' && c.t / C.shop.paySec >= 0.55))) { o.armL = o.armR = 0.85; o.abL = o.abR = 0.03; o.stack = [c.item]; }
+    let hx, hy;
+    let dyaw = face - v.yaw; while (dyaw > Math.PI) dyaw -= Math.PI * 2; while (dyaw < -Math.PI) dyaw += Math.PI * 2;
+    if (c.state === 'wait' && !moving && v.walk < 0.02 && Math.abs(dyaw) < 0.02) {
+      // standing in line, nothing moves: a baked picture of this customer facing this way
+      const sp = personSprite(c.id, face, o), k = VW.dpr, X = PX(c.x) + sp.ox, Y = PY(c.y, 0) + sp.oy;
+      if (Y < VW.h && Y + sp.c.height / k > 0) ctx.drawImage(sp.c, Math.round(X * k) / k, Math.round(Y * k) / k, sp.c.width / k, sp.c.height / k);
+      hx = PX(c.x); hy = PY(c.y, 1.34);
+    } else {
+      const rootM = drawPerson(c, custParts(c.id), v, o), top = apply(rootM, 0, 0, 1.05);
+      hx = PX(top[0]); hy = PY(top[1], top[2]);
+    }
+    if (c.state === 'wait' && c.t > 0.8) hourglass(hx, hy);
+    else if (c.state === 'out' && c.wrong && c.t < 2.5) frown(hx, hy);
+  }
+  // a customer standing still, drawn once per look and facing into its own canvas (the floor's bake
+  // trick: borrow ctx and move the camera so the person's feet land at a known point in it)
+  const PERSON_BAKE = new Map();
+  let personBakeGen = -1;
+  function personSprite(id, face, o) {
+    if (personBakeGen !== VW.gen) { PERSON_BAKE.clear(); personBakeGen = VW.gen; }
+    const look = id % (CUST_SHIRT.length * 5), key = look + '|' + face.toFixed(2);
+    let sp = PERSON_BAKE.get(key);
+    if (sp) return sp;
+    const S = VW.S, w = Math.ceil(1.0 * S), up = Math.ceil((0.35 * SE + 1.45 * CE) * S) + 6, h = up + Math.ceil(0.35 * SE * S) + 6;
+    const c = document.createElement('canvas');
+    c.width = Math.round(w * VW.dpr); c.height = Math.round(h * VW.dpr);
+    const g = c.getContext('2d');
+    g.scale(VW.dpr, VW.dpr);
+    const keep = ctx, ox = VW.ox, cam = VW.camY;
+    ctx = g; VW.ox = w / 2; VW.camY = -up;
+    try { drawPerson({ id, x: 0, y: 0 }, custParts(id), { yaw: face, walk: 0, d: 0, px: 0 }, o); }
+    finally { ctx = keep; VW.ox = ox; VW.camY = cam; }
+    sp = { c, ox: -w / 2, oy: -up };
+    PERSON_BAKE.set(key, sp);
+    return sp;
   }
   // eyes and cheeks, in 2D over the head when the face is toward the camera
-  function drawFace(headM, a, v) {
+  function drawFace(headM, v) {
     const facing = Math.sin(v.yaw) * CE + 0.25;
     if (facing <= 0.05) return;
-    const blink = (Math.sin(clock * 0.9 + 1.3) > 0.985) ? 0.15 : 1;
+    const blink = (Math.sin(clock * 0.9 + 1.3 + v.px) > 0.985) ? 0.15 : 1;
     [1, -1].forEach(sg => {
       const e = apply(headM, 0.2, 0.088 * sg, -0.045), c = apply(headM, 0.17, 0.15 * sg, -0.11);
       const x = PX(e[0]), y = PY(e[1], e[2]), r = VW.S * 0.038;
@@ -2610,7 +3129,28 @@ const MODE = (function () {
       ctx.beginPath(); ctx.ellipse(PX(c[0]), PY(c[1], c[2]), r * 1.1 * Math.min(1, facing * 1.4), r * 0.6, 0, 0, Math.PI * 2); ctx.fill();
     });
   }
-
+  // a waiting customer's thought: an hourglass, its sand running
+  function hourglass(x, y) {
+    ctx.save();
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    rrect(ctx, x - 9, y - 22, 18, 20, 8); ctx.fill(); ctx.stroke();
+    const u = (clock * 0.5) % 1;
+    ctx.beginPath(); ctx.moveTo(x - 4.5, y - 18); ctx.lineTo(x + 4.5, y - 18); ctx.lineTo(x, y - 12); ctx.lineTo(x + 4.5, y - 6); ctx.lineTo(x - 4.5, y - 6); ctx.lineTo(x, y - 12); ctx.closePath();
+    ctx.lineWidth = 1.4; ctx.stroke();
+    ctx.fillStyle = '#e0a23a';
+    ctx.beginPath(); ctx.moveTo(x - 3.8 * (1 - u), y - 17.3 + 5 * u); ctx.lineTo(x + 3.8 * (1 - u), y - 17.3 + 5 * u); ctx.lineTo(x, y - 12.4); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x - 3.8 * u, y - 6.7); ctx.lineTo(x + 3.8 * u, y - 6.7); ctx.lineTo(x, y - 6.7 - 4.5 * u); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  // a customer who paid for a medium plank and got something else
+  function frown(x, y) {
+    ctx.save();
+    ctx.fillStyle = '#e5484d'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, y - 18, 11, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = '#ffffff'; ctx.font = '900 14px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('!', x, y - 17);
+    ctx.restore();
+  }
   /* the robots: hover base, rounded body and head, a face screen, an antenna lit by its instructions */
   const RB = (function () {
     return {
@@ -2642,9 +3182,9 @@ const MODE = (function () {
     else if (r.state === 'look') { const u = clamp(k / C.lookSec, 0, 1); armR = 1.2 + 0.25 * Math.sin(u * Math.PI * 3); armL = 1.05; tilt = 0.22; headYaw = 0.35 * Math.sin(u * Math.PI * 4); }
     else if (r.state === 'reject') { const u = clamp(k / C.tossSec, 0, 1), heave = Math.sin(Math.min(1, u * 1.8) * Math.PI / 2); armR = armL = 1.0 + 1.1 * heave; tilt = 0.15 - 0.2 * heave; }
     else if (r.state === 'flick') { const u = clamp(k / C.tossSec, 0, 1); armR = 0.5 + 1.3 * Math.sin(u * Math.PI); abR = 0.35; }
-    else if (r.state === 'drop') { const u = clamp(k / C.tossSec, 0, 1); armR = 1.3 - 0.5 * u; armL = 0.8; tilt = 0.15; }
-    else if (r.state === 'pitch') { const u = clamp(k / C.pitchSec, 0, 1); armR = 2.6 * Math.sin(Math.min(1, u * 2) * Math.PI / 2); armL = 0.3; abR = 0.1; }
-    if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'pitch' };
+    else if (r.state === 'drop') { const u = clamp(k / C.tossSec, 0, 1), heave = Math.sin(Math.min(1, u * 1.6) * Math.PI / 2); armR = 1.0 + 1.4 * heave; armL = 0.8; tilt = 0.12 - 0.2 * heave; }
+    else if (r.state === 'place') { const u = clamp(k / C.placeSec, 0, 1); armR = 1.0 + 0.7 * Math.sin(Math.min(1, u * 1.5) * Math.PI / 2); armL = 1.2; abR = 0.05; tilt = 0.16; }
+    if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'place' };
     if (r.state === 'idle' && r.job === null) headYaw = 0.3 * Math.sin(clock * 0.7 + r.id);
     const base = chain(Mt(r.x, r.y, hover * v.pop), Mz(v.yaw), Ms(sc, sc, sc), My(tilt));
     const parts = [];
@@ -2789,6 +3329,14 @@ const MODE = (function () {
   }
 
   /* ---------- the floor (live: cheap rects and lines) ---------- */
+  // the four slots (the CD, 2026-10-15): a painted bay each, its number on the floor at the left,
+  // the middle and the right of the row
+  const SLOTS = [
+    { n: '01', y0: 3.05, y1: 5.65 },
+    { n: '02', y0: ROWY.saw - 0.75, y1: ROWY.saw + 1.45 },
+    { n: '03', y0: ROWY.extract - 0.75, y1: ROWY.extract + 1.45 },
+    { n: '04', y0: 12.1, y1: 14.05 }
+  ].map(b => Object.assign(b, { ny: b.y1 - 0.3, nx: [0.45, 3.0, 5.52] }));
   let floorC = null, floorKey = '';
   function drawFloor() {
     ctx.fillStyle = COL.back; ctx.fillRect(0, 0, VW.w, VW.h);
@@ -2813,33 +3361,40 @@ const MODE = (function () {
     const S = VW.S, x0 = PX(0), x1 = PX(L.W), y0 = PY(0, 0), y1 = PY(L.H, 0);
     ctx.fillStyle = COL.floor; ctx.fillRect(x0, y0, x1 - x0, y1 - y0);
     ctx.fillStyle = '#9aa6b1'; ctx.fillRect(x0, y1, x1 - x0, 0.3 * CE * S);   // the floor's front lip
-    // production zone and its painted border
-    ctx.fillStyle = COL.zone; ctx.fillRect(PX(0.08), PY(1.85, 0), 5.84 * S, 3.15 * SE * S);
+    // the shop: a wooden floor behind the counter, with the doorway's threshold
+    const sy0 = PY(SO.wall[3], 0), sy1 = PY(SO.counter[1], 0);
+    ctx.fillStyle = COL.shopFloor; ctx.fillRect(x0, sy0, x1 - x0, sy1 - sy0);
+    ctx.strokeStyle = COL.shopLine; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let y = SO.wall[3] + 0.21; y < SO.counter[1]; y += 0.21) { ctx.moveTo(x0, PY(y, 0)); ctx.lineTo(x1, PY(y, 0)); }
+    ctx.stroke();
+    ctx.fillStyle = '#b08a5e'; ctx.fillRect(PX(-0.07), PY(0.62, 0), 0.12 * S, (1.6 - 0.62) * SE * S);
+    // the slots' bays
+    SLOTS.forEach(b => { ctx.fillStyle = COL.zone; ctx.fillRect(PX(0.08), PY(b.y0, 0), 5.84 * S, (b.y1 - b.y0) * SE * S); });
     ctx.strokeStyle = COL.tile; ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let x = 1; x < L.W; x++) { ctx.moveTo(PX(x), y0); ctx.lineTo(PX(x), y1); }
-    for (let y = 1; y < L.H; y++) { ctx.moveTo(x0, PY(y, 0)); ctx.lineTo(x1, PY(y, 0)); }
+    const fy = PY(SO.counter[3], 0);
+    for (let x = 1; x < L.W; x++) { ctx.moveTo(PX(x), fy); ctx.lineTo(PX(x), y1); }
+    for (let y = Math.ceil(SO.counter[3]); y < L.H; y++) { ctx.moveTo(x0, PY(y, 0)); ctx.lineTo(x1, PY(y, 0)); }
     ctx.stroke();
-    ctx.strokeStyle = COL.stripe; ctx.lineWidth = Math.max(2, S * 0.05);
-    ctx.strokeRect(PX(0.08), PY(1.85, 0), 5.84 * S, 3.15 * SE * S);
-    // the hatch: a gap in the east wall where sold goods leave
-    ctx.fillStyle = '#39424d'; ctx.fillRect(PX(5.86), PY(3.6, 0), 0.16 * S, 1.0 * SE * S);
+    SLOTS.forEach(b => {
+      ctx.strokeStyle = COL.stripe; ctx.lineWidth = Math.max(2, S * 0.05);
+      ctx.strokeRect(PX(0.08), PY(b.y0, 0), 5.84 * S, (b.y1 - b.y0) * SE * S);
+      b.nx.forEach(x => {
+        ctx.save(); ctx.translate(PX(x), PY(b.ny, 0)); ctx.scale(1, SE);
+        ctx.fillStyle = 'rgba(29,36,48,0.3)'; ctx.font = '800 ' + Math.round(0.4 * S) + 'px "Bricolage Grotesque", system-ui, sans-serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.n, 0, 0); ctx.restore();
+      });
+    });
     // charging pads at the dock
     SP.rest.forEach((p, i) => {
       ctx.fillStyle = '#3c4a57'; ctx.beginPath(); ctx.ellipse(PX(p.x), PY(p.y, 0), 0.42 * S, 0.42 * SE * S, 0, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = s.hired > i ? '#3fe0d0' : '#5f7182'; ctx.lineWidth = 2; ctx.stroke();
     });
-    // the bays
-    [[11.0, 17.4, 'BAY 2'], [18.2, 24.6, 'BAY 3']].forEach(([a, b, label]) => {
-      ctx.strokeStyle = COL.stripe; ctx.lineWidth = Math.max(2, S * 0.05);
-      ctx.setLineDash([S * 0.3, S * 0.15]); ctx.strokeRect(PX(0.25), PY(a, 0), 5.5 * S, (b - a) * SE * S); ctx.setLineDash([]);
-      ctx.save(); ctx.translate(PX(3.0), PY(b - 0.75, 0)); ctx.scale(1, SE);
-      ctx.fillStyle = 'rgba(29,36,48,0.18)'; ctx.font = '800 ' + Math.round(0.62 * S) + 'px "Bricolage Grotesque", system-ui, sans-serif';
-      ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(label, 0, 0); ctx.restore();
-    });
     // soft contact shadows under everything that stands
     ctx.fillStyle = 'rgba(30,40,55,0.16)';
-    Object.keys(SO).forEach(k => { if (k === 'wall') return; const q = SO[k]; ctx.fillRect(PX(q[0]) + 3, PY(q[1], 0) - 2, (q[2] - q[0]) * S + 4, (q[3] - q[1]) * SE * S + 4); });
+    Object.keys(SO).forEach(k => { if (k === 'wall' || k === 'counter') return; const q = SO[k]; ctx.fillRect(PX(q[0]) + 3, PY(q[1], 0) - 2, (q[2] - q[0]) * S + 4, (q[3] - q[1]) * SE * S + 4); });
+    ctx.fillRect(PX(0), PY(SO.counter[1], 0) - 2, L.W * S, (SO.counter[3] - SO.counter[1]) * SE * S + 5);
     L.CRATES.forEach((q, i) => { if (s.hired <= i) ctx.fillRect(PX(q[0]) + 3, PY(q[1], 0) - 2, (q[2] - q[0]) * S + 4, (q[3] - q[1]) * SE * S + 4); });
   }
   function floorLive() {
@@ -2848,13 +3403,14 @@ const MODE = (function () {
     ctx.fillStyle = 'rgba(30,40,55,0.24)';
     blob(s.avatar.x, s.avatar.y, 0.24);
     s.robots.forEach(r => blob(r.x, r.y, 0.26));
+    s.shop.people.forEach(c => blob(c.x, c.y, 0.22));
     ctx.fillStyle = 'rgba(80,230,220,0.22)';
     s.robots.forEach(r => blob(r.x, r.y, 0.18));
   }
 
   /* ---------- live machine bits ---------- */
-  function beltTop(x0, x1, moving, off) {
-    const S = VW.S, y0 = PY(2.66, 0.53), y1 = PY(3.14, 0.53);
+  function beltTop(x0, x1, yc, off) {
+    const S = VW.S, y0 = PY(yc - 0.24, 0.53), y1 = PY(yc + 0.24, 0.53);
     ctx.fillStyle = '#353c45'; ctx.fillRect(PX(x0), y0, (x1 - x0) * S, y1 - y0);
     ctx.save(); ctx.beginPath(); ctx.rect(PX(x0), y0, (x1 - x0) * S, y1 - y0); ctx.clip();
     ctx.strokeStyle = '#4b535e'; ctx.lineWidth = Math.max(1.5, S * 0.03);
@@ -2863,10 +3419,10 @@ const MODE = (function () {
     for (let x = x0 - step + o; x < x1 + step; x += step) { ctx.moveTo(PX(x), y0); ctx.lineTo(PX(x + 0.06), (y0 + y1) / 2); ctx.lineTo(PX(x), y1); }
     ctx.stroke(); ctx.restore();
   }
-  let beltOff = 0;
-  function machineWindow() {
-    const m = s.machine, S = VW.S;
-    const x0 = PX(2.38), x1 = PX(3.32), yT = PY(3.58, 1.02), yB = PY(3.58, 0.52);
+  const BO = { planer: 0, saw: 0, extract: 0 };   // how far each row's belts have run
+  function planerWindow() {
+    const m = s.machine, mq = SO.machine;
+    const x0 = PX(mq[0] + 0.23), x1 = PX(mq[2] - 0.23), yT = PY(mq[3] + 0.03, 1.02), yB = PY(mq[3] + 0.03, 0.52);
     ctx.save();
     ctx.beginPath(); ctx.rect(x0, yT, x1 - x0, yB - yT); ctx.clip();
     if (m.phase === 'run') {
@@ -2877,7 +3433,7 @@ const MODE = (function () {
       ctx.closePath(); ctx.fill();
       ctx.fillStyle = '#56606b'; ctx.beginPath(); ctx.arc(cx, cy, R * 0.25, 0, Math.PI * 2); ctx.fill();
       const p = clamp(m.t / C.processSec, 0, 1);
-      ctx.fillStyle = m.result === 'sap' ? COL.sap : COL.plank;
+      ctx.fillStyle = m.result === 'jam' ? COL.sap : F.kindOf(m.result) === 'rough' ? COL.rough : COL.plank;
       ctx.fillRect(x0 + (x1 - x0) * (p - 0.5), cy + R * 0.55, (x1 - x0) * 0.6, (yB - yT) * 0.12);
     } else if (m.phase === 'jam') {
       ctx.fillStyle = '#3a3a24'; ctx.fillRect(x0, yT, x1 - x0, yB - yT);
@@ -2888,39 +3444,70 @@ const MODE = (function () {
     }
     ctx.restore();
   }
-  const M_BUTTON = [cyl(0, 0, 0, 0.11, 0.07, 12, '#ff3b30', '#ff3b30', 0.1)];
-  function drawButton() {
-    const m = s.machine, lit = F.ready(s) && m.phase === 'ready';
-    const down = m.phase === 'run' ? 1 : 0;
-    const z = 0.85 - down * 0.04;
-    const col = lit ? '!#ff3b30' : m.phase === 'jam' ? '#5b2420' : '#7a2620';
-    const top = lit ? '!#ff7a6e' : col;
+  const M_BUTTON = cyl(0, 0, 0, 0.11, 0.07, 12, '#ff3b30', '#ff3b30', 0.1);
+  // a red button on a console: lit when a press would do something, down while its machine runs
+  function drawButton(q, lit, down, dead) {
+    const x = (q[0] + q[2]) / 2, y = (q[1] + q[3]) / 2, z = 0.85 - (down ? 0.04 : 0);
+    const col = lit ? '!#ff3b30' : dead ? '#5b2420' : '#7a2620', top = lit ? '!#ff7a6e' : col;
     if (lit) {
-      const x = PX(2.8), y = PY(3.71, 0.9), pulse = 0.65 + 0.35 * Math.sin(clock * 5);
-      const g = ctx.createRadialGradient(x, y, 0, x, y, VW.S * 0.5);
+      const px = PX(x), py = PY(y, 0.9), pulse = 0.65 + 0.35 * Math.sin(clock * 5);
+      const g = ctx.createRadialGradient(px, py, 0, px, py, VW.S * 0.5);
       g.addColorStop(0, 'rgba(255,80,60,' + (0.55 * pulse) + ')'); g.addColorStop(1, 'rgba(255,80,60,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, VW.S * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(px, py, VW.S * 0.5, 0, Math.PI * 2); ctx.fill();
     }
-    drawPrim(ctx, M_BUTTON[0], Mt(2.8, 3.71, z), VW.ox, -VW.camY, VW.S, outlinePx() * 0.8, [col, top]);
+    drawPrim(ctx, M_BUTTON, Mt(x, y, z), VW.ox, -VW.camY, VW.S, outlinePx() * 0.8, [col, top]);
   }
   const M_BEACON = cyl(0, 0, 0, 0.07, 0.12, 9, '#7d8791', '#7d8791', 0.05);
   function drawBeacon() {
-    const m = s.machine, jam = m.phase === 'jam', run = m.phase === 'run';
+    const m = s.machine, jam = m.phase === 'jam', run = m.phase === 'run', mq = SO.machine;
     const on = jam ? Math.sin(clock * 10) > 0 : run;
     const col = jam ? (on ? '!#ffb020' : '#7a5a20') : run ? '!#59e08a' : '#7d8791';
+    const bx = mq[0] + 0.3, by = mq[1] + 0.45;
     if (on) {
-      const x = PX(2.45), y = PY(2.7, 1.55), g = ctx.createRadialGradient(x, y, 0, x, y, VW.S * 0.45);
+      const x = PX(bx), y = PY(by, 1.55), g = ctx.createRadialGradient(x, y, 0, x, y, VW.S * 0.45);
       g.addColorStop(0, jam ? 'rgba(255,176,32,0.6)' : 'rgba(89,224,138,0.45)'); g.addColorStop(1, 'rgba(255,176,32,0)');
       ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, VW.S * 0.45, 0, Math.PI * 2); ctx.fill();
     }
-    drawPrim(ctx, M_BEACON, Mt(2.45, 2.7, 1.48), VW.ox, -VW.camY, VW.S, outlinePx() * 0.7, [col, col]);
+    drawPrim(ctx, M_BEACON, Mt(bx, by, 1.48), VW.ox, -VW.camY, VW.S, outlinePx() * 0.7, [col, col]);
   }
-  /* ---------- one frame ---------- */
-  // Money and customer satisfaction on the wall (the CD, 2026-10-14): drawn live just in front of
-  // the wall sprite, so they scroll with the floor and anyone walking by the wall passes in front.
+  // the table saw's blade: a toothed disc standing up through the table, spinning while it cuts
+  function sawBlade() {
+    const run = s.saw.phase === 'run', R = 0.25, cx = PX(2.45), cy = PY(ROWY.saw, 0.66), table = PY(ROWY.saw, 0.765);
+    ctx.save();
+    ctx.beginPath(); ctx.rect(cx - R * VW.S - 6, cy - R * CE * VW.S - 10, 2 * R * VW.S + 12, table - (cy - R * CE * VW.S - 10)); ctx.clip();
+    const a0 = run ? clock * 22 : 0.3;
+    ctx.beginPath();
+    for (let i = 0; i < 28; i++) { const t = a0 + i / 28 * Math.PI * 2, rr = (i % 2 ? 1.08 : 0.97) * R; ctx.lineTo(cx + Math.cos(t) * rr * VW.S, cy - Math.sin(t) * rr * CE * VW.S); }
+    ctx.closePath();
+    ctx.fillStyle = run ? '#e7ecf0' : '#d0d7de'; ctx.fill();
+    ctx.lineWidth = Math.max(1.5, outlinePx() * 0.6); ctx.strokeStyle = INK; ctx.stroke();
+    ctx.fillStyle = '#8a96a3'; ctx.beginPath(); ctx.ellipse(cx, cy, R * 0.3 * VW.S, R * 0.3 * CE * VW.S, 0, 0, Math.PI * 2); ctx.fill();
+    if (run) { ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(cx, cy, R * 0.7 * VW.S, R * 0.7 * CE * VW.S, 0, Math.PI * 1.1 + a0, Math.PI * 1.6 + a0); ctx.stroke(); }
+    ctx.restore();
+  }
+  // the sap extractor's glass tank: the sap rises in it while it runs
+  function tankLevel() {
+    const ex = s.extract, run = ex.phase === 'run', p = run ? clamp(ex.t / C.extractSec, 0, 1) : 0;
+    const level = 0.12 + (run ? 0.7 * p : 0), x0 = PX(2.2 - 0.24), x1 = PX(2.2 + 0.24), yf = ROWY.extract - 0.05 + 0.28;
+    const yb = PY(yf, 0.9), yt = PY(yf, 0.9 + level * 0.56);
+    ctx.save();
+    ctx.globalAlpha = 0.85; ctx.fillStyle = COL.sap; ctx.fillRect(x0, yt, x1 - x0, yb - yt);
+    ctx.globalAlpha = 1; ctx.fillStyle = '#b7e061'; ctx.beginPath(); ctx.ellipse((x0 + x1) / 2, yt, (x1 - x0) / 2, 0.06 * VW.S, 0, 0, Math.PI * 2); ctx.fill();
+    if (run) { ctx.fillStyle = '#efffc4'; for (let i = 0; i < 4; i++) { const u = (clock * 0.8 + i * 0.25) % 1; ctx.beginPath(); ctx.arc(x0 + (x1 - x0) * (0.2 + 0.2 * i), yb - (yb - yt) * u, 2.2, 0, Math.PI * 2); ctx.fill(); } }
+    ctx.restore();
+  }
+
+  /* ---------- the boards: money, customer satisfaction, the goal, and the stall's price ---------- */
+  // Money and customer satisfaction on the wall (the CD, 2026-10-14) and the goal across the top
+  // (the CD, 2026-10-15): drawn live just in front of the wall sprite, so they scroll with the floor
+  // and anyone walking by the wall passes in front. The stall's label is drawn on the counter.
   const FONT = (function () { const cs = getComputedStyle(document.documentElement); return { display: cs.getPropertyValue('--display').trim() || 'sans-serif', mono: cs.getPropertyValue('--mono').trim() || 'monospace' }; })();
   const SAT_COL = v => v >= 85 ? '#4fd07a' : v >= 60 ? '#f2b632' : '#ff6b6b';
+  const WANT = () => C.stalls[0].want;
+  const goalText = () => 'Sell medium planks for $' + F.priceOf(WANT());
   function boardRect(k) {
+    if (k === 'goal') { const x0 = PX(BOARD.goal[0]), y0 = PY(BOARD.y, BOARD.g1); return { x: x0, y: y0, w: PX(BOARD.goal[1]) - x0, h: PY(BOARD.y, BOARD.g0) - y0 }; }
+    if (k === 'plate') { const x0 = PX(PLATE.x0), y0 = PY(PLATE.y, PLATE.z1); return { x: x0, y: y0, w: PX(PLATE.x1) - x0, h: PY(PLATE.y, PLATE.z0) - y0 }; }
     const b = BOARD[k], x0 = PX(b[0]), y0 = PY(BOARD.y, BOARD.z1);
     return { x: x0, y: y0, w: PX(b[1]) - x0, h: PY(BOARD.y, BOARD.z0) - y0 };
   }
@@ -2932,11 +3519,20 @@ const MODE = (function () {
   }
   function drawBoards() {
     const S = VW.S, pad = 0.09 * S;
-    let r = boardRect('cash');
-    if (r.y > VW.h || r.y + r.h < 0) return;
+    let r = boardRect('goal');
+    if (r.y > VW.h || boardRect('cash').y + boardRect('cash').h < 0) return;
     ctx.save();
     ctx.textBaseline = 'middle';
+    // the goal: a yellow tag, then the goal itself
+    const gy = r.y + r.h / 2, tag = 'GOAL';
+    const tagSize = fitText(tag, '800 #px ' + FONT.display, 0.24 * S, r.w * 0.2);
+    const tw = ctx.measureText(tag).width + 0.16 * S;
+    ctx.fillStyle = COL.yellow; roundRect(r.x + pad, gy - tagSize * 0.75, tw, tagSize * 1.5, tagSize * 0.35);
+    ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.fillText(tag, r.x + pad + 0.08 * S, gy + 0.5);
+    fitText(goalText(), '700 #px ' + FONT.display, 0.27 * S, r.w - 3 * pad - tw);
+    ctx.fillStyle = '#f5f7f9'; ctx.fillText(goalText(), r.x + 2 * pad + tw, gy + 0.5);
     // money: one big number; it swells green as money comes in, and goes red below zero
+    r = boardRect('cash');
     const u = clamp(bumpT / 0.35, 0, 1), money = cash(s.money);
     ctx.save();
     ctx.translate(r.x + r.w / 2, r.y + r.h / 2);
@@ -2964,66 +3560,107 @@ const MODE = (function () {
     if (v > 0) roundRect(bx, rowY - bh / 2, Math.max(bh, bw * clamp(v, 0, 100) / 100), bh, bh / 2);
     ctx.restore();
   }
+  // the stall's label on the counter: what it sells, and what a customer pays for it now (its price
+  // times customer satisfaction: amber or red when that is less than the price)
+  function drawPlate() {
+    const S = VW.S, r = boardRect('plate'), pad = 0.07 * S;
+    if (r.y > VW.h || r.y + r.h < 0) return;
+    const now = F.priceNow(s, WANT()), full = F.priceOf(WANT()), price = '$' + now;
+    ctx.save();
+    ctx.textBaseline = 'middle';
+    const cy = r.y + r.h / 2;
+    const ps = fitText(price, '800 #px ' + FONT.display, 0.4 * S, r.w * 0.3);
+    const pw = ctx.measureText(price).width;
+    ctx.textAlign = 'right'; ctx.fillStyle = now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';
+    ctx.fillText(price, r.x + r.w - pad, cy + 0.5);
+    ctx.textAlign = 'left'; ctx.fillStyle = '#f5f7f9';
+    fitText('MEDIUM PLANKS', '700 #px ' + FONT.display, Math.min(0.24 * S, ps * 0.66), r.w - 3 * pad - pw);
+    ctx.fillText('MEDIUM PLANKS', r.x + pad, cy + 0.5);
+    ctx.restore();
+  }
   function roundRect(x, y, w, h, rad) {
     ctx.beginPath();
     if (ctx.roundRect) ctx.roundRect(x, y, w, h, rad); else ctx.rect(x, y, w, h);
     ctx.fill();
   }
+
+  /* ---------- one frame ---------- */
+  // where the i-th thing in a bin lies: three rows in it, in layers. A wide bin takes things along
+  // x, the way they leave a belt; a narrow one (an input bin) along y, so they fit
+  function binSlot(q, i) {
+    const layer = Math.floor(i / 3), slot = i % 3, z = 0.06 + Math.min(layer, 5) * 0.075, narrow = q[2] - q[0] < 0.9;
+    if (narrow) return { x: q[0] + 0.17 + slot * (q[2] - q[0] - 0.34) / 2, y: (q[1] + q[3]) / 2, z, turn: Math.PI / 2 };
+    return { x: (q[0] + q[2]) / 2, y: q[1] + 0.15 + slot * (q[3] - q[1] - 0.3) / 2, z, turn: 0 };
+  }
+  const RECYCLED_AT = [[-0.06, -0.08, 0.5], [0.08, 0.06, -0.7], [-0.08, 0.1, 2.2], [0.06, -0.1, 1.3]];
   function draw(dt) {
     const sp = bake();
     ctx.setTransform(VW.dpr, 0, 0, VW.dpr, 0, 0);
     drawFloor();
-    const m = s.machine;
-    const running = m.phase === 'run';
-    if (running || m.staged < 1 || s.belt.length) beltOff += dt * (running ? 0.9 / C.processSec : 1.0);
+    const m = s.machine, run = m.phase === 'run', sw = s.saw, ex = s.extract, yc = ROWY.planer;
+    if (run || m.staged < 1 || s.belt.length) BO.planer += dt * (run ? 0.9 / C.processSec : 1.0);
+    if (sw.phase === 'run' || sw.belt.length) BO.saw += dt;
+    if (ex.phase === 'run' || ex.belt.length) BO.extract += dt;
     const D = [];
     sp.forEach(q => { if (q.crate !== undefined && s.hired > q.crate) return; D.push({ key: q.key, f: () => blit(q) }); });
     D.push({ key: 0.5005, f: drawBoards });
-    D.push({ key: 3.205, f: () => { beltTop(1.0, 2.15, running || m.staged < 1, beltOff); beltTop(3.55, 4.7, running || s.belt.length, beltOff); } });
-    D.push({ key: 3.585, f: machineWindow });
-    D.push({ key: 3.586, f: drawBeacon });
-    D.push({ key: 3.89, f: drawButton });
-    // logs and products on the belts; things in the bin
-    const items = [];
-    if (m.phase === 'ready') {
-      items.push([m.log, 0.65 + 1.05 * m.staged, 2.9, LIFT[m.log]]);
-    } else if (m.phase === 'run') {
-      const p = clamp(m.t / C.processSec, 0, 1);
-      const p2 = m.result === 'sap' ? Math.min(p, C.jamAt / C.processSec) : p;
-      items.push([m.log, 1.7 + 0.9 * p2, 2.9, LIFT[m.log]]);
-      if (m.result !== 'sap') items.push([m.result, 3.1 + 0.9 * p, 2.9, 0.53]);
-    } else if (m.phase === 'jam') {
-      items.push([m.log, 1.7 + 0.9 * C.jamAt / C.processSec, 2.9, LIFT[m.log]]);
+    D.push({ key: SO.counter[3] + 0.0505, f: drawPlate });
+    D.push({ key: yc + 0.305, f: () => { beltTop(SO.inBelt[0], SO.inBelt[2], yc, BO.planer); beltTop(SO.outBelt[0], SO.outBelt[2], yc, BO.planer); } });
+    [['saw', ROWY.saw], ['extract', ROWY.extract]].forEach(([k, y]) => D.push({ key: y + 0.305, f: () => { beltTop(SO[k + 'InBelt'][0], SO[k + 'InBelt'][2], y, BO[k]); beltTop(SO[k + 'OutBelt'][0], SO[k + 'OutBelt'][2], y, BO[k]); } }));
+    D.push({ key: SO.machine[3] + 0.035, f: planerWindow });
+    D.push({ key: SO.machine[3] + 0.036, f: drawBeacon });
+    D.push({ key: SO.console[3] + 0.005, f: () => drawButton(SO.console, F.ready(s), run, m.phase === 'jam') });
+    D.push({ key: SO.sawConsole[3] + 0.005, f: () => drawButton(SO.sawConsole, F.canMill(s, 'saw'), sw.phase === 'run') });
+    D.push({ key: SO.extractConsole[3] + 0.005, f: () => drawButton(SO.extractConsole, F.canMill(s, 'extract'), ex.phase === 'run') });
+    D.push({ key: SO.saw[3] + 0.025, f: sawBlade });
+    D.push({ key: SO.extract[3] + 0.025, f: tankLevel });
+    // things: on the belts, in the machines, in every bin, on the counter
+    const items = [];   // [kind, x, y, z, key, turn, scale]
+    const beltKey = y => y + 0.31 + items.length * 0.00001;
+    const mouth = SO.inBelt[2] - LEN[F.sizeOf(m.log)] / 2 - 0.02;   // a log waiting at the planer's mouth lies whole on the in-feed
+    if (m.phase === 'ready') items.push([m.log, 0.5 + (mouth - 0.5) * m.staged, yc, LIFT(m.log), beltKey(yc)]);
+    else {
+      const p = clamp(m.t / C.processSec, 0, 1), p2 = m.result === 'jam' ? Math.min(p, C.jamAt / C.processSec) : p;
+      items.push([m.log, mouth + (LEN[F.sizeOf(m.log)] + 0.5) * (m.phase === 'jam' ? C.jamAt / C.processSec : p2), yc, LIFT(m.log), beltKey(yc)]);
+      if (m.phase === 'run' && m.result !== 'jam') items.push([m.result, SO.machine[2] - 0.45 + 0.9 * p, yc, 0.53, beltKey(yc)]);
     }
-    s.belt.forEach(it => {
+    const store = q => q === SO.bin ? s.bin : q === SO.sawOut ? sw.out : ex.out;
+    const ride = (list, q, x0, x1, y) => list.forEach(it => {
+      if (it.t < 0) return;
       const u = it.t / C.outSec;
-      if (u <= 1) items.push([it.item, 4.0 + 0.75 * u, 2.9, 0.53]);
-      else { const d = clamp((it.t - C.outSec) / C.dropSec, 0, 1), slot = binSlot(s.bin.length); items.push([it.item, 4.75 + (slot.x - 4.75) * d, 2.9 + (slot.y - 2.9) * d, 0.53 + (slot.z - 0.53) * d * d]); }
+      if (u <= 1) items.push([it.item, x0 + (x1 - x0) * u, y, LIFT(it.item), beltKey(y)]);
+      else { const d = clamp((it.t - C.outSec) / C.dropSec, 0, 1), sl = binSlot(q, Math.min(17, store(q).length)); items.push([it.item, x1 + (sl.x - x1) * d, y + (sl.y - y) * d, LIFT(it.item) + (sl.z - LIFT(it.item)) * d * d, q[1] + 0.02]); }
     });
-    const shown = s.bin.length > 18 ? s.bin.slice(s.bin.length - 18) : s.bin;
-    shown.forEach((k, i) => { const q = binSlot(i); items.push([k, q.x, q.y, q.z]); });
-    items.forEach(([k, x, y, z], i) => D.push({ key: 3.21 + i * 0.0001, f: () => drawItem(k, Mt(x, y, z)) }));
+    ride(s.belt, SO.bin, SO.machine[2] + 0.45, SO.bin[0] + 0.1, yc);
+    ride(sw.belt, SO.sawOut, SO.sawOutBelt[0] + 0.05, SO.sawOut[0] + 0.1, ROWY.saw);
+    ride(ex.belt, SO.extractOut, SO.extractOutBelt[0] + 0.05, SO.extractOut[0] + 0.1, ROWY.extract);
+    if (sw.phase === 'run') { const p = clamp(sw.t / C.sawSec, 0, 1); items.push([sw.item, 1.5 + 1.25 * p, ROWY.saw, 0.77, SO.saw[3] + 0.03]); }
+    if (ex.phase === 'run') { const p = clamp(ex.t / C.extractSec, 0, 1); items.push([ex.item, 1.3 + 1.0 * Math.min(1, p * 2.2), ROWY.extract, LIFT(ex.item), beltKey(ROWY.extract)]); }
+    const heap = (list, q, max) => list.slice(-(max || 18)).forEach((k, i) => { const sl = binSlot(q, i); items.push([k, sl.x, sl.y, sl.z + (isLog(k) ? LOG_R[F.sizeOf(k)] : 0), q[1] + 0.02 + i * 0.0001, sl.turn]); });
+    heap(s.bin, SO.bin); heap(sw.in, SO.sawIn); heap(sw.out, SO.sawOut); heap(ex.in, SO.extractIn); heap(ex.out, SO.extractOut);
+    heap(s.bench.in, SO.benchIn); heap(s.bench.out, SO.benchOut);
+    s.rack.slice(0, 3).forEach((k, i) => items.push([k, 0.33 + 0.19 * i, yc - 0.03, 0.72 + LOG_R[F.sizeOf(k)], SO.rack[3] + 0.001 + i * 0.0001, Math.PI / 2]));
+    if (s.bench.item) { const u = clamp(s.bench.t / C.carveSec, 0, 1); items.push([s.bench.item, 2.85, ROWY.bench - 0.05, 0.88 + (isLog(s.bench.item) ? LOG_R[F.sizeOf(s.bench.item)] : 0), SO.bench[3] + 0.03, 0, 1 - 0.25 * u]); }
+    s.stalls[0].stock.forEach((g, i) => items.push([g.item, (L.STALL.x0 + L.STALL.x1) / 2, L.STALL.y0 + 0.12 + (i % 2) * 0.2, L.STALL.z + 0.03 + Math.floor(i / 2) * 0.065, SO.counter[3] + 0.07 + i * 0.0001, 0, 0.92]));
     // the last few things in the recycle bin poke out of its mouth (not the ones still in the air)
-    const flying = FLY.filter(f => f.recycle).length, lay = s.recycled.slice(0, Math.max(0, s.recycled.length - flying)).slice(-4);
-    lay.forEach((k, i) => { const q = RECYCLED_AT[i]; D.push({ key: 4.36 + i * 0.0001, f: () => drawItem(k, chain(Mt(q[0], q[1], 0.6), Mz(q[2]), Ms(0.5, 0.5, 0.5))) }); });
+    const flying = FLY.filter(f => f.recycle).length, lay = s.recycle.slice(0, Math.max(0, s.recycle.length - flying)).slice(-4);
+    lay.forEach((k, i) => { const q = RECYCLED_AT[i]; items.push([k, L.RECYCLE.x + q[0], L.RECYCLE.y + q[1], 0.6, SO.recycle[3] + 0.001 + i * 0.0001, q[2], 0.5]); });
+    items.forEach(it => D.push({ key: it[4], f: () => blitItem(it[0], it[1], it[2], it[3], it[5], it[6]) }));
     // people and robots
     D.push({ key: s.avatar.y + 0.001, f: () => drawAvatar(s.avatar, dt) });
     s.robots.forEach(r => D.push({ key: r.y, f: () => drawRobot(r, dt) }));
+    s.shop.people.forEach(c => D.push({ key: c.y + 0.002, f: () => drawCustomer(c, dt) }));
     D.sort((a, b) => a.key - b.key);
     D.forEach(d => d.f());
     drawFly();
     drawFx();
     drawFloats();
   }
-  const RECYCLED_AT = [[3.74, 4.02, 0.5], [3.88, 4.16, -0.7], [3.72, 4.2, 2.2], [3.86, 4.0, 1.3]];
-  function binSlot(i) {
-    const layer = Math.floor(i / 3), slot = i % 3;
-    return { x: 5.22, y: 2.62 + slot * 0.29, z: 0.06 + Math.min(layer, 5) * 0.075 };
-  }
   function blit(q) {
     let dx = 0;
-    if (q.shake && s.machine.phase === 'jam') dx = Math.sin(clock * 40) * 1.5;
-    else if (q.shake && s.machine.phase === 'run') dx = Math.sin(clock * 55) * 0.5;
+    if (q.shake === 'planer' && s.machine.phase === 'jam') dx = Math.sin(clock * 40) * 1.5;
+    else if (q.shake === 'planer' && s.machine.phase === 'run') dx = Math.sin(clock * 55) * 0.5;
+    else if (q.shake === 'extract' && s.extract.phase === 'run') dx = Math.sin(clock * 47) * 0.5;
     const y = q.y - VW.camY;
     if (y > VW.h || y + q.h < 0) return;                       // off screen
     const k = VW.dpr;                                           // land on whole device pixels: no resampling
@@ -3031,36 +3668,50 @@ const MODE = (function () {
   }
 
   /* ---------- events from the engine: sound, numbers, sparks ---------- */
-  let whir = null;
+  const whirs = {};
+  const AT = { planer: () => [(SO.machine[0] + SO.machine[2]) / 2, ROWY.planer - 0.3, 1.5], saw: () => [2.45, ROWY.saw, 1.2], extract: () => [2.2, ROWY.extract, 1.6] };
   function drain() {
     const evs = s.events;
     if (!evs.length) return;
     s.events = [];
     evs.forEach(e => {
       switch (e.kind) {
-        case 'press':
-          SND.sfx('press'); if (whir) whir.stop(); whir = SND.whir(C.processSec);
-          if (e.cost) FLOAT.push({ x: 2.85, y: 3.3, z: 1.5, text: '-$' + e.cost, color: '#ff8a8a', age: 0 });
-          break;
-        case 'made': SND.sfx('done'); puff(3.6, 2.9, 0.6, 'dust', 10); break;
-        case 'binned': SND.sfx('drop'); break;
-        case 'jam': SND.sfx('jam'); if (whir) { whir.stop(); whir = null; } puff(3.12, 2.65, 1.8, 'smoke', 8); break;
-        case 'cleaned': SND.sfx('clean'); puff(2.85, 3.6, 0.8, 'spark', 14); break;
-        case 'sold': {
-          const src = typeof e.by === 'number' && s.robots[e.by] ? s.robots[e.by] : s.avatar;
-          FLY.push({ item: e.item, x0: src.x, y0: src.y, z0: 0.9, x1: L.HATCH.x + 0.2, y1: L.HATCH.y, z1: 0.6, h: 1.2, sc: 0.7, spin: 5, age: 0, dur: 0.6 });
-          const col = { fair: '#7dff9a', cheap: '#ffe066', free: '#c9d2db', mislabel: '#ff8a8a' }[e.sale];
-          FLOAT.push({ x: src.x, y: src.y, z: 1.45, text: '+$' + e.paid, color: col, sub: e.sale === 'mislabel' ? 'satisfaction -' + C.satHit + '%' : '', age: 0 });
-          SND.sfx(e.paid > 0 ? 'cash' : 'flop');
-          if (e.sale === 'mislabel') SND.sfx('boo');
+        case 'press': {
+          SND.sfx('press');
+          const at = e.at || 'planer', len = at === 'saw' ? C.sawSec : at === 'extract' ? C.extractSec : C.processSec;
+          if (whirs[at]) whirs[at].stop();
+          whirs[at] = SND.whir(len);
+          const p = AT[at]();
+          if (e.cost) FLOAT.push({ x: p[0], y: p[1], z: p[2], text: '-$' + e.cost, color: '#ff8a8a', age: 0 });
           break;
         }
+        case 'made': SND.sfx('done'); puff(SO.machine[2] + 0.05, ROWY.planer, 0.6, 'dust', 10); break;
+        case 'milled': SND.sfx('done'); puff(e.at === 'saw' ? 2.45 : 2.8, e.at === 'saw' ? ROWY.saw : ROWY.extract, 0.9, 'dust', 10); break;
+        case 'binned': SND.sfx('drop'); break;
+        case 'jam': SND.sfx('jam'); if (whirs.planer) { whirs.planer.stop(); whirs.planer = null; } puff(SO.machine[0] + 0.97, SO.machine[1] + 0.4, 1.8, 'smoke', 8); break;
+        case 'cleaned': {
+          SND.sfx('clean'); puff((SO.console[0] + SO.console[2]) / 2, SO.machine[3] + 0.05, 0.8, 'spark', 14);
+          if (e.cost) FLOAT.push({ x: (SO.machine[0] + SO.machine[2]) / 2, y: ROWY.planer - 0.3, z: 1.5, text: '-$' + e.cost, color: '#ff8a8a', sub: 'jam fixed', age: 0 });
+          break;
+        }
+        case 'customer': SND.sfx('bell'); break;
+        case 'paying': SND.sfx('card'); break;
+        case 'sold': {
+          const wrong = e.sale === 'wrong';
+          FLOAT.push({ x: e.x, y: e.y, z: 1.6, text: '+$' + e.paid, color: wrong ? '#ff8a8a' : '#7dff9a', sub: wrong ? 'not a medium plank: satisfaction -' + C.satHit + '%' : '', age: 0 });
+          SND.sfx(e.paid > 0 ? 'cash' : 'flop');
+          if (wrong) SND.sfx('boo');
+          break;
+        }
+        case 'stocked': case 'put': SND.sfx('drop'); break;
+        case 'picked': case 'took': SND.sfx('pop'); break;
+        case 'carved': SND.sfx('level'); puff(2.85, ROWY.bench - 0.05, 1.0, 'spark', 12); break;
         case 'hired': { SND.sfx('hire'); const c = L.CRATES[e.id]; for (let i = 0; i < 8; i++) puff((c[0] + c[2]) / 2, (c[1] + c[3]) / 2, 0.5, 'crate', 1); puff((c[0] + c[2]) / 2, (c[1] + c[3]) / 2, 0.6, 'spark', 12); break; }
         case 'assigned': SND.sfx('beep'); break;
         case 'recycled': {
-          const R = L.RECYCLE, r = typeof e.by === 'number' ? s.robots[e.by] : null;
-          const from = e.from === 'in' ? [1.7, 2.9, 0.7] : e.from === 'out' ? [3.6, 2.9, 0.6] : r ? [r.x, r.y, 0.9] : [R.x, R.y, 1.2];
-          FLY.push({ item: e.item, x0: from[0], y0: from[1], z0: from[2], x1: R.x, y1: R.y, z1: R.z, h: 0.7, sc: 0.75, spin: 3, age: 0, dur: 0.55, recycle: true });
+          const R = L.RECYCLE, r = typeof e.by === 'number' ? s.robots[e.by] : null, a = s.avatar;
+          const from = e.from === 'in' ? [SO.inBelt[2] - 0.1, ROWY.planer, 0.7] : e.from === 'out' ? [SO.machine[2] + 0.1, ROWY.planer, 0.6] : r ? [r.x, r.y, 0.9] : [a.x, a.y, 0.9];
+          FLY.push({ item: e.item, x0: from[0], y0: from[1], z0: from[2], x1: R.x, y1: R.y, z1: R.z, h: e.from === 'robot' ? 1.3 : 0.7, sc: 0.75, spin: 3, age: 0, dur: e.from === 'robot' ? 0.7 : 0.55, recycle: true });
           SND.sfx('toss');
           break;
         }
@@ -3076,26 +3727,88 @@ const MODE = (function () {
 
   /* ---------- the chat bubble (DOM) ---------- */
   const ICON = {
-    bill: '<svg viewBox="0 0 48 28" width="40" height="24" aria-hidden="true"><rect x="2" y="2" width="44" height="24" rx="4" fill="#3fb26a" stroke="#1d2430" stroke-width="2.5"/><rect x="7" y="6" width="34" height="16" rx="2" fill="none" stroke="#bfeccc" stroke-width="1.5"/><text x="24" y="20" text-anchor="middle" font-family="system-ui,sans-serif" font-weight="900" font-size="15" fill="#ffffff">$</text></svg>',
     robot: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><line x1="20" y1="2" x2="20" y2="8" stroke="#1d2430" stroke-width="2.5"/><circle cx="20" cy="3" r="3" fill="#ff7a2e" stroke="#1d2430" stroke-width="2"/><rect x="4" y="8" width="32" height="24" rx="9" fill="#eef2f5" stroke="#1d2430" stroke-width="2.5"/><rect x="9" y="13" width="22" height="13" rx="5" fill="#13202b"/><ellipse cx="15" cy="19.5" rx="2.2" ry="3.5" fill="#7ff0ff"/><ellipse cx="25" cy="19.5" rx="2.2" ry="3.5" fill="#7ff0ff"/></svg>',
     notes: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><rect x="9" y="4" width="22" height="28" rx="3" fill="#f6e7c8" stroke="#1d2430" stroke-width="2.5"/><rect x="14" y="1.5" width="12" height="6" rx="2" fill="#9aa5b1" stroke="#1d2430" stroke-width="2"/><g stroke="#1d2430" stroke-width="2" stroke-linecap="round"><line x1="14" y1="14" x2="26" y2="14"/><line x1="14" y1="19.5" x2="26" y2="19.5"/><line x1="14" y1="25" x2="22" y2="25"/></g></svg>',
     button: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><rect x="5" y="20" width="30" height="10" rx="3" fill="#e8ecf0" stroke="#1d2430" stroke-width="2.5"/><ellipse cx="20" cy="18" rx="10" ry="5" fill="#b0241c" stroke="#1d2430" stroke-width="2.5"/><ellipse cx="20" cy="15" rx="10" ry="5" fill="#ff3b30" stroke="#1d2430" stroke-width="2.5"/></svg>',
+    stock: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><rect x="3" y="22" width="34" height="8" rx="2" fill="#c99460" stroke="#1d2430" stroke-width="2.5"/><rect x="7" y="10" width="26" height="7" rx="1.5" fill="#ebc77f" stroke="#1d2430" stroke-width="2"/><path d="M20 2v6" stroke="#16b3a5" stroke-width="3" stroke-linecap="round"/><path d="M16 5l4 4 4-4" fill="none" stroke="#16b3a5" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
     rest: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><text x="9" y="28" font-family="system-ui,sans-serif" font-weight="900" font-size="16" fill="#7b8794">z</text><text x="18" y="20" font-family="system-ui,sans-serif" font-weight="900" font-size="13" fill="#7b8794">z</text><text x="26" y="12" font-family="system-ui,sans-serif" font-weight="900" font-size="10" fill="#7b8794">z</text></svg>'
   };
-  const MINI = {
-    plank: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><rect x="1" y="1" width="28" height="8" rx="1" fill="#ebc77f" stroke="#1d2430" stroke-width="1.5"/></svg>',
-    rough: '<svg viewBox="0 0 30 10" width="26" height="9" aria-hidden="true"><rect x="1" y="1" width="28" height="8" rx="1" fill="#c99a58" stroke="#1d2430" stroke-width="1.5"/><g fill="#22140a"><circle cx="7" cy="4" r="1.7"/><circle cx="15.5" cy="6" r="1.7"/><circle cx="23.5" cy="4.5" r="1.7"/></g></svg>',
-    dowels: '<svg viewBox="0 0 30 12" width="26" height="10" aria-hidden="true"><g stroke="#1d2430" stroke-width="1.2" fill="#e6c58c"><rect x="1" y="1" width="28" height="3" rx="1.5"/><rect x="1" y="4.5" width="28" height="3" rx="1.5"/><rect x="1" y="8" width="28" height="3" rx="1.5"/></g><rect x="13" y="0.5" width="4" height="11" fill="#d0453b"/></svg>',
-    largePlank: '<svg viewBox="0 0 34 14" width="30" height="12" aria-hidden="true"><rect x="1" y="1" width="32" height="12" rx="1.5" fill="#ebc77f" stroke="#1d2430" stroke-width="1.6"/><path d="M6 5h14M12 9.5h16" stroke="#c9a160" stroke-width="1.2"/></svg>'
+  // an arrow in the corner of a put or take button: into the bin, or out of it
+  const ARROW = {
+    put: '<svg class="fx-arr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 1v8M2.5 5.5L6 9l3.5-3.5" fill="none" stroke="#16b3a5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    take: '<svg class="fx-arr" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M6 11V3M2.5 6.5L6 3l3.5 3.5" fill="none" stroke="#f2862e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
   };
-  const ITEM_NAME = { plank: 'a medium plank', rough: 'a gnarled plank', dowels: 'dowel rods', largePlank: 'a large plank' };
-  const LOG_NAME = { log: 'a medium log', gnarled: 'a gnarled log', small: 'a small log', large: 'a large log', sappy: 'a sap log' };
+  // a little picture of every thing, sized by its length
+  const MINI_W = { s: 18, m: 26, l: 34 };
+  function mini(id) {
+    const k = F.kindOf(id), z = F.sizeOf(id), w = MINI_W[z] || 26, ink = 'stroke="#1d2430" stroke-width="1.5"';
+    const svg = (vw, vh, body) => '<svg viewBox="0 0 ' + vw + ' ' + vh + '" width="' + vw + '" height="' + vh + '" aria-hidden="true">' + body + '</svg>';
+    if (k === 'log' || k === 'gnarled' || k === 'sappy') {
+      const h = { s: 8, m: 11, l: 14 }[z], bark = k === 'gnarled' ? '#5b3a22' : '#7a4a2a';
+      let b = '<rect x="1" y="1" width="' + (w - 2) + '" height="' + h + '" rx="' + (h / 2) + '" fill="' + bark + '" ' + ink + '/><ellipse cx="' + (w - 2 - h / 4) + '" cy="' + (1 + h / 2) + '" rx="' + (h / 4) + '" ry="' + (h / 2 - 0.5) + '" fill="#e0b072" ' + ink + '/>';
+      if (k === 'gnarled') b += '<g fill="#22140a"><circle cx="' + (w * 0.25) + '" cy="' + (h * 0.45) + '" r="1.4"/><circle cx="' + (w * 0.5) + '" cy="' + (h * 0.7) + '" r="1.4"/></g>';
+      if (k === 'sappy') b += '<g fill="#8fc21f"><ellipse cx="' + (w * 0.35) + '" cy="2.5" rx="' + (w * 0.18) + '" ry="2"/><circle cx="' + (w * 0.3) + '" cy="' + (h * 0.75) + '" r="1.6"/><circle cx="' + (w * 0.55) + '" cy="' + (h * 0.6) + '" r="1.4"/></g>';
+      return svg(w, h + 2, b);
+    }
+    if (k === 'plank' || k === 'rough') {
+      let b = '<rect x="1" y="1" width="' + (w - 2) + '" height="7" rx="1" fill="' + (k === 'rough' ? '#c99a58' : '#ebc77f') + '" ' + ink + '/>';
+      if (k === 'rough') b += '<g fill="#22140a"><circle cx="' + (w * 0.25) + '" cy="4" r="1.5"/><circle cx="' + (w * 0.52) + '" cy="5.5" r="1.5"/><circle cx="' + (w * 0.78) + '" cy="4" r="1.5"/></g>';
+      return svg(w, 9, b);
+    }
+    if (k === 'sap') return svg(14, 18, '<rect x="2" y="5" width="10" height="12" rx="2" fill="#bfe7a0" ' + ink + '/><rect x="3.5" y="9" width="7" height="6.5" rx="1" fill="#8fc21f"/><rect x="1.5" y="1.5" width="11" height="4" rx="1" fill="#6b7682" ' + ink + '/>');
+    if (k === 'b2x4') return svg(w, 12, '<rect x="1" y="1" width="' + (w - 2) + '" height="4.5" fill="#ebc77f" ' + ink + '/><rect x="1" y="6.5" width="' + (w - 2) + '" height="4.5" fill="#ebc77f" ' + ink + '/><rect x="' + (w / 2 - 2) + '" y="0" width="4" height="12" fill="#d0453b"/>');
+    if (k === 'b2x2') return svg(w, 12, '<g fill="#ebc77f" ' + ink + '><rect x="1" y="1" width="' + (w - 2) + '" height="2.8"/><rect x="1" y="4.6" width="' + (w - 2) + '" height="2.8"/><rect x="1" y="8.2" width="' + (w - 2) + '" height="2.8"/></g><rect x="' + (w / 2 - 2) + '" y="0" width="4" height="12" fill="#d0453b"/>');
+    if (k === 'dowels') return svg(w, 12, '<g stroke="#1d2430" stroke-width="1.1" fill="#e6c58c"><rect x="1" y="1" width="' + (w - 2) + '" height="3" rx="1.5"/><rect x="1" y="4.5" width="' + (w - 2) + '" height="3" rx="1.5"/><rect x="1" y="8" width="' + (w - 2) + '" height="3" rx="1.5"/></g><rect x="' + (w / 2 - 2) + '" y="0.5" width="4" height="11" fill="#d0453b"/>');
+    if (k === 'carving') {
+      const body = { bowl: '<path d="M2 6h16l-3 8H5z" fill="#c99a58" ' + ink + '/>', bird: '<ellipse cx="9" cy="10" rx="7" ry="4.5" fill="#c99a58" ' + ink + '/><circle cx="15" cy="5.5" r="3.2" fill="#d7ab6c" ' + ink + '/><path d="M18 5l2.5 1-2.5 1" fill="#9a6a38"/>',
+        spoon: '<rect x="1" y="8" width="11" height="2.6" rx="1.2" fill="#c99a58" ' + ink + '/><ellipse cx="15" cy="9.3" rx="4.5" ry="3.3" fill="#d7ab6c" ' + ink + '/>', owl: '<ellipse cx="10" cy="10" rx="6" ry="7" fill="#c99a58" ' + ink + '/><circle cx="8" cy="8.5" r="1.7" fill="#f3d595"/><circle cx="12" cy="8.5" r="1.7" fill="#f3d595"/>' }[z];
+      return svg(21, 18, body || '');
+    }
+    return '';
+  }
+  const SIZE_NAME = { s: 'small', m: 'medium', l: 'large' };
+  // what a thing is called, in a sentence ('a small gnarled log', 'two medium 2"x4"s')
+  function NAME(id) {
+    const k = F.kindOf(id), z = SIZE_NAME[F.sizeOf(id)];
+    switch (k) {
+      case 'log': return 'a ' + z + ' log';
+      case 'gnarled': return 'a ' + z + ' gnarled log';
+      case 'sappy': return 'a ' + z + ' sap log';
+      case 'plank': return 'a ' + z + ' plank';
+      case 'rough': return 'a ' + z + ' gnarled plank';
+      case 'sap': return 'a jar of sap';
+      case 'b2x4': return 'two ' + z + ' 2"x4"s';
+      case 'b2x2': return 'four ' + z + ' 2"x2"s';
+      case 'dowels': return 'sixteen ' + z + ' dowel rods';
+      case 'carving': return 'a carved ' + F.sizeOf(id);
+    }
+    return 'something';
+  }
+  const CUT_LABEL = { b2x4: '2x4', b2x2: '2x2', dowels: 'dowels' };
   let bubbleSig = '';
   function anchorOf(b) {
-    if (b.kind === 'bin') return [5.22, 2.9, 0.7];
-    if (b.kind === 'dock') return [1.6, 7.3, 1.35];
-    if (b.kind === 'robot') { const r = s.robots[b.id]; return [r.x, r.y, 1.3]; }
-    return null;
+    const mid = (q, z) => [(q[0] + q[2]) / 2, (q[1] + q[3]) / 2, z];
+    switch (b.kind) {
+      case 'rack': return [0.52, ROWY.planer, 0.95];
+      case 'recycle': return [L.RECYCLE.x, L.RECYCLE.y, 0.85];
+      case 'sawIn': case 'extractIn': case 'benchIn': return mid(SO[b.kind], 0.7);
+      case 'saw': return [2.45, ROWY.saw, 1.2];
+      case 'dock': return [1.6, SO.dockPanel[1] + 0.15, 1.35];
+      case 'robot': { const r = s.robots[b.id]; return [r.x, r.y, 1.3]; }
+    }
+    return [s.avatar.x, s.avatar.y, 1.4];
+  }
+  function optButton(o) {
+    let inner = ICON[o.icon] || '', label = '', aria = '';
+    if (o.icon === 'put' || o.icon === 'take') { inner = mini(o.item) + ARROW[o.icon]; label = 'x' + o.count; aria = (o.icon === 'put' ? 'Put ' : 'Take ') + NAME(o.item) + (o.icon === 'put' ? ' in' : ' out') + (o.count > 1 ? ', ' + o.count : ''); if (!o.enabled) { label = '0'; aria = 'Nothing to put in'; } }
+    else if (o.icon === 'cut') { inner = mini(o.item); label = CUT_LABEL[F.kindOf(o.item)]; aria = 'Cut into ' + NAME(o.item); }
+    else {
+      if (o.price !== undefined && o.price !== null) label = '$' + o.price;
+      if (o.id === 'notes' && o.slots) label = o.filled + '/' + o.slots;
+      if (o.soldOut) label = 'sold out';
+      aria = { 'job:operate': 'Run the planer', 'job:stock': 'Stock the sales counter', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions' }[o.id] || '';
+    }
+    return '<button class="fx-opt' + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + esc(aria) + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
   }
   function renderBubble() {
     const b = F.bubbleOpen(s), opts = b ? F.options(s) : [];
@@ -3106,20 +3819,12 @@ const MODE = (function () {
       if (!b) { bubbleEl.hidden = true; bubbleEl.innerHTML = ''; }
       else {
         bubbleEl.hidden = false;
-        const btns = opts.map(o => {
-          let inner = ICON[o.icon] || '';
-          if (o.item && o.item !== 'plank') inner = (MINI[o.item] || '') + inner;
-          let label = '';
-          if (o.price !== undefined && o.price !== null) label = '$' + o.price;
-          if (o.id === 'notes' && o.slots) label = o.filled + '/' + o.slots;
-          if (o.soldOut) label = 'sold out';
-          if (o.count > 1) label += ' <span class="fx-count">x' + o.count + '</span>';
-          const aria = { 'job:operate': 'Run machine 01', 'job:sell': 'Sell from the bin', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions' }[o.id] || ('Sell ' + (ITEM_NAME[o.item] || ''));
-          return '<button class="fx-opt' + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + aria + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
-        }).join('');
+        const puts = opts.filter(o => o.group === 'put'), takes = opts.filter(o => o.group === 'take');
         bubbleEl.classList.toggle('robot', !!bot);
-        if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + btns + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
-        else bubbleEl.innerHTML = btns;
+        bubbleEl.classList.toggle('grouped', takes.length > 0);
+        if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + opts.map(optButton).join('') + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
+        else if (takes.length) bubbleEl.innerHTML = (puts.length ? '<div class="fx-bopts">' + puts.map(optButton).join('') + '</div>' : '') + '<div class="fx-bopts">' + takes.map(optButton).join('') + '</div>';
+        else bubbleEl.innerHTML = opts.map(optButton).join('');
       }
     }
     if (!b) return;
@@ -3136,7 +3841,7 @@ const MODE = (function () {
     if (!btn || btn.disabled) return;
     SND.init();
     F.choose(s, btn.dataset.opt);
-    if (btn.dataset.opt.indexOf('sell:') === 0 || btn.dataset.opt === 'hire') save();
+    if (btn.dataset.opt === 'hire') save();
     ev.stopPropagation();
   });
 
@@ -3150,63 +3855,61 @@ const MODE = (function () {
     if (s.money === shownMoney && v === shownSat) return;
     if (shownMoney !== null && s.money > shownMoney) bumpT = 0.35;
     shownMoney = s.money; shownSat = v;
-    scoreEl.textContent = 'Money ' + cash(s.money) + '. Customer satisfaction ' + v + '%.';
+    scoreEl.textContent = 'Money ' + cash(s.money) + '. Customer satisfaction ' + v + '%. Goal: ' + goalText() + '.';
   }
   const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const JOB_NAME = j => j === 'operate' ? 'on machine 01' : j === 'sell' ? 'selling' : 'resting';
+  const JOB_NAME = j => j === 'operate' ? 'on the planer' : j === 'stock' ? 'stocking the counter' : 'resting';
   const money$ = list => list.map(n => '$' + n).join(', ').replace(/, ([^,]*)$/, ' and $1');
   function renderPanel() {
-    const pct = v => Math.round(v * 100) + '%';
+    const pct = v => Math.round(v * 100) + '%', Z = C.logs.size, Q = C.logs.quality, P = C.price, T = s.tally.player;
     const bots = s.robots.length ? s.robots.map(r => {
       const n = r.tally.good + r.tally.soso + r.tally.bad;
       return '<tr><td>' + esc(r.name) + ' (' + JOB_NAME(r.job) + ')</td><td>' + r.tally.good + '</td><td>' + r.tally.soso + '</td><td>' + r.tally.bad + '</td><td>' + (n ? Math.round(r.tally.good / n * 100) + '%' : '-') + '</td></tr>';
     }).join('') : '<tr><td colspan="5">No robots yet. The first one costs $' + C.hire[0] + '.</td></tr>';
     panelBody.innerHTML =
       '<h2>Robot factory</h2>' +
-      '<p>Machine 01 is a task. You can always do it yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
+      '<p><b>The goal</b>: ' + esc(goalText()) + '. The planer (slot 01) is a task you can always do yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
       '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
-      '<p>The factory makes medium planks. About ' + pct(1 - C.logs.gnarled - C.logs.small - C.logs.large - C.logs.sappy) + ' of the logs off the rack are good medium logs; the rest are gnarled (' + pct(C.logs.gnarled) + '), small (' + pct(C.logs.small) + '), large (' + pct(C.logs.large) + ') or sap logs (' + pct(C.logs.sappy) + '). You toss those in the recycle bin yourself; a robot does what it is told. <b>Machine 01 costs $' + C.logCost + ' for every log it cuts</b>, whoever presses the button and whatever the log, so money can go below zero.</p>' +
+      '<p><b>Wood</b> comes in three sizes, small, medium and large (2\', 4\' and 8\'), and three qualities: normal, gnarled and sappy. Off the rack, ' + pct(Z.s) + ' of logs are small, ' + pct(Z.m) + ' medium and ' + pct(Z.l) + ' large; ' + pct(Q.gnarled) + ' are gnarled and ' + pct(Q.sappy) + ' sappy. The planer makes a normal log a plank of its size and a gnarled one a gnarled plank (its holes kept); any sap log jams it. <b>It costs $' + C.logCost + ' for every log</b>, whoever presses the button and whatever the log, and <b>fixing a jam costs $' + C.fixCost + '</b>, so money can go below zero. You press the normal medium logs, and any normal log you put on its rack yourself, and toss the rest in the recycle bin.</p>' +
+      '<p><b>Your arms</b>: tap an output bin to take everything in it, tap the counter to stock its stall with the medium planks you carry (the rest stay with you), and tap the recycle bin to put things in or take them back out. Tap a machine\'s input bin to put in what it takes.</p>' +
+      '<p><b>The sales counter</b> needs nobody: customers come in at the door, queue for the stall and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything but a medium plank in the medium plank stall still sells as one and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: the stall\'s $' + P.plank.m + ' times it (the counter\'s label shows what they pay now). Each fair sale wins a point back, and customers slowly forget.</p>' +
+      '<p><b>Slots 02 to 04</b> are yours to run for now. The table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length ($' + C.sawCost + '); the sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer ($' + C.extractCost + '); at the bench you carve gnarled wood into something to keep. For now only medium planks are sold. Their prices when they are: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length.</p>' +
       '<p>Each robot\'s page ends in its <b>evals</b>: what it has done, counted, with a dot for how it went. Reset them to start counting again after you change its instructions.</p>' +
       '<ul>' +
-      '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a plank sold for its price; anything sold for its own price when nothing says not to.</li>' +
-      '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; a gnarled, small or large log cut into a gnarled plank ($' + C.price.rough + '), dowel rods ($' + C.price.dowels + ') or a large plank ($' + C.price.largePlank + '); a plank let go for $' + C.cheapPlank + ' or given away; a reach that came up with something other than a plank; and anything done against the robot\'s own instructions.</li>' +
-      '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the machine until you scrub it clean yourself; anything else sold to a customer as a medium plank for $' + C.mislabel + ', which costs ' + C.satHit + ' points of customer satisfaction.</li>' +
-      '<li><b>The seller sells what is in the bin</b>. Told to sell only medium planks, it leaves everything else where it is and has to hunt for a plank: each reach finds one as often as planks make up the bin, and a reach that comes up with something else is a "looking for plank". Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up.</li>' +
-      '<li><b>Satisfaction sets what customers pay</b>: every price is multiplied by it. Each fair sale wins back a point, and customers slowly forget a bad one.</li>' +
-      '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing.</li>' +
+      '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a medium plank put in the stall.</li>' +
+      '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; any other log cut into a plank; a reach that came up with something other than a medium plank; anything done against the robot\'s own instructions.</li>' +
+      '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the planer until you scrub it clean yourself; anything else put in the medium plank stall, which a customer will pay for as a medium plank.</li>' +
+      '<li><b>The stocker</b> takes from the planer\'s output bin and fills the stall. Told to stock only medium planks, it leaves everything else where it is and hunts for one: each reach finds one as often as medium planks make up the bin, and a reach that comes up with something else is a "looking for plank". Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up.</li>' +
+      '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing. Robots can run the planer and stock the counter; the other slots are yours.</li>' +
       '</ul>' +
       '<h3>Measured since each robot\'s evals were last reset</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Green</th><th>Yellow</th><th>Red</th><th>Green %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
-      '<p class="fx-small">You: ' + s.tally.player.made + ' planks made, ' + s.tally.player.tossed + ' bad logs tossed, ' + s.tally.player.sold + ' sold by hand. Earned in all: $' + s.earned + '; spent on logs: $' + s.spent + '.</p>' +
+      '<p class="fx-small">You: ' + T.made + ' planks made, ' + T.tossed + ' logs tossed, ' + T.stocked + ' stocked, ' + T.fixed + ' jams fixed, ' + T.sawn + ' sawn, ' + T.extracted + ' sap logs pressed, ' + T.carved + ' carved. Customers served: ' + s.shop.served + (s.shop.wrong ? ' (' + s.shop.wrong + ' sold something else)' : '') + '. Earned in all: $' + s.earned + '; spent running the machines: $' + s.spent + ' (logs $' + s.costs.logs + ', jams $' + s.costs.fixes + ', saw $' + s.costs.saw + ', extractor $' + s.costs.extract + ').</p>' +
       '<div class="fx-row"><button class="fx-ghost" data-panel="restart">' + (confirmReset ? 'Tap again to start over' : 'Start over') + '</button><button class="fx-ghost" data-panel="close">Close</button></div>';
   }
   let confirmReset = false;
-
   /* ---------- a robot's page: its name, its base prompt, its own instructions, its evals ---------- */
   let panelMode = 'info', pageBot = -1, pickSlot = -1, pageSig = '';
   // a robot's evals: each key is an action, ':' and what it was done to, and '!' when it was done
   // against the robot's own instructions (it slipped). In the order they are listed:
   const DOING = {
     plank: () => 'Medium log, medium plank', think: () => 'Stopped to think, then a medium plank',
-    rough: () => 'Cut a gnarled log: a gnarled plank', dowels: () => 'Cut a small log: dowel rods',
-    largePlank: () => 'Cut a large log: a large plank', sap: () => 'Fed in a sap log: a jam',
-    reject: x => 'Put ' + (LOG_NAME[x] || 'a bad log') + ' in the recycle bin',
-    caught: x => 'Caught ' + (ITEM_NAME[x] || 'a bad cut') + ' at the exit: into the recycle bin',
-    fair: () => 'Sold a medium plank for its price', cheap: () => 'Let a medium plank go cheap', free: () => 'Gave a medium plank away',
-    honest: x => x ? 'Sold ' + ITEM_NAME[x] + (x === 'dowels' ? ' for their price' : ' for its price') : 'Sold something else for its price',
-    mislabel: x => 'Sold ' + (ITEM_NAME[x] || 'something') + ' as a medium plank',
+    cut: x => 'Cut ' + NAME(x) + ': ' + NAME(F.makes(x)), jam: x => 'Fed in ' + NAME(x) + ': a jam',
+    reject: x => 'Put ' + NAME(x) + ' in the recycle bin',
+    caught: x => 'Caught ' + NAME(x) + ' at the exit: into the recycle bin',
+    stock: () => 'Put a medium plank in the stall',
+    misstock: x => 'Put ' + NAME(x) + ' in the medium plank stall',
     looking: () => 'Looking for plank',
-    recycle: x => 'Put ' + (ITEM_NAME[x] || 'something') + ' in the recycle bin'
+    recycle: x => 'Put ' + NAME(x) + ' in the recycle bin'
   };
   const DOING_ORDER = Object.keys(DOING);
   function doing(key) {
-    const against = key.slice(-1) === '!', [act, what] = key.replace(/!$/, '').split(':');
+    const against = key.slice(-1) === '!', k = key.replace(/!$/, ''), at = k.indexOf(':'), act = at < 0 ? k : k.slice(0, at), what = at < 0 ? undefined : k.slice(at + 1);
     return DOING[act] ? DOING[act](what) + (against ? ', against its instructions' : '') : key;
   }
   function evalRows(r) {
-    const rank = k => { const [act, what] = k.replace(/!$/, '').split(':'); return DOING_ORDER.indexOf(act) * 100 + (what ? 10 + ITEMS_ALL.indexOf(what) : 0) + (k.slice(-1) === '!' ? 50 : 0); };
+    const rank = k => { const b = k.replace(/!$/, ''), at = b.indexOf(':'), act = at < 0 ? b : b.slice(0, at), what = at < 0 ? '' : b.slice(at + 1); return DOING_ORDER.indexOf(act) * 100 + (what ? 10 + F.ITEMS.indexOf(what) * 0.5 : 0) + (k.slice(-1) === '!' ? 50 : 0); };
     return Object.keys(r.record).filter(k => r.record[k] > 0).sort((a, b) => rank(a) - rank(b));
   }
-  const ITEMS_ALL = F.LOGS.concat(F.ITEMS);
   const CROSS = '<svg viewBox="0 0 12 12" width="13" height="13" aria-hidden="true"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg>';
   function openRobot(id) {
     const r = s.robots[id];
@@ -3304,17 +4007,18 @@ const MODE = (function () {
       const c = PX(r.x), top = PY(r.y, 1.25), bot = PY(r.y, 0);
       if (Math.abs(x - c) <= Math.max(22, 0.34 * VW.S) && y >= top - 6 && y <= bot + 6) hits.push({ t: { kind: 'robot', id: r.id }, key: r.y + 10 });
     });
-    inR(spriteRect('machine'), { t: { kind: 'machine' }, key: 3.58 });
-    inR(spriteRect('console'), { t: { kind: 'machine' }, key: 3.88 });
-    inR(spriteRect('binBack'), { t: { kind: 'bin' }, key: 2.3 });
-    inR(spriteRect('binFront'), { t: { kind: 'bin' }, key: 3.51 });
-    inR(spriteRect('dockPanel'), { t: { kind: 'dock' }, key: 7.45 });
+    // every sprite that does something when tapped, and what: its key is its front edge, so the front-most wins
+    TAPS.forEach(([id, kind]) => { const sp = (sprites || []).find(q => q.id === id); if (sp) inR(spriteRect(id), { t: { kind }, key: sp.key }); });
     L.CRATES.forEach((c, i) => { if (s.hired <= i) inR(spriteRect('crate' + i), { t: { kind: 'dock' }, key: c[3] }); });
     if (hits.length) { hits.sort((a, b) => b.key - a.key); return hits[0].t; }
     const w = toWorldFloor(x, y);
     if (w.x < 0 || w.x > L.W || w.y < 0 || w.y > L.H) return null;
     return { kind: 'floor', x: w.x, y: w.y };
   }
+  const TAPS = [['machine', 'machine'], ['console', 'machine'], ['rack', 'rack'], ['binBack', 'bin'], ['binFront', 'bin'], ['recycle', 'recycle'],
+    ['counter', 'counter'], ['stall', 'counter'], ['sawInBack', 'sawIn'], ['sawInFront', 'sawIn'], ['saw', 'saw'], ['sawConsole', 'saw'], ['sawOutBack', 'sawOut'], ['sawOutFront', 'sawOut'],
+    ['extractInBack', 'extractIn'], ['extractInFront', 'extractIn'], ['extract', 'extract'], ['extractConsole', 'extract'], ['extractOutBack', 'extractOut'], ['extractOutFront', 'extractOut'],
+    ['benchInBack', 'benchIn'], ['benchInFront', 'benchIn'], ['bench', 'bench'], ['benchOutBack', 'benchOut'], ['benchOutFront', 'benchOut'], ['dockPanel', 'dock']];
   function tapAt(x, y) {
     SND.init();
     const t = hitTest(x, y);
@@ -3362,8 +4066,11 @@ const MODE = (function () {
     F.step(s, dt);
     drain();
     stepFx(dt);
-    if (s.machine.phase === 'run' && s.machine.result !== 'sap' && Math.random() < dt * 30) puff(3.58, 2.9, 0.62, 'dust', 1);
-    if (s.machine.phase === 'jam' && Math.random() < dt * 3) puff(3.12, 2.65, 1.8, 'smoke', 1);
+    const mq = SO.machine;
+    if (s.machine.phase === 'run' && s.machine.result !== 'jam' && Math.random() < dt * 30) puff(mq[2] + 0.03, ROWY.planer, 0.62, 'dust', 1);
+    if (s.machine.phase === 'jam' && Math.random() < dt * 3) puff(mq[0] + 0.97, mq[1] + 0.4, 1.8, 'smoke', 1);
+    if (s.saw.phase === 'run' && Math.random() < dt * 25) puff(2.45 + 0.2, ROWY.saw, 0.9, 'dust', 1);
+    if (s.avatar.act && s.avatar.act.kind === 'carve' && Math.random() < dt * 14) puff(2.85, ROWY.bench - 0.05, 0.95, 'dust', 1);
     draw(dt);
     MARK.age += dt;
     if (MARK.age < 0.5) {
@@ -3392,7 +4099,7 @@ const MODE = (function () {
   function leave() {
     if (!on) return;
     on = false; cancelAnimationFrame(raf);
-    if (whir) { whir.stop(); whir = null; }
+    Object.keys(whirs).forEach(k => { if (whirs[k]) whirs[k].stop(); whirs[k] = null; });
     closePanel();
     save();
   }

@@ -1017,7 +1017,7 @@ voice against a stand-in for OpenAI's speech service, and other phones as browse
 contexts joined over real WebRTC). Detailed context:
 `.claude/cyoa2.md`.
 
-### TAAS (`taas/index.html`, ~3,400 lines)
+### TAAS (`taas/index.html`, ~4,100 lines)
 The **Team AI Adoption Simulator**, designed with the CD on 2026-10-09 and shipped on
 2026-10-12 as the hub's 3rd card (after CYOA2 and CYOA). Not a scene but a **management
 sim rendered as a DOM page**: a roadmap tracker of eight quarters across the top, the
@@ -1038,14 +1038,17 @@ draft the CD is still tuning. Since 2026-10-13 that is the **Formal** mode, and 
 beside the menu button switches to **Robot factory**: the same story played by hand, a
 **Canvas 2D** scene of hand-written low-poly meshes in toon bands and ink outlines, seen
 Zelda-style from 50 degrees up. A chibi in a hard hat walks where you tap (an A* over the
-floor, a walk cycle driven by distance), presses machine01's glowing red button, and sells
-planks from a bin through a chat bubble, tossing gnarled and small logs in a recycle bin; then
-robots hired as **AI agents** run the button and the selling and make mistakes with causes
-(sap logs that jam the machine until you scrub it, gnarled logs cut into planks with holes,
-small ones cut into dowels, planks given away, dowels sold as planks at the cost of **customer
-satisfaction**, which starts at 100% and sets what customers pay). Every log costs $1 at the
-machine, so money can go red, and a seller told to sell only medium planks leaves everything
-else in the bin and has to hunt for them, unless it is told to recycle each kind. Each mistake
+floor, a walk cycle driven by distance), presses the planer's glowing red button, carries
+planks from its output bin round to a **sales counter** along the back wall and recycles what
+will not sell; customers walk in from the left, line up across the counter, pay for a medium
+plank at $4 times **customer satisfaction** (which starts at 100%) and cost 0.1% of it a second
+each while they wait. Wood has a size and a quality, so sappy logs jam the planer ($5 to scrub)
+and gnarled ones make planks with holes; slots 02-04 hold a table saw, a sap extractor and a hand
+crafting bench, worked by hand. Robots hired as **AI agents** run the planer or stock the counter
+and make mistakes with causes (a small, large or gnarled plank in the medium stall is sold, and
+satisfaction drops). Every log costs $1 at the planer, so money can go red, and a stocker told to
+stock only medium planks has to hunt the output bin for them unless it is told to recycle each
+kind. Each mistake
 you see adds an instruction to a list, and each robot has its own named page: its base prompt, then five instruction slots
 bought with cash ($5-$25), which it follows but for a 1-in-20 slip, and its **Evals**: what
 it did, red only for a blocker or a hit to customer satisfaction, resettable. Static scenery is baked per scale and blitted on
