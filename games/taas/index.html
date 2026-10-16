@@ -663,9 +663,14 @@ const FACTORY = (function () {
     slots: [5, 10, 15, 20, 25],      // instruction slots: each robot's own, bought in order (the CD's prices)
     // what rolls off the planer's rack: every log has a size and a quality (the CD, 2026-10-15)
     logs: { size: { s: 0.2, m: 0.65, l: 0.15 }, quality: { log: 0.75, gnarled: 0.15, sappy: 0.1 } },
-    logCost: 1,             // the planer costs $1 for every log it processes, yours included (the CD, 2026-10-14)
+    // running a machine costs $0.10 for each thing it processes, whoever presses it: electricity and
+    // wear and tear (the CD, 2026-10-16; it was $1 from 2026-10-14)
+    logCost: 0.1,           // the planer, every log, yours included
+    // the planer's input bin: a new factory starts with 10 logs in it, and when the planer needs a
+    // log and the bin is empty, 10 more arrive for $10, on top of the $1 a press (the CD, 2026-10-16)
+    startLogs: 10, restock: { n: 10, cost: 10 },
     fixCost: 5,             // scrubbing a sap jam clean costs $5 (the CD, 2026-10-15)
-    sawCost: 1, extractCost: 1,      // the table saw and the sap extractor: $1 for each thing they process (the CD)
+    sawCost: 0.1, extractCost: 0.1,  // the table saw and the sap extractor, the same
     // what a robot does when no instruction covers it (each robot rolls its own dice)
     uninstructed: { think: 0.25 },   // an operator stops to think first (no instruction covers this yet)
     slip: 0.05,             // a robot ignores an instruction it has 1 time in 20, and does what it would have done without it
@@ -673,6 +678,11 @@ const FACTORY = (function () {
     // the right price of each thing (the CD, 2026-10-15); for now only medium planks are sold.
     // cut: two 2"x4"s, four 2"x2"s or sixteen dowel rods, by the length of the plank they came from
     price: { plank: { s: 2, m: 4, l: 8 }, sap: 1, cut: { s: 3, m: 6, l: 12 } },
+    // nothing sells for less than it cost to make, material and labour, however low customer
+    // satisfaction is (the CD, 2026-10-16: "$1.10 min sale price for any plank, $1.20 for two 2x4"):
+    // a log $1, a plank a log and a press, a cut a plank and a saw, sap one extractor run (the log comes
+    // back clean), a carving a gnarled log carved by hand
+    floor: { log: 1, plank: 1.1, cut: 1.2, sap: 0.1, carving: 1 },
     stalls: [{ want: 'plank.m' }],   // the sales counter: one stall, for medium planks, to begin with
     stallCap: 6,
     sapUnits: { s: 1, m: 2, l: 4 },  // the sap a small, medium and large sap log gives up in the extractor
@@ -711,9 +721,19 @@ const FACTORY = (function () {
     if (CUTS.indexOf(k) >= 0) return P.cut[z];
     return null;   // gnarled planks and carvings have no price yet
   }
+  // what a thing cost to make, material and labour: the least it ever sells for (the CD, 2026-10-16)
+  function floorOf(item) {
+    const k = kindOf(item), F = CFG.floor;
+    if (LOGS.indexOf(item) >= 0) return F.log;
+    if (k === 'plank' || k === 'rough') return F.plank;
+    if (CUTS.indexOf(k) >= 0) return F.cut;
+    if (k === 'sap') return F.sap;
+    if (k === 'carving') return F.carving;
+    return 0;
+  }
   // what each bin you can put things into takes from your arms
   const ACCEPTS = {
-    rack: id => kindOf(id) === 'log',                              // the planer's: normal logs
+    rack: id => LOGS.indexOf(id) >= 0,                             // the planer's input bin: any log (the CD, 2026-10-16)
     sawIn: id => kindOf(id) === 'plank',                           // the table saw's: planks
     extractIn: id => kindOf(id) === 'sappy',                       // the sap extractor's: sap logs
     benchIn: id => kindOf(id) === 'gnarled' || kindOf(id) === 'rough',   // the bench's: gnarled wood
@@ -819,14 +839,16 @@ const FACTORY = (function () {
   /* ---------- state ---------- */
   function newMill() { return { in: [], phase: 'idle', t: 0, item: null, cut: null, by: null, belt: [], out: [] }; }
   function newGame(seed) {
-    return {
+    const s = {
       version: CFG.version, t: 0, seed: (seed === undefined ? 20261013 : seed) >>> 0,
       money: 0, earned: 0, satisfaction: CFG.satStart, hired: 0,
-      spent: 0, costs: { logs: 0, fixes: 0, saw: 0, extract: 0 },   // spent: running the machines (logs, fixes, cuts)
+      spent: 0, costs: { logs: 0, fixes: 0, saw: 0, extract: 0, bought: 0 },   // spent: running the machines (logs, fixes, cuts) and buying logs
       // the planer (slot 01). log: what is on the in-feed (the first is always a normal medium
       // log); mine: you put it on the rack yourself
       machine: { phase: 'ready', t: 0, staged: 1, log: 'log.m', mine: false, result: null, by: null, what: null, dirt: 0 },
-      rack: [],                     // logs you put on the planer's rack: they roll in before the pile's
+      // the planer's input bin (its rack): the logs it has, the next to roll in first. The first
+      // rackMine of them are logs you put in yourself: they roll in before the ones bought
+      rack: [], rackMine: 0,
       belt: [], bin: [],            // the planer's out-feed and its output bin
       recycle: [],                  // everything in the recycle bin, newest last
       saw: newMill(), extract: newMill(),
@@ -839,6 +861,8 @@ const FACTORY = (function () {
       tally: { player: { made: 0, pressed: 0, tossed: 0, stocked: 0, fixed: 0, sawn: 0, extracted: 0, carved: 0 } },
       force: {}, events: []
     };
+    s.rack = buyLogs(s, CFG.startLogs);   // free: the logs a new factory starts with (the CD, 2026-10-16)
+    return s;
   }
 
   function rng(s) {   // mulberry32 on the state's own seed, so a save resumes the same luck
@@ -884,7 +908,7 @@ const FACTORY = (function () {
   function buySlot(s, id) {
     const r = s.robots[id], p = slotPrice(s, id);
     if (!r || p === null || !slotsOpen(s) || s.money < p) return false;
-    s.money -= p; r.slots++; r.rules.push(null);
+    s.money = cents(s.money - p); r.slots++; r.rules.push(null);
     ev(s, 'slot', { id, n: r.slots, price: p });
     return true;
   }
@@ -922,10 +946,14 @@ const FACTORY = (function () {
 
   /* ---------- prices ---------- */
   // customer satisfaction sets what customers pay (the CD, 2026-10-15): the stall's price times it
-  function paid(s, ask) { return Math.round(ask * s.satisfaction / 100); }
-  function priceNow(s, item) { const p = priceOf(item); return p === null ? null : paid(s, p); }
+  // what a customer pays for a thing now: its price times customer satisfaction, to the cent, and
+  // never less than it cost to make (the CD, 2026-10-16)
+  function paid(s, item) { const p = priceOf(item); return p === null ? null : Math.max(floorOf(item), cents(p * s.satisfaction / 100)); }
+  function priceNow(s, item) { return paid(s, item); }
   function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }
-  function spend(s, what, n) { s.money -= n; s.spent += n; s.costs[what] += n; }
+  // money is kept to the cent: every change is rounded, so $0.10 a run adds up exactly
+  const cents = v => Math.round(v * 100) / 100;
+  function spend(s, what, n) { s.money = cents(s.money - n); s.spent = cents(s.spent + n); s.costs[what] = cents(s.costs[what] + n); }
 
   /* ---------- pathing: an A* over 0.2 m cells, then string-pulled ---------- */
   const CELL = 0.2, GW = Math.round(W / CELL), GH = Math.round(H / CELL), PAD = 0.22, EDGE = 0.25;
@@ -1057,11 +1085,25 @@ const FACTORY = (function () {
     const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
     return against && g === 'good' ? 'soso' : g;
   }
-  // the next log: one you put on the rack, or else one off the pile, a size and a quality
+  // logs as they are bought: each a size and a quality
+  function buyLogs(s, n) {
+    const Z = CFG.logs.size, Q = CFG.logs.quality, out = [];
+    for (let i = 0; i < n; i++) out.push(roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * Z[sizeOf(id)]]), 'log.m'));
+    return out;
+  }
+  // the bin is empty and the planer needs a log: 10 more arrive, for $10 (the CD, 2026-10-16)
+  function restock(s) {
+    const logs = buyLogs(s, CFG.restock.n);
+    s.rack.push.apply(s.rack, logs);
+    spend(s, 'bought', CFG.restock.cost);
+    ev(s, 'restock', { n: logs.length, cost: CFG.restock.cost, logs });
+  }
+  // the next log out of the planer's input bin: one you put in yourself first, then the ones bought
   function nextLog(s) {
-    if (s.rack.length) return { log: s.rack.shift(), mine: true };
-    const Z = CFG.logs.size, Q = CFG.logs.quality;
-    return { log: roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * Z[sizeOf(id)]]), 'log.m'), mine: false };
+    if (!s.rack.length) restock(s);
+    const mine = s.rackMine > 0;
+    if (mine) s.rackMine--;
+    return { log: s.rack.shift(), mine };
   }
   function ready(s) { const m = s.machine; return m.phase === 'ready' && m.staged >= 1; }
   // a press cuts whatever is on the in-feed, and the planer charges for the log whatever it is
@@ -1204,8 +1246,8 @@ const FACTORY = (function () {
     return false;
   }
   function buy(s, c) {
-    const st = s.stalls[c.stall] || s.stalls[0], fair = c.item === st.want, p = paid(s, priceOf(st.want));
-    s.money += p; s.earned += p;
+    const st = s.stalls[c.stall] || s.stalls[0], fair = c.item === st.want, p = paid(s, st.want);
+    s.money = cents(s.money + p); s.earned = cents(s.earned + p);
     if (fair) s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);
     else { s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit); s.shop.wrong++; }
     s.shop.served++;
@@ -1585,10 +1627,9 @@ const FACTORY = (function () {
   function options(s) {
     const b = bubbleOpen(s), a = s.avatar;
     if (!b) return [];
-    if (ACCEPTS[b.kind]) {   // a bin you put things in: what in your arms it takes, and the recycle bin's own things
+    if (ACCEPTS[b.kind]) {   // a bin you put things in: what in your arms it takes, then what is in it, to take out (the CD, 2026-10-16)
       const opts = kindsIn(a.inv.filter(ACCEPTS[b.kind])).map(q => ({ id: 'put:' + q.item, icon: 'put', item: q.item, count: q.n, enabled: true, group: 'put' }));
-      if (b.kind === 'recycle') kindsIn(s.recycle).forEach(q => opts.push({ id: 'take:' + q.item, icon: 'take', item: q.item, count: q.n, enabled: true, group: 'take' }));
-      if (!opts.length) opts.push({ id: 'none', icon: 'put', item: SAMPLE[b.kind], count: 0, enabled: false, group: 'put' });
+      kindsIn(store(s, b.kind)).forEach(q => opts.push({ id: 'take:' + q.item, icon: 'take', item: q.item, count: q.n, enabled: true, group: 'take' }));
       return opts;
     }
     if (b.kind === 'saw') {   // which cut: the next plank in the input bin, three ways
@@ -1618,23 +1659,30 @@ const FACTORY = (function () {
       const item = id.slice(4), to = store(s, b.kind);
       let n = 0;
       for (let i = a.inv.length - 1; i >= 0; i--) if (a.inv[i] === item) { a.inv.splice(i, 1); n++; }
-      for (let i = 0; i < n; i++) { if (b.kind === 'recycle') recycle(s, item, 'player', 'hands'); else to.push(item); }
+      for (let i = 0; i < n; i++) {
+        if (b.kind === 'recycle') recycle(s, item, 'player', 'hands');
+        else if (b.kind === 'rack') to.splice(s.rackMine++, 0, item);   // yours roll in before the ones bought
+        else to.push(item);
+      }
       if (b.kind !== 'recycle') ev(s, 'put', { at: b.kind, item, n });
       a.act = { kind: 'put', t: 0, dur: CFG.putSec, item };
       return true;
     }
-    if (id.indexOf('take:') === 0) {   // and back out of the recycle bin into your arms
-      const item = id.slice(5);
+    if (id.indexOf('take:') === 0) {   // and everything of that kind in the bin back out into your arms
+      const item = id.slice(5), from = store(s, b.kind);
       let n = 0;
-      for (let i = s.recycle.length - 1; i >= 0; i--) if (s.recycle[i] === item) { s.recycle.splice(i, 1); n++; }
+      for (let i = from.length - 1; i >= 0; i--) if (from[i] === item) {
+        from.splice(i, 1); n++;
+        if (b.kind === 'rack' && i < s.rackMine) s.rackMine--;
+      }
       for (let i = 0; i < n; i++) a.inv.push(item);
-      ev(s, 'took', { item, n });
+      ev(s, 'took', { at: b.kind, item, n });
       a.act = { kind: 'put', t: 0, dur: CFG.putSec, item };
       return true;
     }
     if (id.indexOf('cut:') === 0) { pressMill(s, 'saw', id.slice(4)); return true; }
     if (id === 'hire') {
-      s.money -= o.price; s.hired++;
+      s.money = cents(s.money - o.price); s.hired++;
       const r = newRobot(s);
       s.robots.push(r);
       ev(s, 'hired', { id: r.id, price: o.price });
@@ -1691,7 +1739,11 @@ const FACTORY = (function () {
       const s = Object.assign(newGame(), d, { events: [], force: {} });
       const items = (v, ok) => (Array.isArray(v) ? v : []).filter(x => isItem(x) && (!ok || ok(x)));
       const belt = v => (Array.isArray(v) ? v : []).filter(it => it && isItem(it.item)).map(it => ({ item: it.item, t: Math.min(CFG.outSec + CFG.dropSec, +it.t || 0), by: it.by }));
-      s.rack = items(d.rack, ACCEPTS.rack); s.bin = items(d.bin); s.recycle = items(d.recycle); s.belt = belt(d.belt);
+      s.rack = items(d.rack, ACCEPTS.rack); s.bin = items(d.bin);
+      // a save from before the bin of bought logs (2026-10-16): its rack was all yours, and it gets
+      // the logs a new factory starts with behind them
+      if (typeof d.rackMine === 'number' && Number.isFinite(d.rackMine)) s.rackMine = Math.max(0, Math.min(s.rack.length, Math.floor(d.rackMine)));
+      else { s.rackMine = s.rack.length; s.rack = s.rack.concat(buyLogs(s, CFG.startLogs)); } s.recycle = items(d.recycle); s.belt = belt(d.belt);
       ['saw', 'extract'].forEach(key => {
         const m = Object.assign(newMill(), d[key] && typeof d[key] === 'object' ? d[key] : {});
         m.in = items(m.in, ACCEPTS[key + 'In']); m.out = items(m.out); m.belt = belt(m.belt);
@@ -1752,18 +1804,19 @@ const FACTORY = (function () {
       if (a.act && ACTS.indexOf(a.act.kind) < 0) a.act = null;
       if (a.task && PLACES.indexOf(a.task.kind) < 0) { a.task = null; a.path = []; }
       s.satisfaction = Math.max(CFG.satMin, Math.min(100, +s.satisfaction || CFG.satStart));
-      s.money = Math.round(+s.money) || 0;   // money may be below zero (logs cost money)
-      s.spent = Math.max(0, Math.round(+s.spent) || 0);
-      const c = d.costs && typeof d.costs === 'object' ? d.costs : {};
-      s.costs = { logs: Math.max(0, c.logs | 0), fixes: Math.max(0, c.fixes | 0), saw: Math.max(0, c.saw | 0), extract: Math.max(0, c.extract | 0) };
+      s.money = cents(+s.money || 0);   // money may be below zero (logs cost money); kept to the cent
+      s.spent = Math.max(0, cents(+s.spent || 0));
+      s.earned = Math.max(0, cents(+s.earned || 0));
+      const c = d.costs && typeof d.costs === 'object' ? d.costs : {}, cost = v => Math.max(0, cents(+v || 0));
+      s.costs = { logs: cost(c.logs), fixes: cost(c.fixes), saw: cost(c.saw), extract: cost(c.extract), bought: cost(c.bought) };
       s.tally.player = Object.assign(newGame().tally.player, s.tally && s.tally.player);
       return s;
     } catch (e) { return null; }
   }
 
-  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, RULES, BASE, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, keepers,
+  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, RULES, BASE, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, keepers,
     gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, known, slotsOpen, slotPrice, buySlot, setRule, setWait, rename,
-    resetEvals, ready, canMill, store, waitingNow, kindsIn, path, free, nearestFree, grid, save, load, rects, CELL };
+    resetEvals, ready, canMill, store, waitingNow, kindsIn, SAMPLE, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
 if (typeof module !== 'undefined') module.exports = FACTORY;
 </script>

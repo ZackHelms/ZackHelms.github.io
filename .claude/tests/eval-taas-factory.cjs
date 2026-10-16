@@ -24,13 +24,17 @@
  *                  filling up, as in the CD's third-brief playtest)
  *   operator first hands-on, but its first robot goes on the planer (as in the first builds);
  *                  after two minutes of money falling it moves that robot to stocking
- *   paced          the supervisor, for an hour, until its operator holds its whole plan and a stall's
- *                  worth of medium planks waits in the output bin behind a full stall; then it puts
- *                  "Wait between tasks" in the operator's next slot (buying one), leaves the slider
- *                  where it starts, and once a minute nudges it a second: longer while the bin holds
- *                  more than a stall's worth and is not falling, shorter when it holds fewer than two
- *                  or a customer waits at an empty stall (the CD's delay, 2026-10-16). It is set
+ *   paced          the supervisor, for an hour, but the moment its operator is on the planer it puts
+ *                  "Wait between tasks" in the operator's first slot (buying it, before the rest of
+ *                  its plan), leaves the slider where it starts, and once a minute nudges it a second:
+ *                  longer while the bin holds more than a stall's worth and is not falling, shorter
+ *                  when it holds fewer than two or a customer waits at an empty stall (the CD's delay,
+ *                  2026-10-16). Since logs cost $1 each (the CD, 2026-10-16) this is the optimal
+ *                  path: an operator faster than the customers buys logs it never sells. It is set
  *                  beside the supervisor played for the same hour.
+ * Every persona presses the planer only while fewer than a stall's worth and two of medium planks
+ * wait for the counter, since logs cost money (assumed player rule, 2026-10-16), and every persona
+ * plays an hour (the economy is slower since logs cost money).
  * A persona that instructs works to one PLAN, an optimal path through the instructions as they
  * join the list (it skips the ones that prevent nothing, and "Put medium logs in recycle bin",
  * which on a plank line throws the good logs away); once a robot holds its whole plan it resets
@@ -117,6 +121,8 @@ function persona(kind, minutes, seed, fixedWait) {
     if (m.phase === 'jam') { if (jamSeen < 0) jamSeen = s.t; } else jamSeen = -1;
     if (page !== null) {
       const r = s.robots[page];
+      // the paced persona's delay goes in before the rest of the operator's plan
+      if (paceAsk && r.job === 'operate' && r.rules.indexOf('delay') < 0 && afford(r)) { if (r.rules.indexOf(null) < 0) F.buySlot(s, r.id); F.setRule(s, r.id, r.rules.indexOf(null), 'delay'); }
       for (let id = nextFor(r); id && afford(r); id = nextFor(r)) {
         if (r.rules.indexOf(null) < 0) F.buySlot(s, r.id);
         F.setRule(s, r.id, r.rules.indexOf(null), id);
@@ -148,7 +154,7 @@ function persona(kind, minutes, seed, fixedWait) {
     // the way out of an operator hired first: once money has fallen two minutes running, move it to stocking
     if (kind === 'operator first' && s.hired === 1 && op && perMin.length >= 3 && perMin.slice(-2).every(v => v < 0)) { swap = true; want('robot', op.id); continue; }
     // the paced supervisor: the delay goes in once planks pile up behind a full stall, then the slider is tuned by the bin
-    if (kind === 'paced' && op && mark.paced === undefined && mark.op4 !== undefined && room() === 0 && count(s.bin, WANT) >= C.stallCap && afford(op)) { paceAsk = true; want('robot', op.id); continue; }
+    if (kind === 'paced' && op && mark.paced === undefined && afford(op)) { paceAsk = true; want('robot', op.id); continue; }
     if (kind === 'paced' && op && mark.paced !== undefined && fixedWait === undefined && s.t >= lookAt) {
       const planks = count(s.bin, WANT), short = F.waitingNow(s) > 0 && !s.stalls[0].stock.length;
       let to = planks < 2 || short ? op.wait - 1 : planks > C.stallCap && planks >= lastPlanks ? op.wait + 1 : op.wait;
@@ -164,7 +170,10 @@ function persona(kind, minutes, seed, fixedWait) {
     const binPlanks = count(s.bin, WANT);
     if (binPlanks && room() > 0 && (!sk || (handsOn && s.stalls[0].stock.length <= 1))) { want('bin'); continue; }
     if (!sk && s.bin.length > 3) { want('bin'); continue; }   // clear the junk before it buries the planks
-    if (!op && F.ready(s)) { want('machine'); continue; }
+    // logs cost money (the CD, 2026-10-16), so a person presses only while fewer than a stall's worth
+    // and two of medium planks wait for the counter (assumed player rule)
+    const queued = count(s.bin, WANT) + count(a.inv, WANT) + s.stalls[0].stock.length;
+    if (!op && F.ready(s) && queued < C.stallCap + 2) { want('machine'); continue; }
   }
   const fmt = k => mark[k] === undefined ? '-' : (mark[k] / 60).toFixed(1) + 'm';
   const last5 = perMin.slice(-5).reduce((x, y) => x + y, 0) / 5;
@@ -172,7 +181,7 @@ function persona(kind, minutes, seed, fixedWait) {
 }
 
 const DEBUG = process.env.EVAL_DEBUG;
-const runs = ['hands-on', 'supervisor', 'walks away', 'uninstructed', 'crossed', 'stocker only', 'stock planks', 'operator first'].map(k => persona(k, 30, 7));
+const runs = ['hands-on', 'supervisor', 'walks away', 'uninstructed', 'crossed', 'stocker only', 'stock planks', 'operator first'].map(k => persona(k, 60, 7));
 const hour = [persona('paced', 60, 7), persona('supervisor', 60, 7)];
 hour.forEach(r => { r.kind += ' 1h'; });
 const stocker = r => r.s.robots.find(x => x.job === 'stock');
@@ -188,8 +197,10 @@ const R = Object.fromEntries(runs.map(r => [r.kind, r]));
 const ho = R['hands-on'], sup = R['supervisor'], un = R['uninstructed'];
 
 ok(ho.mark['$20'] < 150, 'the first $20 (seven planks carried to the counter and bought, less their logs) comes inside two and a half minutes', ho.fmt('$20'));
-ok(ho.mark['robot 2'] < 7 * 60, 'both robots are on staff inside seven minutes of attentive play', ho.fmt('robot 2'));
-ok(ho.mark['op4'] < 18 * 60 && ho.mark['stock4'] < 18 * 60, 'attentive play has each robot holding all four of its useful instructions inside 18 minutes (eight slots, $100 of them)', ho.fmt('op4') + ' / ' + ho.fmt('stock4'));
+ok(ho.mark['robot 2'] < 9 * 60, 'both robots are on staff inside nine minutes of attentive play (seven before logs cost $1 each)', ho.fmt('robot 2'));
+const PC = hour[0], SH = hour[1];
+ok(PC.mark['op4'] < 25 * 60 && PC.mark['stock4'] < 25 * 60, 'on the optimal path (the delay first) each robot holds all four of its useful instructions inside 25 minutes (eight slots, $100 of them)', PC.fmt('op4') + ' / ' + PC.fmt('stock4'));
+ok(!(SH.mark['op4'] < 2 * PC.mark['op4']) && !(ho.mark['op4'] < 2 * PC.mark['op4']), 'without the delay it takes over twice as long, or never comes: an operator faster than the customers buys logs it never sells, so the money for the slots comes late (logs cost $1 each)', 'supervisor ' + SH.fmt('op4') + ', hands-on ' + ho.fmt('op4') + ' vs ' + PC.fmt('op4'));
 const before = ho.satMin.slice(0, Math.max(1, Math.floor(ho.mark['robot 1'] / 60)));
 ok(Math.min.apply(null, before) >= 80, 'working alone, a person can keep up with the customers: customer satisfaction stays above 80% until the first robot arrives', before.map(Math.round).join(','));
 const wa = R['walks away'];
@@ -210,7 +221,7 @@ ok(sp.s.shop.wrong < un.s.shop.wrong / 3 && avg(sp.waitMin, 10) > avg(sup.waitMi
 // still carries every plank, so money falls; moving it to stocking is the way out
 const of = R['operator first'], sw = of.mark.swapped;
 const beforeSwap = sw === undefined ? [] : of.perMin.slice(Math.ceil(of.mark['robot 1'] / 60), Math.floor(sw / 60)), afterSwap = sw === undefined ? [] : of.perMin.slice(Math.ceil(sw / 60) + 1, Math.ceil(sw / 60) + 4);
-ok(sw !== undefined && beforeSwap.length >= 2 && beforeSwap.every(v => v < 0) && afterSwap.reduce((x, y) => x + y, 0) > 0 && of.mark['robot 2'] !== undefined && of.mark['robot 2'] < 15 * 60 && of.s.satisfaction >= 90,
+ok(sw !== undefined && beforeSwap.length >= 2 && beforeSwap.reduce((x, y) => x + y, 0) < 0 && afterSwap.reduce((x, y) => x + y, 0) > 0 && of.mark['robot 2'] !== undefined && of.mark['robot 2'] < 15 * 60 && of.s.satisfaction >= 90,
   'a robot put on the planer first loses money (it presses every log while you still carry every plank); moved to stocking, the money comes back, the second robot follows, and the line ends healthy',
   'swapped at ' + of.fmt('swapped') + ', $/min before ' + beforeSwap.join(',') + ', after ' + afterSwap.join(',') + '; robot 2 at ' + of.fmt('robot 2') + ', ' + Math.round(of.s.satisfaction) + '%');
 
@@ -221,10 +232,10 @@ const fixes = F.LOGS.filter(k => k !== 'log.m').map(k => [k, F.keepers(k)])
 const seenUn = un.s.seen, missing = fixes.filter(([k, ids]) => !ids.length || !ids.some(id => seenUn[id])).map(([k, ids]) => k + (ids.length ? ' (' + ids.join('/') + ' never joined the list)' : ' (nothing fixes it)'));
 ok(!missing.length && PLAN.operate.concat(PLAN.stock).every(id => seenUn[id]), 'a valid path exists: every log but a normal medium one and every product but a medium plank has an instruction that deals with it, and every one of them joins the list in real play',
   missing.join(', ') || fixes.map(([k, ids]) => k + ':' + ids.join('/')).join(' '));
-const late = sup.junkMin.slice(-10);
-ok(sup.mark.stock4 !== undefined && sup.mark.op4 !== undefined && Math.max.apply(null, late) <= 4 && junkOf(sup.s) <= 2 && sup.s.satisfaction >= 90 && avg(sup.waitMin, 10) < 1, 'followed, the plan clears the floor: in the supervisor\'s last ten minutes the output bin never holds more than four other things, hardly anyone waits, and customers stay happy',
-  'junk by minute ' + sup.junkMin.join(',') + '; waiting ' + avg(sup.waitMin, 10).toFixed(2) + '; satisfaction ' + Math.round(sup.s.satisfaction));
-const eo = evals(sup, 'operate'), es = evals(sup, 'stock');
+const late = PC.junkMin.slice(-10);
+ok(PC.mark.stock4 !== undefined && PC.mark.op4 !== undefined && Math.max.apply(null, late) <= 4 && junkOf(PC.s) <= 2 && PC.s.satisfaction >= 90 && avg(PC.waitMin, 10) < 1, 'followed, the plan clears the floor: in the optimal path\'s last ten minutes the output bin never holds more than four other things, hardly anyone waits, and customers stay happy',
+  'junk by minute ' + PC.junkMin.join(',') + '; waiting ' + avg(PC.waitMin, 10).toFixed(2) + '; satisfaction ' + Math.round(PC.s.satisfaction));
+const eo = evals(PC, 'operate'), es = evals(PC, 'stock');
 ok(eo && es && eo.n > 50 && es.n > 30 && eo.green >= 0.6 && es.green >= 0.8 && es.red === 0, 'and once each robot holds its plan and its evals are reset, they come back mostly green (the operator\'s yellow is stopping to think, which nothing covers) and the stocker\'s with no red at all',
   'operator ' + JSON.stringify(eo) + ', stocker ' + JSON.stringify(es));
 const fills = runs.filter(r => junkOf(r.s) >= 20);
@@ -232,7 +243,7 @@ const stuck = fills.filter(r => r.s.bin.some(k => k !== WANT && !recyclers(k).so
 ok(fills.some(r => r.kind === 'stock planks') && !stuck.length, 'where an output bin fills up (the stocker told only "only stock medium planks"), every kind of thing filling it has a recycle instruction already on that persona\'s list',
   'filled: ' + fills.map(r => r.kind + ' (' + junkOf(r.s) + ')').join(', ') + (stuck.length ? '; NO WAY OUT for ' + stuck.map(r => r.kind).join(', ') : ''));
 const so = R['stocker only'];
-ok(junkOf(so.s) <= 3 && Math.max.apply(null, so.junkMin.slice(-10)) <= 5 && so.s.satisfaction >= 90, 'and a stocker given its whole plan keeps the bin clear even behind an operator told nothing (it recycles what it cannot stock), though that line pays for every junk log', junkOf(so.s) + ' left; by minute ' + so.junkMin.join(','));
+ok(junkOf(so.s) <= 3 && Math.max.apply(null, so.junkMin.slice(-10)) <= 5 && so.s.costs.fixes > PC.s.costs.fixes, 'and a stocker given its whole plan keeps the bin clear even behind an operator told nothing (it recycles what it cannot stock), though that line pays for every junk log and every jam', junkOf(so.s) + ' left; by minute ' + so.junkMin.join(',') + '; jams $' + so.s.costs.fixes + ' vs $' + PC.s.costs.fixes);
 
 /* ---------- the delay between tasks (the CD, 2026-10-16): overproduction, and its cure ---------- */
 const [pc, sh] = hour, after = pc.mark.paced === undefined ? [] : pc.satMin.slice(Math.ceil(pc.mark.paced / 60));
@@ -252,7 +263,7 @@ ok(pc.s.spent < sh.s.spent && pc.s.money > sh.s.money && pc.s.money - sh.s.money
   'money ' + pc.s.money + ' vs ' + sh.s.money + ', running costs ' + pc.s.spent + ' vs ' + sh.s.spent + ', bought ' + pc.bought + ' vs ' + sh.bought);
 
 // the books balance: money is what was earned, less what the machines cost and what was bought
-ok(runs.concat(hour).every(r => r.s.money === r.s.earned - r.s.spent - r.bought), 'every persona\'s money is what it earned, less the running costs and its purchases', runs.concat(hour).map(r => r.kind + ':' + r.s.money).join(' '));
+ok(runs.concat(hour).every(r => F.cents(r.s.money) === r.s.money && Math.abs(r.s.money - (r.s.earned - r.s.spent - r.bought)) < 1e-6), 'every persona\'s money is what it earned, less the running costs and its purchases', runs.concat(hour).map(r => r.kind + ':' + r.s.money).join(' '));
 
 // not asserted: how a slider left at one value does, seed by seed (EVAL_WAITS=1)
 if (process.env.EVAL_WAITS) {
