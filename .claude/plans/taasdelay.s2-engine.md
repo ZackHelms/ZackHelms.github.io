@@ -1,4 +1,4 @@
-# taasdelay step 1 - the engine and the rules suite
+# taasdelay step 2 - the engine and the rules suite
 
 **Status:** open
 **Arc:** `.claude/plans/taasdelay.delay-arc.md` (the CD's answers and the design decisions).
@@ -47,7 +47,7 @@
 - Save and load mid-pause resumes or releases cleanly; a bad `wait` in a save is clamped.
 - Overproduction: an instructed operator plus stocker over 10 minutes, with and without a
   delay of about the customers' pace: the output bin's medium planks stay bounded with it and
-  grow without it (record both numbers in the arc's Results; step 3's eval builds on them).
+  grow without it (record both numbers in the arc's Results; step 4's eval builds on them).
 
 ## Done when
 

@@ -1,4 +1,4 @@
-# taasdelay step 5 - ship, verify the deploy, report
+# taasdelay step 6 - ship, verify the deploy, report
 
 **Status:** open
 **Arc:** `.claude/plans/taasdelay.delay-arc.md` (its Results hold the report's facts).
@@ -10,10 +10,10 @@ workflow, `.claude/zmh/producer.md` § Publish and § Reporting. Same shape as
 
 1. **Badge:** `.claude/scripts/stamp-badge.sh games/taas/index.html`; read it back
    (`grep -o 'build 20[^<]*' games/taas/index.html`); smoke once more -> `SMOKE: GREEN`.
-2. **Close the arc in the same commit:** mark the arc and its five step files
-   `IMPLEMENTED <date>` and `git mv` all six to `.claude/plans/DONE/`.
+2. **Close the arc in the same commit:** mark the arc and its six step files
+   `IMPLEMENTED <date>` and `git mv` all seven to `.claude/plans/DONE/`.
 3. **One clean commit** on `taas-delay`: `git reset --soft $(git merge-base HEAD origin/main)`,
-   then `feat(taas): a delay between a robot's tasks - every robot, 0-60 s, on the list from the start`,
+   then `feat(taas): a delay between a robot's tasks, and people keep their hair facing the camera`,
    a body (the CD's ask and four answers, the suites' counts, the break lists) and the
    attribution lines from the session's system reminder. No model name.
 4. **Push, re-checked immediately before:** `git fetch origin main`,
@@ -23,7 +23,7 @@ workflow, `.claude/zmh/producer.md` § Publish and § Reporting. Same shape as
    remote session (the proxy refuses ref deletion): add it to `TODO.md`'s branch item instead.
 5. **Deploy:** `mcp__github__actions_list`, `list_workflow_runs`, `resource_id: '266280069'`,
    `perPage: 1`; match `head_sha`, read the jobs; a second check via `send_later` (~3 min).
-6. **Report to the CD**, short, plain ASCII, labelled: what shipped, the badge string, the
+6. **Report to the CD**, short, plain ASCII, labelled: what shipped (the delay, and the hair fix with its traced cause), the badge string, the
    deploy verdict, the assumptions worth their call (wording, default 5 s, the stocker's
    iteration, the slider), the eval's finding on overproduction, and what to try first (set a
    delay on an instructed operator once the stall stays full and watch the output bin).

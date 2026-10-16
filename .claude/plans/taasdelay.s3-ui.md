@@ -1,7 +1,7 @@
-# taasdelay step 2 - the UI and the page suite
+# taasdelay step 3 - the UI and the page suite
 
 **Status:** open
-**Arc:** `.claude/plans/taasdelay.delay-arc.md`. Needs step 1's engine API (`setWait`, `r.wait`,
+**Arc:** `.claude/plans/taasdelay.delay-arc.md`. Needs step 2's engine API (`setWait`, `r.wait`,
 the `pause` state, the eval keys); read the arc's Results for their final names.
 **Scope:** the factory UI in `games/taas/index.html` and `.claude/tests/drive-taas-factory-ui.cjs`.
 

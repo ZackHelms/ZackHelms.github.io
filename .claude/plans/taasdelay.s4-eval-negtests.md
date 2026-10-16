@@ -1,7 +1,7 @@
-# taasdelay step 3 - the eval and both break lists
+# taasdelay step 4 - the eval and both break lists
 
 **Status:** open
-**Arc:** `.claude/plans/taasdelay.delay-arc.md` (step 1's overproduction numbers are in Results).
+**Arc:** `.claude/plans/taasdelay.delay-arc.md` (step 2's overproduction numbers are in Results).
 **Scope:** `.claude/tests/eval-taas-factory.cjs`, `.claude/tests/negtests/taas-factory-engine.json`,
 `.claude/tests/negtests/taas-factory-ui.json`; rows added to the two drive suites if a break
 is missed.
@@ -18,12 +18,12 @@ is missed.
 
 ## Break lists (`.claude/scripts/negtest-copies.py`, never hand-edit the page)
 
-- Engine list: add breaks for each piece of step 1 (the rule not on the list from the start, the
+- Engine list: add breaks for each piece of step 2 (the rule not on the list from the start, the
   wait skipped, the wait applied twice, waiting after a "looking", the slip rolled at 0 s, the
   slip never rolled, `setWait` not clamping, `load()` dropping `r.wait`, `release()` leaving
   `pause`). Run only the new names with `--only`, then classify every miss: a row missing, a row
   that cannot fail, or an equivalent change. Add rows for the first two, re-run those names.
-- Page list: the same for step 2 (slider not wired, steppers not clamped, the pause sign never
+- Page list: the same for step 3 and for step 1's hair (slider not wired, steppers not clamped, the pause sign never
   drawn, the picker hiding the delay, the evals line missing, the re-render breaking a drag).
 - Record caught / total for each list in Results, with every miss and what became of it.
 

@@ -1,9 +1,10 @@
 # taasdelay - TAAS robot factory: a delay between a robot's tasks (plan arc)
 
-**Status:** IN PROGRESS (steps 1-5 open)
+**Status:** IN PROGRESS (steps 1-6 open)
 **Requested:** 2026-10-16, the CD's answer to the storefront's open question 2 (overproduction):
 "Add an instruction that lets me add a delay between iterations of its task. Let the delay be a
-configurable value, a positive integer 0,1,2,...,60 seconds."
+configurable value, a positive integer 0,1,2,...,60 seconds." And one more fix the same day (step
+1): "customers appear to go bald when they turn to face towards me (down)", the avatar too.
 **Scope:** `games/taas/index.html` (the `FACTORY` engine and the factory UI),
 `.claude/tests/drive-taas-factory*.cjs`, `.claude/tests/eval-taas-factory.cjs`,
 `.claude/tests/negtests/taas-factory-*.json`, `.claude/taas.md`, `.claude/tests/README.md`,
@@ -35,7 +36,7 @@ configurable value, a positive integer 0,1,2,...,60 seconds."
   instructions" as a line of its own (yellow), per the fourth brief's rules.
 - **Saves**: no version bump (a bump would wipe every player's factory): `load()` sets
   `seen.delay` and clamps `r.wait`, defaulting a missing one to 5.
-- **UI** (step 2): the filled slot shows the wait with a slider (0-60, step 1) and - / + buttons;
+- **UI** (step 3): the filled slot shows the wait with a slider (0-60, step 1) and - / + buttons;
   a waiting robot shows a pause sign with a ring that empties.
 
 ## How to use this arc
@@ -47,18 +48,19 @@ needed to resume from disk alone. To run the next step after a compact:
 
 At the end of each step: tick it below, write what it found under **Results** (numbers the
 later steps need), commit to the branch `taas-delay` and push the branch (never `main` before
-step 5).
+step 6).
 
 ## Arc
 
 | # | Step | Plan file | Status |
 |---|---|---|---|
 | 0 | The CD's three answers recorded, the demand item in `TODO.md`, this arc | (this session) | DONE - on `main` |
-| 1 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s1-engine.md` | open |
-| 2 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s2-ui.md` | open |
-| 3 | Eval (does a delay end overproduction?) and both break lists | `taasdelay.s3-eval-negtests.md` | open |
-| 4 | Docs final and gates | `taasdelay.s4-docs-gates.md` | open |
-| 5 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasdelay.s5-ship.md` | open |
+| 1 | Fix: people keep their hair when they face the camera (cause traced: the hair sorts behind the head) | `taasdelay.s1-hair.md` | open |
+| 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | open |
+| 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | open |
+| 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | open |
+| 5 | Docs final and gates | `taasdelay.s5-docs-gates.md` | open |
+| 6 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasdelay.s6-ship.md` | open |
 
 ## Results (shared memory between steps; append, do not rewrite)
 
