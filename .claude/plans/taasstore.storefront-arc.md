@@ -39,19 +39,30 @@ step 4).
 - **Engine break list** (`negtests/taas-factory-engine.json`): 101 breaks, 100 caught; the
   miss is `bubbleOpen()`'s arrival check, an equivalent change (every `tap()` clears the
   bubble). Already written up in `.claude/taas.md` § Negative tests (factory).
-- **Page break list** (`negtests/taas-factory-ui.json`, 50 breaks): run in progress, see
-  step 1. Misses so far:
+- **Page break list** (`negtests/taas-factory-ui.json`, 50 breaks): the first run reached
+  34 verdicts (31 caught, 3 missed; `<scratchpad>/v3/neg/ui.out`) before a container
+  restart killed it. The other 16 were restarted with `--only` against the current suite
+  (with the overlap row) into `<scratchpad>/v3/neg/ui2.out` (`ui2.log`); the list of names is
+  `<scratchpad>/v3/neg/rest.txt`. Misses so far:
   - `tap-keys-flat` (tap targets' depth key flattened to 0): **a row was missing**. The
     planer's box overlaps the recycle bin's on screen and only the key makes the bin, in
     front, win. Row added to the page suite's section 5 ("where two things overlap on
     screen, a tap there reaches the one standing in front"), judged by the layout's
     footprints, not the page's keys. Verified: page GREEN 83/83, the break's copy RED.
   - `money-stale` (the wall's money board drawn from `shownMoney` instead of `s.money`):
-    not yet classified.
+    **a row was missing**, though the effect is one frame: `draw()` runs before
+    `renderHud()` updates `shownMoney`, so the board showed each new sum 16 ms late, and the
+    "figures" row settles three frames before reading. New row in section 13: down from
+    $7,777 to $4 (no swell), the first frame's board must match a dt-0 redraw ("it shows a
+    new sum on the very frame the money changes"). Pins the boards' rule: draw from the
+    state. Verified: page GREEN, the copy RED on that row only.
   - `saw-never-spins` (`const a0 = run ? clock * 22 : 0.3;` -> `const a0 = 0.3;`, the
-    table saw's blade angle frozen): not yet classified. The page suite claims "the saw's
-    blade spinning only while it cuts"; find why that row did not see a frozen blade (it
-    may compare frames that differ for another reason, e.g. the cut piece moving).
+    table saw's blade angle frozen): **the row could not fail**. Its "spinning" frames
+    differed because of the plank sliding over the table and the dust puffs, not the blade.
+    Section 11's row now holds the engine (`FACTORY.step` stubbed) and the dust
+    (`Math.random` stubbed) for 1.5 s before the two frames, so only the blade can move.
+    Verified: page GREEN, the copy RED (0 px changed).
+  - **Page suite now 84 checks** (82 + overlap + same-frame money).
 - **Placeholders left in the docs for step 2:** `@UICAUGHT@` (twice in `.claude/taas.md`),
   `@UIMISSES@` (once in `.claude/taas.md`), `@UIROW@` (once in `.claude/tests/README.md`).
 - **For the report (step 4):**

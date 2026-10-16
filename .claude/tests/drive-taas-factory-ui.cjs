@@ -566,8 +566,14 @@ const server = http.createServer((req, res) => {
     await H(() => { const s = window.TAAS_FACTORY.s; s.saw.in.push('plank.m'); s.saw.phase = 'idle'; });
     await H(() => { const s = window.TAAS_FACTORY.s; s.avatar.x = FACTORY.LAYOUT.SPOT.saw.x; s.avatar.y = FACTORY.LAYOUT.SPOT.saw.y; FACTORY.tap(s, { kind: 'saw' }); FACTORY.choose(s, 'cut:b2x4'); });
     await step(0.5);
+    // between the two frames only the blade may move: the engine is held (so the plank on the table stays put) and no
+    // dust is made, after a second and a half for the dust already in the air to clear (the first version of this row
+    // passed on the plank and the dust alone, with the blade frozen)
+    const held = await H(() => { const T = window.TAAS_FACTORY; window.__step = FACTORY.step; window.__rnd = Math.random;
+      FACTORY.step = () => {}; Math.random = () => 0.999; for (let i = 0; i < 90; i++) T.tick(1 / 60); return T.s.saw.phase; });
     const r1 = await sawPx(); await H(() => { window.TAAS_FACTORY.tick(1 / 30); }); const r2 = await sawPx();
-    ok(diff(i1, i2) < 5 && diff(r1, r2) > 30, 'the table saw\'s blade stands still until it cuts, then spins', diff(i1, i2) + ' vs ' + diff(r1, r2) + ' px changed between frames');
+    await H(() => { FACTORY.step = window.__step; Math.random = window.__rnd; });
+    ok(held === 'run' && diff(i1, i2) < 5 && diff(r1, r2) > 30, 'the table saw\'s blade stands still until it cuts, then spins (with nothing else in view moving)', held + ': ' + diff(i1, i2) + ' vs ' + diff(r1, r2) + ' px changed between frames');
     await H(() => { const T = window.TAAS_FACTORY, y = FACTORY.LAYOUT.ROW.extract; T.view.camY = T.screen(0, y, 0)[1] + T.view.camY - 400; T.tick(0); });
     const ey = await H(() => FACTORY.LAYOUT.ROW.extract);
     const tankAt = () => green(1.95, 2.45, ey - 0.05 + 0.28, 0.9, 1.45);
@@ -610,6 +616,16 @@ const server = http.createServer((req, res) => {
     const f4 = await figures(4), f7 = await figures(7777);
     let fd = 0; for (let i = 0; i < f4.length; i++) if (f4[i] !== f7[i]) fd++;
     ok(fd > 200 && f4.indexOf('1') >= 0, 'the money board draws the sum it is given ($4 and $7,777 come out as different figures)', fd + ' px differ');
+    // and on the very frame the sum changes: the board draws from the state, never from what the last frame showed.
+    // Down from $7,777 to $4, so no swell; the second draw is at dt 0, so nothing else on the wall has moved.
+    const sameFrame = await H(() => { const T = window.TAAS_FACTORY, d = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      const bits = () => { const r = T.board('cash'), im = g.getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data;
+        let b = ''; for (let i = 0; i < im.length; i += 4) b += im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225 ? '1' : '0'; return b; };
+      const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+      T.s.money = 7777; for (let i = 0; i < 3; i++) T.tick(1); const was = bits();
+      T.s.money = 4; T.tick(1 / 60); const first = bits(); T.tick(0); const next = bits();
+      return { first: diff(first, next), changed: diff(was, next) }; });
+    ok(sameFrame.first < 20 && sameFrame.changed > 200, 'and it shows a new sum on the very frame the money changes, not a frame late', JSON.stringify(sameFrame));
     await H(() => { const T = window.TAAS_FACTORY; T.s.money = 98765432; for (let i = 0; i < 3; i++) T.tick(1); });
     const big = await boardInk('cash', 0.05);
     ok(big.white > 60 && big.edge === 0, 'a very large sum shrinks to fit inside the money board', JSON.stringify(big));
