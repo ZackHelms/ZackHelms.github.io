@@ -1,6 +1,6 @@
 # taasstore step 3 - gates
 
-**Status:** open
+**Status:** DONE 2026-10-16 (results in the arc)
 **Arc:** `.claude/plans/taasstore.storefront-arc.md`.
 **Scope:** read-only checks; fixes only if a gate is red (then record the cause in the
 arc's Results, traced to code, before fixing).

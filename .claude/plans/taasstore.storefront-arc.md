@@ -1,6 +1,6 @@
 # taasstore - TAAS robot factory: the storefront brief (plan arc)
 
-**Status:** IN PROGRESS (steps 1-2 done; steps 3-4 open)
+**Status:** IN PROGRESS (steps 1-3 done; step 4 open)
 **Requested:** 2026-10-15 (the CD's storefront brief, two answers: customers "Across the
 counter", a full room "Room fills up").
 **Scope:** `games/taas/index.html` (the `FACTORY` engine and the factory UI),
@@ -26,7 +26,7 @@ step 4).
 | 0 | Brief, engine v3, rules suite, UI, page suite, eval, busy pose and frame budget, engine break list, docs spliced | (this session, before the arc) | DONE - WIP commit `b1d9838` on `taas-storefront` |
 | 1 | Finish the page's break list: classify every miss, add rows, re-run the misses | `taasstore.s1-page-break-list.md` | DONE - 49 of 50 caught |
 | 2 | Docs final: fill the placeholders from step 1's results, check every count | `taasstore.s2-docs-final.md` | DONE - no placeholder, counts match |
-| 3 | Gates: every suite, smoke, games-sync, no break left in the page | `taasstore.s3-gates.md` | open |
+| 3 | Gates: every suite, smoke, games-sync, no break left in the page | `taasstore.s3-gates.md` | DONE - GATES: GREEN, six suites green |
 | 4 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasstore.s4-ship.md` | open |
 
 ## Results (shared memory between steps; append, do not rewrite)
@@ -116,3 +116,16 @@ step 4).
   wording fix: the engine list's "nine misses were rows" listed eight (the ninth is the
   equivalent); now "eight of its nine misses were rows". `CLAUDE.md` and `games/CLAUDE.md`
   read true.
+- **Gates (step 3 done, 2026-10-16):** `.claude/scripts/gates.sh --eval games/taas/index.html`
+  -> `GATES: GREEN` (SMOKE, GAMES-SYNC, NEGTEST-SCAN "nothing changed", four drives, two
+  evals). Each suite run on its own, its own last lines:
+  - formal, untouched: `drive-taas.cjs` `CHECKS=43` `TAAS: GREEN`; `drive-taas-ui.cjs`
+    `CHECKS=39` `TAAS-UI: GREEN` (both at the README's counts);
+  - factory: `drive-taas-factory.cjs` `CHECKS=156` `TAAS-FACTORY: GREEN`;
+    `drive-taas-factory-ui.cjs` `CHECKS=86` `TAAS-FACTORY-UI: GREEN`;
+  - evals: `eval-taas.cjs` `CHECKS=9` `TAAS-EVAL: GREEN`; `eval-taas-factory.cjs`
+    `CHECKS=19` `TAAS-FACTORY-EVAL: GREEN`.
+  - Nothing left behind: no `@negtest` in the page, no `.claude/tests/.negcopies-*`, the
+    tree clean before this note. The page is unchanged since `b1d9838` (empty
+    `git diff --stat b1d9838 -- games/taas/index.html`), so the frame budget's 16.7 ms
+    median stands and was not re-run.
