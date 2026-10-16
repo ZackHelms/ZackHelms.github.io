@@ -1,6 +1,6 @@
 # taasstalls - TAAS robot factory: four stalls, eight robots (plan arc)
 
-**Status:** PLANNED (step 0 done 2026-10-16: the CD's brief and four answers recorded here; no code)
+**Status:** IN PROGRESS (step 1 done 2026-10-16: the engine's stalls and customers; branch `taas-stalls`)
 **Requested:** 2026-10-16, inside the CD's answer to the bins brief (`.claude/plans/DONE/taasbins.md`,
 which ships the first half: bins you take from, logs bought 10 for $10, $0.10 a run, the floor).
 Verbatim:
@@ -57,7 +57,7 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
 | # | Step | Status |
 |---|---|---|
 | 0 | The CD's brief and four answers recorded (this file) | DONE 2026-10-16 |
-| 1 | Engine: stalls (buy, set, unsold to arms), customers picking a stall, prices per stall; rules suite rows | open |
+| 1 | Engine: stalls (buy, set, unsold to arms), customers picking a stall, prices per stall; rules suite rows | DONE 2026-10-16 |
 | 2 | Engine: eight robots, stall jobs and "Only stock X" per item, slot 02-04 jobs; rules suite rows | open |
 | 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | open |
 | 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | open |
@@ -65,3 +65,35 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
 | 6 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
 
 ## Results (append, do not rewrite)
+
+### Step 1 (2026-10-16): the engine's stalls and customers
+
+- **Settled** (each an assumed row in `.claude/taas.md`, "Stalls: ..."): a stall sells any of the
+  13 things with a price (`SELLS`); four places along the counter (`STALLS`, 1.35 m apart, the first
+  where the one stall stood), any empty one bought at the next price ($50 / $100 / $150 by how many);
+  a tap on a stall stocks it and opens a bubble of the 13 things with what a customer pays now;
+  choosing another brings the unsold stock back into your arms and stocks what you carry of the new
+  thing; a stall bought sells nothing until set, and nobody comes for it.
+- **The shop in three rows** (not the plan's "one line from the door" exactly): one customer waits
+  at each stall across the counter (`lineY`), anyone whose stall is taken waits in one line along the
+  back wall (`backY`), first come first served, and everyone walks in and out along a walk between
+  them (`laneY`, `walkTo()`). A screenshot at four stalls shows the line's hourglasses **covering the
+  satisfaction board's number**: step 3 has to draw the line's waiting differently (smaller, lower,
+  or not at all).
+- **A die only when there is a choice**: a counter with one open stall rolls no `stall` die.
+- **Saves stay version 3**; `load()` fills the new fields (a save from before: its stall the first,
+  three places to buy; a walk to the counter becomes a walk to the first stall).
+- **Two bugs the new rows caught before they shipped**: a customer could stop dead on the walk, its
+  turn-off 0.30000000000000004 m short of its place counting as "far" for ever (now a hair's
+  tolerance), and the next customer took a freed stall one step late (payments are now settled before
+  places are handed out).
+- **Interim until step 2**: the stocker still stocks the first stall from the planer's output bin;
+  the UI only maps the counter's tap to the first stall and faces customers by their row (step 3).
+- **Suites**: rules 197 -> 221 (section 14, the stalls: buying, prices by count, setting and the
+  unsold stock, no customers for an unset stall and no die, equal odds over three stalls, a customer
+  at each stall and the line behind, first come first served, prices and floors stall by stall, a
+  wrong thing sold as the stall's, a change while a customer waits, an empty stall filling the shop,
+  a busy quarter hour where nobody walks through anybody or gets stuck, bad taps, saves old and new);
+  page 111 unchanged (the tap map now expects a stall); eval 24, its crossed-wires row now measured
+  over the last ten minutes, not five (main's own pair was 1.2 $/min apart over five, 0.6 over ten;
+  the new shop moved them to 2.1 and 1.1 with nothing about instructions changed). Formal untouched.

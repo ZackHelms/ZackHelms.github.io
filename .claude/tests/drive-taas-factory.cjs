@@ -12,9 +12,11 @@
  * the $5 to scrub a jam, the stocker robot and its instructions, slots 02-04 (the table saw,
  * the sap extractor, the hand crafting bench), hiring, the two jobs, every mistake a robot can
  * make and what it does, the instruction list and its slots, the 1-in-20 slip, an instruction
- * about another job doing nothing, the rates as MEASURED over real play, saving, and the delay
+ * about another job doing nothing, the rates as MEASURED over real play, saving, the delay
  * between tasks (the CD, 2026-10-16: an instruction for every robot, on the list from the start,
- * holding 0-60 whole seconds).
+ * holding 0-60 whole seconds), the planer's input bin of bought logs, and the counter's four stalls
+ * (the CD, 2026-10-16: bought for $50 / $100 / $150, each set to sell any thing with a price, unsold
+ * stock back into your arms, customers picking a stall at random and waiting there).
  * Numbers come from FACTORY.CFG, so a retune never turns this red, except where the CD set them.
  * The page around the engine is drive-taas-factory-ui.cjs.
  *
@@ -109,9 +111,15 @@ const RULE_TEXT = {
 };
 // the instructions on the list that a mistake put there (the delay is on it from the start)
 const learnt = s => F.known(s).filter(q => !q.start).map(q => q.id).join();
-// customers standing in the shop, as if they had walked in: in line, place 0 at the stall
-function queue(s, n) {
-  for (let k = 0; k < n; k++) s.shop.people.push({ id: s.shop.n++, x: L.SHOP.x0 - k * P.gap, y: L.SHOP.lineY, state: 'in', t: 0, stall: 0, item: null, by: null, wrong: false });
+// customers standing in the shop, as if they had walked in: the first at the stall's place, the
+// rest in the line along the back wall (all of them for the first stall unless told otherwise)
+function queue(s, n, stall) {
+  const i = stall || 0;
+  for (let k = 0; k < n; k++) {
+    const first = k === 0 && !s.shop.people.some(c => c.state !== 'out' && c.stall === i);
+    const inLine = s.shop.people.filter(c => c.state !== 'out' && c.at === 'line').length;
+    s.shop.people.push({ id: s.shop.n++, x: first ? L.SHOP.places[i] : L.SHOP.x0 - inLine * P.gap, y: first ? L.SHOP.lineY : L.SHOP.backY, state: 'in', t: 0, stall: i, at: first ? 'stall' : 'line', item: null, by: null, wrong: false });
+  }
   return s;
 }
 
@@ -122,7 +130,9 @@ function queue(s, n) {
   const cut = z => ['b2x4', 'b2x2', 'dowels'].map(c => F.priceOf(c + '.' + z));
   ok(F.priceOf('plank.s') === 2 && F.priceOf('plank.l') === 8 && F.priceOf('sap') === 1 && cut('s').join() === '3,3,3' && cut('m').join() === '6,6,6' && cut('l').join() === '12,12,12',
     'the CD\'s prices: planks $2 / $4 / $8 by length, sap $1, and two 2"x4"s, four 2"x2"s or sixteen dowel rods $3 / $6 / $12 by the length they came from', [F.priceOf('plank.s'), F.priceOf('plank.l'), F.priceOf('sap')].concat(cut('s'), cut('l')).join());
-  ok(C.stalls.length === 1 && C.stalls[0].want === 'plank.m', 'for now only medium planks are sold: the counter has one stall, for medium planks (the CD)');
+  ok(C.stalls.n === 4 && C.stalls.start === 'plank.m' && JSON.stringify(C.stalls.prices) === '[50,100,150]', 'the counter has room for four stalls: the first sells medium planks from the start, and the other three cost $50, $100 and $150 in the order you buy them (the CD\'s numbers)', JSON.stringify(C.stalls));
+  ok(F.SELLS.join() === 'plank.s,plank.m,plank.l,sap,b2x4.s,b2x4.m,b2x4.l,b2x2.s,b2x2.m,b2x2.l,dowels.s,dowels.m,dowels.l' && F.SELLS.every(k => F.priceOf(k) !== null) && F.ITEMS.filter(k => F.SELLS.indexOf(k) < 0).every(k => F.priceOf(k) === null),
+    'a stall can sell anything with a price: the three planks, sap and the nine cuts; logs, gnarled planks and carvings have no price, so no stall sells them (assumed)', F.SELLS.join());
   ok(C.logCost === 0.1 && C.fixCost === 5 && C.sawCost === 0.1 && C.extractCost === 0.1, 'every machine costs $0.10 for each thing it processes, the planer, the table saw and the sap extractor (electricity and wear, the CD 2026-10-16), and fixing a sap jam $5', [C.logCost, C.fixCost, C.sawCost, C.extractCost].join());
   const fl = ['log.s', 'sappy.l', 'plank.s', 'plank.l', 'rough.m', 'b2x4.s', 'dowels.l', 'sap', 'carving.owl'].map(F.floorOf);
   ok(fl.join() === '1,1,1.1,1.1,1.1,1.2,1.2,0.1,1' && C.floor.plank === F.cents(C.floor.log + C.logCost) && C.floor.cut === F.cents(C.floor.plank + C.sawCost),
@@ -152,8 +162,8 @@ function queue(s, n) {
 /* ---------- 2. the floor ---------- */
 {
   const s = F.newGame();
-  const keys = Object.keys(SP).filter(k => k !== 'rest');
-  const spots = keys.map(k => Object.assign({ k }, SP[k]));
+  const keys = Object.keys(SP).filter(k => k !== 'rest' && k !== 'stalls');
+  const spots = keys.map(k => Object.assign({ k }, SP[k])).concat(SP.stalls.slice(1).map((p, i) => Object.assign({ k: 'stall' + (i + 2) }, p)));
   ok(onFree(s, spots), 'every spot stands on free floor', spots.filter(p => !F.free(s, p.x, p.y)).map(p => p.k).join());
   const bad = [];
   spots.forEach(a => spots.forEach(b => {
@@ -172,6 +182,13 @@ function queue(s, n) {
   ok(!F.free(s, mid.x, mid.y) && dist(L.RECYCLE, mid) < 0.1 && dist(SP.press, mid) < 1.3 && dist(SP.operate, mid) < 2 && dist(SP.bin, mid) < 1.3, 'the recycle bin stands in front of the planer\'s out-feed, within reach of its button and its output bin');
   const rows = [L.ROW.planer, L.ROW.saw, L.ROW.extract, L.ROW.bench];
   ok(rows.every((y, i) => !i || y > rows[i - 1] + 2) && L.STALL.y1 <= L.SOLID.counter[3] && L.SHOP.lineY < L.SOLID.counter[1] && L.ROW.planer > L.SOLID.counter[3] + 1, 'from the back: the shop, the counter, the walkway, then slots 01 to 04 one under another');
+  // the counter's four stalls (the CD, 2026-10-16), and the shop's three rows behind it (assumed)
+  const S4 = L.STALLS, ct = L.SOLID.counter, sh = L.SHOP;
+  ok(S4.length === C.stalls.n && S4[0] === L.STALL && S4.every((q, i) => q.x0 >= ct[0] && q.x1 <= ct[2] && q.y0 >= ct[1] && q.y1 <= ct[3] && (!i || q.x1 < S4[i - 1].x0)) && SP.stalls[0] === SP.counter &&
+    SP.stalls.every((p, i) => p.x > S4[i].x1 && p.x - S4[i].x1 < 0.3 && p.y > ct[3] && p.face === SP.counter.face) && sh.places.every((x, i) => x > S4[i].x0 && x < S4[i].x1) && sh.places[0] === sh.x0,
+    'four stalls along the counter, side by side east to west, the first where the one stall always stood; each is stocked standing just east of it on the walkway, and its customer waits across the counter from it', S4.map(q => q.x0 + '-' + q.x1).join(' '));
+  ok(L.SOLID.wall[3] < sh.backY - 0.2 && sh.backY < sh.laneY && sh.laneY < sh.lineY && sh.lineY < ct[1] - 0.2 && sh.door.y === sh.laneY && sh.x0 - (P.max - 2) * P.gap > 0.3,
+    'the shop behind it, from the back wall: the line, the walk (in from the door and back out), then the places at the stalls; and a line of everyone but one fits along the wall', [sh.backY, sh.laneY, sh.lineY].join());
   const c = L.CRATES[0], cm = { x: (c[0] + c[2]) / 2, y: (c[1] + c[3]) / 2 };
   const t = staffed(1, [null]);
   ok(!F.free(s, cm.x, cm.y) && F.free(t, cm.x, cm.y), 'a robot\'s crate blocks the floor until it is hired and unpacked');
@@ -209,7 +226,7 @@ function queue(s, n) {
   until(s, x => !x.avatar.act && x.avatar.task && x.avatar.task.arrived, 10);
   ok(early === 0 && s.avatar.inv.slice().sort().join() === 'plank.m,plank.m,plank.s,rough.m' && !s.bin.length && !F.bubbleOpen(s) && take(s, 'picked').length === 1,
     'a tap on the planer\'s output bin walks you over and you take everything in it into your arms (no bubble to answer)', s.avatar.inv.join());
-  F.tap(s, { kind: 'counter' });
+  F.tap(s, { kind: 'stall', i: 0 });
   until(s, x => !x.avatar.act && x.avatar.task && x.avatar.task.arrived, 20);
   const near = shut(F.newGame()); near.avatar.x = SP.counter.x; near.avatar.y = SP.counter.y; F.tap(near, { kind: 'bin' });
   const fromWalk = near.avatar.task.spot; near.avatar.x = SP.press.x; near.avatar.y = SP.press.y; F.tap(near, { kind: 'bin' });
@@ -305,13 +322,14 @@ function queue(s, n) {
   for (let t = 0; t < 2; t += 0.05) { F.step(s, 0.05); walkMax = Math.max(walkMax, F.waitingNow(s)); }
   ok(s.shop.people[0].state === 'in' && !walkMax && s.satisfaction === 100, 'a customer still walking in from the door is not waiting, and costs nothing', s.shop.people[0].state + ' / ' + s.satisfaction);
   const two = shut(F.newGame()); queue(two, 2); two.stalls[0].stock.push({ item: 'plank.m', by: 'player' }, { item: 'plank.m', by: 'player' });
-  until(two, x => x.shop.people[0].state === 'pay', 5); F.step(two, 0.05);
-  ok(two.shop.people[1].state === 'wait' && two.stalls[0].stock.length === 1, 'with a plank left for the second customer, it still waits its turn behind the first');
+  until(two, x => x.shop.people[0].state === 'pay' && x.shop.people[1].state === 'wait', 5); F.step(two, 0.05);
+  const sec = two.shop.people[1];
+  ok(two.shop.people[0].state === 'pay' && sec.state === 'wait' && sec.at === 'line' && sec.x === L.SHOP.x0 && sec.y === L.SHOP.backY && two.stalls[0].stock.length === 1, 'with a plank left for the second customer, it still waits its turn, in the line along the back wall behind the first', sec.at + ' ' + sec.x + ',' + sec.y);
   // the line moves up
   until(s, x => x.shop.people[0].state === 'out', 10);
   const left = s.t, next = s.shop.people.find(p => p.state !== 'out');
   until(s, x => Math.abs(next.x - L.SHOP.x0) < 0.02 && next.state === 'wait', 5);
-  ok(Math.abs(next.x - L.SHOP.x0) < 0.02 && s.t - left < P.gap / P.speed + 0.2, 'and when the first is served, the next steps up to the stall', next.x.toFixed(2) + ' after ' + (s.t - left).toFixed(2) + ' s');
+  ok(Math.abs(next.x - L.SHOP.x0) < 0.02 && next.y === L.SHOP.lineY && next.at === 'stall' && s.t - left < P.gap / P.speed + 0.2, 'and when the first is served, the next steps up from the line to the stall', next.x.toFixed(2) + ',' + next.y + ' after ' + (s.t - left).toFixed(2) + ' s');
   // the room fills up: nobody else comes in until someone leaves (the CD's answer)
   s = F.newGame(); s.force.arrive = many(6, 200);
   run(s, P.first + 6 * (P.max + 3));
@@ -346,7 +364,7 @@ function queue(s, n) {
   ok(Math.abs(q.satisfaction - want) < 0.5, 'customers forget: a minute with nobody waiting heals satisfaction from 40% toward 100%', q.satisfaction.toFixed(1) + ' vs ' + want.toFixed(1));
   // the stall holds a handful
   s = shut(F.newGame()); for (let i = 0; i < C.stallCap + 3; i++) s.avatar.inv.push('plank.m');
-  F.tap(s, { kind: 'counter' }); until(s, x => !x.avatar.act && x.avatar.task.arrived, 20);
+  F.tap(s, { kind: 'stall', i: 0 }); until(s, x => !x.avatar.act && x.avatar.task.arrived, 20);
   ok(s.stalls[0].stock.length === C.stallCap && count(s.avatar.inv, 'plank.m') === 3, 'the stall holds ' + C.stallCap + '; what does not fit stays in your arms', s.stalls[0].stock.length + ' / ' + s.avatar.inv.length);
 }
 
@@ -702,7 +720,7 @@ function stockCycle(bin, force, rules) {
   const kept = s.bench.item, prog = s.bench.t;
   F.tap(s, { kind: 'bench' }); until(s, x => x.bench.out.length > 1, C.carveSec + 6);
   ok(kept === 'gnarled.s' && prog > 2 && prog < 3 && s.bench.out[1] === 'carving.owl', 'walking away mid-carve leaves the piece on the bench, half done, and you finish it later');
-  ok(F.priceOf('carving.bird') === null && F.priceOf('rough.m') === null && !s.stalls.some(q => q.want !== 'plank.m'), 'carvings and gnarled planks have no price yet, and only medium planks are sold');
+  ok(F.priceOf('carving.bird') === null && F.priceOf('rough.m') === null && s.stalls.every((q, i) => i ? !q.bought && q.want === null : q.want === 'plank.m'), 'carvings and gnarled planks have no price yet, and the one stall a factory starts with sells medium planks');
   const t = staffed(41, ['operate', 'stock']);
   ok(!F.options(t).length && t.robots.every(r => r.job === 'operate' || r.job === 'stock'), 'and no robot can be put on slots 02-04: their jobs are the planer and the counter (the CD)');
 }
@@ -751,12 +769,13 @@ function stockCycle(bin, force, rules) {
 /* ---------- 11. saving, determinism and the bounds, over seeded random play ---------- */
 {
   const rnd = (seed => () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; })(99);
-  const TAPS = ['machine', 'bin', 'counter', 'recycle', 'rack', 'dock', 'floor', 'robot', 'robot', 'saw', 'sawIn', 'sawOut', 'extract', 'extractIn', 'extractOut', 'bench', 'benchIn', 'benchOut'];
+  const TAPS = ['machine', 'bin', 'stall', 'stall', 'recycle', 'rack', 'dock', 'floor', 'robot', 'robot', 'saw', 'sawIn', 'sawOut', 'extract', 'extractIn', 'extractOut', 'bench', 'benchIn', 'benchOut'];
   const play = (s, n, choices) => {
     for (let i = 0; i < n; i++) {
       const k = TAPS[Math.floor(rnd() * TAPS.length)];
       if (k === 'robot') { if (s.robots.length) F.tap(s, { kind: 'robot', id: Math.floor(rnd() * s.robots.length) }); }
       else if (k === 'floor') F.tap(s, { kind: 'floor', x: rnd() * 6, y: rnd() * 17 });
+      else if (k === 'stall') F.tap(s, { kind: 'stall', i: Math.floor(rnd() * 4) });
       else F.tap(s, { kind: k });
       for (let t = 0; t < 4 + rnd() * 6; t += 0.05) {
         F.step(s, 0.05);
@@ -774,13 +793,13 @@ function stockCycle(bin, force, rules) {
     return s;
   };
   let worst = '';
-  const all = x => [x.bin, x.rack, x.recycle, x.avatar.inv, x.saw.in, x.saw.out, x.extract.in, x.extract.out, x.bench.in, x.bench.out].concat([x.stalls[0].stock.map(g => g.item)]);
+  const all = x => [x.bin, x.rack, x.recycle, x.avatar.inv, x.saw.in, x.saw.out, x.extract.in, x.extract.out, x.bench.in, x.bench.out].concat(x.stalls.map(st => st.stock.map(g => g.item)));
   const s = F.newGame(4);
   s.money = 200;   // so the random player can hire and buy
   let bought = 0;
   play(s, 400, x => {
     if (worst) return;
-    x.events.forEach(e => { if (e.kind === 'hired' || e.kind === 'slot') bought += e.price; });
+    x.events.forEach(e => { if (e.kind === 'hired' || e.kind === 'slot' || e.kind === 'stallbought') bought += e.price; });
     x.events = [];
     const inside = x.shop.people.filter(c => c.state !== 'out').length;
     if (F.cents(x.money) !== x.money || Math.abs(x.money - (200 + x.earned - x.spent - bought)) > 1e-6) worst = 'money ' + x.money + ' is not earned ' + x.earned + ' less running costs ' + x.spent + ' and purchases ' + bought;
@@ -789,14 +808,16 @@ function stockCycle(bin, force, rules) {
     else if (!F.free(x, x.avatar.x, x.avatar.y)) worst = 'avatar inside something at ' + x.avatar.x.toFixed(2) + ',' + x.avatar.y.toFixed(2);
     else if (x.robots.some(r => !F.free(x, r.x, r.y))) worst = 'a robot inside something';
     else if (all(x).some(a => a.some(k => !F.isItem(k)))) worst = 'something that is not a thing in a bin';
-    else if (x.stalls[0].stock.length > C.stallCap || inside > P.max) worst = 'stall ' + x.stalls[0].stock.length + ', inside ' + inside;
+    else if (x.stalls.some(st => st.stock.length > C.stallCap) || inside > P.max) worst = 'stalls ' + x.stalls.map(st => st.stock.length) + ', inside ' + inside;
+    else if (!x.stalls[0].bought || !x.stalls[0].want || x.stalls.some(st => st.bought ? st.want !== null && F.SELLS.indexOf(st.want) < 0 : st.want !== null || st.stock.length)) worst = 'a stall ' + JSON.stringify(x.stalls.map(st => [st.bought, st.want]));
+    else if (x.shop.people.some(c => c.state !== 'out' && !(x.stalls[c.stall].bought && x.stalls[c.stall].want))) worst = 'a customer at a stall that sells nothing';
     else if (x.shop.people.some(c => c.y < L.SOLID.wall[3] || c.y > L.SOLID.counter[1])) worst = 'a customer outside the shop';
     else if (['ready', 'run', 'jam'].indexOf(x.machine.phase) < 0 || F.LOGS.indexOf(x.machine.log) < 0) worst = 'planer ' + x.machine.phase + ' ' + x.machine.log;
     else if (x.robots.some(r => r.slots > C.slots.length || r.rules.length !== r.slots || r.rules.some(id => id !== null && !x.seen[id]) || new Set(r.rules.filter(Boolean)).size !== r.rules.filter(Boolean).length)) worst = 'a robot\'s instructions ' + JSON.stringify(x.robots.map(r => r.rules));
   });
   const tl = s.tally.player;
-  ok(!worst && s.robots.length >= 1 && s.spent > 0 && tl.stocked + tl.sawn + tl.extracted + tl.carved > 0, 'over 400 random taps and page visits: money is always whole cents and what was earned less the running costs (logs pressed and bought, fixes, cuts) and purchases, satisfaction in bounds, nobody walks into anything, every bin and your arms hold only things, the stall and the shop never overfill, customers stay in the shop, instructions only ever seen ones',
-    worst || (s.robots.length + ' robots, $' + s.money + ', ' + JSON.stringify(tl)));
+  ok(!worst && s.robots.length >= 1 && s.spent > 0 && tl.stocked + tl.sawn + tl.extracted + tl.carved > 0 && s.stalls.filter(st => st.bought).length > 1, 'over 400 random taps and page visits: money is always whole cents and what was earned less the running costs (logs pressed and bought, fixes, cuts) and purchases (robots, slots, stalls), satisfaction in bounds, nobody walks into anything, every bin and your arms hold only things, no stall and not the shop ever overfills, a stall sells only a thing with a price and one not bought sells nothing, customers stay in the shop and only come for a stall that sells something, instructions only ever seen ones',
+    worst || (s.robots.length + ' robots, ' + s.stalls.filter(st => st.bought).length + ' stalls, $' + s.money + ', ' + JSON.stringify(tl)));
   const a = play(F.newGame(8), 80), text = F.save(a), b = F.load(text);
   const strip = x => JSON.stringify(Object.assign({}, x, { events: [] }));
   ok(b && strip(a) === strip(b), 'a save loads back to the same factory: your arms, every bin, the customers, names and instructions included');
@@ -809,13 +830,14 @@ function stockCycle(bin, force, rules) {
   Object.assign(raw, { money: 'lots', spent: -9, satisfaction: 400, seen: { bogus: true } });
   raw.robots[0].slots = 9; raw.robots[0].rules = ['sap', 'sap', 'nonsense', 'price']; raw.robots[0].name = 'x'.repeat(40); raw.robots[1].job = 'sell';
   raw.machine.log = 'stone'; raw.bin = ['plank.m', 'brick', 'plank']; raw.avatar.inv = ['sap', 7, 'carving.dragon']; raw.rack = ['sappy.m', 'stone', 'plank.m', 'log.s']; raw.rackMine = 9;
-  raw.stalls = [{ want: 'plank.s', stock: Array(9).fill({ item: 'plank.m', by: 0 }) }];
+  raw.stalls = [{ want: 'rough.m', stock: Array(9).fill({ item: 'plank.m', by: 0 }) }, { bought: true, want: 'carving.owl', stock: [] }, { want: 'plank.s', stock: [{ item: 'plank.s', by: 'player' }] }, 'stall'];
   raw.shop = { people: [{ id: 1, x: 2, y: 1.15, state: 'dance' }, { id: 2, x: 3, y: 1.15, state: 'wait' }], next: 'soon', n: 3 };
   const hacked = F.load(JSON.stringify(raw));
   ok(hacked && hacked.money === 0 && hacked.spent === 0 && hacked.satisfaction === 100 && hacked.robots[0].slots === 5 && hacked.robots[0].rules.join() === 'sap,,,price,' && hacked.robots[0].name.length === C.nameMax && hacked.robots[1].job === null &&
     hacked.seen.price && !hacked.seen.bogus && hacked.machine.log === 'log.m' && hacked.bin.join() === 'plank.m' && hacked.avatar.inv.join() === 'sap' && hacked.rack.join() === 'sappy.m,log.s' && hacked.rackMine === 2 &&
-    hacked.stalls[0].want === 'plank.m' && hacked.stalls[0].stock.length === C.stallCap && hacked.shop.people.length === 1 && Number.isFinite(hacked.shop.next),
-    'a hand-edited save is clamped: money, what was spent, satisfaction, slots, instructions, a long name, an old job, an unknown log or thing, a stone or a plank in the planer\'s input bin and more of it yours than it holds, an overfull stall, a customer doing something else', hacked && JSON.stringify([hacked.money, hacked.robots[0].rules, hacked.bin, hacked.avatar.inv, hacked.rack, hacked.stalls[0].stock.length, hacked.shop.people.length]));
+    hacked.stalls[0].want === 'plank.m' && hacked.stalls[0].stock.length === C.stallCap && JSON.stringify(hacked.stalls.slice(1)) === '[{"bought":true,"want":null,"stock":[]},{"bought":false,"want":null,"stock":[]},{"bought":false,"want":null,"stock":[]}]' &&
+    hacked.shop.people.length === 1 && Number.isFinite(hacked.shop.next),
+    'a hand-edited save is clamped: money, what was spent, satisfaction, slots, instructions, a long name, an old job, an unknown log or thing, a stone or a plank in the planer\'s input bin and more of it yours than it holds, an overfull stall, a stall selling something with no price, a stall not bought holding things, a customer doing something else', hacked && JSON.stringify([hacked.money, hacked.robots[0].rules, hacked.bin, hacked.avatar.inv, hacked.rack, hacked.stalls, hacked.shop.people.length]));
   raw.money = -37;
   ok(F.load(JSON.stringify(raw)).money === -37, 'and money below zero is kept: logs cost money');
 }
@@ -1040,7 +1062,7 @@ function stockCycle(bin, force, rules) {
   F.choose(w, 'put:rough.m'); F.choose(w, 'take:rough.m');
   const beOk = !w.bench.in.length && count(w.avatar.inv, 'rough.m') === 1;
   ok(sawOk && exOk && beOk && take(w, 'took').map(e => e.at).join() === 'sawIn,extractIn,benchIn', 'what you put in the table saw\'s, the sap extractor\'s or the bench\'s input bin can be taken back out into your arms (the CD: change your mind and sell the plank)', [sawOpts, sawOk, exOk, beOk].join(' / '));
-  F.tap(w, { kind: 'counter' }); until(w, x => !x.avatar.act && x.avatar.task && x.avatar.task.arrived, 30);
+  F.tap(w, { kind: 'stall', i: 0 }); until(w, x => !x.avatar.act && x.avatar.task && x.avatar.task.arrived, 30);
   ok(w.stalls[0].stock.length === 1 && w.stalls[0].stock[0].item === 'plank.m', 'and the plank taken back out of the saw\'s bin goes on the counter to sell');
   // no bin has a limit
   const big = shut(F.newGame(9));
@@ -1063,6 +1085,152 @@ function stockCycle(bin, force, rules) {
   const was = F.load(JSON.stringify(old));
   ok(was && was.rack.length === 2 + C.startLogs && was.rack.slice(0, 2).join() === 'log.s,log.l' && was.rackMine === 2 && was.costs.bought === 0 && was.money === sv.money,
     'a save made before the bin of bought logs keeps its rack as yours, gets the 10 a new factory starts with behind them, free (no version bump)', was && was.rack.join());
+}
+
+/* ---------- 14. the counter's four stalls (the CD, 2026-10-16) ---------- */
+{
+  // walk to a stall (or an empty place on the counter) and wait for its bubble and any stocking
+  const at = (s, i) => { F.tap(s, { kind: 'stall', i }); until(s, x => !!F.bubbleOpen(x) && !x.avatar.act, 30); return F.options(s); };
+  // a customer at the door, come for stall i
+  const door = (s, i) => { const c = { id: s.shop.n++, x: L.SHOP.door.x, y: L.SHOP.laneY, state: 'in', t: 0, stall: i, at: null, item: null, by: null, wrong: false }; s.shop.people.push(c); return c; };
+  const settle = s => until(s, x => x.shop.people.every(c => c.state === 'wait' || c.state === 'pay' || c.state === 'out'), 20);
+  const s = shut(F.newGame(14));
+  ok(s.stalls.length === 4 && s.stalls[0].bought && s.stalls[0].want === 'plank.m' && s.stalls.slice(1).every(q => !q.bought && q.want === null && !q.stock.length) && F.openStalls(s).join() === '0' && F.stallPrice(s) === 50,
+    'a new factory has the one stall, selling medium planks, and three empty places along the counter; the next stall costs $50', JSON.stringify(s.stalls));
+  let o = at(s, 2);
+  ok(dist(s.avatar, SP.stalls[2]) < 0.05 && o.length === 1 && o[0].id === 'buystall' && o[0].price === 50 && !o[0].enabled && !F.choose(s, 'buystall') && !s.stalls[2].bought && s.money === 0,
+    'a tap on an empty place on the counter walks you round to it, and its bubble offers a stall for $50, out of reach with $0', JSON.stringify(o));
+  s.money = 60;
+  ok(F.options(s)[0].enabled && F.choose(s, 'buystall') && s.money === 10 && s.stalls[2].bought && s.stalls[2].want === null && take(s, 'stallbought').map(e => e.i + ':' + e.price).join() === '2:50',
+    'with $60 it is $50: the place is yours, a stall that sells nothing yet', s.money);
+  o = F.options(s);
+  ok(o.length === F.SELLS.length && o.every((x, k) => x.id === 'sell:' + F.SELLS[k] && x.enabled && !x.on && x.price === F.priceNow(s, F.SELLS[k])) && F.openStalls(s).join() === '0',
+    'and its bubble now offers everything a stall can sell, each with what a customer would pay for it now; customers still come only for the first stall', o.map(x => x.id + '$' + x.price).join());
+  s.money = 1000;
+  at(s, 1); F.choose(s, 'buystall');
+  const third = 1000 - s.money, last = at(s, 3)[0].price;
+  F.choose(s, 'buystall');
+  const full = at(s, 0);
+  ok(third === 100 && last === 150 && s.money === 750 && F.stallPrice(s) === null && s.stalls.every(q => q.bought) && full.every(x => x.id.indexOf('sell:') === 0),
+    'the next costs $100 and the last $150, whichever place each goes in; then all four are stalls and nothing is left to buy (the CD\'s prices)', [third, last, s.money].join());
+  // what a stall sells: anything unsold comes back into your arms, and in go the new things you carry
+  const t = shut(F.newGame(15));
+  t.stalls[0].stock.push({ item: 'plank.m', by: 'player' }, { item: 'plank.m', by: 'player' }, { item: 'plank.s', by: 0 });
+  t.avatar.inv.push('b2x4.m', 'b2x4.m', 'plank.l');
+  o = at(t, 0);
+  ok(t.stalls[0].stock.length === 3 && o.filter(x => x.on).map(x => x.id).join() === 'sell:plank.m', 'at the first stall the bubble marks what it sells now, medium planks', o.filter(x => x.on).map(x => x.id).join());
+  F.choose(t, 'sell:b2x4.m'); until(t, x => !x.avatar.act, 5);
+  const set = take(t, 'stallset')[0];
+  ok(t.stalls[0].want === 'b2x4.m' && t.stalls[0].stock.map(g => g.item).join() === 'b2x4.m,b2x4.m' && t.stalls[0].stock.every(g => g.by === 'player') && t.avatar.inv.slice().sort().join() === 'plank.l,plank.m,plank.m,plank.s' &&
+    set && set.was === 'plank.m' && set.back.join() === 'plank.m,plank.m,plank.s' && F.options(t).filter(x => x.on).map(x => x.id).join() === 'sell:b2x4.m',
+    'choosing medium 2x4s instead: everything unsold in it comes back into your arms (the CD), the small plank a robot put there too, and the 2x4s you carry go in', t.avatar.inv.join() + ' / ' + t.stalls[0].stock.map(g => g.item).join());
+  F.choose(t, 'sell:b2x4.m');
+  ok(t.stalls[0].stock.length === 2 && take(t, 'stallset').length === 1 && !F.choose(t, 'sell:rough.m') && !F.choose(t, 'sell:carving.owl') && !F.choose(t, 'sell:plank.x') && t.stalls[0].want === 'b2x4.m',
+    'choosing what it already sells changes nothing, and nothing without a price can be chosen');
+  t.avatar.inv.push('b2x4.m', 'b2x4.m', 'b2x4.m', 'b2x4.m', 'b2x4.m', 'b2x4.m');
+  at(t, 0);
+  ok(t.stalls[0].stock.length === C.stallCap && count(t.avatar.inv, 'b2x4.m') === 2, 'a tap on it stocks it with what it sells, up to ' + C.stallCap + ', like the one stall always was; what does not fit stays in your arms', t.stalls[0].stock.length);
+  // a stall bought but selling nothing gets no customers, and no die is rolled to choose
+  const u = F.newGame(16); u.money = 50; at(u, 1); F.choose(u, 'buystall');
+  u.avatar.inv.push('plank.m'); at(u, 1);
+  u.force.stall = [1, 1, 1]; u.force.arrive = many(8, 40); u.events = [];
+  run(u, 50);
+  let cs = take(u, 'customer');
+  ok(cs.length >= 4 && cs.every(e => e.stall === 0) && u.force.stall.length === 3 && !u.stalls[1].stock.length && count(u.avatar.inv, 'plank.m') === 1,
+    'a stall bought but selling nothing: a tap on it stocks nothing, every customer comes for the first stall, and with only one stall to choose no die is rolled', cs.map(e => e.stall).join());
+  // with more than one, each customer picks a stall that sells something, all equally likely (the CD)
+  const r = F.newGame(17); r.money = 1000;
+  [1, 3].forEach(i => { at(r, i); F.choose(r, 'buystall'); F.choose(r, 'sell:sap'); });
+  r.force.arrive = many(8, 400); r.events = [];
+  const per = [0, 0, 0, 0];
+  for (let k = 0; k < 2400 * 20; k++) {
+    F.step(r, 0.05);
+    r.stalls.forEach(q => { if (q.want) while (q.stock.length < C.stallCap) q.stock.push({ item: q.want, by: 'player' }); });
+    r.events.forEach(e => { if (e.kind === 'customer') per[e.stall]++; }); r.events = [];
+  }
+  const n = per.reduce((a, b) => a + b, 0);
+  ok(n > 250 && !per[2] && [0, 1, 3].every(i => per[i] / n > 0.27 && per[i] / n < 0.4), 'with three stalls selling, each customer picks one of them at random, all equally likely, and never the place with no stall (the CD)', per.join(' / ') + ' of ' + n);
+  // one customer waits at each stall, the rest in the line along the back, first come first served
+  const q = shut(F.newGame(18)); q.money = 50; at(q, 1); F.choose(q, 'buystall'); F.choose(q, 'sell:b2x4.m'); until(q, x => !x.avatar.act, 5);
+  const A = door(q, 0), B = door(q, 0), Cc = door(q, 1);
+  settle(q);
+  ok(A.at === 'stall' && A.x === L.SHOP.places[0] && A.y === L.SHOP.lineY && B.at === 'line' && B.x === L.SHOP.x0 && B.y === L.SHOP.backY && Cc.at === 'stall' && Cc.x === L.SHOP.places[1] && Cc.y === L.SHOP.lineY && F.waitingNow(q) === 3,
+    'each customer waits at its own stall, across the counter from it; a second for the same stall waits in the line along the back wall; all three cost satisfaction while they wait', [A, B, Cc].map(c => c.at + '@' + c.x + ',' + c.y).join(' '));
+  q.satisfaction = 100;
+  q.stalls[1].stock.push({ item: 'b2x4.m', by: 'player' });
+  until(q, x => take(x, 'sold').length > 0, 10);
+  let sold = take(q, 'sold')[0];
+  ok(sold.at === 1 && sold.item === 'b2x4.m' && sold.sale === 'fair' && Math.abs(sold.paid - F.priceOf('b2x4.m') * q.satisfaction / 100) < 0.06 && A.state === 'wait' && B.state === 'wait',
+    'a medium 2x4 in the second stall: its customer pays the 2x4\'s $6 times customer satisfaction, while the first stall\'s two go on waiting', sold.at + ' $' + sold.paid);
+  until(q, x => x.shop.people.indexOf(Cc) < 0, 20);
+  const D = door(q, 1); settle(q);
+  ok(D.at === 'stall' && D.x === L.SHOP.places[1] && B.at === 'line', 'a customer for a free stall walks straight to it, past one who came earlier for a stall still taken', D.at + ' / ' + B.at);
+  q.stalls[0].stock.push({ item: 'plank.m', by: 'player' });
+  until(q, x => A.state === 'out', 10); until(q, x => B.at === 'stall' && B.state === 'wait', 5);
+  ok(B.at === 'stall' && B.x === L.SHOP.places[0] && B.y === L.SHOP.lineY && B.state === 'wait', 'and when the first stall\'s customer is served, the next for it steps up from the line', B.at + '@' + B.x + ',' + B.y);
+  // what a customer pays, stall by stall: its thing's price times satisfaction, never below what that cost to make
+  const pay = (item, sat) => { const v = shut(F.newGame(19)); v.money = 50; at(v, 1); F.choose(v, 'buystall'); F.choose(v, 'sell:' + item); queue(v, 1, 1); v.stalls[1].stock.push({ item, by: 'player' }); until(v, x => x.shop.people[0].state === 'pay' && x.shop.people[0].t > P.paySec - 0.05, 10); v.satisfaction = sat; until(v, x => take(x, 'sold').length > 0, 5); return take(v, 'sold')[0].paid; };
+  const prices = [['b2x4.s', 50], ['sap', 50], ['plank.l', 50], ['b2x4.s', 10], ['sap', 10], ['dowels.s', 10]].map(([i, v]) => pay(i, v));
+  ok(prices.join() === '1.5,0.5,4,1.2,0.1,1.2', 'every stall prices its own thing: at 50% a small 2x4 sells for $1.50, sap for $0.50 and a large plank for $4; at 10% the 2x4 and the small dowels for their $1.20 floor and sap for its $0.10 (the CD, 2026-10-16)', prices.join());
+  // anything else in a stall still sells, as the stall's thing, and costs satisfaction
+  const w = shut(F.newGame(20)); w.money = 50; at(w, 1); F.choose(w, 'buystall'); F.choose(w, 'sell:b2x4.m'); queue(w, 1, 1); w.satisfaction = 100;
+  w.stalls[1].stock.push({ item: 'dowels.m', by: 0 });
+  until(w, x => take(x, 'sold').length > 0, 10);
+  sold = take(w, 'sold')[0];
+  ok(sold.item === 'dowels.m' && sold.want === 'b2x4.m' && sold.sale === 'wrong' && sold.paid === 6 && w.satisfaction < 100 - C.satHit + 0.5 && w.shop.wrong === 1, 'dowels in the 2x4 stall sell as 2x4s, at $6, and cost customer satisfaction ' + C.satHit, sold.paid + ' / ' + w.satisfaction.toFixed(1));
+  // a customer waiting when the stall changes what it sells buys the new thing
+  const x2 = shut(F.newGame(21)); x2.money = 50; at(x2, 2); F.choose(x2, 'buystall'); F.choose(x2, 'sell:sap'); queue(x2, 1, 2); settle(x2);
+  x2.avatar.inv.push('plank.l'); x2.satisfaction = 100;
+  at(x2, 2); F.choose(x2, 'sell:plank.l');
+  until(x2, x => take(x, 'sold').length > 0, 10);
+  sold = take(x2, 'sold')[0];
+  ok(sold && sold.item === 'plank.l' && sold.sale === 'fair' && Math.abs(sold.paid - 8) < 0.05, 'a customer waiting at a stall when you change what it sells buys the new thing, at its price', sold && sold.item + ' $' + sold.paid);
+  // an empty stall fills the shop: its customers wait while the others are served, until all six are its
+  const e = F.newGame(22); e.money = 50; at(e, 1); F.choose(e, 'buystall'); F.choose(e, 'sell:sap');
+  e.force.arrive = many(8, 200); e.events = [];
+  for (let k = 0; k < 20 * 400; k++) { F.step(e, 0.05); while (e.stalls[0].stock.length < C.stallCap) e.stalls[0].stock.push({ item: 'plank.m', by: 'player' }); }
+  const inside = e.shop.people.filter(c => c.state !== 'out');
+  ok(inside.length === P.max && inside.every(c => c.stall === 1 && c.state === 'wait') && inside.filter(c => c.at === 'stall').length === 1 && e.satisfaction < 50,
+    'a stall that sells something you never stock: its customers wait while the first stall\'s are served, until all ' + P.max + ' in the shop are its, nobody else comes in, and satisfaction drains (the CD\'s rule: they wait there)', inside.map(c => c.stall + c.at).join() + ' ' + e.satisfaction.toFixed(1) + '%');
+  // nobody walks through anybody: over a busy shop with four stalls
+  const b = F.newGame(23); b.money = 1000;
+  [1, 2, 3].forEach(i => { at(b, i); F.choose(b, 'buystall'); F.choose(b, 'sell:' + ['sap', 'b2x4.m', 'plank.s'][i - 1]); });
+  b.force.arrive = many(8, 400); b.force.stall = []; b.events = [];
+  const rr = (sd => () => { sd = (sd * 1664525 + 1013904223) >>> 0; return sd / 4294967296; })(7);
+  let bad = '', seenLine = 0, seenStall = 0, served = 0;
+  const walking = {};
+  for (let k = 0; k < 20 * 900 && !bad; k++) {
+    F.step(b, 0.05);
+    if (rr() < 0.01) { const st = b.stalls[Math.floor(rr() * 4)]; if (st.stock.length < C.stallCap) st.stock.push({ item: st.want, by: 'player' }); }
+    served += take(b, 'sold').length; b.events = [];
+    const ppl = b.shop.people, stand = ppl.filter(c => c.state === 'wait' || c.state === 'pay');
+    ppl.forEach(c => { walking[c.id] = c.state === 'in' ? (walking[c.id] || 0) + 0.05 : 0; if (walking[c.id] > 12) bad = 'customer ' + c.id + ' still walking after 12 s, at ' + c.x.toFixed(2) + ',' + c.y.toFixed(2); });
+    seenLine = Math.max(seenLine, ppl.filter(c => c.at === 'line' && c.state === 'wait').length); seenStall = Math.max(seenStall, ppl.filter(c => c.at === 'stall' && c.state === 'wait').length);
+    stand.forEach(c => stand.forEach(d => { if (c !== d && dist(c, d) < 0.39) bad = 'two customers standing ' + dist(c, d).toFixed(2) + ' m apart'; }));
+    ppl.forEach(c => {
+      if (c.y > L.SHOP.laneY + 1e-6 && Math.abs(c.x - L.SHOP.places[c.stall]) > 0.31) bad = 'customer ' + c.id + ' (' + c.state + ') off the walk at ' + c.x.toFixed(2) + ',' + c.y.toFixed(2) + ', away from its stall';
+      if (c.y < L.SOLID.wall[3] + 0.2 || c.y > L.SOLID.counter[1] - 0.2) bad = 'customer ' + c.id + ' at the wall or the counter';
+    });
+    for (let i = 0; i < 4; i++) { const mine = ppl.filter(c => c.state !== 'out' && c.stall === i); if (mine.length && mine[0].at !== 'stall') bad = 'the first customer for stall ' + (i + 1) + ' is not at it'; }
+  }
+  ok(!bad && seenLine >= 2 && seenStall >= 2 && served > 60, 'over a busy quarter of an hour at four stalls: everyone who walks somewhere gets there, the first customer for each stall is always the one at it, nobody standing ever stands in anyone\'s place, and nobody crosses the stalls\' row except at their own stall (they come and go along the walk behind it)', bad || ('up to ' + seenStall + ' at the stalls, ' + seenLine + ' in the line, ' + served + ' served'));
+  // a bad tap does nothing
+  const g = shut(F.newGame(24)), before = JSON.stringify(g.avatar);
+  [{ kind: 'stall' }, { kind: 'stall', i: 4 }, { kind: 'stall', i: -1 }, { kind: 'stall', i: 1.5 }, { kind: 'stall', i: '1' }, { kind: 'counter' }].forEach(tk => F.tap(g, tk));
+  ok(JSON.stringify(g.avatar) === before && !g.bubble, 'a tap on a stall that is not one of the four, or on the old counter, does nothing');
+  // saves
+  const sv = F.load(F.save(r));
+  ok(sv && JSON.stringify(sv.stalls) === JSON.stringify(r.stalls) && JSON.stringify(sv.shop.people) === JSON.stringify(r.shop.people), 'a save keeps the four stalls (which are bought, what each sells, what is in each) and who waits where');
+  const old = JSON.parse(F.save(shut(F.newGame(25))));
+  old.stalls = [{ want: 'plank.m', stock: [{ item: 'plank.m', by: 'player' }] }];
+  old.avatar.task = { kind: 'counter', arrived: true, spot: SP.counter }; old.avatar.act = { kind: 'stock', t: 0.1, done: false }; old.bubble = { kind: 'counter' };
+  old.shop.people = [{ id: 0, x: 4.8, y: 1.15, state: 'wait', t: 2, stall: 0, item: null, by: null, wrong: false }, { id: 1, x: 2, y: 0.8, state: 'out', t: 1, stall: 0, item: 'plank.m', by: 'player', wrong: false }, { id: 2, x: 3, y: 1.15, state: 'wait', t: 0, stall: 3, item: null, by: null, wrong: false }];
+  const was = F.load(JSON.stringify(old));
+  ok(was && JSON.stringify(was.stalls) === '[{"bought":true,"want":"plank.m","stock":[{"item":"plank.m","by":"player"}]},{"bought":false,"want":null,"stock":[]},{"bought":false,"want":null,"stock":[]},{"bought":false,"want":null,"stock":[]}]' &&
+    was.avatar.task.kind === 'stall' && was.avatar.task.i === 0 && was.avatar.act.i === 0 && was.bubble === null && was.shop.people.map(c => c.stall).join() === '0,0,0' && was.version === C.version,
+    'a save from before the four stalls loads as it was: its stall the first, three empty places, a walk to the counter a walk to the first stall, a customer for a stall that sells nothing back at the first (no version bump)', was && JSON.stringify([was.stalls.map(q => q.bought), was.avatar.task, was.shop.people.map(c => c.stall)]));
+  run(was, 10);
+  ok(was.stalls[0].stock.length === 0 && take(was, 'sold').length === 1, 'and carries on: its customer buys the plank');
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);

@@ -236,7 +236,7 @@ const server = http.createServer((req, res) => {
   /* ---------- 5. taps land where things are drawn, at every size ---------- */
   await section('5. hit tests', async () => {
     const sizes = [[390, 844], [320, 640], [430, 932], [844, 390], [1280, 800], [768, 1024]];
-    const want = { machine: 'machine', console: 'machine', rack: 'rack', binBack: 'bin', binFront: 'bin', recycle: 'recycle', counter: 'counter', stall: 'counter',
+    const want = { machine: 'machine', console: 'machine', rack: 'rack', binBack: 'bin', binFront: 'bin', recycle: 'recycle', counter: 'stall', stall: 'stall',
       sawInFront: 'sawIn', saw: 'saw', sawConsole: 'saw', sawOutFront: 'sawOut', extractInFront: 'extractIn', extract: 'extract', extractConsole: 'extract', extractOutFront: 'extractOut',
       benchInFront: 'benchIn', bench: 'bench', benchOutFront: 'benchOut', dockPanel: 'dock' };
     const bad = [], front = [];
