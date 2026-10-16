@@ -62,7 +62,14 @@ step 4).
     Section 11's row now holds the engine (`FACTORY.step` stubbed) and the dust
     (`Math.random` stubbed) for 1.5 s before the two frames, so only the blade can move.
     Verified: page GREEN, the copy RED (0 px changed).
-  - **Page suite now 84 checks** (82 + overlap + same-frame money).
+  - `stall-stock-undrawn` (the stall's planks never drawn on the counter): **a row was
+    missing**. New row in section 13: one plank then three on the stall change the stall's
+    pixels (~2,500 px each step at 390 px; 0 on the copy).
+  - `carry-count-gone` (the count badge over your arms never drawn): **a row was
+    missing**. New row at the start of section 15: one thing in your arms adds no white,
+    two or three add a white badge (~600 px; 0 on the copy).
+  - **Page suite now 86 checks** (82 + overlap + same-frame money + stall + badge). Both new
+    rows verified: page GREEN 86/86, each copy RED on its own row only.
 - **Placeholders left in the docs for step 2:** `@UICAUGHT@` (twice in `.claude/taas.md`),
   `@UIMISSES@` (once in `.claude/taas.md`), `@UIROW@` (once in `.claude/tests/README.md`).
 - **For the report (step 4):**

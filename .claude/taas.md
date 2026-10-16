@@ -19,7 +19,7 @@ nine protected games). Suites: `.claude/tests/drive-taas.cjs` (the engine's rule
 checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 26 checks, Chromium at
 phone width) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in); both drive suites
 are negative-tested (§ Negative tests). The robot factory has its own three
-(`drive-taas-factory.cjs`, 156 checks; `drive-taas-factory-ui.cjs`, 84; `eval-taas-factory.cjs`, 19). It is a
+(`drive-taas-factory.cjs`, 156 checks; `drive-taas-factory-ui.cjs`, 86; `eval-taas-factory.cjs`, 19). It is a
 **first draft the CD is still designing**; most numbers below are guesses waiting for the
 CD's tuning.
 
@@ -972,7 +972,7 @@ clearing the bubble. @UIMISSES@
   $5 to fix a jam; the goal on the wall and the price on the counter's label; **slots 02-04** (table
   saw, sap extractor, hand crafting bench), worked by hand; robots on the planer or stocking only.
   Save version 3 (older factory saves ignored). Items and waiting customers baked to sprites to
-  hold the frame budget. Rules suite 156 checks, page 84, eval 19 with an eighth persona (operator
+  hold the frame budget. Rules suite 156 checks, page 86, eval 19 with an eighth persona (operator
   first, the trap it found); break lists 101 and 50 (100 and @UICAUGHT@ caught).
 - 2026-10-14 (night): **the menu, a reload button and scoreboards on the wall** (the CD's
   note from a phone screenshot, and three answers). The back, mute and i buttons gave way to a

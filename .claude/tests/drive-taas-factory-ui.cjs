@@ -637,6 +637,15 @@ const server = http.createServer((req, res) => {
     const low = await boardInk('plate'), r72 = await plateBits();
     let pd = 0; for (let i = 0; i < r100.length; i++) if (r100[i] !== r72[i]) pd++;
     ok(full.green > 40 && full.white > 60 && !full.amber && low.amber > 40 && !low.green && low.white > 60 && pd > 30, 'the counter\'s label reads MEDIUM PLANKS and the price a customer pays: $4 in green at 100%, $3 in amber at 72%', JSON.stringify([full, low]) + ' ' + pd + ' px of the figure changed');
+    // what is on the stall is drawn on it: one plank, then three (nobody in the shop, and every redraw at dt 0)
+    const onStall = await H(() => { const T = window.TAAS_FACTORY, s = T.s, st = FACTORY.LAYOUT.STALL, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      const grab = () => { const a = T.screen(st.x0, st.y0, st.z + 0.4), b = T.screen(st.x1, st.y1, st.z - 0.02); return g.getImageData(Math.round(a[0] * k), Math.round(a[1] * k), Math.round((b[0] - a[0]) * k), Math.round((b[1] - a[1]) * k)).data; };
+      const diff = (a, b) => { let n = 0; for (let i = 0; i < a.length; i += 4) if (Math.abs(a[i] - b[i]) + Math.abs(a[i + 1] - b[i + 1]) + Math.abs(a[i + 2] - b[i + 2]) > 60) n++; return n; };
+      s.shop.next = 1e9; s.shop.people = []; s.stalls[0].stock = []; T.tick(0); const s0 = grab();
+      s.stalls[0].stock.push({ item: 'plank.m', by: 'player' }); T.tick(0); const s1 = grab();
+      s.stalls[0].stock.push({ item: 'plank.m', by: 'player' }, { item: 'plank.m', by: 'player' }); T.tick(0); const s3 = grab();
+      return { one: diff(s0, s1), three: diff(s1, s3) }; });
+    ok(onStall.one > 400 && onStall.three > 400, 'the planks on the stall are drawn on the counter: one, then more as it fills', JSON.stringify(onStall) + ' px changed');
   });
 
   /* ---------- 14. the shop, with real time ---------- */
@@ -675,6 +684,14 @@ const server = http.createServer((req, res) => {
   /* ---------- 15. your arms, the recycle bin and the slots, through the bubbles ---------- */
   await section('15. bubbles', async () => {
     await fresh(16);
+    // with more than one thing in your arms, a white badge says how many
+    const badge = await H(() => { const T = window.TAAS_FACTORY, a = T.s.avatar, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      T.s.shop.next = 1e9; T.view.camY = T.view.minY;
+      const white = () => { const p = T.screen(a.x - 0.5, a.y, 1.5), q = T.screen(a.x + 0.5, a.y, 0.3), d = g.getImageData(Math.round(p[0] * k), Math.round(p[1] * k), Math.round((q[0] - p[0]) * k), Math.round((q[1] - p[1]) * k)).data;
+        let n = 0; for (let i = 0; i < d.length; i += 4) if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) n++; return n; };
+      const out = {}; [[], ['plank.s'], ['plank.s', 'rough.m'], ['plank.s', 'rough.m', 'plank.s']].forEach(inv => { a.inv = inv; T.tick(0); out[inv.length] = white(); });
+      a.inv = []; T.tick(0); return out; });
+    ok(badge[1] - badge[0] < 20 && badge[2] - badge[1] > 200 && badge[3] - badge[1] > 200, 'with more than one thing in your arms a white badge counts them; one thing has none', JSON.stringify(badge) + ' white px by things held');
     await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.shop.next = 1e9; s.avatar.inv.push('plank.s', 'rough.m', 'plank.s'); s.recycle.push('sappy.l'); T.view.camY = T.view.minY; T.tick(0); });
     const rec = await rectOf('recycle');
     await page.touchscreen.tap(rec.x + rec.w / 2, rec.y + rec.h * 0.6);
