@@ -9,7 +9,7 @@
   const F = FACTORY, s = F.newGame(7), run = n => { for (let k = 0; k < n; k++) F.step(s, 0.05); };
   s.money = 60;
   F.tap(s, { kind: 'dock' }); run(400);
-  F.choose(s, 'hire'); F.choose(s, 'job:stock');
+  F.choose(s, 'hire'); F.choose(s, 'job:stock:0');
   F.tap(s, { kind: 'dock' }); run(20);
   F.choose(s, 'hire'); F.choose(s, 'job:operate');
   s.money = 100; s.seen.stockOnly = true; F.buySlot(s, 0); F.setRule(s, 0, 0, 'stockOnly');

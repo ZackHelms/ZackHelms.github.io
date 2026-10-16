@@ -219,18 +219,18 @@ const server = http.createServer((req, res) => {
     await step(0.2);
     const jobs = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt + '=' + b.getAttribute('aria-label')));
     const nm = await H(() => document.querySelector('#fx-bubble .fx-bname') && document.querySelector('#fx-bubble .fx-bname').textContent);
-    ok(jobs.join() === 'job:operate=Run the planer,job:stock=Stock the sales counter,job:rest=Rest,notes=Instructions' && nm === 'Bolt' && (await S()).robots.length === 1, 'hiring it turns the bubble to the new robot: its name, its two jobs (the planer and the counter), rest and its clipboard', nm + ': ' + jobs.join());
-    await page.tap('#fx-bubble [data-opt="job:stock"]');
+    ok(jobs.join() === 'job:operate=Run the planer,job:stock:0=Stock stall 1,job:saw=Run the table saw,job:extract=Run the sap extractor,job:carve=Carve at the bench,job:rest=Rest,notes=Instructions' && nm === 'Bolt' && (await S()).robots.length === 1, 'hiring it turns the bubble to the new robot: its name, its jobs (the planer, the one stall, slots 02-04), rest and its clipboard', nm + ': ' + jobs.join());
+    await page.tap('#fx-bubble [data-opt="job:stock:0"]');
     await step(16);   // out of the crate, up the floor, round the planer's output bin to the walkway
     const r = (await S()).robots[0], sp = await H(() => FACTORY.LAYOUT.SPOT.stock);
-    ok(r.job === 'stock' && Math.hypot(r.x - sp.x, r.y - sp.y) < 0.1, 'a tap on the stocking icon sends the robot to the walkway by the counter', r.x.toFixed(2) + ',' + r.y.toFixed(2));
+    ok(r.job === 'stock:0' && Math.hypot(r.x - sp.x, r.y - sp.y) < 0.1, 'a tap on the stocking icon sends the robot to the walkway by the counter', r.x.toFixed(2) + ',' + r.y.toFixed(2));
     await H(() => { const T = window.TAAS_FACTORY; T.view.camY = T.view.minY; T.tick(0); });
     const rp = await H(() => { const r = window.TAAS_FACTORY.s.robots[0]; return window.TAAS_FACTORY.screen(r.x, r.y, 0.55); });
     await page.touchscreen.tap(rp[0], rp[1]);
     let ro = false;
     for (let i = 0; i < 160 && !ro; i++) { await step(0.1); ro = await H(() => !!document.querySelector('#fx-bubble [data-opt="job:operate"]')); }
     const on = await H(() => document.querySelector('#fx-bubble .fx-opt.on') && document.querySelector('#fx-bubble .fx-opt.on').dataset.opt);
-    ok(ro && on === 'job:stock', 'a tap on the drawn robot walks over and shows its jobs, its own one marked', on);
+    ok(ro && on === 'job:stock:0', 'a tap on the drawn robot walks over and shows its jobs, its own one marked', on);
   });
 
   /* ---------- 5. taps land where things are drawn, at every size ---------- */
@@ -363,7 +363,7 @@ const server = http.createServer((req, res) => {
     await step(9);
     await page.tap('#fx-bubble [data-opt="hire"]');
     await step(0.1);
-    await page.tap('#fx-bubble [data-opt="job:stock"]');
+    await page.tap('#fx-bubble [data-opt="job:stock:0"]');
     await H(() => { window.TAAS_FACTORY.s.money = 17; });
     await step(2.2);   // the page's own autosave, every 2 s
     // read it from a second tab: a reload would also save on pagehide and hide a dead autosave
@@ -372,7 +372,7 @@ const server = http.createServer((req, res) => {
     await p2.waitForFunction(() => window.TAAS_FACTORY && window.TAAS_FACTORY.on);
     const tab2 = await p2.evaluate(() => ({ money: window.TAAS_FACTORY.s.money, robots: window.TAAS_FACTORY.s.robots.map(r => r.job) }));
     await p2.close();
-    ok(tab2.money === 17 && tab2.robots.join() === 'stock', 'the factory saves itself every few seconds while it runs', JSON.stringify(tab2));
+    ok(tab2.money === 17 && tab2.robots.join() === 'stock:0', 'the factory saves itself every few seconds while it runs', JSON.stringify(tab2));
     // a real formal-mode run, one quarter in: the factory must not touch it
     await H(() => { const st = TAAS.commit(TAAS.newGame(), { opp: true, inv: { train: 4 } }); localStorage.setItem('taas.v' + TAAS.CFG.version, JSON.stringify({ state: st, plan: { opp: true, inv: {} } })); });
     await H(() => { window.TAAS_FACTORY.s.money = 23; });   // no frame runs: only leaving the page can save this
@@ -380,7 +380,7 @@ const server = http.createServer((req, res) => {
     await page.waitForFunction(() => window.TAAS_FACTORY && window.TAAS_FACTORY.on);
     ok(await H(() => window.TAAS_FACTORY.s.money) === 23, 'and saves on the way out, so a reload loses nothing');
     const back = await H(() => { const f = JSON.parse(localStorage.getItem('taas.v' + TAAS.CFG.version)); return { money: window.TAAS_FACTORY.s.money, robots: window.TAAS_FACTORY.s.robots.map(r => r.job), formal: f.state.q + '/' + f.state.history.length + '/' + f.plan.opp }; });
-    ok(back.robots.join() === 'stock' && back.formal === '1/1/true', 'a reload brings the factory back (money, the robot and its job) and leaves the formal save alone', JSON.stringify(back));
+    ok(back.robots.join() === 'stock:0' && back.formal === '1/1/true', 'a reload brings the factory back (money, the robot and its job) and leaves the formal save alone', JSON.stringify(back));
     // doctor the save on the way in, after the outgoing page's pagehide save and before any script
     await page.addInitScript(() => {
       if (sessionStorage.getItem('fx-bump') !== '1') return;
@@ -420,7 +420,7 @@ const server = http.createServer((req, res) => {
     await H(() => {
       const T = window.TAAS_FACTORY, s = T.s;
       s.money = 60; s.shop.next = 1e9;
-      ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      ['operate', 'stock:0'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
       s.rack = Array(80).fill('log.m'); s.rackMine = 0; s.force.think = Array(80).fill(false);   // the planer's input bin: medium logs only
       for (let i = 0; i < 300; i++) FACTORY.step(s, 0.05);
       s.robots[1].job = null; s.robots[1].state = 'idle'; s.robots[1].carry = null;
@@ -477,14 +477,14 @@ const server = http.createServer((req, res) => {
     await fresh(10);
     await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.money = 20; FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); s.money = 500; FACTORY.choose(s, 'notes'); T.tick(1 / 60); });
     const one = await H(() => ({ open: !document.getElementById('fx-panel').hidden, buy: document.querySelector('[data-panel="buy"]').textContent, dis: document.querySelector('[data-panel="buy"]').disabled, base: document.querySelector('.fx-base').textContent }));
-    ok(one.open && one.dis && /once both robots are on staff/.test(one.buy) && /No job/.test(one.base), 'with one robot its page is there (name, no job yet), but slots wait for the second robot', JSON.stringify(one));
+    ok(one.open && one.dis && /once two robots are on staff/.test(one.buy) && /No job/.test(one.base), 'with one robot its page is there (name, no job yet), but slots wait for the second robot', JSON.stringify(one));
     await H(() => window.TAAS_FACTORY.closePanel());
     // the stocker, told to stock only medium planks, at a bin of other things: its page counts the looking
     await fresh(12);
     await H(() => {
       const T = window.TAAS_FACTORY, s = T.s;
       s.money = 60; s.shop.next = 1e9;
-      ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      ['operate', 'stock:0'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
       s.robots[0].job = null; s.robots[0].state = 'idle';
       s.money = 100; s.seen.stockOnly = true; FACTORY.buySlot(s, 1); FACTORY.setRule(s, 1, 0, 'stockOnly');
       for (let i = 0; i < 400; i++) FACTORY.step(s, 0.05);
@@ -492,9 +492,9 @@ const server = http.createServer((req, res) => {
       T.tick(1 / 60);
     });
     await step(6);
-    const hunt = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1]; T.openRobot(1); const row = [...document.querySelectorAll('.fx-rec tr')].find(tr => /Looking for plank/.test(tr.textContent)); return { n: r.record.looking, row: row && row.textContent, bin: T.s.bin.join(), dot: row && row.querySelector('.fx-dot').className, base: document.querySelector('.fx-base').textContent }; });
-    ok(hunt.n >= 3 && hunt.row === 'Looking for plank' + hunt.n && /soso/.test(hunt.dot) && hunt.bin === 'plank.s,rough.m,plank.l' && hunt.base === 'Stock the sales counter with the items in this bin.',
-      'the stocker\'s page (its base prompt: stock the sales counter) counts each reach that came up with something other than a medium plank: "Looking for plank" and how often', JSON.stringify(hunt));
+    const hunt = await H(() => { const T = window.TAAS_FACTORY, r = T.s.robots[1]; T.openRobot(1); const row = [...document.querySelectorAll('.fx-rec tr')].find(tr => /Looking for a medium plank/.test(tr.textContent)); return { n: r.record['looking:plank.m'], row: row && row.textContent, bin: T.s.bin.join(), dot: row && row.querySelector('.fx-dot').className, base: document.querySelector('.fx-base').textContent }; });
+    ok(hunt.n >= 3 && hunt.row === 'Looking for a medium plank' + hunt.n && /soso/.test(hunt.dot) && hunt.bin === 'plank.s,rough.m,plank.l' && hunt.base === 'Stock the sales counter with the items in this bin.',
+      'the stocker\'s page (its base prompt: stock the sales counter) counts each reach that came up with something other than a medium plank: "Looking for a medium plank" and how often', JSON.stringify(hunt));
     const ev = await H(() => {
       const T = window.TAAS_FACTORY, r = T.s.robots[1];
       r.record = { stock: 4, 'misstock:plank.s': 2, 'misstock:rough.m!': 1, 'recycle:plank.l': 2, looking: 3 };
@@ -782,7 +782,7 @@ const server = http.createServer((req, res) => {
       await H(() => {
         const T = window.TAAS_FACTORY, s = T.s;
         s.money = 60; s.shop.next = 1e9;
-        ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+        ['operate', 'stock:0'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
         s.robots[1].job = null; s.robots[1].state = 'idle';
         s.rack = Array(400).fill('log.m'); s.rackMine = 0; s.force.think = Array(400).fill(false); s.force.slip = Array(400).fill(false);
         s.money = 100; s.events = []; T.view.camY = T.view.minY; T.tick(1 / 60);
@@ -903,7 +903,7 @@ const server = http.createServer((req, res) => {
     const pk = await H(() => {
       const T = window.TAAS_FACTORY, s = T.s;
       s.money = 60; s.shop.next = 1e9;
-      ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      ['operate', 'stock:0'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
       s.rack = Array(200).fill('log.m'); s.rackMine = 0; s.force.think = Array(400).fill(false);
       FACTORY.RULES.forEach(q => { if (q.id !== 'output') s.seen[q.id] = true; });   // a long list, one still to come
       s.money = 500; FACTORY.buySlot(s, 0); s.events = [];

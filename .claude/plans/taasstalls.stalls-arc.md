@@ -1,6 +1,6 @@
 # taasstalls - TAAS robot factory: four stalls, eight robots (plan arc)
 
-**Status:** IN PROGRESS (step 1 done 2026-10-16: the engine's stalls and customers; branch `taas-stalls`)
+**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; branch `taas-stalls`)
 **Requested:** 2026-10-16, inside the CD's answer to the bins brief (`.claude/plans/DONE/taasbins.md`,
 which ships the first half: bins you take from, logs bought 10 for $10, $0.10 a run, the floor).
 Verbatim:
@@ -58,7 +58,7 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
 |---|---|---|
 | 0 | The CD's brief and four answers recorded (this file) | DONE 2026-10-16 |
 | 1 | Engine: stalls (buy, set, unsold to arms), customers picking a stall, prices per stall; rules suite rows | DONE 2026-10-16 |
-| 2 | Engine: eight robots, stall jobs and "Only stock X" per item, slot 02-04 jobs; rules suite rows | open |
+| 2 | Engine: eight robots, stall jobs and "Only stock X" per item, slot 02-04 jobs; rules suite rows | DONE 2026-10-16 |
 | 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | open |
 | 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | open |
 | 5 | Docs final and gates | open |
@@ -97,3 +97,60 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
   page 111 unchanged (the tap map now expects a stall); eval 24, its crossed-wires row now measured
   over the last ten minutes, not five (main's own pair was 1.2 $/min apart over five, 0.6 over ten;
   the new shop moved them to 2.1 and 1.1 with nothing about instructions changed). Formal untouched.
+
+### Step 2 (2026-10-16): the engine's eight robots
+
+- **Settled** (each an assumed row in `.claude/taas.md`, "Robots: ...", "Stall robots: ...", "Slot
+  robots", "The bench: ..."): eight robots at $20 to $160 (`CFG.hire`), named Bolt to Dynamo; jobs as
+  strings, `operate`, `stock:0`-`stock:3` (one for each stall bought), `saw`, `extract`, `carve`, one
+  robot to a job (a save's `stock` is `stock:0`); instruction slots open once two are on staff
+  (`CFG.slotsAt`). Saves stay version 3.
+- **The dock of eight**: two rows of four crates 0.6 m square in front of the panel, a cell of floor
+  between any two, you hire from the aisle between the rows. **A first try ran the panel across the
+  whole dock**, which sent every robot round its east end; the eval's paced persona then fell into a
+  jam spiral (money below zero, never the slot for the sap-log instruction). Traced: the old dock with
+  everything else new played as before (the operator's plan at 24.8 min, $367 at the end); the panel
+  back at its own width (x 0.4-2.8), robots leave between the crates, and the persona is back (24.1
+  min, $377). It also moved slot 04's floor number out from behind the panel, which the page suite
+  had caught.
+- **A stall's robot waits at the output bin its stall's thing comes out of** (planks the planer's,
+  cuts the saw's, sap the extractor's), reaches in, walks one thing to its stall, puts it in and walks
+  back (`stocker()`'s new `carry`, `go()`). The first stall's robot on planks has the bin behind it and
+  the stall in front, as the stocker always had, and never takes a step: the old stocker rows pass
+  unchanged but for the new eval keys. **Thirteen "Only stock X"** (the medium plank one still
+  `stockOnly`), one consulted per stall; a recycle instruction never takes the stall's own thing; a
+  stall set to something else mid-fetch sends the robot's load back to its bin. Evals name the thing:
+  `stock:plank.l`, `misstock:plank.s@plank.l`, `looking:sap` (the page's `DOING` reads both these and
+  a save's older keys).
+- **Slot robots** (`miller()`, `carver()`): press the saw (the cut set on its page, `setCut()`) or the
+  extractor whenever idle with something in the input bin; carve the bench's gnarled wood piece by
+  piece; green every time, no slip die without the delay; the delay works on them. The bench is one
+  pair of hands: you cannot carve while its robot does, it waits while you do, and either finishes a
+  piece the other left.
+- **A bug the new rows caught**: a robot that counts as home within 0.06 m keeps the rest of its path,
+  and the first stall robot's walk reused it and snapped to its stall in one step (`go()` now replans a
+  path that ends somewhere else).
+- **Interim until step 3**: the robot bubble lists the new jobs with the planer's button for the
+  three slots and a number for each stall; `JOB_NAME`, the base prompt and `DOING` know the new jobs;
+  "once two robots are on staff". A screenshot with all eight hired: every robot at its post; the
+  dock panel's art covers only the west half of the pads, and the first and second stalls' robots
+  overlap on screen at the planer's bin. The test hook's state setter left a stale bubble on screen
+  (it reset the bubble's signature to a closed bubble's own); fixed.
+- **Interim until step 4**: the eval's personas still hire two. **One eval row is red, and was luck
+  on main**: "without the delay it takes over twice as long" (supervisor 45.3 min vs paced 24.1, 1.88x
+  here). Measured over six seeds (7-12) on main itself it held only on seed 7 (2.23x; the others 0.84,
+  1.15, 1.17, 0.84, 0.98), and "inside 25 minutes" missed on three of them (26.8, 30.2, 25.7). Step 4
+  restates the delay's claims over several seeds rather than retuning one seed green; the Tip "an agent
+  faster than demand makes waste" should be checked against that too before it is told to the CD as
+  measured.
+- **Two rules rows made honest**: the operator's instruction rows had a 20 s budget the old dock met
+  with 0.65 s to spare (now 30 s), and the overproduction row's "12 or more medium planks" held by luck
+  (main left 11 on seed 53; it is now "more than a stall's worth, at least four times the paced bin").
+- **Suites**: rules 221 -> 259 (section 15: the dock of eight and that a robot from any pad reaches
+  every post however many are packed, slots open at two, a job for each stall bought, each stall's
+  robot fetching from its own bin and walking it over, the first stall's robot never stepping,
+  untold / told / told about another thing, recycle never the stall's own, a change mid-fetch, two
+  stalls sharing a bin, a stall selling nothing, the saw's cut and pace, the extractor, the bench's
+  one pair of hands, no slip on the slots, the delay on a slot robot, saves new and old, and a quarter
+  hour with all eight where every stall sells and nothing wrong is stocked); page 111 unchanged (its
+  job ids and eval line updated); eval 23 of 24 (above). `gates.sh` GREEN (formal 43 / 39 untouched).

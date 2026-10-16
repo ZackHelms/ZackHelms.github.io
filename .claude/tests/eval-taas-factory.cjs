@@ -72,8 +72,8 @@ function ok(cond, name, detail) { checks++; if (cond) console.log('PASS ' + name
 
 // the optimal path: per job, the instructions a player who knows the floor would use, in order of
 // preference as they join the list ("Only input medium logs" covers small and large logs both)
-const PLAN = { operate: ['sappy', 'gnarled', 'medium', 'output'], stock: ['stockOnly', 'smallOut', 'largeOut', 'roughOut'] };
-const other = job => job === 'operate' ? 'stock' : 'operate';
+const PLAN = { operate: ['sappy', 'gnarled', 'medium', 'output'], 'stock:0': ['stockOnly', 'smallOut', 'largeOut', 'roughOut'] };
+const other = job => job === 'operate' ? 'stock:0' : 'operate';
 const junkOf = s => s.bin.filter(k => k !== WANT).length;
 const count = (arr, k) => arr.filter(x => x === k).length;
 
@@ -92,7 +92,7 @@ function persona(kind, minutes, seed, fixedWait) {
   const instructs = ['paced', 'hands-on', 'supervisor', 'crossed', 'stocker only', 'stock planks', 'operator first'].indexOf(kind) >= 0;
   const handsOn = kind === 'hands-on' || kind === 'operator first';
   const planFor = r => {
-    if (!instructs || !r.job || (kind === 'stocker only' || kind === 'stock planks') && r.job !== 'stock') return [];
+    if (!instructs || !r.job || (kind === 'stocker only' || kind === 'stock planks') && r.job !== 'stock:0') return [];
     if (kind === 'stock planks') return ['stockOnly'];
     return PLAN[kind === 'crossed' ? other(r.job) : r.job];
   };
@@ -109,9 +109,9 @@ function persona(kind, minutes, seed, fixedWait) {
     if (s.hired >= 1) at('robot 1');
     if (s.hired >= 2) at('robot 2');
     if (s.robots.some(r => r.rules.some(Boolean))) at('first rule');
-    const op = s.robots.find(r => r.job === 'operate'), sk = s.robots.find(r => r.job === 'stock');
+    const op = s.robots.find(r => r.job === 'operate'), sk = s.robots.find(r => r.job === 'stock:0');
     if (op && PLAN.operate.every(id => op.rules.indexOf(id) >= 0)) at('op4');
-    if (sk && PLAN.stock.every(id => sk.rules.indexOf(id) >= 0)) at('stock4');
+    if (sk && PLAN['stock:0'].every(id => sk.rules.indexOf(id) >= 0)) at('stock4');
     if (Math.floor(s.t / 60) > perMin.length) {
       const net = s.earned - s.spent;
       perMin.push(net - lastNet); lastNet = net; junkMin.push(junkOf(s)); waitMin.push(waitSum / waitN); satMin.push(s.satisfaction); plankMin.push(count(s.bin, WANT)); waitSum = 0; waitN = 0;
@@ -140,16 +140,18 @@ function persona(kind, minutes, seed, fixedWait) {
     }
     if (bub) {
       if (bub.kind === 'recycle') { let o; while ((o = F.options(s).find(x => x.enabled && x.group === 'put'))) F.choose(s, o.id); s.bubble = null; continue; }
-      if (bub.kind === 'dock') { if (F.choose(s, 'hire')) { F.choose(s, (s.hired === 1) === (kind !== 'operator first') ? 'job:stock' : 'job:operate'); } s.bubble = null; continue; }
-      if (bub.kind === 'robot') { if (swap) { F.choose(s, 'job:stock'); swap = false; at('swapped'); } else F.choose(s, 'notes'); continue; }
+      if (bub.kind === 'dock') { if (F.choose(s, 'hire')) { F.choose(s, (s.hired === 1) === (kind !== 'operator first') ? 'job:stock:0' : 'job:operate'); } s.bubble = null; continue; }
+      if (bub.kind === 'robot') { if (swap) { F.choose(s, 'job:stock:0'); swap = false; at('swapped'); } else F.choose(s, 'notes'); continue; }
       s.bubble = null;
     }
     if (!idle()) continue;
     if (kind === 'walks away' && s.hired >= 2) continue;
     const late = handsOn || s.hired < 2 ? 0 : 10;
     if (m.phase === 'jam' && s.t - jamSeen >= late) { want('machine'); continue; }
+    // two robots, the planer's and the first stall's: the personas hire no more until they are
+    // rebuilt for the stalls and the slots (taasstalls step 4)
     const hp = F.hirePrice(s);
-    if (hp !== null && s.money >= hp) { want('dock'); continue; }
+    if (hp !== null && s.money >= hp && s.hired < 2) { want('dock'); continue; }
     if (F.slotsOpen(s)) { const r = s.robots.find(x => nextFor(x) && afford(x)); if (r) { want('robot', r.id); continue; } }
     // the way out of an operator hired first: once money has fallen two minutes running, move it to stocking
     if (kind === 'operator first' && s.hired === 1 && op && perMin.length >= 3 && perMin.slice(-2).every(v => v < 0)) { swap = true; want('robot', op.id); continue; }
@@ -184,9 +186,9 @@ const DEBUG = process.env.EVAL_DEBUG;
 const runs = ['hands-on', 'supervisor', 'walks away', 'uninstructed', 'crossed', 'stocker only', 'stock planks', 'operator first'].map(k => persona(k, 60, 7));
 const hour = [persona('paced', 60, 7), persona('supervisor', 60, 7)];
 hour.forEach(r => { r.kind += ' 1h'; });
-const stocker = r => r.s.robots.find(x => x.job === 'stock');
-const stocked = r => { const x = stocker(r); return x ? (x.record.stock || 0) + Object.keys(x.record).filter(k => /^misstock/.test(k)).reduce((n, k) => n + x.record[k], 0) : 0; };
-const looked = r => { const x = stocker(r); return x ? (x.record.looking || 0) + (x.record['looking!'] || 0) : 0; };
+const stocker = r => r.s.robots.find(x => x.job === 'stock:0');
+const stocked = r => { const x = stocker(r); return x ? (x.record['stock:' + WANT] || 0) + Object.keys(x.record).filter(k => /^misstock/.test(k)).reduce((n, k) => n + x.record[k], 0) : 0; };
+const looked = r => { const x = stocker(r); return x ? (x.record['looking:' + WANT] || 0) + (x.record['looking:' + WANT + '!'] || 0) : 0; };
 const evals = (r, job) => { const x = r.s.robots.find(q => q.job === job); if (!x) return null; const n = x.tally.good + x.tally.soso + x.tally.bad; return { n, green: n ? +(x.tally.good / n).toFixed(2) : 0, red: x.tally.bad }; };
 const avg = (arr, n) => { const v = arr.slice(-n); return v.reduce((x, y) => x + y, 0) / Math.max(1, v.length); };
 console.log('persona        $20    robot1  robot2  rule1  op x4  stk x4  earned  costs  $/min net(last5)  sat end/min  served/wrong  waiting(last10)  stocked/looking  junk');
@@ -234,12 +236,12 @@ const recyclers = k => F.RULES.filter(q => q.job === 'stock' && q.recycles && (!
 const fixes = F.LOGS.filter(k => k !== 'log.m').map(k => [k, F.keepers(k)])
   .concat(F.PRODUCTS.filter(k => k !== WANT).map(k => [k, recyclers(k).map(q => q.id)]));
 const seenUn = un.s.seen, missing = fixes.filter(([k, ids]) => !ids.length || !ids.some(id => seenUn[id])).map(([k, ids]) => k + (ids.length ? ' (' + ids.join('/') + ' never joined the list)' : ' (nothing fixes it)'));
-ok(!missing.length && PLAN.operate.concat(PLAN.stock).every(id => seenUn[id]), 'a valid path exists: every log but a normal medium one and every product but a medium plank has an instruction that deals with it, and every one of them joins the list in real play',
+ok(!missing.length && PLAN.operate.concat(PLAN['stock:0']).every(id => seenUn[id]), 'a valid path exists: every log but a normal medium one and every product but a medium plank has an instruction that deals with it, and every one of them joins the list in real play',
   missing.join(', ') || fixes.map(([k, ids]) => k + ':' + ids.join('/')).join(' '));
 const late = PC.junkMin.slice(-10);
 ok(PC.mark.stock4 !== undefined && PC.mark.op4 !== undefined && Math.max.apply(null, late) <= 4 && junkOf(PC.s) <= 2 && PC.s.satisfaction >= 90 && avg(PC.waitMin, 10) < 1, 'followed, the plan clears the floor: in the optimal path\'s last ten minutes the output bin never holds more than four other things, hardly anyone waits, and customers stay happy',
   'junk by minute ' + PC.junkMin.join(',') + '; waiting ' + avg(PC.waitMin, 10).toFixed(2) + '; satisfaction ' + Math.round(PC.s.satisfaction));
-const eo = evals(PC, 'operate'), es = evals(PC, 'stock');
+const eo = evals(PC, 'operate'), es = evals(PC, 'stock:0');
 ok(eo && es && eo.n > 50 && es.n > 30 && eo.green >= 0.6 && es.green >= 0.8 && es.red === 0, 'and once each robot holds its plan and its evals are reset, they come back mostly green (the operator\'s yellow is stopping to think, which nothing covers) and the stocker\'s with no red at all',
   'operator ' + JSON.stringify(eo) + ', stocker ' + JSON.stringify(es));
 const fills = runs.filter(r => junkOf(r.s) >= 20);

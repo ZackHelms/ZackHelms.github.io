@@ -667,8 +667,10 @@ const FACTORY = (function () {
     unboxSec: 0.9,
     pickSec: 0.4, putSec: 0.35, stockSec: 0.45,     // you: empty an output bin into your arms, put things in a bin, stock the counter
     sawSec: 3, extractSec: 4, carveSec: 5,          // slot 02's table saw, slot 03's sap extractor, slot 04's bench
-    hire: [20, 40],         // the first robot, the second
-    names: ['Bolt', 'Sprocket'],     // until you name them
+    // eight robots, each $20 more than the last (the CD, 2026-10-16: one for each stall and one for
+    // each slot); instruction slots open once two are on staff
+    hire: [20, 40, 60, 80, 100, 120, 140, 160], slotsAt: 2,
+    names: ['Bolt', 'Sprocket', 'Widget', 'Gizmo', 'Rivet', 'Piston', 'Ratchet', 'Dynamo'],     // until you name them
     nameMax: 16,
     slots: [5, 10, 15, 20, 25],      // instruction slots: each robot's own, bought in order (the CD's prices)
     // what rolls off the planer's rack: every log has a size and a quality (the CD, 2026-10-15)
@@ -715,6 +717,7 @@ const FACTORY = (function () {
   // 'b2x4.m' two 2"x4"s, 'b2x2.m' four 2"x2"s and 'dowels.m' sixteen dowel rods cut from a medium
   // plank; 'sap' one unit of sap; 'carving.bird' something carved by hand at the bench
   const SIZES = ['s', 'm', 'l'];
+  const SIZE_WORD = { s: 'small', m: 'medium', l: 'large' };
   const LOGS = [], PRODUCTS = [];
   ['log', 'gnarled', 'sappy'].forEach(q => SIZES.forEach(z => LOGS.push(q + '.' + z)));
   ['plank', 'rough'].forEach(k => SIZES.forEach(z => PRODUCTS.push(k + '.' + z)));
@@ -770,6 +773,11 @@ const FACTORY = (function () {
   // carries a number, the robot's own `r.wait` in whole seconds (`wait`): after each iteration of
   // its task, a robot that holds it waits that long before the next (an operator's iteration is a
   // log handled, a stocker's a thing taken out of the bin and stocked or recycled).
+  // With the four stalls (the CD, 2026-10-16: "rules per item"), "Only stock medium planks" became one
+  // of thirteen, an "Only stock X" for each thing a stall can sell (`only`); a stall's robot consults
+  // only the one for what its stall sells, so the others do nothing on it.
+  const ONLY_TEXT = { plank: z => SIZE_WORD[z] + ' planks', sap: () => 'sap', b2x4: z => SIZE_WORD[z] + ' 2x4s', b2x2: z => SIZE_WORD[z] + ' 2x2s', dowels: z => SIZE_WORD[z] + ' dowel rods' };
+  const onlyRow = item => ({ id: item === 'plank.m' ? 'stockOnly' : 'only:' + item, job: 'stock', text: 'Only stock ' + ONLY_TEXT[kindOf(item)](sizeOf(item)), only: item });
   const RULES = [
     { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: ['sappy'] },
     { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin', rejects: { quality: ['sappy'] } },
@@ -779,15 +787,15 @@ const FACTORY = (function () {
     { id: 'largeLog', job: 'operate', text: 'Put large logs in recycle bin', rejects: { size: ['l'] } },
     { id: 'mediumLog', job: 'operate', text: 'Put medium logs in recycle bin', rejects: { size: ['m'] }, joins: ['smallLog', 'largeLog'] },
     { id: 'output', job: 'operate', text: 'Only output medium wood planks' },
-    { id: 'stockOnly', job: 'stock', text: 'Only stock medium planks' },
+    ...SELLS.map(onlyRow),
     { id: 'price', job: 'stock', text: 'Sell medium wood planks for $4', joins: ['stockOnly'] },
     { id: 'smallOut', job: 'stock', text: 'Put small planks in recycle bin', recycles: { kind: ['plank'], size: ['s'] } },
     { id: 'largeOut', job: 'stock', text: 'Put large planks in recycle bin', recycles: { kind: ['plank'], size: ['l'] } },
     { id: 'roughOut', job: 'stock', text: 'Put gnarled planks in recycle bin', recycles: { kind: ['rough'] } },
     { id: 'delay', job: null, text: 'Wait between tasks', wait: true, start: true }
   ];
-  const RULE = {};
-  RULES.forEach(q => { RULE[q.id] = q; });
+  const RULE = {}, ONLY = {};
+  RULES.forEach(q => { RULE[q.id] = q; if (q.only) ONLY[q.only] = q.id; });
   // the instructions on the list before any mistake: the delay (the CD, 2026-10-16)
   function startSeen() { const o = {}; RULES.forEach(q => { if (q.start) o[q.id] = true; }); return o; }
   const matches = (m, id) => !!m && (!m.quality || m.quality.indexOf(kindOf(id)) >= 0) && (!m.kind || m.kind.indexOf(kindOf(id)) >= 0) && (!m.size || m.size.indexOf(sizeOf(id)) >= 0);
@@ -796,8 +804,21 @@ const FACTORY = (function () {
   // the instructions that would have kept a log out of the planer (the look-alikes aside): these
   // join the list when an operator cuts it, or jams the planer with it
   const keepers = log => RULES.filter(q => q.job === 'operate' && !q.joins && rejectsLog(q, log)).map(q => q.id);
-  // each job's base prompt, shown above a robot's own instructions
-  const BASE = { operate: 'Use the planer to refine raw materials.', stock: 'Stock the sales counter with the items in this bin.' };
+  // each job's base prompt, shown above a robot's own instructions. Every stall's robot gets the
+  // same one (the CD, 2026-10-16); the wording for the three slots' robots is assumed
+  const BASE = { operate: 'Use the planer to refine raw materials.', stock: 'Stock the sales counter with the items in this bin.',
+    saw: 'Use the table saw to cut planks.', extract: 'Use the sap extractor to take the sap out of sap logs.', carve: 'Carve gnarled wood into decorative pieces at the bench.' };
+  // the jobs (the CD, 2026-10-16): the planer, one for each stall ('stock:0' stocks the first), and
+  // slots 02 to 04. A robot with no job rests (null)
+  const SLOT_JOBS = ['saw', 'extract', 'carve'];
+  const jobKind = j => typeof j === 'string' ? j.split(':')[0] : null;
+  const stallOfJob = j => jobKind(j) === 'stock' ? +j.split(':')[1] : -1;
+  // which output bin a stall's robot fetches its thing from: planks the planer's, cuts the saw's,
+  // sap the extractor's (null: nothing set, or nothing a machine makes)
+  function srcOf(item) {
+    const k = kindOf(item);
+    return k === 'plank' ? 'bin' : CUTS.indexOf(k) >= 0 ? 'sawOut' : k === 'sap' ? 'extractOut' : null;
+  }
 
   /* ---------- the floor (metres; x right, y toward the camera, z up) ---------- */
   // From the back: the wall; the shop, where customers come in through a door on the left and
@@ -827,7 +848,12 @@ const FACTORY = (function () {
     benchIn: [0.3, 12.35, 1.1, 13.25], bench: [1.8, 12.35, 3.9, 13.15], benchOut: [4.4, 12.35, 5.2, 13.25],
     dockPanel: [0.4, 15.2, 2.8, 15.5]
   };
-  const CRATES = [[0.65, 15.7, 1.35, 16.4], [1.85, 15.7, 2.55, 16.4]];
+  // the robot dock: eight crates in two rows of four in front of its panel (2026-10-16), each a
+  // robot's until it is hired and its charging pad after; a cell of floor between any two, so a robot
+  // unpacked anywhere can walk out whoever else is still in a crate. The panel stands where it always
+  // did, low enough on the floor not to hide slot 04's painted number
+  const r2 = v => Math.round(v * 100) / 100;
+  const CRATES = [0, 1, 2, 3, 4, 5, 6, 7].map(i => { const x = r2(0.55 + 1.2 * (i % 4)), y = i < 4 ? 15.7 : 16.95; return [x, y, r2(x + 0.6), r2(y + 0.6)]; });
   const N = -Math.PI / 2, E = 0, S = Math.PI / 2;
   const SPOT = {
     start: { x: 3.0, y: 6.1, face: S },
@@ -842,14 +868,26 @@ const FACTORY = (function () {
     sawIn: { x: 0.58, y: ROW.saw + 0.95, face: N }, saw: { x: 2.9, y: ROW.saw + 1.25, face: N }, sawOut: { x: 4.45, y: ROW.saw + 0.95, face: N },
     extractIn: { x: 0.58, y: ROW.extract + 0.95, face: N }, extract: { x: 2.9, y: ROW.extract + 1.25, face: N }, extractOut: { x: 4.45, y: ROW.extract + 0.95, face: N },
     benchIn: { x: 0.7, y: 13.7, face: N }, bench: { x: 2.85, y: 13.6, face: N }, benchOut: { x: 4.8, y: 13.7, face: N },
-    dock: { x: 1.6, y: 17.35, face: N },
-    rest: [{ x: 1.0, y: 16.05, face: S }, { x: 2.2, y: 16.05, face: S }]
+    dock: { x: 2.65, y: 16.7, face: N },          // in the aisle between the dock's two rows of crates
+    rest: CRATES.map(c => ({ x: r2((c[0] + c[2]) / 2), y: r2((c[1] + c[3]) / 2), face: S })),
+    // a robot on slots 02 to 04 stands west of where you do
+    sawBot: { x: 2.15, y: ROW.saw + 1.2, face: N }, extractBot: { x: 2.15, y: ROW.extract + 1.2, face: N }, benchBot: { x: 2.1, y: 13.6, face: N }
   };
   // the counter's four stalls, east to west: the first where the one stall always stood, each of
   // the others 1.35 m further west. You stock one standing just east of it on the walkway
   const STALLS = [0, 1, 2, 3].map(i => ({ x0: Math.round((4.15 - 1.35 * i) * 100) / 100, x1: Math.round((5.45 - 1.35 * i) * 100) / 100, y0: 1.75, y1: 2.2, z: 0.75 }));
   const STALL = STALLS[0];
   SPOT.stalls = STALLS.map((q, i) => i ? { x: q.x1 + 0.15, y: SPOT.counter.y, face: N } : SPOT.counter);
+  // ...and its robot just inside its west end (the first stall's where the stocker always stood)
+  SPOT.stallBots = STALLS.map((q, i) => i ? { x: r2(q.x0 + 0.35), y: 2.85, face: N } : SPOT.stock);
+  // where each stall's robot stands at the output bin its thing comes out of: the first stall's at the
+  // planer's is where it always stood (the bin behind, the stall in front); the others along the
+  // planer's bin on the walkway side, and along the saw's and the extractor's from the floor
+  SPOT.fetch = {
+    bin: [SPOT.stock, { x: 4.2, y: 3.0, face: S }, { x: 4.6, y: 3.0, face: S }, { x: 5.0, y: 3.0, face: S }],
+    sawOut: [0, 1, 2, 3].map(i => ({ x: r2(4.0 + 0.3 * i), y: ROW.saw + 0.95, face: N })),
+    extractOut: [0, 1, 2, 3].map(i => ({ x: r2(4.0 + 0.3 * i), y: ROW.extract + 0.95, face: N }))
+  };
   // the shop, three rows deep (assumed, 2026-10-16): a customer waits at the counter across from
   // its stall (`places`, on `lineY`), one at each stall; anyone whose stall already has someone
   // there waits in one line along the back wall (`backY`), its head at x0 behind the first stall
@@ -875,7 +913,7 @@ const FACTORY = (function () {
       belt: [], bin: [],            // the planer's out-feed and its output bin
       recycle: [],                  // everything in the recycle bin, newest last
       saw: newMill(), extract: newMill(),
-      bench: { in: [], out: [], item: null, t: 0, design: null },
+      bench: { in: [], out: [], item: null, t: 0, design: null, by: null },   // by: who is carving it
       // the counter's stalls: the first bought from the start and selling medium planks
       stalls: STALLS.map((q, i) => ({ bought: !i, want: i ? null : CFG.stalls.start, stock: [] })),
       shop: { people: [], next: CFG.shop.first, n: 0, served: 0, wrong: 0 },
@@ -927,7 +965,7 @@ const FACTORY = (function () {
     ev(s, 'rule', { id: fresh[0], ids: fresh, by });
   }
   function known(s) { return RULES.filter(q => s.seen[q.id]); }
-  function slotsOpen(s) { return s.hired >= CFG.hire.length; }
+  function slotsOpen(s) { return s.hired >= CFG.slotsAt; }
   function slotPrice(s, id) { const r = s.robots[id]; return r && r.slots < CFG.slots.length ? CFG.slots[r.slots] : null; }
   function buySlot(s, id) {
     const r = s.robots[id], p = slotPrice(s, id);
@@ -958,6 +996,15 @@ const FACTORY = (function () {
     if (!r || typeof sec !== 'number' || !Number.isInteger(sec) || sec < W.min || sec > W.max) return false;
     r.wait = sec;
     ev(s, 'waitset', { id, wait: sec });
+    return true;
+  }
+  // the cut a robot makes when it runs the table saw, set on its page (the CD, 2026-10-16): one of
+  // the three, kept whatever its job
+  function setCut(s, id, cut) {
+    const r = s.robots[id];
+    if (!r || CUTS.indexOf(cut) < 0) return false;
+    r.cut = cut;
+    ev(s, 'cutset', { id, cut });
     return true;
   }
   function rename(s, id, name) {
@@ -1103,12 +1150,17 @@ const FACTORY = (function () {
 
   /* ---------- the planer (slot 01, once machine01) ---------- */
   // How each thing a robot does is graded in its evals (the CD, fourth brief): red only for a
-  // blocker (a jam) or a hit to customer satisfaction (anything but a medium plank put in the
-  // medium plank stall); anything unexpected or wasteful yellow; the rest green. A key is the
-  // action, then ':' and the thing it was done to; a trailing '!' means it was done against the
-  // robot's own instructions (it slipped), which turns a green action yellow and leaves red red.
+  // blocker (a jam) or a hit to customer satisfaction (anything but a stall's thing put in the
+  // stall); anything unexpected or wasteful yellow; the rest green. A key is the action, then ':'
+  // and the thing it was done to; a trailing '!' means it was done against the robot's own
+  // instructions (it slipped), which turns a green action yellow and leaves red red. Since the four
+  // stalls (2026-10-16) a stall's robot names what it stocked ('stock:plank.l'), what it put in
+  // which stall ('misstock:plank.s@plank.l') and what it was looking for ('looking:sap'); a save's
+  // older keys ('stock', 'misstock:plank.s', 'looking') were the medium plank stall's. The three
+  // slots' robots make no mistakes yet (the CD): a run of the saw or the extractor, a carving
   const GRADE = { plank: 'good', think: 'soso', cut: 'soso', jam: 'bad', reject: 'good', caught: 'good',
-    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' };
+    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good',
+    sawn: 'good', extracted: 'good', carved: 'good' };
   function gradeOf(key) {
     const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
     return against && g === 'good' ? 'soso' : g;
@@ -1249,7 +1301,8 @@ const FACTORY = (function () {
         const outs = millOut(key, m);
         outs.forEach((item, i) => m.belt.push({ item, t: -i * 0.3 }));   // one after another down the out-feed
         if (m.by === 'player') s.tally.player[key === 'saw' ? 'sawn' : 'extracted']++;
-        ev(s, 'milled', { at: key, item: m.item, outs });
+        else credit(s, m.by, (key === 'saw' ? 'sawn:' : 'extracted:') + m.item);   // a robot's (credit() ignores anyone else)
+        ev(s, 'milled', { at: key, item: m.item, outs, by: m.by });
         m.phase = 'idle'; m.t = 0; m.item = null; m.cut = null; m.by = null;
       }
     }
@@ -1433,10 +1486,12 @@ const FACTORY = (function () {
     const a = s.avatar;
     a.act = canMill(s, key) ? { kind: 'press', t: 0, on: key, cut: cut || null, done: false } : null;
   }
-  // the bench: carve the first piece of gnarled wood in its input bin into something to keep
+  // the bench: carve the first piece of gnarled wood in its input bin into something to keep. One
+  // pair of hands at a time: you do not carve while a robot is carving, nor it while you are
+  const robotCarving = s => s.robots.some(r => r.job === 'carve' && r.state === 'carve');
   function carve(s) {
     const b = s.bench;
-    s.avatar.act = b.item || b.in.length ? { kind: 'carve', t: 0 } : null;
+    s.avatar.act = (b.item || b.in.length) && !robotCarving(s) ? { kind: 'carve', t: 0 } : null;
   }
   function stepAvatar(s, dt) {
     const a = s.avatar;
@@ -1488,16 +1543,17 @@ const FACTORY = (function () {
         if (k.t >= CFG.stockSec) a.act = null;
       } else if (k.kind === 'carve') {
         const b = s.bench;
+        if (robotCarving(s)) { a.act = null; return; }
         if (!b.item) {
           if (!b.in.length) { a.act = null; return; }
           b.item = b.in.shift(); b.t = 0; b.design = roll(s, 'carve', DESIGNS.map(d => [d, 1 / DESIGNS.length]), DESIGNS[DESIGNS.length - 1]);
         }
-        b.t += dt;
+        b.by = 'player'; b.t += dt;
         if (b.t >= CFG.carveSec) {
           const made = 'carving.' + b.design;
           b.out.push(made); s.tally.player.carved++;
-          ev(s, 'carved', { from: b.item, item: made });
-          b.item = null; b.t = 0; b.design = null; a.act = null;
+          ev(s, 'carved', { from: b.item, item: made, by: 'player' });
+          b.item = null; b.t = 0; b.design = null; b.by = null; a.act = null;
         }
       } else if (k.t >= (k.dur || 0.3)) a.act = null;
       return;
@@ -1509,22 +1565,45 @@ const FACTORY = (function () {
   function newRobot(s) {
     const i = s.robots.length, r = SPOT.rest[i];
     return { id: i, name: CFG.names[i], x: r.x, y: r.y, yawT: r.face, path: [], dist: 0, job: null, state: 'unbox', t: 0,
-      goal: null, think: false, check: false, hunt: null, carry: null, mood: null, moodT: 0,
-      against: false, outSlip: false, huntSlip: false, wait: CFG.wait.start,
+      goal: null, think: false, check: false, hunt: null, carry: null, src: null, mood: null, moodT: 0,
+      against: false, outSlip: false, huntSlip: false, wait: CFG.wait.start, cut: CUTS[0],
       slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {}, since: s.t };
   }
-  function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'stock' ? SPOT.stock : SPOT.rest[r.id]; }
-  // a robot taken off a job lets go of what the job had it holding (back in the bin it came from)
+  // where a robot waits for work: at the planer's button, at its slot, at the output bin its stall's
+  // thing comes out of (or, with nothing set to sell, at its stall), or on its charging pad
+  function homeOf(s, r) {
+    switch (jobKind(r.job)) {
+      case 'operate': return SPOT.operate;
+      case 'saw': return SPOT.sawBot;
+      case 'extract': return SPOT.extractBot;
+      case 'carve': return SPOT.benchBot;
+      case 'stock': { const i = stallOfJob(r.job), src = srcOf(s.stalls[i].want); return src ? SPOT.fetch[src][i] : SPOT.stallBots[i]; }
+    }
+    return SPOT.rest[r.id];
+  }
+  // a robot taken off a job lets go of what the job had it holding (back in the bin it came from;
+  // a carving it was at stays on the bench for whoever comes next)
   function release(s, r) {
-    if (r.carry) s.bin.unshift(r.carry);
-    r.carry = null; r.think = false; r.check = false; r.hunt = null; r.against = false; r.outSlip = false; r.huntSlip = false;
+    if (r.carry) store(s, r.src || 'bin').unshift(r.carry);
+    if (s.bench.by === r.id) s.bench.by = null;
+    r.carry = null; r.src = null; r.think = false; r.check = false; r.hunt = null; r.against = false; r.outSlip = false; r.huntSlip = false;
     r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;
+  }
+  // a robot's walk to a spot on its job: true once it is there (at once if it already is). A path
+  // left over from another walk (a robot counts as home within 0.06 m, path unfinished) is replanned
+  function go(s, r, spot, dt) {
+    if (dist(r, spot) > 0.06) {
+      if (!r.path.length || dist(r.path[r.path.length - 1], spot) > 0.15) r.path = path(s, r, spot);
+      if (!moveAlong(r, dt, CFG.robotSpeed) && r.path.length) return false;
+    }
+    r.x = spot.x; r.y = spot.y; r.path = [];
+    return true;
   }
   function stepRobot(s, r, dt) {
     if (r.moodT > 0) r.moodT = Math.max(0, r.moodT - dt);
     if (r.state === 'unbox') { r.t += dt; if (r.t >= CFG.unboxSec) { r.state = 'idle'; r.t = 0; } return; }
     if (r.state === 'idle' || r.state === 'move') {
-      const home = homeOf(s, r), key = r.job || 'rest';
+      const home = homeOf(s, r), key = (r.job || 'rest') + '@' + home.x + ',' + home.y;
       if (dist(r, home) > 0.06) {
         if (r.goal !== key || (!r.path.length && r.state !== 'move')) { r.path = path(s, r, home); r.goal = key; }
         r.state = 'move';
@@ -1534,8 +1613,12 @@ const FACTORY = (function () {
       if (r.state === 'move') { r.state = 'idle'; r.t = 0; }
       r.yawT = home.face; r.goal = key;
     }
-    if (r.job === 'operate') operate(s, r, dt);
-    else if (r.job === 'stock') stocker(s, r, dt);
+    switch (jobKind(r.job)) {
+      case 'operate': operate(s, r, dt); break;
+      case 'stock': stocker(s, r, dt); break;
+      case 'saw': case 'extract': miller(s, r, dt, r.job); break;
+      case 'carve': carver(s, r, dt); break;
+    }
   }
   // the operator's turn at the planer: look at the log (one it holds an instruction about goes in
   // the recycle bin; each such instruction gets its own chance to be followed), then (perhaps) a
@@ -1602,76 +1685,82 @@ const FACTORY = (function () {
   // waiting between tasks: r.wait is read every step, so a shorter wait set mid-pause ends it
   // sooner, and taking the instruction out of its slot ends it at once
   function pause(r, dt) { r.t += dt; if (r.t >= r.wait || !has(r, 'delay')) { r.state = 'idle'; r.t = 0; } }
-  // the stocker's turn between the planer's output bin and the stall: "stock the sales counter with
-  // the items in this bin" (the CD, 2026-10-15). Without an instruction it takes the next thing and
-  // puts it in the stall, whatever it is (a red mark in its evals for anything but a medium plank:
-  // a customer will pay for a medium plank and get it). Told to stock only medium planks, it hunts
-  // for one through each stocking (deciding once, so a slip is 1 stocking in 20): every reach turns
-  // one up with the chance medium planks / everything in the bin, and one that turns up something
-  // else picks it in proportion to what is there. Whatever it turns up that it holds a recycle
-  // instruction for goes in the recycle bin; anything else turned up on a hunt goes back, a
-  // "looking for plank".
+  // a stall's robot: "stock the sales counter with the items in this bin" (the CD, 2026-10-15), the
+  // same prompt for every stall (2026-10-16). It waits at the output bin its stall's thing comes out
+  // of, reaches in, carries what it takes to its stall and puts it in (the first stall's robot does
+  // all of it standing where the stocker always stood, the bin behind it and the stall in front).
+  // Without an instruction it takes the next thing, whatever it is, and puts it in the stall (a red
+  // mark in its evals for anything but the stall's thing: a customer will pay for that and get
+  // this). Told "Only stock X" for its stall's X, it hunts for one through each stocking (deciding
+  // once, so a slip is 1 stocking in 20): every reach turns one up with the chance Xs / everything in
+  // the bin, and one that turns up something else picks it in proportion to what is there. Whatever
+  // it turns up that it holds a recycle instruction for goes in the recycle bin (never the stall's
+  // own thing); anything else turned up on a hunt goes back, a "looking for X". An "Only stock" for
+  // another thing is never consulted, so it does nothing.
   function stocker(s, r, dt) {
-    const st = s.stalls[0];
+    const i = stallOfJob(r.job), st = s.stalls[i], want = st.want, src = srcOf(want), from = src ? store(s, src) : [];
     switch (r.state) {
       case 'idle':
-        if (s.bin.length && room(s, 0) > 0) { r.state = 'reach'; r.t = 0; }
+        if (from.length && room(s, i) > 0) { r.state = 'reach'; r.t = 0; }
         return;
       case 'reach': {
         r.yawT = S; r.t += dt;
         if (r.t < CFG.reachSec) return;
-        if (!s.bin.length) { r.state = 'idle'; return; }
-        if (r.hunt === null) { r.hunt = follows(s, r, 'stockOnly'); r.huntSlip = has(r, 'stockOnly') && !r.hunt; }
-        const want = st.want;
+        if (!from.length) { r.state = 'idle'; return; }
+        const only = ONLY[want];
+        if (r.hunt === null) { r.hunt = follows(s, r, only); r.huntSlip = has(r, only) && !r.hunt; }
         let at = 0;
         if (r.hunt) {
-          const hits = count(s.bin, want);
-          if (hits && chance(s, 'find', hits / s.bin.length)) at = s.bin.indexOf(want);
+          const hits = count(from, want);
+          if (hits && chance(s, 'find', hits / from.length)) at = from.indexOf(want);
           else {
-            const kinds = ITEMS.filter(k => k !== want && s.bin.indexOf(k) >= 0), n = s.bin.length - hits;
-            at = s.bin.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, count(s.bin, k) / n]), kinds[kinds.length - 1]) : kinds[0]);
+            const kinds = ITEMS.filter(k => k !== want && from.indexOf(k) >= 0), n = from.length - hits;
+            at = from.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, count(from, k) / n]), kinds[kinds.length - 1]) : kinds[0]);
           }
         }
-        const kind = s.bin[at];
+        const kind = from[at];
         r.against = false;
-        const out = RULES.find(q => q.recycles && recyclesItem(q, kind));
+        const out = kind !== want && RULES.find(q => q.recycles && recyclesItem(q, kind));
         if (out && !has(r, out.id)) see(s, out.id, r.id);
         else if (out) {
-          if (follows(s, r, out.id)) { r.carry = s.bin.splice(at, 1)[0]; r.state = 'drop'; r.t = 0; return; }
+          if (follows(s, r, out.id)) { r.carry = from.splice(at, 1)[0]; r.src = src; r.state = 'drop'; r.t = 0; return; }
           r.against = true;   // it slipped: the thing stays in its hands
         }
         if (r.hunt && kind !== want) {
-          note(r, 'looking' + (r.against ? '!' : ''));
-          ev(s, 'looking', { by: r.id, of: s.bin.length, item: kind });
+          note(r, 'looking:' + want + (r.against ? '!' : ''));
+          ev(s, 'looking', { by: r.id, of: from.length, item: kind, want, at: i });
           r.state = 'look'; r.t = 0;
           return;
         }
         if (kind !== want && r.huntSlip) r.against = true;
         r.hunt = null;
-        r.carry = s.bin.splice(at, 1)[0];
-        r.state = 'place'; r.t = 0;
+        r.carry = from.splice(at, 1)[0]; r.src = src;
+        r.state = dist(r, SPOT.stallBots[i]) > 0.06 ? 'carry' : 'place'; r.t = 0;
         return;
       }
-      case 'look':   // what it turned up was not a medium plank: back it goes, and it reaches again
+      case 'look':   // what it turned up was not its thing: back it goes, and it reaches again
         r.yawT = S; r.t += dt;
         if (r.t >= CFG.lookSec) { r.state = 'idle'; r.t = 0; }
         return;
-      case 'drop':   // over the out-feed into the recycle bin
+      case 'drop':   // into the recycle bin (from the planer's output bin, over the out-feed)
         r.yawT = 2.0; r.t += dt;
         if (r.t >= CFG.tossSec) {
           recycle(s, r.carry, r.id, 'robot'); credit(s, r.id, 'recycle:' + r.carry);
-          r.carry = null; r.state = 'cool'; r.t = 0;
+          r.carry = null; r.src = null; r.state = 'cool'; r.t = 0;
         }
+        return;
+      case 'carry':   // across the floor to its stall
+        if (go(s, r, SPOT.stallBots[i], dt)) { r.state = 'place'; r.t = 0; }
         return;
       case 'place':   // into the stall, once there is room in it
         r.yawT = N; r.t += dt;
-        if (r.t >= CFG.placeSec && room(s, 0) > 0) {
-          const item = r.carry, right = item === st.want;
+        if (r.t >= CFG.placeSec && room(s, i) > 0) {
+          const item = r.carry, right = item === want;
           st.stock.push({ item, by: r.id });
-          ev(s, 'stocked', { by: r.id, item, n: 1, at: 0 });
-          if (!right) see(s, 'stockOnly', r.id);
-          credit(s, r.id, right ? 'stock' : 'misstock:' + item, r.against);
-          r.carry = null; r.against = false; r.state = 'cool'; r.t = 0;
+          ev(s, 'stocked', { by: r.id, item, n: 1, at: i });
+          if (!right) see(s, ONLY[want], r.id);
+          credit(s, r.id, right ? 'stock:' + item : 'misstock:' + item + '@' + want, r.against);
+          r.carry = null; r.src = null; r.against = false; r.state = 'cool'; r.t = 0;
         }
         return;
       case 'cool':   // a thing out of the bin and stocked or recycled: one iteration (a look is not one)
@@ -1682,10 +1771,62 @@ const FACTORY = (function () {
         return;
     }
   }
+  // a robot on slot 02 or 03 (the CD, 2026-10-16: "nothing yet" goes wrong there): whenever the
+  // machine is idle with something in its input bin, it presses it on the first thing there, the
+  // table saw making the cut set on its page. One press, one iteration; no instruction but the delay
+  function miller(s, r, dt, key) {
+    const m = s[key];
+    switch (r.state) {
+      case 'idle':
+        if (canMill(s, key)) { r.state = 'press'; r.t = 0; }
+        return;
+      case 'press':
+        r.yawT = N; r.t += dt;
+        if (r.t >= CFG.pressSec) { r.state = startMill(s, key, r.cut, r.id) ? 'wait' : 'idle'; r.t = 0; }
+        return;
+      case 'wait':   // the run is out (the machine is someone else's again): that thing has been handled
+        if (m.phase !== 'run' || m.by !== r.id) done(s, r);
+        return;
+      case 'pause':
+        pause(r, dt);
+        return;
+    }
+  }
+  // a robot at the bench, slot 04: it carves the first piece of gnarled wood in the input bin into a
+  // carving (the design rolled, as yours is), one after another; never while you are carving, and a
+  // carving left half done on the bench it finishes. One carving, one iteration
+  function carver(s, r, dt) {
+    const b = s.bench, yours = s.avatar.act && s.avatar.act.kind === 'carve';
+    switch (r.state) {
+      case 'idle':
+        if ((b.item || b.in.length) && !yours) { r.state = 'carve'; r.t = 0; }
+        return;
+      case 'carve': {
+        r.yawT = N;
+        if (yours || (!b.item && !b.in.length)) { r.state = 'idle'; return; }
+        if (!b.item) { b.item = b.in.shift(); b.t = 0; b.design = roll(s, 'carve', DESIGNS.map(d => [d, 1 / DESIGNS.length]), DESIGNS[DESIGNS.length - 1]); }
+        b.by = r.id; b.t += dt;
+        if (b.t >= CFG.carveSec) {
+          const made = 'carving.' + b.design;
+          b.out.push(made);
+          ev(s, 'carved', { from: b.item, item: made, by: r.id });
+          credit(s, r.id, 'carved:' + made);
+          b.item = null; b.t = 0; b.design = null; b.by = null;
+          done(s, r);
+        }
+        return;
+      }
+      case 'pause':
+        pause(r, dt);
+        return;
+    }
+  }
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
-  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'place', 'cool', 'pause'];
+  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'carry', 'place', 'cool', 'pause', 'carve'];
   const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m' };
+  // the jobs a robot can be given now: the planer, a stall's for each stall bought, slots 02 to 04
+  const jobsOpen = s => ['operate'].concat(s.stalls.map((st, i) => st.bought ? 'stock:' + i : null).filter(Boolean), SLOT_JOBS);
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
     if (!b || !a.task || !a.task.arrived || a.path.length) return null;
@@ -1714,14 +1855,11 @@ const FACTORY = (function () {
       if (!st.bought) { const p = stallPrice(s); return [{ id: 'buystall', icon: 'stall', price: p, enabled: p !== null && s.money >= p }]; }
       return SELLS.map(item => ({ id: 'sell:' + item, icon: 'sell', item, price: paid(s, item), on: st.want === item, enabled: true }));
     }
-    if (b.kind === 'robot') {
+    if (b.kind === 'robot') {   // its jobs: the planer, each stall bought, slots 02 to 04; rest; its page
       const r = s.robots[b.id];
-      return [
-        { id: 'job:operate', icon: 'button', enabled: true, on: r.job === 'operate' },
-        { id: 'job:stock', icon: 'stock', enabled: true, on: r.job === 'stock' },
-        { id: 'job:rest', icon: 'rest', enabled: true, on: r.job === null },
-        { id: 'notes', icon: 'notes', enabled: true, filled: r.rules.filter(Boolean).length, slots: r.slots }
-      ];
+      return jobsOpen(s).map(j => ({ id: 'job:' + j, icon: j === 'operate' ? 'button' : jobKind(j), i: jobKind(j) === 'stock' ? stallOfJob(j) : undefined, enabled: true, on: r.job === j }))
+        .concat([{ id: 'job:rest', icon: 'rest', enabled: true, on: r.job === null },
+          { id: 'notes', icon: 'notes', enabled: true, filled: r.rules.filter(Boolean).length, slots: r.slots }]);
     }
     return [];
   }
@@ -1766,6 +1904,8 @@ const FACTORY = (function () {
       // and you stock it with what you carry of the new thing, as a tap on it would
       const st = s.stalls[b.i], item = id.slice(5);
       if (st.want === item) return true;
+      // its robot drops what it was fetching for the old thing (back in that bin) and starts over
+      s.robots.forEach(r => { if (r.job === 'stock:' + b.i && (r.carry || r.hunt !== null || r.state === 'reach')) release(s, r); });
       const back = st.stock.splice(0).map(g => g.item);
       a.inv.push.apply(a.inv, back);
       ev(s, 'stallset', { i: b.i, item, was: st.want, back });
@@ -1844,7 +1984,7 @@ const FACTORY = (function () {
         m.t = Math.max(0, +m.t || 0);
         s[key] = m;
       });
-      const b = Object.assign({ in: [], out: [], item: null, t: 0, design: null }, d.bench && typeof d.bench === 'object' ? d.bench : {});
+      const b = Object.assign({ in: [], out: [], item: null, t: 0, design: null, by: null }, d.bench && typeof d.bench === 'object' ? d.bench : {});
       b.in = items(b.in, ACCEPTS.benchIn); b.out = items(b.out);
       if (!isItem(b.item) || !ACCEPTS.benchIn(b.item) || DESIGNS.indexOf(b.design) < 0) { b.item = null; b.design = null; b.t = 0; }
       b.t = Math.max(0, Math.min(CFG.carveSec, +b.t || 0));
@@ -1868,6 +2008,7 @@ const FACTORY = (function () {
       s.hired = s.robots.length;
       s.seen = startSeen();   // a save from before the delay gets it on the list too
       Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true && RULE[k]) s.seen[k] = true; });
+      const jobs = jobsOpen(s), taken = {};
       s.robots.forEach((r, i) => {
         r.id = i;
         r.name = typeof r.name === 'string' && r.name.trim() ? r.name.trim().slice(0, CFG.nameMax) : CFG.names[i];
@@ -1879,7 +2020,11 @@ const FACTORY = (function () {
           if (id) s.seen[id] = true;   // an instruction a robot holds has been seen
         }
         r.rules = rules;
-        if (r.job !== 'operate' && r.job !== 'stock') r.job = null;
+        if (r.job === 'stock') r.job = 'stock:0';   // a save from before the four stalls: its stocker stocks the first
+        if (jobs.indexOf(r.job) < 0 || taken[r.job]) r.job = null;   // one robot to a job
+        if (r.job) taken[r.job] = true;
+        if (CUTS.indexOf(r.cut) < 0) r.cut = CUTS[0];
+        if (OUTS.indexOf(r.src) < 0) r.src = null;
         r.record = r.record && typeof r.record === 'object' ? r.record : {};
         r.tally = r.tally && typeof r.tally === 'object' ? { good: r.tally.good | 0, soso: r.tally.soso | 0, bad: r.tally.bad | 0 } : { good: 0, soso: 0, bad: 0 };
         r.since = Number.isFinite(+r.since) ? Math.min(+r.since, s.t) : 0;
@@ -1889,8 +2034,11 @@ const FACTORY = (function () {
         r.t = typeof r.t === 'number' && Number.isFinite(r.t) ? Math.max(0, r.t) : 0;
         if (!isItem(r.carry)) r.carry = null;
         if (typeof r.hunt !== 'boolean') r.hunt = null;
-        if (STATES.indexOf(r.state) < 0 || ((r.state === 'drop' || r.state === 'place') && !r.carry)) release(s, r);
+        if (r.carry && !r.src) r.src = 'bin';
+        if (STATES.indexOf(r.state) < 0 || ((r.state === 'drop' || r.state === 'place' || r.state === 'carry') && !r.carry)) release(s, r);
       });
+      const bb = s.bench.by;
+      s.bench.by = s.bench.item && (bb === 'player' || (typeof bb === 'number' && s.robots[bb])) ? bb : null;
       const m = s.machine;
       if (LOGS.indexOf(m.log) < 0) m.log = 'log.m';
       m.mine = !!m.mine && kindOf(m.log) === 'log';
@@ -1915,8 +2063,9 @@ const FACTORY = (function () {
     } catch (e) { return null; }
   }
 
-  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, SELLS, RULES, BASE, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, keepers,
-    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, stallPrice, openStalls, known, slotsOpen, slotPrice, buySlot, setRule, setWait, rename,
+  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, SELLS, RULES, ONLY, BASE, SLOT_JOBS, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, keepers,
+    jobKind, stallOfJob, srcOf, jobsOpen, homeOf,
+    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, stallPrice, openStalls, known, slotsOpen, slotPrice, buySlot, setRule, setWait, setCut, rename,
     resetEvals, ready, canMill, store, waitingNow, kindsIn, SAMPLE, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
 if (typeof module !== 'undefined') module.exports = FACTORY;
@@ -4059,7 +4208,9 @@ const MODE = (function () {
       if (o.price !== undefined && o.price !== null) label = '$' + o.price;
       if (o.id === 'notes' && o.slots) label = o.filled + '/' + o.slots;
       if (o.soldOut) label = 'sold out';
-      aria = { 'job:operate': 'Run the planer', 'job:stock': 'Stock the sales counter', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions' }[o.id] || '';
+      aria = { 'job:operate': 'Run the planer', 'job:saw': 'Run the table saw', 'job:extract': 'Run the sap extractor', 'job:carve': 'Carve at the bench', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions' }[o.id] || '';
+      if (o.icon === 'stock') { aria = 'Stock stall ' + (o.i + 1); label = String(o.i + 1); }
+      if (!inner) inner = ICON.button;   // (until the slots' robots have pictures of their own)
     }
     return '<button class="fx-opt' + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + esc(aria) + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
   }
@@ -4141,7 +4292,16 @@ const MODE = (function () {
     scoreEl.textContent = 'Money ' + cash(s.money) + '. Customer satisfaction ' + v + '%. Goal: ' + goalText() + '.';
   }
   const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-  const JOB_NAME = j => j === 'operate' ? 'on the planer' : j === 'stock' ? 'stocking the counter' : 'resting';
+  const JOB_NAME = j => {
+    switch (F.jobKind(j)) {
+      case 'operate': return 'on the planer';
+      case 'stock': return 'stocking stall ' + (F.stallOfJob(j) + 1);
+      case 'saw': return 'on the table saw';
+      case 'extract': return 'on the sap extractor';
+      case 'carve': return 'at the bench';
+    }
+    return 'resting';
+  };
   const money$ = list => list.map(n => '$' + n).join(', ').replace(/, ([^,]*)$/, ' and $1');
   function renderPanel() {
     const pct = v => Math.round(v * 100) + '%', Z = C.logs.size, Q = C.logs.quality, P = C.price, T = s.tally.player;
@@ -4186,9 +4346,10 @@ const MODE = (function () {
     cut: x => 'Cut ' + NAME(x) + ': ' + NAME(F.makes(x)), jam: x => 'Fed in ' + NAME(x) + ': a jam',
     reject: x => 'Put ' + NAME(x) + ' in the recycle bin',
     caught: x => 'Caught ' + NAME(x) + ' at the exit: into the recycle bin',
-    stock: () => 'Put a medium plank in the stall',
-    misstock: x => 'Put ' + NAME(x) + ' in the medium plank stall',
-    looking: () => 'Looking for plank',
+    stock: x => 'Put ' + (x ? NAME(x) : 'a medium plank') + ' in the stall',
+    misstock: x => { const w = String(x).split('@'); return 'Put ' + NAME(w[0]) + ' in the ' + (w[1] ? NAME(w[1]).replace(/^(a|two|four|sixteen) /, '').replace(/s$/, '') : 'medium plank') + ' stall'; },
+    looking: x => 'Looking for ' + (x ? NAME(x) : 'plank'),
+    sawn: x => 'Cut ' + NAME(x), extracted: x => 'Took the sap out of ' + NAME(x), carved: x => 'Carved ' + NAME(x),
     recycle: x => 'Put ' + NAME(x) + ' in the recycle bin',
     waited: () => 'Waited between tasks', straight: () => 'Went straight on'
   };
@@ -4239,7 +4400,7 @@ const MODE = (function () {
     if (!r || !panelBody.querySelector('[data-part]')) return;
     const price = F.slotPrice(s, r.id), open = F.slotsOpen(s), known = F.known(s);
     // its base prompt and its slots
-    const base = F.BASE[r.job];
+    const base = F.BASE[F.jobKind(r.job)];
     let h = '<div class="fx-sec"><div class="fx-h"><span>Base prompt</span><span>' + JOB_NAME(r.job) + '</span></div>' +
       '<div class="fx-base' + (base ? '' : ' none') + '">' + (base ? esc(base) : 'No job, so no base prompt.') + '</div></div>';
     h += '<div class="fx-sec"><div class="fx-h"><span>Instructions</span><span>' + r.rules.filter(Boolean).length + ' of ' + r.slots + ' slots</span></div><ol class="fx-slots">';
@@ -4254,7 +4415,7 @@ const MODE = (function () {
           '<button class="fx-step" data-panel="wait:1" aria-label="One second more"' + (r.wait >= C.wait.max ? ' disabled' : '') + '>+</button><output for="fx-wait">' + r.wait + ' s</output></div>';
       } else if (k === r.slots) {
         const can = open && s.money >= C.slots[k];
-        h += '<button class="fx-slot buy" data-panel="buy"' + (can ? '' : ' disabled') + '>' + (open ? 'Unlock this slot: $' + C.slots[k] : '$' + C.slots[k] + ' once both robots are on staff') + '</button>';
+        h += '<button class="fx-slot buy" data-panel="buy"' + (can ? '' : ' disabled') + '>' + (open ? 'Unlock this slot: $' + C.slots[k] : '$' + C.slots[k] + ' once two robots are on staff') + '</button>';
       } else h += '<span class="fx-slot locked">$' + C.slots[k] + '</span>';
       h += '</li>';
     }
@@ -4446,7 +4607,7 @@ const MODE = (function () {
 
   // test hook: lets the suites find where things are drawn and run frames without a display
   window.TAAS_FACTORY = {
-    get s() { return s; }, set s(v) { s = v; bubbleSig = ''; shownMoney = null; shownSat = -1; },
+    get s() { return s; }, set s(v) { s = v; bubbleSig = null; shownMoney = null; shownSat = -1; },   // (null: '' is a closed bubble's own signature)
     view: VW, layout, tick, save, hitTest, spriteRect, openRobot, closePanel,
     get page() { return { mode: panelMode, bot: pageBot, pick: pickSlot, open: !panelEl.hidden }; },
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],
