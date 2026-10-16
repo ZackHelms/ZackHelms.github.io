@@ -1,6 +1,6 @@
 # taasdelay - TAAS robot factory: a delay between a robot's tasks (plan arc)
 
-**Status:** IN PROGRESS (steps 1-4 done; steps 5-6 open)
+**Status:** IN PROGRESS (steps 1-5 done; step 6 open)
 **Requested:** 2026-10-16, the CD's answer to the storefront's open question 2 (overproduction):
 "Add an instruction that lets me add a delay between iterations of its task. Let the delay be a
 configurable value, a positive integer 0,1,2,...,60 seconds." And one more fix the same day (step
@@ -59,7 +59,7 @@ step 6).
 | 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | DONE 2026-10-16 |
 | 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | DONE 2026-10-16 |
 | 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | DONE 2026-10-16 |
-| 5 | Docs final and gates | `taasdelay.s5-docs-gates.md` | open |
+| 5 | Docs final and gates | `taasdelay.s5-docs-gates.md` | DONE 2026-10-16 |
 | 6 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasdelay.s6-ship.md` | open |
 
 ## Results (shared memory between steps; append, do not rewrite)
@@ -128,4 +128,12 @@ step 6).
   (miss `no-remeasure`, the known equivalent); all 23 `delay-*`, 16 `delay-ui-*` and 5 `hair-*`
   caught. No suite rows added. A background shell stops at 30 min: run the page list with a
   longer `timeout` (it takes ~45 min at three jobs).
-
+- **Step 5 (2026-10-16), docs and gates:** `.claude/taas.md` (the delay's section, four answers, 12
+  assumed rows, open question 2 built, 8 a first answer, **new open question 10: what the delay
+  starts at**, architecture, how to change it, Measured (the delay), negative tests 124 / 123,
+  71 / 70, 4 / 4, frame cost, History), `.claude/tests/README.md`, `CLAUDE.md` and
+  `games/CLAUDE.md` (the Depth row's second case: a part over another). **`GATES: GREEN`** with
+  `--eval`; formal 43 / 39 / 9; factory **180 / 99 / 23**; frame budget median **16.7 ms**, p95
+  16.7-16.8, 0-2 of 149 over (four runs). Step 6's report should carry: the delay (what it does,
+  the four answers as built), the hair, the 5 s start starving the line (3 s works on all eight
+  seeds; the CD's call), and the blink offer from step 1.

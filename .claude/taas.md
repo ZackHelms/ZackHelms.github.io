@@ -16,10 +16,10 @@ Q&A, then a playable first draft published as a private artifact named "TAAS"), 
 shipped here on 2026-10-12 at the CD's request: 3rd card on the hub, after CYOA2 and
 CYOA, with the restrictive licence. **Proprietary** (`games/taas/LICENSE`; one of the
 nine protected games). Suites: `.claude/tests/drive-taas.cjs` (the engine's rules, 43
-checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 26 checks, Chromium at
+checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 39 checks, Chromium at
 phone width) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in); both drive suites
 are negative-tested (§ Negative tests). The robot factory has its own three
-(`drive-taas-factory.cjs`, 156 checks; `drive-taas-factory-ui.cjs`, 86; `eval-taas-factory.cjs`, 19). It is a
+(`drive-taas-factory.cjs`, 180 checks; `drive-taas-factory-ui.cjs`, 99; `eval-taas-factory.cjs`, 23). It is a
 **first draft the CD is still designing**; most numbers below are guesses waiting for the
 CD's tuning.
 
@@ -657,6 +657,7 @@ depends on what it meets and on what it has been told:
 | Stocker | a small plank, a large plank or a gnarled plank it turns up | as above | **Put small planks / large planks / gnarled planks in recycle bin** (gnarled of any size): that thing goes over the out-feed into the recycle bin, never back in the bin and never into the stall. These join the list the first time the stocker turns the thing up without the instruction |
 | Stocker | - | - | **Sell medium wood planks for $4** prevents nothing (the stall sets the price; a stocker never names one): a look-alike that joins with "Only stock medium planks" |
 | Stocker | a full stall | waits; one already carrying holds it until there is room | - |
+| Either | the end of a task (operator: each log pressed, tossed or caught at the exit; stocker: each thing stocked or recycled) | goes straight on to the next, so an instructed operator fills the output bin faster than customers buy | **Wait between tasks** (2026-10-16): on the list from the start, set under its slot to 0-60 s (5 to begin with); the robot waits that long under a pause sign (§ A delay between tasks) |
 
 A robot that holds an instruction **slips 1 time in 20** and does what it would have done without
 it; the stocker decides **once a stocking** whether to follow "only stock", so a long hunt is one
@@ -708,6 +709,45 @@ here starts from the goal and explains wood, your arms, the counter and its cust
 and the CD's prices, the robots, the evals and instructions, each robot's tally and yours, and
 **Start over**.
 
+### A delay between tasks (CD, 2026-10-16) - stated
+
+The CD's answer to open question 2 (overproduction), quotes made straight: "**Add an instruction
+that lets me add a delay between iterations of its task.** Let the delay be a **configurable value,
+a positive integer 0,1,2,...,60 seconds**." Four answers the same day, before any code:
+
+| Question | CD's answer |
+|---|---|
+| Which robots can take it? | **Every robot**: one instruction, any job (the operator waits between logs, the stocker between stockings). The first instruction that belongs to no one job |
+| When does it join the list? | **From the start**: on the list as soon as there is a slot to put it in, not after a mistake (the first exception to "an instruction joins when its mistake is seen") |
+| Does a robot ever ignore it? | **Slips 1 in 20**, like every instruction: about one iteration in 20 it goes straight on |
+| What is one operator iteration? | **Every log it handles**: the wait comes after each press (once the cut is out) and after each log it tosses in the recycle bin |
+
+**What was built.** "**Wait between tasks**" is on every robot's list from the first slot. Put in a
+slot, the slot grows a second line: a **slider** from 0 to 60 s in whole seconds with a **-** and a
+**+** either side (greyed at the ends) and the figure, "5 s" to begin with. Each robot keeps its
+own number, even with the instruction out of its slot. At the end of each task (the operator:
+after each log pressed, once its cut is out or the planer has jammed, after each log tossed, after
+each bad plank caught at the exit; the stocker: after each thing stocked or recycled, never after a
+reach that found nothing) a robot that holds it waits that long: a **pause sign** over it (a white
+disc, two bars and a teal ring that empties) and a calm face. About one task in 20 it **goes
+straight on** instead. Its Evals gain "**Waited between tasks**" (green) and "**Went straight on,
+against its instructions**" (yellow, the slip). A job change, rest, or the instruction taken out
+of its slot ends a wait; a shorter wait set mid-wait ends it sooner. The next log rolls onto the
+planer while its operator waits, so the gap between two logs is the longer of the wait and the
+0.9 s roll-in, then the press. Info says all of this under Instructions.
+
+**Measured** (the eval's paced persona, § Measured, the delay): with the slider moved by what piles
+up in the output bin, the hour ends with 3 medium planks there instead of 116 and climbing, 297
+customers served instead of 302, satisfaction at 100%, and $83 more. **The 5 s it starts at starves the line** behind an
+operator holding its whole plan (satisfaction ends at 10-24% on all eight seeds); 3 s works on all
+eight (open question 10).
+
+**The hair, the same day** (the CD: "customers appear to go bald when they turn to face towards
+me (down)", the avatar too). Traced: the hair sorted by its own centre, which lies behind the
+head's, so facing the camera the head drew over it. The hair is now the old ellipsoid less the
+facets in front of the head's centre and below a hairline 0.1 m up (`hairOver()`), sorted as the
+head with a small bias: the face shows through and the back and sides are as they were.
+
 ### Assumed, not decided (Claude's choices; the CD has not ruled on these)
 
 | Assumption | Where it lives | Why |
@@ -741,6 +781,18 @@ and the CD's prices, the robots, the evals and instructions, each robot's tally 
 | **Storefront: a factory saved before this brief starts fresh** (save version 3) | `CFG.version` | Wood, the bins and the jobs all changed under it |
 | **Storefront: things in bins and on belts, and customers standing in line, are baked once and blitted** | `itemSprite()`, `personSprite()` | The busy scene was missing every second frame without it (measured, below) |
 | **Slip 5%** and **slots, names, the robot's page, the antenna bulb, Reset evals, the menu, sound and the badge** as before | `CFG`, the page | Unchanged by this brief |
+| **Delay: the wording** "Wait between tasks", one row with `job: null` (consulted by every job), last on the list; **held once**, like any instruction; **one number per robot** (`r.wait`), kept while the instruction is out of its slot | `RULES`, `newRobot()` | The CD gave the meaning, not the words |
+| **Delay: 5 s to begin with** (and for a loaded robot without a number) | `CFG.wait.start`, `load()` | 0 would look like it does nothing. **Measured to starve customers** behind an operator holding its whole plan; 3 s works (open question 10) |
+| **Delay: what ends an iteration**: the operator's press once the cut is out **or the planer has jammed** (a sap log fed in was handled too), a toss, a bad plank caught at the exit; the stocker's stocking or recycling, **never a reach that found nothing** (the thing went back, so the job is not done); a toss you beat the robot to is none | `done()` | The CD's "every log it handles"; the stocker's iteration by analogy |
+| **Delay: the slip is rolled once an iteration, at its end, and only when the wait is above 0**: at 0 s no die is used, so a day matches a day without the instruction roll for roll | `done()`, `follows()` | The "crossed wires" proof stays possible |
+| **Delay: a wait is a robot state, `pause`**, left after `r.wait` seconds (read every step), or by a job change, rest, or the instruction taken out | `pause()`, `release()` | Like every other state |
+| **Delay: the wait overlaps the next log rolling in**, so the gap between logs is the longer of the wait and 0.9 s, then the press | `operate()` | "Sleep N between iterations"; the next iteration still waits for its log |
+| **Delay: `setWait()` refuses** anything but a whole number 0-60 (no rounding); allowed with the instruction in no slot | `setWait()` | The slider and steppers only give whole numbers; a fraction can only be a bug |
+| **Delay: Evals** "Waited between tasks" (green) and "Went straight on, against its instructions" (yellow), written as lines (no tally, no face, no outcome) | `GRADE`, `DOING`, `note()` | The fourth brief's rules: a slip is a yellow line of its own |
+| **Delay: saves** keep version 3: `load()` puts the delay on the list and clamps `r.wait` (anything not a number -> 5) | `startSeen()`, `load()` | A bump would wipe every player's factory |
+| **Delay: the controls**: a slider (0-60, step 1) with - and + under the slot and the figure "N s"; at 360 px and under the row drops its indent; never redrawn while a finger holds the slider | `renderRobot()`, `holdWait` | The CD's "configurable value"; a 60 fps redraw would stop a drag |
+| **Delay: the pause sign**: a white disc, two bars, a teal ring that empties, beside the mood badge while it is up; a calm face; a slip draws nothing | `pauseSign()`, `drawRobot()` | The wait has to be seen, or a robot told to wait looks broken |
+| **Hair: a hairline 0.1 m up**, the facets in front of the head's centre and below it cut away, the rest as it was | `hairOver()`, `hairCap()` | The CD asked for hair, not this shape; a cap of the facets outside the head was tried first and left a bald patch seen from behind |
 
 ### Open questions for the CD (factory)
 
@@ -755,8 +807,8 @@ and the CD's prices, the robots, the evals and instructions, each robot's tally 
    instruction that lets me add a delay between iterations of its task. Let the delay be a
    configurable value, a positive integer 0,1,2,...,60 seconds." Asked the same day: **every robot**
    can take it, it is **on the list from the start**, it **slips 1 time in 20** like any instruction,
-   and for the operator **one iteration is one log handled** (pressed or tossed). Being built: plan
-   arc `.claude/plans/taasdelay.delay-arc.md`.
+   and for the operator **one iteration is one log handled** (pressed or tossed). **Built
+   2026-10-16** (§ A delay between tasks; plan arc `.claude/plans/taasdelay.delay-arc.md`).
 3. **Demand.** Customers come one every 8-16 s whatever happens. Should fewer come when satisfaction
    is low (and more when it is high)? That would also break the slide where a long line drops
    satisfaction, prices fall with it and the money for instructions never comes. **Deferred
@@ -766,8 +818,15 @@ and the CD's prices, the robots, the evals and instructions, each robot's tally 
 5. **Robots on slots 02 to 04**: which jobs, which mistakes, which instructions?
 6. **How should instructions grow more nuanced?** (still open from the second brief)
 7. **Should stopping to think have an instruction**, or stay the price of an agent?
-8. **Should every instruction be on the list from the start**, look-alikes included?
+8. **Should every instruction be on the list from the start**, look-alikes included? **A first
+   answer, for one instruction (2026-10-16):** the delay is on the list from the start (the CD);
+   every other instruction still joins when its mistake is seen.
 9. **Who writes the evals?** (the CD's FYI, fourth brief)
+10. **What should the delay start at?** 5 s (assumed) starves the line behind an operator holding
+   its whole plan: over an hour on eight seeds satisfaction ends at 10-24% on all eight; 4 s starves
+   4 of 8; **3 s keeps 100% on all eight** and the bin at 6-37; 2 s still overproduces (45-67 in the
+   bin). A player who leaves the slider alone at 5 s learns the lesson the hard way, as with the
+   operator-first trap. Not changed: the CD's call.
 
 Answered by this brief: what the bays hold (slots 02 to 04), whether a jam should cost more than
 time ($5 to fix), how what is not a plank leaves the bin (your arms, and the stocker's recycle
@@ -798,6 +857,14 @@ Three script blocks join the page, in this order after the formal engine:
      (`recycles: { kind, size }`), a look-alike only `joins`. `keepers(log)` is every instruction
      that would have kept a log out (they join the list when an operator cuts it); `see()` puts
      instructions on the list; `follows()` rolls the slip.
+   - **An instruction with a value** (the delay, 2026-10-16): the row `{ id: 'delay', job: null,
+     wait: true, start: true }`. **A row with `job: null` belongs to every job** and is consulted
+     by each, at the end of every iteration (`done(s, r)`); the operator's and stocker's data
+     filters skip it. `start: true` puts it on the list in `newGame()` and `load()`
+     (`startSeen()`). Its value is `r.wait` (`CFG.wait`, 0-60, 5 to begin with), set only through
+     **`setWait(s, id, sec)`**, which refuses anything but a whole number in range. `done()` sends a
+     robot that holds it with `r.wait > 0` to the state **`pause`** (one `slip` die), which
+     `pause()` leaves after `r.wait` seconds or once the instruction is out of its slot.
    - **The avatar's places** (`PLACES`): the planer (`work()`), output bins (`pick`), the counter
      (`stock`), the extractor (a press), the bench (`carve`), and bubbles for the rack, the input
      bins, the recycle bin, the saw, the dock and robots. `store(s, place)` is the array behind a
@@ -810,10 +877,11 @@ Three script blocks join the page, in this order after the formal engine:
      look or carry, place when the stall has room, cool. **The operator** is `operate()`, as before.
    - **Evals** are `r.record`, keyed `action[:thing][!]`; `GRADE` and `gradeOf()` colour them
      (`jam` and `misstock` red; `cut`, `think`, `looking` yellow; `plank`, `reject`, `caught`, `stock`,
-     `recycle` green).
+     `recycle`, `waited` green; `straight!`, the delay's slip, yellow by its '!').
    - The engine emits `s.events` (press with where and what it cost, made, milled, binned, jam,
      cleaned with its cost, recycled, looking, customer, paying, sold, stocked, picked, put, took,
-     carved, hired, assigned, outcome, rule, slot, instructed, notes, arrive).
+     carved, hired, assigned, outcome, rule, slot, instructed, notes, arrive, waitset, paused,
+     straight).
 2. **`SND`, `MODE` and the menu**, shared by both modes (unchanged but for two new effects: a door
    bell when a customer comes in and a card's beep when one pays).
 3. **The factory UI** (an IIFE): the 3D kit and everything on screen.
@@ -829,7 +897,12 @@ Three script blocks join the page, in this order after the formal engine:
      shapes with fewer facets, in the customer's own shirt, hair and trousers, no hat). **A customer
      standing in line is baked** (`personSprite()`, once per look and facing, by borrowing `ctx` and
      moving the camera the way the floor's bake does); walking, paying and leaving ones are live.
-     The avatar carries up to four things across its arms and a count chip.
+     The avatar carries up to four things across its arms and a count chip. **A part that sits on
+     another sorts with that part's centre, not its own**: the hair (`hairOver()`, built by
+     `hairCap()`) is its ellipsoid less the facets in front of the head's centre and below a 0.1 m
+     hairline, sorted at the head's centre with bias +0.001, so facing the camera it is no longer
+     drawn under the face (2026-10-16; a cap of the facets outside the head was tried first and
+     left a bald patch seen from behind, `.claude/plans/taasdelay.s1-hair.md`).
    - **Live machine bits**: belt tops per row, the planer's window and beacon, a red button on each
      console (lit when a press would do something), the saw's blade (still until it cuts), the
      extractor's tank level.
@@ -840,8 +913,13 @@ Three script blocks join the page, in this order after the formal engine:
      comes from `mini(id)` and its name from `NAME(id)`.
    - **Input**: `hitTest()` walks the `TAPS` table (sprite id to place), robots first, the front-most
      sprite next, then the floor.
+   - **The robot's page** (`renderRobot()`) redraws only when `pageSig` changes; a slot holding
+     the delay grows `.fx-wait` (-, the slider `#fx-wait`, +, the figure), and while a finger holds
+     the slider (`holdWait`) the page is never redrawn, or the drag would stop. A robot in `pause`
+     wears `pauseSign()`.
    - **Test hook**: `window.TAAS_FACTORY` as before (`s`, `view`, `tick`, `paused`, `hitTest`,
-     `spriteRect`, `screen`, `board`, `showInfo`, `save`, `layout`, `openRobot`, `closePanel`, `page`).
+     `spriteRect`, `screen`, `board`, `showInfo`, `save`, `layout`, `openRobot`, `closePanel`, `page`),
+     and `person(who, face)`, one person baked alone (`bakePerson()`).
 
 ### Measured (2026-10-15, storefront)
 
@@ -892,13 +970,57 @@ median** (every second frame missed), with no single part to blame (only skippin
 the people together brought it back). Baking the things in bins and on belts, then baking customers
 standing in line and giving customers fewer facets: **16.7 ms median, p95 16.8, 3-5 of 149 over**
 across four runs, against 0 of 149 for the menu build's busy pose in the same container the same
-hour (a quieter scene): inside budget.
+hour (a quieter scene): inside budget. Re-run after the delay and the hair (2026-10-16), four runs:
+**16.7 ms median, p95 16.7-16.8, 0-2 of 149 over**.
+
+### Measured (2026-10-16, the delay)
+
+`node .claude/tests/eval-taas-factory.cjs` adds a ninth persona, **paced**: the supervisor, for an
+hour, who once its operator holds its whole plan and a stall's worth of medium planks waits behind
+a full stall puts the delay in a fifth slot, leaves it at 5 s and then moves it a second a minute
+by the bin (one less when the bin is nearly empty or a customer waits at an empty stall, one more
+when the bin is over a stall's worth and not shrinking; an assumed player, not a measured one).
+Beside it, the supervisor for the same hour, seed 7:
+
+| Persona, an hour | delay in | bin at the hour | most in the bin, last 20 min | served | satisfaction | spent | money |
+|---|---|---|---|---|---|---|---|
+| supervisor | - | 116, climbing | - | 302 | 100% | $471 | $575 |
+| paced | 16.7 min | 3 | 12 | 297 | 100% | $343 | **$658** |
+
+The waits it chose ran 5, 6, 7, 6, 5, 4, 3, 2, 1, 0, 1, 2, 3, 4, 5, 4, 3, 2 s. The eval asserts that
+the supervisor overproduces (the bin past ten stalls' worth and still growing), that the paced bin
+stays bounded (at most three stalls' worth over the last 20 minutes, under a quarter of the
+supervisor's), that nobody starves (satisfaction at least 90% at the end and 50% throughout, under
+one waiting on average over the last ten minutes, served at least 95% of the supervisor's), and
+that it pays (less spent, and more money by more than the $25 slot). The books balance for all
+ten runs.
+
+`EVAL_WAITS=1` adds a sweep (printed, not asserted): seeds 1-8, the supervisor for an hour, the
+delay put in at the same moment and then left alone at one value:
+
+| Wait | bin at the hour | satisfaction at the hour | money against no delay |
+|---|---|---|---|
+| none | 116-151 | 100% on all 8 | - |
+| the paced persona's | 3-10 | 100% on all 8 (one dipped to 59% mid-run) | +$51 to +$120 |
+| 2 s | 45-67 | 100% on all 8 | +$23 to +$65 |
+| 3 s | 6-37 | 100% on all 8 | +$60 to +$102 |
+| 4 s | - | starved on 4 of 8 (10-33%) | -$102 to +$119 |
+| 5 s (the start) | - | starved on all 8 (10-24%) | -$321 to +$53 |
+
+So the delay ends overproduction and pays, inside a narrow band (about 3 s against today's
+demand), and the 5 s it starts at starves the line (open question 10).
 
 ### Negative tests (factory)
 
-`.claude/tests/negtests/taas-factory-engine.json` (101 breaks, against `drive-taas-factory.cjs`) and
-`taas-factory-ui.json` (50, against `drive-taas-factory-ui.cjs`), both rebuilt for the storefront:
-**100 and 49 caught**. The first engine run caught 92: eight of its nine misses were rows not yet
+`.claude/tests/negtests/taas-factory-engine.json` (**124** breaks, against `drive-taas-factory.cjs`),
+`taas-factory-ui.json` (**71**, against `drive-taas-factory-ui.cjs`) and `taas-factory-eval.json`
+(**4**, against `eval-taas-factory.cjs`): **123, 70 and 4 caught** (2026-10-16, the whole of each
+list re-run on copies). The delay added 23 engine breaks (`delay-*`), 16 page breaks
+(`delay-ui-*`) and the eval's four (demand doubled, a robot that never pauses, every wait at 60 s,
+a wait that costs money); the hair added five page breaks (`hair-*`). All were caught; on the way,
+two rows were widened or tightened (a load row that only loaded a save already holding the delay;
+a stepper that never saved, hidden by the page's own `pagehide` save). The page list takes about
+45 minutes at three jobs. The storefront's runs: **100 and 49 caught** of 101 and 50. The first engine run caught 92: eight of its nine misses were rows not yet
 written (a customer walking in counted as waiting, a wrong sale's money, the second in line paying
 early, one tap putting in only one of a kind, the extractor's bin taking clean logs, the output bin
 always reached from the floor, a robot double-pressing a planer you started, a stocker overfilling a
@@ -928,7 +1050,12 @@ top.
   one with `recycles: { kind, size }`, a look-alike with `joins`); in its job's code a `follows()`
   where the robot would make the mistake (the data rows need none: `operate()` and `stocker()` ask
   every row that matches); a `see()` where the mistake shows; a `DOING` line if it adds a new
-  action; rows in the rules suite's § 8.
+  action; rows in the rules suite's § 8. **An instruction with a value**, like the delay: a field
+  on the robot (`r.wait`), a `CFG` range, a setter that refuses what the control cannot give
+  (`setWait()`), a clamp in `load()`, `pageSig` holding it, and a control under the slot in
+  `renderRobot()` kept out of the redraw while held (`holdWait`). A row with `job: null` is
+  consulted by every job, so give it a place in each (`done()`); `start: true` puts it on the
+  list from the start.
 - **A new kind of thing**: a size or quality goes in `SIZES` or the `LOGS` list and `CFG.logs`; a
   product in `ITEMS` (and `PRODUCTS` if the planer makes it), `makes()`, `priceOf()`, `ACCEPTS` for
   the bins that take it, a model in the UI's `ITEM_MODEL` builders, a `mini()` picture and a `NAME()`.
@@ -967,6 +1094,14 @@ top.
 - **Copy rule:** plain ASCII in the page (straight quotes, hyphens); the CD prefers it.
 
 ## History
+
+- 2026-10-16: **a delay between tasks** (the CD's answer to overproduction, and four answers):
+  "Wait between tasks" on every robot's list from the start, a slider 0-60 s (5 to begin with)
+  under its slot, a wait after each log handled and each thing stocked or recycled under a pause
+  sign, a 1-in-20 slip. The eval's ninth persona, paced, proves it ends overproduction and pays;
+  a sweep finds the 5 s start starves the line (open question 10). And **people keep their hair**
+  facing the camera (`hairOver()`). Save version 3 kept. Rules suite 180 checks, page 99, eval 23;
+  break lists 124, 71 and the eval's new 4 (123, 70 and 4 caught).
 
 - 2026-10-09: designed in a claude.ai session; first draft published as a private
   artifact ("TAAS", First playable draft).

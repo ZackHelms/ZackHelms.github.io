@@ -1,6 +1,6 @@
 # taasdelay step 5 - docs final and gates
 
-**Status:** open
+**Status:** DONE 2026-10-16
 **Arc:** `.claude/plans/taasdelay.delay-arc.md` (every count and finding is in Results).
 **Scope:** `.claude/taas.md`, `.claude/tests/README.md`, `CLAUDE.md`, `games/CLAUDE.md`; no code.
 
@@ -34,3 +34,36 @@
 its own for its count (formal 43 / 39 / 9 untouched). Frame budget
 (`.claude/scripts/frame-budget.cjs` with the busy pose) re-run, since the page changed: the median
 must stay 16.7 ms. Record all of it in Results. Commit to `taas-delay`, push, tick the arc.
+
+## What was done (2026-10-16)
+
+- **`.claude/taas.md`**: the header's suite counts (factory 180 / 99 / 23; formal page 26 -> 39,
+  stale since 2026-10-14); a new section **"A delay between tasks (CD, 2026-10-16) - stated"**
+  after the storefront's What was built (the CD's words, the four answers, what was built, the
+  measured lesson, the hair); a robots-table row for either job; **12 assumed-not-decided rows**
+  (wording and one number per robot, 5 s, what ends an iteration, the slip only above 0, the
+  `pause` state, the overlap with the roll-in, `setWait` refusing, the evals lines, saves, the
+  controls, the pause sign, the hairline); open question 2 marked built, 8 given its first answer,
+  **a new open question 10 (what the delay starts at)**; Architecture (an instruction with a value,
+  the job-less row consulted by every job, `start` rows, grades, events, the hair's sort, the
+  robot's page and `holdWait`, the `person()` hook); How to change it (an instruction with a value);
+  a new **Measured (2026-10-16, the delay)** with the paced-vs-supervisor table and the sweep;
+  Negative tests (124 / 123, 71 / 70, eval 4 / 4); the frame cost re-run; a History entry.
+- **`.claude/tests/README.md`**: the three factory rows (180, 99, 23; the delay's and hair's rows;
+  the paced persona and `EVAL_WAITS`; break lists 124 / 123, 71 / 70 and the eval's 4 / 4).
+- **`CLAUDE.md`** TAAS row: overproduction "answered 2026-10-16 with a delay instruction" (no
+  "being built"), open question 10, and a clause on the delay and the hair.
+- **`games/CLAUDE.md`**: the TAAS inventory gains the delay; the Depth row's flush-part sentence
+  gains the second case (a part sitting over another, the hair).
+- Stale counts grepped in those five files and `.claude/games-index.md`: only the 2026-10-15
+  History entry keeps 156 / 86 / 19, as history.
+
+## Gates (2026-10-16)
+
+- `.claude/scripts/gates.sh --eval games/taas/index.html`: smoke, games-sync, negtest scan, the four
+  drive suites and both evals GREEN; **`GATES: GREEN`**.
+- Each TAAS suite on its own: formal `drive-taas` **43**, `drive-taas-ui` **39**, `eval-taas` **9**
+  (untouched); factory `drive-taas-factory` **180**, `drive-taas-factory-ui` **99**,
+  `eval-taas-factory` **23**; all GREEN.
+- Frame budget (busy pose, 390x844), four runs: **median 16.7 ms**, p95 16.7-16.8, max 16.8-33.3,
+  **0-2 of 149 over**: inside budget, as before.
