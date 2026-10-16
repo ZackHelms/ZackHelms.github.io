@@ -298,5 +298,35 @@
   "file": "games/taas/index.html",
   "old": "<div id=\"build-badge\" style=\"position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;",
   "new": "<!-- @negtest --><div id=\"build-badge\" style=\"position:fixed;top:2px;right:6px;"
+ },
+ {
+  "name": "hair-old-whole",
+  "file": "games/taas/index.html",
+  "old": "const hairCap = (nu, nv, col) => hairOver(ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, nu, nv, col, 1), 0.1);",
+  "new": "const hairCap = (nu, nv, col) => /* @negtest */ ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, nu, nv, col, 1);"
+ },
+ {
+  "name": "hair-sorts-by-own-centre",
+  "file": "games/taas/index.html",
+  "old": "    return { v, f, e: edgesOf(f), c: p.c, ol: p.ol, bias: p.bias, cx: 0, cy: 0, cz: 0 };",
+  "new": "    return { v, f, e: edgesOf(f), c: p.c, ol: p.ol, bias: p.bias, cx: p.cx, cy: p.cy, cz: p.cz }; /* @negtest */"
+ },
+ {
+  "name": "hair-no-face-opening",
+  "file": "games/taas/index.html",
+  "old": "      return x <= 0 || z / (fc.length - 1) >= zh;",
+  "new": "      return true || x <= 0 || z / (fc.length - 1) >= zh; /* @negtest */"
+ },
+ {
+  "name": "hair-cap-inside-head",
+  "file": "games/taas/index.html",
+  "old": "      return x <= 0 || z / (fc.length - 1) >= zh;",
+  "new": "      const n = fc.length - 1; let y = 0; for (let i = 1; i < fc.length; i++) y += v[fc[i] * 3 + 1]; return (x / n / 0.22) ** 2 + (y / n / 0.23) ** 2 + (z / n / 0.21) ** 2 > 1; /* @negtest */"
+ },
+ {
+  "name": "hair-drawn-first",
+  "file": "games/taas/index.html",
+  "old": "{ p: P.hair, M: headM, bias: 0.001 });",
+  "new": "{ p: P.hair, M: headM, bias: -0.004 }); /* @negtest */"
  }
 ]

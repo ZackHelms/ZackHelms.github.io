@@ -2495,6 +2495,19 @@ const MODE = (function () {
     return { v, f: p.f, e: p.e, c: p.c, ol: p.ol, bias: p.bias, cx: c[0], cy: c[1], cz: c[2] };
   }
   const recol = (p, cols) => Object.assign({}, p, { c: cols });
+  // hair over a head whose centre is the origin: the hair less its facets in front of the head's
+  // centre and below the hairline zh, so the face shows, sorted by the head's centre so it can be
+  // drawn just after the head. Two whole ellipsoids sorted by their own centres swap order as a
+  // person turns, and facing the camera the head was drawn over the hair (the CD's bald customers,
+  // 2026-10-16). drawPrim inks the open edge, which reads as the hairline
+  function hairOver(p, zh) {
+    const v = p.v, f = p.f.filter(fc => {
+      let x = 0, z = 0;
+      for (let i = 1; i < fc.length; i++) { x += v[fc[i] * 3]; z += v[fc[i] * 3 + 2]; }
+      return x <= 0 || z / (fc.length - 1) >= zh;
+    });
+    return { v, f, e: edgesOf(f), c: p.c, ol: p.ol, bias: p.bias, cx: 0, cy: 0, cz: 0 };
+  }
 
   /* ---------- shading: three flat bands, shadows pushed cool ---------- */
   const SHADE = new Map();
@@ -2934,12 +2947,14 @@ const MODE = (function () {
     ctx.drawImage(sp.c, Math.round(X * k) / k, Math.round(Y * k) / k, sp.c.width / k, sp.c.height / k);
   }
   /* the avatar: a chibi in a hard hat, joints as matrices, a walk cycle driven by distance */
+  // the hair: an ellipsoid a little behind and above the head, open over the face below 0.1 m
+  const hairCap = (nu, nv, col) => hairOver(ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, nu, nv, col, 1), 0.1);
   const AV = (function () {
     const P = {
       torso: ell(0, 0, 0.17, 0.12, 0.15, 0.18, 8, 5, COL.shirt, 0.85),
       hips: ell(0, 0, 0.02, 0.11, 0.14, 0.08, 8, 4, COL.pants, 0.8),
       head: ell(0, 0, 0, 0.22, 0.23, 0.21, 10, 6, COL.skin, 1),
-      hair: ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, 10, 6, COL.hair, 1),
+      hair: hairCap(10, 6, COL.hair),
       hat: ell(-0.03, 0, 0.15, 0.19, 0.205, 0.1, 10, 5, COL.hat, 0.9),
       brim: box(-0.2, -0.025, 0.2, 0.15, 0.025, 0.262, COL.hatBrim),
       arm: ell(0, 0, -0.09, 0.05, 0.05, 0.11, 7, 4, COL.shirt, 1),
@@ -2961,7 +2976,7 @@ const MODE = (function () {
     const shirt = CUST_SHIRT[k % CUST_SHIRT.length], hair = CUST_HAIR[(k * 3) % CUST_HAIR.length], pants = CUST_PANTS[(k * 5) % CUST_PANTS.length];
     // the avatar's shapes with fewer facets: there can be seven customers on screen at once
     return (CUST[k] = { torso: ell(0, 0, 0.17, 0.12, 0.15, 0.18, 7, 4, shirt, 0.85), hips: ell(0, 0, 0.02, 0.11, 0.14, 0.08, 6, 3, pants, 0.8),
-      head: ell(0, 0, 0, 0.22, 0.23, 0.21, 8, 5, COL.skin, 1), hair: ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, 8, 5, hair, 1),
+      head: ell(0, 0, 0, 0.22, 0.23, 0.21, 8, 5, COL.skin, 1), hair: hairCap(8, 5, hair),
       bun: k % 3 === 1 ? ell(-0.2, 0, 0.1, 0.09, 0.09, 0.09, 6, 3, hair, 1) : null,
       arm: ell(0, 0, -0.09, 0.05, 0.05, 0.11, 5, 3, shirt, 1), hand: ell(0, 0, -0.205, 0.055, 0.055, 0.055, 5, 3, COL.skin, 1),
       thigh: ell(0, 0, -0.065, 0.058, 0.058, 0.08, 5, 3, pants, 1), shin: ell(0, 0, -0.06, 0.05, 0.05, 0.075, 5, 3, pants, 1), boot: AV.boot });
@@ -2992,7 +3007,7 @@ const MODE = (function () {
     parts.push({ p: P.hips, M: rootM });
     parts.push({ p: P.torso, M: chain(rootM, Ms(1, 1, 1 + breathe * 3)) });
     const headM = chain(rootM, Mt(0, 0, 0.55 + breathe), My(o.headP || 0));
-    parts.push({ p: P.head, M: headM }, { p: P.hair, M: headM, bias: -0.004 });
+    parts.push({ p: P.head, M: headM }, { p: P.hair, M: headM, bias: 0.001 });   // the hair sorts as the head, just after it
     if (P.hat) parts.push({ p: P.hat, M: headM, bias: 0.002 }, { p: P.brim, M: headM, bias: 0.001 });
     if (P.bun) parts.push({ p: P.bun, M: headM, bias: -0.006 });
     [['L', 1, o.armL, o.abL, hipL, kneeL], ['R', -1, o.armR, o.abR, hipR, kneeR]].forEach(([side, sgn, arm, ab, hip, knee]) => {
@@ -3101,18 +3116,24 @@ const MODE = (function () {
     const look = id % (CUST_SHIRT.length * 5), key = look + '|' + face.toFixed(2);
     let sp = PERSON_BAKE.get(key);
     if (sp) return sp;
+    sp = bakePerson(id, custParts(id), face, o);
+    PERSON_BAKE.set(key, sp);
+    return sp;
+  }
+  // one person standing still in a canvas of their own, feet at (-ox, -oy) in CSS px; head: the
+  // head's centre there (the suites look at one person alone through this)
+  function bakePerson(id, P, face, o) {
     const S = VW.S, w = Math.ceil(1.0 * S), up = Math.ceil((0.35 * SE + 1.45 * CE) * S) + 6, h = up + Math.ceil(0.35 * SE * S) + 6;
     const c = document.createElement('canvas');
     c.width = Math.round(w * VW.dpr); c.height = Math.round(h * VW.dpr);
     const g = c.getContext('2d');
     g.scale(VW.dpr, VW.dpr);
     const keep = ctx, ox = VW.ox, cam = VW.camY;
+    let head;
     ctx = g; VW.ox = w / 2; VW.camY = -up;
-    try { drawPerson({ id, x: 0, y: 0 }, custParts(id), { yaw: face, walk: 0, d: 0, px: 0 }, o); }
+    try { const hc = apply(drawPerson({ id, x: 0, y: 0 }, P, { yaw: face, walk: 0, d: 0, px: 0 }, o), 0, 0, 0.55); head = [PX(hc[0]), PY(hc[1], hc[2])]; }
     finally { ctx = keep; VW.ox = ox; VW.camY = cam; }
-    sp = { c, ox: -w / 2, oy: -up };
-    PERSON_BAKE.set(key, sp);
-    return sp;
+    return { c, ox: -w / 2, oy: -up, head };
   }
   // eyes and cheeks, in 2D over the head when the face is toward the camera
   function drawFace(headM, v) {
@@ -4114,6 +4135,9 @@ const MODE = (function () {
     get page() { return { mode: panelMode, bot: pageBot, pick: pickSlot, open: !panelEl.hidden }; },
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],
     board: boardRect, showInfo,
+    // one person alone, standing, arms down: 'avatar' or a customer's id, facing a yaw (pi/2 is down the screen)
+    person: (who, face) => Object.assign(bakePerson(who === 'avatar' ? 0 : who, who === 'avatar' ? AV : custParts(who), face,
+      { armL: 0.12, armR: 0.12, abL: 0.32, abR: 0.32, lean: 0, headP: 0, twist: 0, hold: null }), { S: VW.S, dpr: VW.dpr }),
     get on() { return on; },
     set paused(v) { paused = !!v; }, get paused() { return paused; }
   };

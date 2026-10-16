@@ -11,7 +11,9 @@
     "What was built": the CD's words, the four answers table (copy from the arc), what was built;
   - the robots table: the delay's row (both jobs);
   - the hair fix (step 1): one line in the 3D kit notes (a part that sits on another sorts with
-    that part's centre, not its own; the hair is a cap of the faces outside the head), and the
+    that part's centre, not its own; the hair is its ellipsoid less the facets in front of the
+    head's centre and below a 0.1 m hairline, `hairOver()`; a cap of the faces outside the head
+    was tried first and left a bald patch seen from behind, see step 1's Results), and the
     `games/CLAUDE.md` Depth row's flush-part sentence gains this second case if it reads naturally;
   - the assumed-not-decided table: every design decision in the arc's list, plus anything step 2
     or 3 decided (wording, default 5 s, one per robot, the stocker's iteration, 0 s rolls no

@@ -1,6 +1,6 @@
 # taasdelay - TAAS robot factory: a delay between a robot's tasks (plan arc)
 
-**Status:** IN PROGRESS (steps 1-6 open)
+**Status:** IN PROGRESS (step 1 done; steps 2-6 open)
 **Requested:** 2026-10-16, the CD's answer to the storefront's open question 2 (overproduction):
 "Add an instruction that lets me add a delay between iterations of its task. Let the delay be a
 configurable value, a positive integer 0,1,2,...,60 seconds." And one more fix the same day (step
@@ -55,7 +55,7 @@ step 6).
 | # | Step | Plan file | Status |
 |---|---|---|---|
 | 0 | The CD's three answers recorded, the demand item in `TODO.md`, this arc | (this session) | DONE - on `main` |
-| 1 | Fix: people keep their hair when they face the camera (cause traced: the hair sorts behind the head) | `taasdelay.s1-hair.md` | open |
+| 1 | Fix: people keep their hair when they face the camera (cause traced: the hair sorts behind the head) | `taasdelay.s1-hair.md` | DONE 2026-10-16 |
 | 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | open |
 | 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | open |
 | 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | open |
@@ -67,3 +67,12 @@ step 6).
 - **Baseline (2026-10-16, `main` after the storefront):** rules `drive-taas-factory.cjs` 156
   checks; page `drive-taas-factory-ui.cjs` 86; eval `eval-taas-factory.cjs` 19 (8 personas);
   engine break list 100 of 101 caught; page break list 49 of 50. Formal 43 / 39 / 9.
+- **Step 1 (2026-10-16), the hair:** built as an explicit hairline, not the planned cap (the cap left
+  a bald patch on the crown seen from behind; traced in `taasdelay.s1-hair.md` § What was built).
+  `hairOver(p, zh)` / `hairCap(nu, nv, col)` in the 3D kit, sorted as the head with bias +0.001.
+  New test hook `TAAS_FACTORY.person(who, face)` over `bakePerson()` (split out of
+  `personSprite()`). Page suite `drive-taas-factory-ui.cjs` **89** (86 + 3 rows in section
+  16. hair); rules **156** GREEN; smoke GREEN. Five breaks `hair-*` appended to
+  `taas-factory-ui.json` (now **55** entries) and caught **5 of 5** on copies; each of the three
+  new rows catches at least one. Not fixed, outside the ask: a waiting customer's look baked
+  mid-blink keeps its eyes shut while it waits (traced; offer the CD a one-line fix).

@@ -21,7 +21,8 @@
  * bubbles (the recycle bin's put and take, an input bin, the saw's three cuts), the build badge
  * in the bottom right corner in both modes, the info panel opened from the menu, saves that
  * survive a reload without touching the formal mode's, re-measuring after a resize while hidden,
- * and the chrome and bubble all on screen at phone, landscape and desktop sizes. Frames are
+ * the chrome and bubble all on screen at phone, landscape and desktop sizes, and people who keep
+ * their hair turned toward the camera (customers and the avatar under its hat). Frames are
  * stepped through the page's own test hook (TAAS_FACTORY, paused), so time is exact; input goes
  * through real touch events.
  *
@@ -731,6 +732,39 @@ const server = http.createServer((req, res) => {
     await step(4.5);
     const cut = await S();
     ok(cut.saw.out.join() === 'b2x2.l' && cut.money === m0 - 1, 'a tap on a cut presses the saw ($1), and four large 2"x2"s land in its output bin', cut.saw.out.join() + ' / ' + (m0 - cut.money));
+  });
+  /* ---------- 16. people keep their hair facing the camera (the CD, 2026-10-16) ---------- */
+  // turned toward the camera the head was drawn over the hair, so customers went bald and the avatar lost the hair under
+  // its hat. One person alone through the hook (standing, arms down), its pixels sorted by the shading bands of its hair
+  // and skin colours (the page's own, read from the source), in boxes round its head's centre measured in metres: the
+  // crown above the centre, the face below it, either side of the head under the hat
+  await section('16. hair', async () => {
+    const hex = ((SRC.match(/const CUST_HAIR = \[([^\]]*)\]/) || ['', ''])[1].match(/#[0-9a-f]{6}/g)) || [], col = SRC.match(/skin: '(#[0-9a-f]{6})', hair: '(#[0-9a-f]{6})'/) || [];
+    const look = await H(([hex, skin, avHair]) => {
+      const T = window.TAAS_FACTORY;
+      const band = h => { const n = parseInt(h.slice(1), 16); return [0, 1, 2].map(k => { const m = [1, 0.85, 0.68][k], t = [0, 0.05, 0.16][k], f = (v, c) => Math.round(Math.min(255, Math.max(0, v * m * (1 - t) + c * t))); return [f(n >> 16 & 255, 60), f(n >> 8 & 255, 70), f(n & 255, 120)]; }); };
+      const near = (d, i, B) => B.some(c => Math.abs(d[i] - c[0]) + Math.abs(d[i + 1] - c[1]) + Math.abs(d[i + 2] - c[2]) < 24);
+      const out = {};
+      for (const who of [1, 2, 'avatar']) {
+        const H = band(who === 'avatar' ? avHair : hex[(who * 3) % hex.length]), K = band(skin);
+        out[who] = {};
+        for (const [nm, yaw] of [-0.7, -0.35, 0, 0.35, 0.7].map(e => [Math.round(e * 180 / Math.PI), Math.PI / 2 + e]).concat([['up', -Math.PI / 2]])) {
+          const sp = T.person(who, yaw), k = sp.dpr, S = sp.S, d = sp.c.getContext('2d').getImageData(0, 0, sp.c.width, sp.c.height).data, W = sp.c.width, [hx, hy] = sp.head;
+          const cnt = (x0, x1, y0, y1, B) => { let n = 0; for (let y = Math.round((hy + y0 * S) * k); y < Math.round((hy + y1 * S) * k); y++) for (let x = Math.round((hx + x0 * S) * k); x < Math.round((hx + x1 * S) * k); x++) { const i = (y * W + x) * 4; if (d[i + 3] > 200 && near(d, i, B)) n++; } return n; };
+          out[who][nm] = { crown: cnt(-0.15, 0.15, -0.27, -0.08, H), bare: cnt(-0.15, 0.15, -0.27, -0.08, K), face: cnt(-0.12, 0.12, 0.02, 0.2, K), sides: cnt(-0.3, -0.12, -0.15, 0.08, H) + cnt(0.12, 0.3, -0.15, 0.08, H) };
+        }
+      }
+      return out;
+    }, [hex, col[1], col[2]]);
+    const turned = who => Object.keys(look[who] || {}).filter(n => n !== 'up').map(n => [n, look[who][n]]), up = who => (look[who] || {}).up || {};
+    const say = who => JSON.stringify(look[who]);
+    const cust = [1, 2].filter(w => !(turned(w).length === 5 && turned(w).every(([, r]) => r.crown >= 0.75 * up(w).crown && r.bare < 40 && r.face > 200)));
+    ok(hex.length === 5 && !cust.length, 'a customer turned toward the camera keeps its hair (the CD\'s bald customers): as much on its crown as seen from behind, from 40 degrees either side of straight down, with its face below',
+      cust.map(say).join(' ') + (hex.length === 5 ? '' : ' hair colours ' + hex.join()));
+    const back = [1, 2].filter(w => !(up(w).crown > 300 && up(w).bare < 20 && up(w).face < 20));
+    ok(!back.length, 'and seen from behind it is all hair still, crown and nape: the hair opens over the face only', back.map(say).join(' '));
+    const av = turned('avatar');
+    ok(av.length === 5 && av.every(([, r]) => r.sides >= 0.4 * up('avatar').sides && r.face > 200), 'the avatar too: turned toward the camera, hair shows under the hard hat either side of its head, with its face below', say('avatar'));
   });
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
   await section('12. badge', async () => {
