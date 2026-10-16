@@ -28,8 +28,10 @@
   access to this GitHub API path is not permitted through this proxy"). A
   branch pushed as an off-box safety copy therefore stays until the CD deletes
   it. Pushing one is still right when hours of uncommitted work are at stake;
-  name it so it is recognisable, say so in the report, and list it in
-  `TODO.md` § Needs Zack.
+  name it so it is recognisable. **Do not ask the CD to delete it**, in a
+  report or in `TODO.md`: the CD deletes stale branches when convenient
+  (2026-10-16: "No need to ask me to delete remote branches when you can't,
+  that is just noise").
 
 ## Backlog (TODO.md)
 - Buckets, in file order: In progress · Now · Needs Zack · Next · Later ·

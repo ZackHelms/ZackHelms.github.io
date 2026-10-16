@@ -496,5 +496,11 @@
   "file": "games/taas/index.html",
   "old": "        case 'restock': FLOAT.push(",
   "new": "        case 'restock': /* @negtest */ break; FLOAT.push("
+ },
+ {
+  "name": "tips-gone",
+  "file": "games/taas/index.html",
+  "old": "      '<h3>Tips</h3><ul class=\"fx-tips\">' +",
+  "new": "      '<h3>Tips</h3><ul>' + /* @negtest */"
  }
 ]

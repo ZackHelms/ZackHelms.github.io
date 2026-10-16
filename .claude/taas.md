@@ -19,7 +19,7 @@ nine protected games). Suites: `.claude/tests/drive-taas.cjs` (the engine's rule
 checks, pure node), `.claude/tests/drive-taas-ui.cjs` (the page, 39 checks, Chromium at
 phone width) and `.claude/tests/eval-taas.cjs` (balance shape, opt-in); both drive suites
 are negative-tested (§ Negative tests). The robot factory has its own three
-(`drive-taas-factory.cjs`, 194 checks; `drive-taas-factory-ui.cjs`, 110; `eval-taas-factory.cjs`, 24). It is a
+(`drive-taas-factory.cjs`, 194 checks; `drive-taas-factory-ui.cjs`, 111; `eval-taas-factory.cjs`, 24). It is a
 **first draft the CD is still designing**; most numbers below are guesses waiting for the
 CD's tuning.
 
@@ -314,6 +314,33 @@ the new code rather than dropping it.
 - What the page suite measures that a reading of the code would not: a log table allowed
   to overflow widens the phone's layout viewport to ~850 px, and the tracker then lies
   over the plan's buttons. The layout row asks for `innerWidth` to stay the screen's.
+
+## Tips: what the game teaches (both modes)
+
+The CD, 2026-10-16, on two findings of the factory's eval: "Those two things your test found are
+**perfect examples of how sometimes AI agents are not worth it until you have sufficient experience
+and funding to properly support them.** Add these to a list of tips in the info section. I might want
+to find a way to surface these types of insights in the natural flow of the game later, so for now I
+just want you to capture them in that in game info section (via top left menu) and capture in a
+context file for this taas game (both modes). In this case the simplest lesson is that **the first
+draft of an agent will likely not provide ROI**, it takes time to learn where it needs supporting
+instructions/guardrails and eventually it will start to show **positive (>1) ROI (ie return >
+investment+maintenance+cleanup)**."
+
+This is the list. **Each tip is shown in the robot factory's Info** (menu > Info, under "Tips"; the
+wording there is Claude's, from the CD's words), and each names the evidence that found it. A later
+brief may move them into the flow of play (the CD's "later"); until then they stay behind the
+opt-in panel, per the discovery rule.
+
+| Tip | Where the game shows it | Evidence |
+|---|---|---|
+| **A first agent rarely pays for itself.** The first draft of an agent will likely not return what it costs: it takes time to learn where it needs instructions and guardrails, and only then does it return more than its investment, upkeep and cleanup (ROI above 1). Agents are worth it once you have the experience and the funding to support them | Factory: a robot line loses money until it holds its instructions, and the slots cost money it has not earned yet. Formal: the **J-curve** (§ Research, DORA): skill bought costs delivery before it pays back | Factory eval, seed 7, an hour (§ Measured, the bins): without the delay the robots' plans of four come at 50 / 45 minutes, and the supervisor's line nets $2.40 a minute at the end of the hour; the jams ($5 each) and the logs it recycles are the cleanup |
+| **An agent faster than demand makes waste.** Pace it before tuning anything else | Factory: an instructed operator handles about 18 logs a minute against about 5 customers; given "Wait between tasks" the moment it is hired, its plan comes at 23 / 17 minutes instead of 50 / 45, and the line clears $11.50 a minute | The same run, the paced persona against the supervisor |
+| **Give an agent the next best task, not the biggest.** A first robot on the planer, while you still carry every plank, presses logs nobody is selling | Factory: the operator-first trap (open question 1, kept as a lesson by the CD: "if not careful we learn this the painful way") | The eval's "operator first" persona since the storefront (§ Measured, storefront) |
+
+When a new finding of this kind turns up (in an eval, a playtest, or the CD's report), add a row
+here and a line to the factory's Info "Tips" (`renderPanel()`), and the page suite's tips row
+(`drive-taas-factory-ui.cjs` section 7) with it.
 
 ## Robot factory mode (2026-10-13)
 
@@ -1142,7 +1169,7 @@ and the person never presses a log nobody will buy.
 
 `.claude/tests/negtests/taas-factory-engine.json` (**143** breaks, against `drive-taas-factory.cjs`),
 `taas-factory-ui.json` (**84**, against `drive-taas-factory-ui.cjs`) and `taas-factory-eval.json`
-(**5**, against `eval-taas-factory.cjs`; `ev-logs-free` added 2026-10-16): **142, 82 and 5 caught** (2026-10-16, later, every break in each list re-run on copies). The bins brief (2026-10-16, later) added 19
+(**5**, against `eval-taas-factory.cjs`; `ev-logs-free` added 2026-10-16): **142, 83 and 5 caught** (2026-10-16, later, every break in each list re-run on copies). The bins brief (2026-10-16, later) added 19
 engine breaks (`bins-*`: no starting logs or billed ones, a free restock, one every pull, five not
 ten, yours at the back or never yours, takes only at the recycle bin, a take that forgets yours,
 the rack taking only normal logs, $1 a press or a saw run, money not to the cent, no floor, whole
@@ -1234,6 +1261,11 @@ top.
 
 ## History
 
+- 2026-10-16 (later still): **Tips** in the factory's Info and § Tips here (the CD: the eval's two
+  findings are "perfect examples of how sometimes AI agents are not worth it until you have
+  sufficient experience and funding to properly support them"): a first agent rarely pays for
+  itself, an agent faster than demand makes waste, give an agent the next best task. Page suite
+  111 (the tips row); page break list 84 (`tips-gone`).
 - 2026-10-16 (later): **bins you can take from, logs bought by the ten, $0.10 a run** (the CD's
   bins brief, three answers, then a change of costs once the first answer was measured): the
   robot's page in three parts so the instruction list stops jumping to the top; every input bin and

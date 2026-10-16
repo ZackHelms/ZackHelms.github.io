@@ -335,7 +335,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-16 18:53 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-16 19:19 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -4073,6 +4073,13 @@ const MODE = (function () {
       '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the planer until you scrub it clean yourself; anything else put in the medium plank stall, which a customer will pay for as a medium plank.</li>' +
       '<li><b>The stocker</b> takes from the planer\'s output bin and fills the stall. Told to stock only medium planks, it leaves everything else where it is and hunts for one: each reach finds one as often as medium planks make up the bin, and a reach that comes up with something else is a "looking for plank". Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up.</li>' +
       '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing. One is on the list from the start and suits any robot: <b>Wait between tasks</b>. Under its slot you set how long, ' + C.wait.min + ' to ' + C.wait.max + ' seconds (' + C.wait.start + ' to begin with), and the robot waits that long after each log it handles and each thing it stocks or recycles. Robots can run the planer and stock the counter; the other slots are yours.</li>' +
+      '</ul>' +
+      // what the game has taught the CD so far (the CD, 2026-10-16: "add these to a list of tips in the
+      // info section"); found by the eval, kept in .claude/taas.md § Tips
+      '<h3>Tips</h3><ul class="fx-tips">' +
+      '<li><b>A first agent rarely pays for itself.</b> The first draft of an agent will likely not return what it costs. It takes time to learn where it needs instructions and guardrails, and only then does it return more than its investment, its upkeep and the cleanup after it (an ROI above 1). Robots are worth it once you have the experience and the money to support them.</li>' +
+      '<li><b>An agent faster than demand makes waste.</b> A robot on the planer handles logs far faster than customers buy planks, and every log it presses that nobody buys was paid for. Pace it before anything else: given Wait between tasks the moment it starts, it earns sooner and the rest of its instructions come about twice as fast.</li>' +
+      '<li><b>Give an agent the next best task, not the biggest.</b> A first robot put on the planer, while you still carry every plank to the counter yourself, presses logs nobody is selling and the money runs down. Put it on stocking first.</li>' +
       '</ul>' +
       '<h3>Measured since each robot\'s evals were last reset</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Green</th><th>Yellow</th><th>Red</th><th>Green %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
       '<p class="fx-small">You: ' + T.made + ' planks made, ' + T.tossed + ' logs tossed, ' + T.stocked + ' stocked, ' + T.fixed + ' jams fixed, ' + T.sawn + ' sawn, ' + T.extracted + ' sap logs pressed, ' + T.carved + ' carved. Customers served: ' + s.shop.served + (s.shop.wrong ? ' (' + s.shop.wrong + ' sold something else)' : '') + '. Earned in all: ' + cash(s.earned) + '; spent on logs and running the machines: ' + cash(s.spent) + ' (logs bought ' + cash(s.costs.bought) + ', the planer ' + cash(s.costs.logs) + ', jams ' + cash(s.costs.fixes) + ', saw ' + cash(s.costs.saw) + ', extractor ' + cash(s.costs.extract) + ').</p>' +
