@@ -265,6 +265,16 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 .fx-bubble.grouped { flex-direction: column; gap: 6px; max-width: calc(100% - 12px); }
 .fx-bubble { max-width: calc(100% - 12px); flex-wrap: wrap; }
 .fx-arr { position: absolute; top: 3px; right: 3px; }
+/* a bin's bubble: yours on top, settled into the lower left; the bin's below, settled into the upper
+   left; a line between them that does not move */
+.fx-bubble.bin { flex-direction: column; flex-wrap: nowrap; gap: 6px; }
+.fx-half { display: flex; gap: 6px; overflow-y: auto; overscroll-behavior: contain; }
+.fx-half.fx-mine { flex-direction: column-reverse; }
+.fx-half.fx-bins { flex-direction: column; }
+.fx-brow { display: flex; gap: 6px; flex: 0 0 auto; }
+.fx-bubble.bin .fx-opt { width: 58px; min-width: 58px; flex: 0 0 58px; }
+.fx-ph { opacity: .3; }
+.fx-line { flex: 0 0 auto; height: 0; border-top: 2.5px solid #1d2430; margin: 0 -6px; }
 #fx-panel { position: absolute; inset: 0; z-index: 40; background: rgba(15,20,28,.55); display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
   overflow-y: auto; padding: calc(48px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom)); }
 #fx-panel > :first-child { margin-top: auto; }
@@ -286,7 +296,8 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 #fx-rp-name { width: 100%; font: 800 20px/1.2 var(--display); color: #1d2430; border: 2px solid #e1e6ea; border-radius: 10px; padding: 6px 10px; background: #f4f7f9;
   user-select: text; -webkit-user-select: text; }
 #fx-rp-name:focus { outline: none; border-color: #16b3a5; background: #fff; }
-#fx-rp-dyn { display: flex; flex-direction: column; gap: 12px; }
+#fx-panel-body [data-part] { display: flex; flex-direction: column; gap: 12px; }
+#fx-panel-body [data-part]:empty { display: none; }
 .fx-sec { display: flex; flex-direction: column; gap: 6px; }
 .fx-h { display: flex; justify-content: space-between; gap: 8px; font: 700 11px/1.2 var(--mono); letter-spacing: .05em; text-transform: uppercase; color: #586663; }
 .fx-base { font: 500 14px/1.45 var(--mono); background: #13202b; color: #7ff0ff; border-radius: 10px; padding: 10px 12px; }
@@ -2783,12 +2794,9 @@ const MODE = (function () {
     ]);
     // slot 01: the planer (once machine01), its rack of logs, its belts, its output bin
     const yc = ROWY.planer;
-    const endLog = (x, z, r, bark) => xf(cyl(0, 0, -0.65, r || 0.11, 1.3, 9, bark || COL.bark, COL.woodEnd), chain(Mt(x, yc - 0.03, z), Mx(Math.PI / 2)));
     add('rack', SO.rack[3], [
-      box(SO.rack[0], SO.rack[1] - 0.05, 0, SO.rack[2], SO.rack[1] + 0.05, 0.7, '#8a6a4c', '#a8835f'), box(SO.rack[0], SO.rack[3] - 0.1, 0, SO.rack[2], SO.rack[3], 0.18, '#8a6a4c', '#a8835f'),
-      endLog(0.29, 0.11), endLog(0.52, 0.11, 0.11, COL.gnarl), endLog(0.75, 0.11),
-      endLog(0.4, 0.31), endLog(0.64, 0.28, 0.07), endLog(0.52, 0.5)
-    ]);
+      box(SO.rack[0], SO.rack[1] - 0.05, 0, SO.rack[2], SO.rack[1] + 0.05, 0.7, '#8a6a4c', '#a8835f'), box(SO.rack[0], SO.rack[3] - 0.1, 0, SO.rack[2], SO.rack[3], 0.18, '#8a6a4c', '#a8835f')
+    ]);   // the logs on it are the planer's input bin, drawn live (the CD, 2026-10-16)
     add('inBelt', yc + 0.3, beltFrame(SO.inBelt[0], SO.inBelt[2], yc));
     add('outBelt', yc + 0.3, beltFrame(SO.outBelt[0], SO.outBelt[2], yc));
     const mq = SO.machine;
@@ -2956,6 +2964,8 @@ const MODE = (function () {
   /* ---------- live models: every thing in the factory, by kind and size ---------- */
   // how long each size is drawn: 2', 4' and 8' in the CD's words, squeezed onto the belts
   const LEN = { s: 0.55, m: 0.85, l: 1.1 }, LOG_R = { s: 0.085, m: 0.12, l: 0.16 };
+  // where the planer's input bin's logs lie on its rack: x, and the height of the log's underside
+  const RACK_AT = [[0.31, 0], [0.52, 0], [0.73, 0], [0.415, 0.22], [0.625, 0.22], [0.52, 0.43]];
   // a gnarled log's holes, [along, across] in metres on a medium log; its plank has them in the
   // same places (the CD, 2026-10-14), since the log runs along x on the belt and the plank comes
   // out along x. A longer or shorter one has them spread to its length.
@@ -3713,7 +3723,7 @@ const MODE = (function () {
   function drawPlate() {
     const S = VW.S, r = boardRect('plate'), pad = 0.07 * S;
     if (r.y > VW.h || r.y + r.h < 0) return;
-    const now = F.priceNow(s, WANT()), full = F.priceOf(WANT()), price = '$' + now;
+    const now = F.priceNow(s, WANT()), full = F.priceOf(WANT()), price = usd(now);
     ctx.save();
     ctx.textBaseline = 'middle';
     const cy = r.y + r.h / 2;
@@ -3787,7 +3797,10 @@ const MODE = (function () {
     const heap = (list, q, max) => list.slice(-(max || 18)).forEach((k, i) => { const sl = binSlot(q, i); items.push([k, sl.x, sl.y, sl.z + (isLog(k) ? LOG_R[F.sizeOf(k)] : 0), q[1] + 0.02 + i * 0.0001, sl.turn]); });
     heap(s.bin, SO.bin); heap(sw.in, SO.sawIn); heap(sw.out, SO.sawOut); heap(ex.in, SO.extractIn); heap(ex.out, SO.extractOut);
     heap(s.bench.in, SO.benchIn); heap(s.bench.out, SO.benchOut);
-    s.rack.slice(0, 3).forEach((k, i) => items.push([k, 0.33 + 0.19 * i, yc - 0.03, 0.72 + LOG_R[F.sizeOf(k)], SO.rack[3] + 0.001 + i * 0.0001, Math.PI / 2]));
+    // the planer's input bin: up to six of its logs stacked on the rack, three, two and one, the next
+    // to roll in on top
+    const shown = s.rack.slice(0, RACK_AT.length).reverse();
+    shown.forEach((k, i) => { const p = RACK_AT[i]; items.push([k, p[0], yc - 0.03, p[1] + LOG_R[F.sizeOf(k)], SO.rack[3] + 0.001 + i * 0.0001, Math.PI / 2]); });
     if (s.bench.item) { const u = clamp(s.bench.t / C.carveSec, 0, 1); items.push([s.bench.item, 2.85, ROWY.bench - 0.05, 0.88 + (isLog(s.bench.item) ? LOG_R[F.sizeOf(s.bench.item)] : 0), SO.bench[3] + 0.03, 0, 1 - 0.25 * u]); }
     s.stalls[0].stock.forEach((g, i) => items.push([g.item, (L.STALL.x0 + L.STALL.x1) / 2, L.STALL.y0 + 0.12 + (i % 2) * 0.2, L.STALL.z + 0.03 + Math.floor(i / 2) * 0.065, SO.counter[3] + 0.07 + i * 0.0001, 0, 0.92]));
     // the last few things in the recycle bin poke out of its mouth (not the ones still in the air)
@@ -3830,7 +3843,7 @@ const MODE = (function () {
           if (whirs[at]) whirs[at].stop();
           whirs[at] = SND.whir(len);
           const p = AT[at]();
-          if (e.cost) FLOAT.push({ x: p[0], y: p[1], z: p[2], text: '-$' + e.cost, color: '#ff8a8a', age: 0 });
+          if (e.cost) FLOAT.push({ x: p[0], y: p[1], z: p[2], text: '-' + usd(e.cost), color: '#ff8a8a', age: 0 });
           break;
         }
         case 'made': SND.sfx('done'); puff(SO.machine[2] + 0.05, ROWY.planer, 0.6, 'dust', 10); break;
@@ -3839,14 +3852,15 @@ const MODE = (function () {
         case 'jam': SND.sfx('jam'); if (whirs.planer) { whirs.planer.stop(); whirs.planer = null; } puff(SO.machine[0] + 0.97, SO.machine[1] + 0.4, 1.8, 'smoke', 8); break;
         case 'cleaned': {
           SND.sfx('clean'); puff((SO.console[0] + SO.console[2]) / 2, SO.machine[3] + 0.05, 0.8, 'spark', 14);
-          if (e.cost) FLOAT.push({ x: (SO.machine[0] + SO.machine[2]) / 2, y: ROWY.planer - 0.3, z: 1.5, text: '-$' + e.cost, color: '#ff8a8a', sub: 'jam fixed', age: 0 });
+          if (e.cost) FLOAT.push({ x: (SO.machine[0] + SO.machine[2]) / 2, y: ROWY.planer - 0.3, z: 1.5, text: '-' + usd(e.cost), color: '#ff8a8a', sub: 'jam fixed', age: 0 });
           break;
         }
         case 'customer': SND.sfx('bell'); break;
+        case 'restock': FLOAT.push({ x: (SO.rack[0] + SO.rack[2]) / 2, y: ROWY.planer, z: 1.3, text: '-' + usd(e.cost), color: '#ff8a8a', sub: e.n + ' logs bought', age: 0 }); SND.sfx('drop'); break;
         case 'paying': SND.sfx('card'); break;
         case 'sold': {
           const wrong = e.sale === 'wrong';
-          FLOAT.push({ x: e.x, y: e.y, z: 1.6, text: '+$' + e.paid, color: wrong ? '#ff8a8a' : '#7dff9a', sub: wrong ? 'not a medium plank: satisfaction -' + C.satHit + '%' : '', age: 0 });
+          FLOAT.push({ x: e.x, y: e.y, z: 1.6, text: '+' + usd(e.paid), color: wrong ? '#ff8a8a' : '#7dff9a', sub: wrong ? 'not a medium plank: satisfaction -' + C.satHit + '%' : '', age: 0 });
           SND.sfx(e.paid > 0 ? 'cash' : 'flop');
           if (wrong) SND.sfx('boo');
           break;
@@ -3958,19 +3972,49 @@ const MODE = (function () {
     }
     return '<button class="fx-opt' + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + esc(aria) + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
   }
+  // a bin you put things in and take them out of (the planer's, the three input bins, the recycle
+  // bin): what you carry that it takes on top, what is in it below, and a line between them that
+  // stays put. Yours settle into the lower left and the bin's into the upper left, so tapping the
+  // same tile again and again moves everything across (the CD, 2026-10-16). The halves are sized when
+  // the bubble opens to hold every kind on either side, and only grow
+  let binLay = null;
+  const TILE = 58, GAP = 6;
+  function binHalves(b, opts) {
+    const puts = opts.filter(o => o.group === 'put'), takes = opts.filter(o => o.group === 'take');
+    if (!binLay || binLay.of !== s.bubble) binLay = { of: s.bubble, kinds: new Set(), cols: 1, rows: 1 };
+    puts.concat(takes).forEach(o => binLay.kinds.add(o.item));
+    const n = Math.max(1, binLay.kinds.size), most = clamp(Math.floor((VW.w - 29 + GAP) / (TILE + GAP)), 3, 6);
+    binLay.cols = Math.max(binLay.cols, Math.min(most, n));
+    binLay.rows = Math.max(binLay.rows, Math.ceil(n / binLay.cols));
+    const cols = binLay.cols, span = k => k * TILE + (k - 1) * GAP;
+    const fit = Math.max(1, Math.floor(((VW.h - VW.hudBottom - 60) / 2 + GAP) / (TILE + GAP)));   // rows a half can show; more scroll
+    const w = span(cols), h = span(Math.min(binLay.rows, fit));
+    const ph = icon => '<span class="fx-opt off fx-ph" aria-hidden="true">' + mini(F.SAMPLE[b.kind]) + ARROW[icon] + '<span class="fx-lbl">0</span></span>';
+    const rows = (list, icon) => {
+      if (!list.length) return '<div class="fx-brow">' + ph(icon) + '</div>';
+      let out = '';
+      for (let i = 0; i < list.length; i += cols) out += '<div class="fx-brow">' + list.slice(i, i + cols).map(optButton).join('') + '</div>';
+      return out;
+    };
+    return '<div class="fx-half fx-mine" style="width:' + w + 'px;height:' + h + 'px">' + rows(puts, 'put') + '</div><div class="fx-line"></div>' +
+      '<div class="fx-half fx-bins" style="width:' + w + 'px;height:' + h + 'px">' + rows(takes, 'take') + '</div>';
+  }
   function renderBubble() {
     const b = F.bubbleOpen(s), opts = b ? F.options(s) : [];
     const bot = b && b.kind === 'robot' ? s.robots[b.id] : null;
     const sig = b ? JSON.stringify([b, opts, bot ? bot.name : '']) : '';
     if (sig !== bubbleSig) {
       bubbleSig = sig;
-      if (!b) { bubbleEl.hidden = true; bubbleEl.innerHTML = ''; }
+      if (!b) { bubbleEl.hidden = true; bubbleEl.innerHTML = ''; binLay = null; }
       else {
         bubbleEl.hidden = false;
         const puts = opts.filter(o => o.group === 'put'), takes = opts.filter(o => o.group === 'take');
+        const bin = !!F.ACCEPTS[b.kind];
         bubbleEl.classList.toggle('robot', !!bot);
-        bubbleEl.classList.toggle('grouped', takes.length > 0);
-        if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + opts.map(optButton).join('') + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
+        bubbleEl.classList.toggle('bin', bin);
+        bubbleEl.classList.toggle('grouped', !bin && takes.length > 0);
+        if (bin) bubbleEl.innerHTML = binHalves(b, opts);
+        else if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + opts.map(optButton).join('') + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
         else if (takes.length) bubbleEl.innerHTML = (puts.length ? '<div class="fx-bopts">' + puts.map(optButton).join('') + '</div>' : '') + '<div class="fx-bopts">' + takes.map(optButton).join('') + '</div>';
         else bubbleEl.innerHTML = opts.map(optButton).join('');
       }
@@ -3995,7 +4039,10 @@ const MODE = (function () {
 
   /* ---------- HUD and the opt-in panel ---------- */
   let shownMoney = null, shownSat = -1, bumpT = 0;
-  const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US');
+  // money is kept to the cent since a machine run costs $0.10 (the CD, 2026-10-16): the board shows
+  // the cents; a price or a cost shows them only when it has some
+  const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const usd = n => '$' + (Math.abs(n - Math.round(n)) < 0.005 ? String(Math.round(n)) : (+n).toFixed(2));
   // the boards draw from the state every frame; this keeps the bump timer and the screen-reader line
   function renderHud(dt) {
     bumpT = Math.max(0, bumpT - (dt || 0));
@@ -4018,10 +4065,10 @@ const MODE = (function () {
       '<h2>Robot factory</h2>' +
       '<p><b>The goal</b>: ' + esc(goalText()) + '. The planer (slot 01) is a task you can always do yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
       '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
-      '<p><b>Wood</b> comes in three sizes, small, medium and large (2\', 4\' and 8\'), and three qualities: normal, gnarled and sappy. Off the rack, ' + pct(Z.s) + ' of logs are small, ' + pct(Z.m) + ' medium and ' + pct(Z.l) + ' large; ' + pct(Q.gnarled) + ' are gnarled and ' + pct(Q.sappy) + ' sappy. The planer makes a normal log a plank of its size and a gnarled one a gnarled plank (its holes kept); any sap log jams it. <b>It costs $' + C.logCost + ' for every log</b>, whoever presses the button and whatever the log, and <b>fixing a jam costs $' + C.fixCost + '</b>, so money can go below zero. You press the normal medium logs, and any normal log you put on its rack yourself, and toss the rest in the recycle bin.</p>' +
-      '<p><b>Your arms</b>: tap an output bin to take everything in it, tap the counter to stock its stall with the medium planks you carry (the rest stay with you), and tap the recycle bin to put things in or take them back out. Tap a machine\'s input bin to put in what it takes.</p>' +
-      '<p><b>The sales counter</b> needs nobody: customers come in at the door, queue for the stall and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything but a medium plank in the medium plank stall still sells as one and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: the stall\'s $' + P.plank.m + ' times it (the counter\'s label shows what they pay now). Each fair sale wins a point back, and customers slowly forget.</p>' +
-      '<p><b>Slots 02 to 04</b> are yours to run for now. The table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length ($' + C.sawCost + '); the sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer ($' + C.extractCost + '); at the bench you carve gnarled wood into something to keep. For now only medium planks are sold. Their prices when they are: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length.</p>' +
+      '<p><b>Wood</b> comes in three sizes, small, medium and large (2\', 4\' and 8\'), and three qualities: normal, gnarled and sappy. The planer\'s input bin starts with ' + C.startLogs + ' logs, and <b>when it runs out ' + C.restock.n + ' more arrive for ' + usd(C.restock.cost) + '</b>. Of the logs bought, ' + pct(Z.s) + ' are small, ' + pct(Z.m) + ' medium and ' + pct(Z.l) + ' large; ' + pct(Q.gnarled) + ' are gnarled and ' + pct(Q.sappy) + ' sappy. The planer makes a normal log a plank of its size and a gnarled one a gnarled plank (its holes kept); any sap log jams it. <b>Every machine costs ' + usd(C.logCost) + ' for each thing it processes</b> (electricity and wear), whoever presses the button and whatever the thing, and <b>fixing a jam costs ' + usd(C.fixCost) + '</b>, so money can go below zero. You press the normal medium logs, and any normal log you put in its bin yourself (yours roll in first), and toss the rest in the recycle bin.</p>' +
+      '<p><b>Your arms</b>: tap an output bin to take everything in it, tap the counter to stock its stall with the medium planks you carry (the rest stay with you), and tap the recycle bin or a machine\'s input bin to put things in or take them back out: what you carry that it takes is on top, what is in it below. No bin ever fills up.</p>' +
+      '<p><b>The sales counter</b> needs nobody: customers come in at the door, queue for the stall and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything but a medium plank in the medium plank stall still sells as one and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: the stall\'s $' + P.plank.m + ' times it, but never less than the thing cost to make (' + usd(C.floor.plank) + ' for a plank, a log and a press; the counter\'s label shows what they pay now). Each fair sale wins a point back, and customers slowly forget.</p>' +
+      '<p><b>Slots 02 to 04</b> are yours to run for now. The table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length (' + usd(C.sawCost) + '); the sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer\'s input bin (' + usd(C.extractCost) + '); at the bench you carve gnarled wood into something to keep. For now only medium planks are sold. Their prices when they are: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length.</p>' +
       '<p>Each robot\'s page ends in its <b>evals</b>: what it has done, counted, with a dot for how it went. Reset them to start counting again after you change its instructions.</p>' +
       '<ul>' +
       '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a medium plank put in the stall; a wait between tasks, as told.</li>' +
@@ -4031,12 +4078,12 @@ const MODE = (function () {
       '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing. One is on the list from the start and suits any robot: <b>Wait between tasks</b>. Under its slot you set how long, ' + C.wait.min + ' to ' + C.wait.max + ' seconds (' + C.wait.start + ' to begin with), and the robot waits that long after each log it handles and each thing it stocks or recycles. Robots can run the planer and stock the counter; the other slots are yours.</li>' +
       '</ul>' +
       '<h3>Measured since each robot\'s evals were last reset</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Green</th><th>Yellow</th><th>Red</th><th>Green %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
-      '<p class="fx-small">You: ' + T.made + ' planks made, ' + T.tossed + ' logs tossed, ' + T.stocked + ' stocked, ' + T.fixed + ' jams fixed, ' + T.sawn + ' sawn, ' + T.extracted + ' sap logs pressed, ' + T.carved + ' carved. Customers served: ' + s.shop.served + (s.shop.wrong ? ' (' + s.shop.wrong + ' sold something else)' : '') + '. Earned in all: $' + s.earned + '; spent running the machines: $' + s.spent + ' (logs $' + s.costs.logs + ', jams $' + s.costs.fixes + ', saw $' + s.costs.saw + ', extractor $' + s.costs.extract + ').</p>' +
+      '<p class="fx-small">You: ' + T.made + ' planks made, ' + T.tossed + ' logs tossed, ' + T.stocked + ' stocked, ' + T.fixed + ' jams fixed, ' + T.sawn + ' sawn, ' + T.extracted + ' sap logs pressed, ' + T.carved + ' carved. Customers served: ' + s.shop.served + (s.shop.wrong ? ' (' + s.shop.wrong + ' sold something else)' : '') + '. Earned in all: ' + cash(s.earned) + '; spent on logs and running the machines: ' + cash(s.spent) + ' (logs bought ' + cash(s.costs.bought) + ', the planer ' + cash(s.costs.logs) + ', jams ' + cash(s.costs.fixes) + ', saw ' + cash(s.costs.saw) + ', extractor ' + cash(s.costs.extract) + ').</p>' +
       '<div class="fx-row"><button class="fx-ghost" data-panel="restart">' + (confirmReset ? 'Tap again to start over' : 'Start over') + '</button><button class="fx-ghost" data-panel="close">Close</button></div>';
   }
   let confirmReset = false;
   /* ---------- a robot's page: its name, its base prompt, its own instructions, its evals ---------- */
-  let panelMode = 'info', pageBot = -1, pickSlot = -1, pageSig = '';
+  let panelMode = 'info', pageBot = -1, pickSlot = -1;
   // a robot's evals: each key is an action, ':' and what it was done to, and '!' when it was done
   // against the robot's own instructions (it slipped). In the order they are listed:
   const DOING = {
@@ -4063,8 +4110,10 @@ const MODE = (function () {
   function openRobot(id) {
     const r = s.robots[id];
     if (!r) return;
-    panelMode = 'robot'; pageBot = id; pickSlot = -1; pageSig = '';
-    panelBody.innerHTML = '<input id="fx-rp-name" maxlength="' + C.nameMax + '" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Robot name"><div id="fx-rp-dyn"></div>';
+    panelMode = 'robot'; pageBot = id; pickSlot = -1;
+    Object.keys(partSig).forEach(k => delete partSig[k]);
+    panelBody.innerHTML = '<input id="fx-rp-name" maxlength="' + C.nameMax + '" autocomplete="off" autocapitalize="words" spellcheck="false" enterkeyhint="done" aria-label="Robot name">' +
+      '<div data-part="slots"></div><div data-part="pick"></div><div data-part="evals"></div><div class="fx-row"><button class="fx-ghost" data-panel="close">Close</button></div>';
     const inp = document.getElementById('fx-rp-name');
     inp.value = r.name;
     inp.addEventListener('input', () => F.rename(s, id, inp.value));
@@ -4073,13 +4122,28 @@ const MODE = (function () {
     renderRobot();
     panelEl.hidden = false;
   }
+  // the page is three parts, each rebuilt only when what it shows has changed, never while a finger
+  // is down in it, and keeping where each of its lists was scrolled: the picker's list is its own
+  // scroller, and rebuilding it whenever the robot finished something put it back at the top under
+  // the player's finger (the CD, 2026-10-16)
+  const partSig = {};
+  let holdPart = null, touching = 0;
+  function part(name, sig, html) {
+    const el = panelBody.querySelector('[data-part="' + name + '"]');
+    if (!el || partSig[name] === sig || holdPart === name) return;
+    partSig[name] = sig;
+    const kept = [...el.querySelectorAll('.fx-rules, .fx-scroll')].map(x => [x.scrollTop, x.scrollLeft]);
+    const had = document.activeElement && el.contains(document.activeElement) ? document.activeElement : null, sel = had && (had.id ? '#' + had.id : had.dataset.panel ? '[data-panel="' + had.dataset.panel + '"]' : '');
+    el.innerHTML = html;
+    el.querySelectorAll('.fx-rules, .fx-scroll').forEach((x, i) => { if (kept[i]) { x.scrollTop = kept[i][0]; x.scrollLeft = kept[i][1]; } });
+    const back = sel && el.querySelector(sel);   // a keyboard on the slider or a stepper keeps its place
+    if (back && !back.disabled) back.focus({ preventScroll: true });
+  }
   function renderRobot() {
-    const r = s.robots[pageBot], dyn = document.getElementById('fx-rp-dyn');
-    if (!r || !dyn) return;
+    const r = s.robots[pageBot];
+    if (!r || !panelBody.querySelector('[data-part]')) return;
     const price = F.slotPrice(s, r.id), open = F.slotsOpen(s), known = F.known(s);
-    const sig = JSON.stringify([r.name, r.job, r.slots, r.rules, r.wait, known.map(q => q.id), open, price !== null && s.money >= price, r.record, pickSlot, Math.floor((s.t - r.since) / 60)]);
-    if (sig === pageSig || holdWait) return;   // never under a finger on the wait's slider: it would be a new slider, and the drag would stop
-    pageSig = sig;
+    // its base prompt and its slots
     const base = F.BASE[r.job];
     let h = '<div class="fx-sec"><div class="fx-h"><span>Base prompt</span><span>' + JOB_NAME(r.job) + '</span></div>' +
       '<div class="fx-base' + (base ? '' : ' none') + '">' + (base ? esc(base) : 'No job, so no base prompt.') + '</div></div>';
@@ -4100,6 +4164,9 @@ const MODE = (function () {
       h += '</li>';
     }
     h += '</ol></div>';
+    part('slots', JSON.stringify([r.job, r.slots, r.rules, r.wait, open, price !== null && s.money >= price, pickSlot]), h);
+    // the picker: the instructions on the list, for the slot being filled
+    h = '';
     if (pickSlot >= 0) {
       h += '<div class="fx-sec fx-picker"><div class="fx-h"><span>Instruction for slot ' + (pickSlot + 1) + '</span></div>';
       if (!known.length) h += '<p class="fx-small">None yet. Each kind of mistake a robot makes adds the instruction that prevents it to this list.</p>';
@@ -4109,19 +4176,16 @@ const MODE = (function () {
       }).join('') + '</div>';
       h += '<div class="fx-row"><button class="fx-ghost" data-panel="cancel">Cancel</button></div></div>';
     }
+    part('pick', JSON.stringify([pickSlot, pickSlot >= 0 ? known.map(q => q.id) : 0, pickSlot >= 0 ? r.rules : 0]), h);
+    // its evals
     const rec = evalRows(r).map(k => '<tr><td><i class="fx-dot ' + F.gradeOf(k) + '"></i>' + esc(doing(k)) + '</td><td>' + r.record[k] + '</td></tr>').join('');
     const mins = Math.floor((s.t - r.since) / 60);
-    h += '<div class="fx-sec fx-evals"><div class="fx-h"><span>Evals</span><span>' + (mins < 1 ? 'under a minute' : mins + ' min') + '</span></div>' +
+    h = '<div class="fx-sec fx-evals"><div class="fx-h"><span>Evals</span><span>' + (mins < 1 ? 'under a minute' : mins + ' min') + '</span></div>' +
       (rec ? '<div class="fx-scroll"><table class="fx-rec"><tbody>' + rec + '</tbody></table></div>' : '<p class="fx-small">Nothing yet.</p>') +
       '<div class="fx-row"><button class="fx-ghost" data-panel="evals-reset"' + (rec ? '' : ' disabled') + '>Reset evals</button></div></div>';
-    h += '<div class="fx-row"><button class="fx-ghost" data-panel="close">Close</button></div>';
-    const had = document.activeElement && dyn.contains(document.activeElement) ? document.activeElement : null, sel = had && (had.id ? '#' + had.id : had.dataset.panel ? '[data-panel="' + had.dataset.panel + '"]' : '');
-    dyn.innerHTML = h;
-    const back = sel && dyn.querySelector(sel);   // a keyboard on the slider or a stepper keeps its place
-    if (back && !back.disabled) back.focus({ preventScroll: true });
+    part('evals', JSON.stringify([r.record, mins]), h);
   }
   // the wait under a slot holding the delay: the slider sets it as it moves, the steppers a second at a time
-  let holdWait = false;
   function showWait(r) {
     const o = panelBody.querySelector('.fx-wait output'), lo = panelBody.querySelector('[data-panel="wait:-1"]'), hi = panelBody.querySelector('[data-panel="wait:1"]');
     if (o) o.textContent = r.wait + ' s';
@@ -4133,13 +4197,19 @@ const MODE = (function () {
     if (!r || ev.target.id !== 'fx-wait') return;
     if (F.setWait(s, r.id, +ev.target.value)) showWait(r);
   });
-  panelEl.addEventListener('change', ev => { if (ev.target.id === 'fx-wait') { holdWait = false; save(); } });
-  ['pointerdown', 'touchstart'].forEach(k => panelEl.addEventListener(k, ev => { if (ev.target.id === 'fx-wait') holdWait = true; }, { passive: true }));
-  ['pointerup', 'pointercancel', 'touchend', 'touchcancel'].forEach(k => window.addEventListener(k, () => { holdWait = false; }, { passive: true }));
+  panelEl.addEventListener('change', ev => { if (ev.target.id === 'fx-wait') save(); });
+  // a finger down in a part of the robot's page holds that part as it is until the finger lifts (a
+  // drag on the wait's slider, a scroll through the picker's list, a press on a button). A browser
+  // cancels the pointer when a touch starts to scroll, so a touch is held until the touch ends
+  const grab = ev => { const p = ev.target.closest && ev.target.closest('[data-part]'); holdPart = p ? p.dataset.part : null; };
+  panelEl.addEventListener('pointerdown', grab, { passive: true });
+  panelEl.addEventListener('touchstart', ev => { touching = ev.touches.length; grab(ev); }, { passive: true });
+  ['touchend', 'touchcancel'].forEach(k => window.addEventListener(k, ev => { touching = ev.touches.length; if (!touching) holdPart = null; }, { passive: true }));
+  ['pointerup', 'pointercancel'].forEach(k => window.addEventListener(k, () => { if (!touching) holdPart = null; }, { passive: true }));
   function closePanel() {
     const inp = document.getElementById('fx-rp-name');
     if (inp && document.activeElement === inp) inp.blur();
-    panelEl.hidden = true; panelMode = 'info'; pageBot = -1; pickSlot = -1; holdWait = false;
+    panelEl.hidden = true; panelMode = 'info'; pageBot = -1; pickSlot = -1; holdPart = null;
   }
   // how the factory works: the menu's Info in this mode
   function showInfo() { SND.init(); SND.sfx('pop'); confirmReset = false; pageBot = -1; pickSlot = -1; panelMode = 'info'; renderPanel(); panelEl.hidden = false; }
