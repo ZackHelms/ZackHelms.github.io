@@ -1,6 +1,6 @@
 # taasdelay - TAAS robot factory: a delay between a robot's tasks (plan arc)
 
-**Status:** IN PROGRESS (steps 1-2 done; steps 3-6 open)
+**Status:** IN PROGRESS (steps 1-3 done; steps 4-6 open)
 **Requested:** 2026-10-16, the CD's answer to the storefront's open question 2 (overproduction):
 "Add an instruction that lets me add a delay between iterations of its task. Let the delay be a
 configurable value, a positive integer 0,1,2,...,60 seconds." And one more fix the same day (step
@@ -57,7 +57,7 @@ step 6).
 | 0 | The CD's three answers recorded, the demand item in `TODO.md`, this arc | (this session) | DONE - on `main` |
 | 1 | Fix: people keep their hair when they face the camera (cause traced: the hair sorts behind the head) | `taasdelay.s1-hair.md` | DONE 2026-10-16 |
 | 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | DONE 2026-10-16 |
-| 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | open |
+| 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | DONE 2026-10-16 |
 | 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | open |
 | 5 | Docs final and gates | `taasdelay.s5-docs-gates.md` | open |
 | 6 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasdelay.s6-ship.md` | open |
@@ -97,4 +97,18 @@ step 6).
   satisfaction ends 38-98%; 4-5 s starves the line (11-18%). The useful band is narrow (2-3 s)
   and the 5 s default starves customers behind a fully instructed operator: step 4 should
   measure it and the report should put it to the CD.
-
+- **Step 3 (2026-10-16), the UI:** a slot holding the delay wraps to a second line, `.fx-wait`:
+  `-` / slider `#fx-wait` (range 0-60, step 1) / `+` / "N s" (`data-panel="wait:-1"` and
+  `"wait:1"` through the click delegate; the slider on `input` -> `F.setWait` + `showWait()` in
+  place, `change` -> save). `pageSig` holds `r.wait`; `renderRobot()` skips while `holdWait`
+  (pointer/touch down on the slider), or the 60 fps redraw replaces the slider mid-drag; a redraw
+  restores keyboard focus. At <= 360 px the row drops its indent. `pauseSign()` over a robot in
+  `pause` (white disc, two bars, teal ring that empties; 27 px right while a mood badge is up) and
+  a `calm` face; `DOING.waited` / `DOING.straight`; Info (Instructions + Green items). Page suite
+  **99** (89 + 10 rows, section 17); rules 180; formal 43 / 39; smoke, parse, `negtest.sh scan`
+  GREEN; factory eval not re-run (engine untouched). Page break list **71** (16 `delay-ui-*`
+  appended), **16 of 16** caught on copies after one row was tightened (a stepper that never
+  saved was hidden by the page's `pagehide` save: the row now reads the save before any frame).
+  Every `old` in the four TAAS lists occurs once. Screenshots looked at: the robot page at 390
+  and 320 (the first 320 shot put "5 s" off the panel; fixed with `width: 0` on the slider and
+  `min-width: 0` on the row) and the pause signs in the scene.
