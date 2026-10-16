@@ -148,9 +148,9 @@ const server = http.createServer((req, res) => {
     ok(pressedAt > 2, 'the avatar walked first and pressed on arrival', pressedAt);
     await step(5.6);
     const t2 = await S();
-    ok(t2.bin.join() === 'plank.m' && t2.money === -1, 'four seconds later a medium plank is in the planer\'s output bin, and the log cost $1', t2.bin.join() + ' / ' + t2.money);
+    ok(t2.bin.join() === 'plank.m' && t2.money === -0.1, 'four seconds later a medium plank is in the planer\'s output bin, and the press cost $0.10 (the CD, 2026-10-16)', t2.bin.join() + ' / ' + t2.money);
     const neg = await boardInk('cash'), said = await H(() => document.getElementById('fx-score').textContent);
-    ok(neg.red > 40 && neg.white < 5 && /^Money -\$1\./.test(said), 'below zero the money board on the wall reads -$1, in red', JSON.stringify(neg) + ' ' + said);
+    ok(neg.red > 40 && neg.white < 5 && /^Money -\$0\.10\./.test(said), 'below zero the money board on the wall reads -$0.10, in red (money to the cent)', JSON.stringify(neg) + ' ' + said);
     const bin = await rectOf('binFront');
     await page.touchscreen.tap(centre(bin)[0], bin.y + bin.h * 0.4);
     for (let i = 0; i < 40 && !(await H(() => window.TAAS_FACTORY.s.avatar.inv.length)); i++) await step(0.1);
@@ -173,8 +173,8 @@ const server = http.createServer((req, res) => {
     const t5 = await S(), bump = await boardInk('cash');
     await step(0.5);
     const after = await boardInk('cash'), said3 = await H(() => document.getElementById('fx-score').textContent);
-    ok(c0.length === 1 && c0[0] < 0.2 && sold && t5.money === 3 && !t5.stalls[0].stock.length && bump.green > 40 && bump.red === 0 && after.white > 40 && after.green === 0 && after.red === 0 && /^Money \$3\./.test(said3),
-      'a customer comes in at the door on the left and buys it for $4: the money board flashes green, then reads $3 in white, out of the red', JSON.stringify([c0, bump, after]) + ' ' + said3);
+    ok(c0.length === 1 && c0[0] < 0.2 && sold && t5.money === 3.9 && !t5.stalls[0].stock.length && bump.green > 40 && bump.red === 0 && after.white > 40 && after.green === 0 && after.red === 0 && /^Money \$3\.90\./.test(said3),
+      'a customer comes in at the door on the left and buys it for $4: the money board flashes green, then reads $3.90 in white, out of the red', JSON.stringify([c0, bump, after]) + ' ' + said3);
     await step(1.5);   // the sale's "+$4" floats up past the board first
     const sat0 = await boardInk('sat');
     await H(() => { window.TAAS_FACTORY.s.satisfaction = 70; window.TAAS_FACTORY.tick(1 / 60); });
@@ -342,7 +342,8 @@ const server = http.createServer((req, res) => {
     ok(p.open && !p.menu && sub === 'How the factory works' && p.rows.length === 1 && /No robots yet/.test(p.rows[0]), 'Info in the menu ("How the factory works") closes the menu and opens the explanation, with the measured table (no robots yet)', JSON.stringify(p) + ' ' + sub);
     const words = await H(() => document.getElementById('fx-panel-body').textContent);
     ok(/Sell medium planks for \$4/.test(words) && /Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it starts from the goal and explains customer satisfaction on its own terms, without the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
-    ok(/costs \$1 for every log/.test(words) && /fixing a jam costs \$5/.test(words) && /every second each one waits costs 0.1%/.test(words) && /Satisfaction sets what customers pay/.test(words), 'and the storefront\'s rules: $1 a log, $5 to fix a jam, 0.1% a second for each customer waiting, satisfaction setting the price');
+    ok(/costs \$0\.10 for each thing it processes/.test(words) && /starts with 10 logs/.test(words) && /10 more arrive for \$10/.test(words) && /fixing a jam costs \$5/.test(words) && /every second each one waits costs 0.1%/.test(words) && /Satisfaction sets what customers pay/.test(words) && /never less than the thing cost to make \(\$1\.10 for a plank/.test(words),
+      'and the storefront\'s rules: 10 logs to start and 10 more for $10, $0.10 a machine run, $5 to fix a jam, 0.1% a second for each customer waiting, satisfaction setting the price but never below what the thing cost to make');
     ok(/three sizes/.test(words) && /table saw/.test(words) && /sap extractor/.test(words) && /bench/.test(words) && /\$2 \/ \$4 \/ \$8/.test(words) && /\$3 \/ \$6 \/ \$12/.test(words) && /Instructions/.test(words) && /\$5, \$10, \$15, \$20 and \$25/.test(words),
       'and wood\'s sizes and qualities, slots 02 to 04, the CD\'s prices, and instructions');
     await H(() => { window.TAAS_FACTORY.s.money = 33; });
@@ -417,7 +418,7 @@ const server = http.createServer((req, res) => {
       const T = window.TAAS_FACTORY, s = T.s;
       s.money = 60; s.shop.next = 1e9;
       ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
-      s.force.log = Array(80).fill('log.m'); s.force.think = Array(80).fill(false);
+      s.rack = Array(80).fill('log.m'); s.rackMine = 0; s.force.think = Array(80).fill(false);   // the planer's input bin: medium logs only
       for (let i = 0; i < 300; i++) FACTORY.step(s, 0.05);
       s.robots[1].job = null; s.robots[1].state = 'idle'; s.robots[1].carry = null;
       s.events = []; s.money = 100; s.seen.sap = true; s.seen.gnarled = true;
@@ -735,7 +736,7 @@ const server = http.createServer((req, res) => {
     await page.tap('#fx-bubble [data-opt="cut:b2x2"]');
     await step(4.5);
     const cut = await S();
-    ok(cut.saw.out.join() === 'b2x2.l' && cut.money === m0 - 1, 'a tap on a cut presses the saw ($1), and four large 2"x2"s land in its output bin', cut.saw.out.join() + ' / ' + (m0 - cut.money));
+    ok(cut.saw.out.join() === 'b2x2.l' && Math.round((m0 - cut.money) * 100) === 10, 'a tap on a cut presses the saw ($0.10), and four large 2"x2"s land in its output bin', cut.saw.out.join() + ' / ' + (m0 - cut.money));
   });
   /* ---------- 16. people keep their hair facing the camera (the CD, 2026-10-16) ---------- */
   // turned toward the camera the head was drawn over the hair, so customers went bald and the avatar lost the hair under
@@ -780,7 +781,7 @@ const server = http.createServer((req, res) => {
         s.money = 60; s.shop.next = 1e9;
         ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
         s.robots[1].job = null; s.robots[1].state = 'idle';
-        s.force.log = Array(400).fill('log.m'); s.force.think = Array(400).fill(false); s.force.slip = Array(400).fill(false);
+        s.rack = Array(400).fill('log.m'); s.rackMine = 0; s.force.think = Array(400).fill(false); s.force.slip = Array(400).fill(false);
         s.money = 100; s.events = []; T.view.camY = T.view.minY; T.tick(1 / 60);
       });
     };
@@ -854,6 +855,7 @@ const server = http.createServer((req, res) => {
     const sign = await H(() => {
       const T = window.TAAS_FACTORY, s = T.s, r = s.robots[0], k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
       window.__step = FACTORY.step; window.__rnd = Math.random; FACTORY.step = () => {}; Math.random = () => 0.999;
+      T.tick(2);   // the minute's floats (a "-$0.10" a press, a restock's "-$10") rise and go before the pixels are read
       T.view.camY = Math.min(T.view.maxY, Math.max(T.view.minY, T.screen(0, r.y, 0)[1] + T.view.camY - 400));
       const grab = () => { r.moodT = 0; T.tick(0); const p = T.screen(r.x, r.y, 1.3); const d = g.getImageData(Math.round((p[0] - 18) * k), Math.round((p[1] - 36) * k), Math.round(36 * k), Math.round(40 * k)).data; let teal = 0, white = 0; for (let i = 0; i < d.length; i += 4) { if (Math.abs(d[i] - 22) < 30 && Math.abs(d[i + 1] - 179) < 30 && Math.abs(d[i + 2] - 165) < 30) teal++; if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) white++; } return { teal, white, px: Array.from(d) }; };
       r.state = 'idle'; r.t = 0; const idle = grab();
@@ -890,6 +892,131 @@ const server = http.createServer((req, res) => {
     const info = await H(() => document.getElementById('fx-panel-body').textContent);
     await H(() => window.TAAS_FACTORY.closePanel());
     ok(/Wait between tasks/.test(info) && /0 to 60 seconds \(5 to begin with\)/.test(info) && /a wait between tasks, as told/.test(info), 'Info tells of the delay: on the list from the start, 0 to 60 seconds, 5 to begin with, and a wait as told is green', (info.match(/One is on the list[^.]*\.[^.]*\./) || [''])[0]);
+  });
+  /* ---------- 18. the picker that stays put, and bins you can take from (the CD, 2026-10-16) ---------- */
+  await section('18. bins', async () => {
+    // the picker: scrolled down its list while the robot works, it stays where it was
+    await fresh(19);
+    const pk = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s;
+      s.money = 60; s.shop.next = 1e9;
+      ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+      s.rack = Array(200).fill('log.m'); s.rackMine = 0; s.force.think = Array(400).fill(false);
+      FACTORY.RULES.forEach(q => { if (q.id !== 'output') s.seen[q.id] = true; });   // a long list, one still to come
+      s.money = 500; FACTORY.buySlot(s, 0); s.events = [];
+      T.openRobot(0); T.tick(1 / 60);
+      document.querySelector('[data-panel="pick:0"]').click(); T.tick(1 / 60);
+      const list = document.querySelector('.fx-rules');
+      list.scrollTop = 140; const first = list.firstElementChild; first.dataset.mark = 'kept';
+      const rec0 = JSON.stringify(s.robots[0].record);
+      for (let i = 0; i < 20 * 60; i++) T.tick(1 / 60);   // twenty seconds of the robot pressing logs, the page drawn every frame
+      const l2 = document.querySelector('.fx-rules');
+      const worked = JSON.stringify(s.robots[0].record) !== rec0;
+      const out = { worked, top: l2.scrollTop, same: l2 === list && l2.firstElementChild.dataset.mark === 'kept', n: l2.children.length, scrolls: l2.scrollHeight > l2.clientHeight + 100 };
+      // a new instruction joining the list rebuilds the picker, still where it was
+      s.seen.output = true; T.tick(1 / 60);
+      const l3 = document.querySelector('.fx-rules');
+      out.joined = [l3.children.length, l3.scrollTop, l3 !== list];
+      return out;
+    });
+    ok(pk.worked && pk.scrolls && pk.same && pk.top === 140, 'scrolled down the instruction list while the robot works, the list stays where it was: the robot finishing things no longer rebuilds it (the CD\'s jumping list)', JSON.stringify(pk));
+    ok(pk.joined[0] === pk.n + 1 && pk.joined[1] === 140 && pk.joined[2], 'and when a new instruction joins the list the picker is rebuilt with it, still scrolled where it was', JSON.stringify(pk.joined));
+    // a finger down in the list holds it as it is until the finger lifts
+    const held = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s, list = document.querySelector('.fx-rules'), btn = list.children[3];
+      const touch = (type, el) => { const tch = new Touch({ identifier: 1, target: el, clientX: 10, clientY: 10 }); el.dispatchEvent(new TouchEvent(type, { bubbles: true, touches: type === 'touchend' ? [] : [tch], changedTouches: [tch] })); };
+      touch('touchstart', btn);
+      s.seen.output = false; s.seen.output = true; delete s.seen.price; T.tick(1 / 60);   // the list changes under the finger
+      const during = document.querySelector('.fx-rules') === list;
+      touch('touchend', btn); T.tick(1 / 60);
+      const after = document.querySelector('.fx-rules') !== list;
+      return { during, after };
+    });
+    ok(held.during && held.after, 'a finger down in the list holds it as it is (no button swapped under the finger), and it is rebuilt once the finger lifts', JSON.stringify(held));
+    await H(() => window.TAAS_FACTORY.closePanel());
+
+    // the recycle bin's bubble: yours on top, settled into the lower left; the bin's below, settled into the upper left
+    await fresh(20);
+    await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s;
+      s.shop.next = 1e9;
+      s.avatar.inv.push('plank.s', 'plank.s', 'rough.m', 'sap', 'log.l', 'b2x4.m');
+      s.recycle.push('sappy.l', 'dowels.s');
+      FACTORY.tap(s, { kind: 'recycle' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05);
+      T.tick(1 / 60); T.tick(1 / 60);
+    });
+    const geo = () => H(() => {
+      const b = document.getElementById('fx-bubble'), top = b.querySelector('.fx-mine'), bot = b.querySelector('.fx-bins'), line = b.querySelector('.fx-line');
+      const R = e => { const r = e.getBoundingClientRect(); return { l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom) }; };
+      const puts = [...top.querySelectorAll('[data-opt]')], takes = [...bot.querySelectorAll('[data-opt]')];
+      return { line: R(line).t, top: R(top), bot: R(bot), puts: puts.map(e => e.dataset.opt), takes: takes.map(e => e.dataset.opt), p0: puts[0] ? R(puts[0]) : null, t0: takes[0] ? R(takes[0]) : null, ph: [top.querySelectorAll('.fx-ph').length, bot.querySelectorAll('.fx-ph').length] };
+    });
+    const g0 = await geo();
+    ok(g0.puts.join() === 'put:log.l,put:plank.s,put:rough.m,put:sap,put:b2x4.m' && g0.takes.join() === 'take:sappy.l,take:dowels.s' && g0.top.b < g0.line && g0.bot.t > g0.line && g0.top.b - g0.top.t === g0.bot.b - g0.bot.t,
+      'at the recycle bin the bubble shows what you carry on top and what is in the bin below, a line between two halves of the same height', JSON.stringify(g0));
+    ok(g0.p0 && Math.abs(g0.p0.b - g0.top.b) <= 1 && Math.abs(g0.p0.l - g0.top.l) <= 1 && g0.t0 && Math.abs(g0.t0.t - g0.bot.t) <= 1 && Math.abs(g0.t0.l - g0.bot.l) <= 1,
+      'yours settle into the lower left of the top half, the bin\'s into the upper left of the bottom half', JSON.stringify([g0.p0, g0.top, g0.t0, g0.bot]));
+    // tap the same spot again and again: everything you carry goes in, and the line never moves
+    const spot = [g0.p0.l + 20, g0.p0.b - 20], lines = [g0.line];
+    for (let i = 0; i < 7; i++) { await page.touchscreen.tap(spot[0], spot[1]); await step(0.05); lines.push((await geo()).line); }
+    const g1 = await geo(), s1 = await S();
+    ok(!s1.avatar.inv.length && s1.recycle.length === 8 && lines.every(y => y === g0.line) && g1.ph[0] === 1 && g1.puts.length === 0,
+      'tapping that lower-left tile again and again puts everything you carry in the bin, a kind a tap, and the line between the halves never moves (the CD)', JSON.stringify({ lines, inv: s1.avatar.inv, bin: s1.recycle.length, ph: g1.ph }));
+    const spot2 = [g1.t0.l + 20, g1.t0.t + 20];
+    for (let i = 0; i < 9; i++) { await page.touchscreen.tap(spot2[0], spot2[1]); await step(0.05); lines.push((await geo()).line); }
+    const g2 = await geo(), s2 = await S();
+    ok(!s2.recycle.length && s2.avatar.inv.length === 8 && lines.every(y => y === g0.line) && g2.ph[1] === 1 && g2.takes.length === 0,
+      'and tapping the upper-left tile below again and again takes it all back out into your arms, the line still where it was', JSON.stringify({ inv: s2.avatar.inv.length, bin: s2.recycle.length, ph: g2.ph, lines: [...new Set(lines)] }));
+    // a plank put in the table saw's input bin comes back out (the CD's example)
+    await fresh(21);
+    await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s;
+      s.shop.next = 1e9; s.avatar.inv.push('plank.m');
+      FACTORY.tap(s, { kind: 'sawIn' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05);
+      T.tick(1 / 60); T.tick(1 / 60);
+    });
+    await page.tap('#fx-bubble [data-opt="put:plank.m"]'); await step(0.05);
+    const inSaw = await H(() => window.TAAS_FACTORY.s.saw.in.join());
+    await page.tap('#fx-bubble [data-opt="take:plank.m"]'); await step(0.05);
+    const s3 = await S();
+    ok(inSaw === 'plank.m' && !s3.saw.in.length && s3.avatar.inv.join() === 'plank.m', 'a plank put in the table saw\'s input bin can be taken back out with a tap on its bubble\'s lower half, to sell instead (the CD\'s example)', inSaw + ' / ' + s3.avatar.inv.join());
+    // the planer's input bin: its logs are on its rack, and its bubble takes them out
+    const rackPx = async () => H(() => {
+      const T = window.TAAS_FACTORY, r = T.spriteRect('rack'), k = T.view.dpr;
+      T.tick(0);
+      const d = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * k), Math.round(r.y * k), Math.round(r.w * k), Math.round(r.h * k)).data;
+      let n = 0; for (let i = 0; i < d.length; i += 4) n += d[i] + d[i + 1] + d[i + 2]; return n / (d.length / 4);
+    });
+    await fresh(22);
+    await H(() => { const s = window.TAAS_FACTORY.s; s.shop.next = 1e9; s.rack = []; });
+    const empty = await rackPx();
+    await H(() => { const s = window.TAAS_FACTORY.s; s.rack = ['log.l', 'log.l', 'log.l', 'log.l', 'log.l', 'log.l']; });
+    const full = await rackPx();
+    ok(Math.abs(full - empty) > 8, 'the planer\'s rack shows the logs in its input bin: an empty bin, an empty rack', empty.toFixed(1) + ' vs ' + full.toFixed(1));
+    await fresh(23);
+    await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s;
+      s.shop.next = 1e9; s.rack = ['sappy.m', 'log.m', 'sappy.m']; s.rackMine = 0;
+      FACTORY.tap(s, { kind: 'rack' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05);
+      T.tick(1 / 60); T.tick(1 / 60);
+    });
+    const rb = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt + '|' + b.getAttribute('aria-label')));
+    await page.tap('#fx-bubble [data-opt="take:sappy.m"]'); await step(0.05);
+    const s4 = await S();
+    ok(rb.join() === 'take:log.m|Take a medium log out,take:sappy.m|Take a medium sap log out, 2' && s4.avatar.inv.join() === 'sappy.m,sappy.m' && s4.rack.join() === 'log.m',
+      'the planer\'s input bin gives its logs back too: take the sap logs out for the sap extractor', JSON.stringify(rb) + ' / ' + s4.avatar.inv.join());
+    // a restock says what it cost, over the rack (what the canvas writes, read off fillText)
+    const said = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s, g = document.getElementById('fx-canvas').getContext('2d'), out = [], fill = g.fillText;
+      s.bubble = null; s.rack = []; s.rackMine = 0; s.machine.log = 'log.m'; s.machine.staged = 1;
+      FACTORY.tap(s, { kind: 'machine' });
+      for (let i = 0; i < 400 && !s.events.some(e => e.kind === 'restock'); i++) FACTORY.step(s, 0.05);
+      g.fillText = function (txt) { out.push(String(txt)); return fill.apply(this, arguments); };
+      T.tick(1 / 60);
+      g.fillText = fill;
+      return out;
+    });
+    ok(said.includes('-$10') && said.includes('10 logs bought') && said.includes('-$0.10'), 'when the planer\'s bin runs out and restocks, "-$10" and "10 logs bought" float up over it (and each press says its "-$0.10")', JSON.stringify(said.filter(x => /\$|logs/.test(x))));
   });
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
   await section('12. badge', async () => {

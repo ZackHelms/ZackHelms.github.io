@@ -122,8 +122,8 @@
  {
   "name": "plate-full-price",
   "file": "games/taas/index.html",
-  "old": "    const now = F.priceNow(s, WANT()), full = F.priceOf(WANT()), price = '$' + now;",
-  "new": "    const now = F.priceOf(WANT()), full = F.priceOf(WANT()), price = '$' + now; /* @negtest */"
+  "old": "    const now = F.priceNow(s, WANT()), full = F.priceOf(WANT()), price = usd(now);",
+  "new": "    const now = F.priceOf(WANT()), full = F.priceOf(WANT()), price = usd(now); /* @negtest */"
  },
  {
   "name": "plate-never-amber",
@@ -234,12 +234,6 @@
   "new": "    if (o.icon === 'put' || o.icon === 'take') { inner = mini(o.item); /* @negtest */"
  },
  {
-  "name": "take-row-gone",
-  "file": "games/taas/index.html",
-  "old": "+ '<div class=\"fx-bopts\">' + takes.map(optButton).join('') + '</div>';",
-  "new": "; /* @negtest */"
- },
- {
   "name": "cut-labels-gone",
   "file": "games/taas/index.html",
   "old": "  const CUT_LABEL = { b2x4: '2x4', b2x2: '2x2', dowels: 'dowels' };",
@@ -278,7 +272,7 @@
  {
   "name": "info-no-fix",
   "file": "games/taas/index.html",
-  "old": " and <b>fixing a jam costs $' + C.fixCost + '</b>, so money",
+  "old": " and <b>fixing a jam costs ' + usd(C.fixCost) + '</b>, so money",
   "new": ", so money  @negtest "
  },
  {
@@ -338,20 +332,20 @@
  {
   "name": "delay-ui-redraw-mid-drag",
   "file": "games/taas/index.html",
-  "old": "    if (sig === pageSig || holdWait) return;",
-  "new": "    if (sig === pageSig) return; /* @negtest */"
+  "old": "    if (!el || partSig[name] === sig || holdPart === name) return;",
+  "new": "    if (!el || partSig[name] === sig) return; /* @negtest */"
  },
  {
   "name": "delay-ui-hold-never-set",
   "file": "games/taas/index.html",
-  "old": "  ['pointerdown', 'touchstart'].forEach(k => panelEl.addEventListener(k, ev => { if (ev.target.id === 'fx-wait') holdWait = true; }",
-  "new": "  [].forEach(k => panelEl.addEventListener(k, ev => { if (ev.target.id === 'fx-wait') holdWait = true; } /* @negtest */"
+  "old": "  panelEl.addEventListener('pointerdown', grab, { passive: true });\n  panelEl.addEventListener('touchstart', ev => { touching = ev.touches.length; grab(ev); }, { passive: true });",
+  "new": "  /* @negtest */"
  },
  {
   "name": "delay-ui-wait-not-in-sig",
   "file": "games/taas/index.html",
-  "old": "JSON.stringify([r.name, r.job, r.slots, r.rules, r.wait, known.map",
-  "new": "JSON.stringify([r.name, r.job, r.slots, r.rules, /* @negtest */ known.map"
+  "old": "part('slots', JSON.stringify([r.job, r.slots, r.rules, r.wait, open",
+  "new": "part('slots', JSON.stringify([r.job, r.slots, r.rules, /* @negtest */ open"
  },
  {
   "name": "delay-ui-steppers-both-add",
@@ -368,8 +362,8 @@
  {
   "name": "delay-ui-slider-no-save",
   "file": "games/taas/index.html",
-  "old": "if (ev.target.id === 'fx-wait') { holdWait = false; save(); } });",
-  "new": "if (ev.target.id === 'fx-wait') { holdWait = false; } }); /* @negtest */"
+  "old": "panelEl.addEventListener('change', ev => { if (ev.target.id === 'fx-wait') save(); });",
+  "new": "panelEl.addEventListener('change', ev => { if (ev.target.id === 'fx-wait') {} }); /* @negtest */"
  },
  {
   "name": "delay-ui-plus-never-greyed",
@@ -424,5 +418,83 @@
   "file": "games/taas/index.html",
   "old": "One is on the list from the start and suits any robot: <b>Wait between tasks</b>.",
   "new": "/* @negtest */"
+ },
+ {
+  "name": "bins-ui-pick-rebuilt-on-record",
+  "file": "games/taas/index.html",
+  "old": "    part('pick', JSON.stringify([pickSlot,",
+  "new": "    part('pick', JSON.stringify([r.record, /* @negtest */ pickSlot,"
+ },
+ {
+  "name": "bins-ui-no-scroll-keep",
+  "file": "games/taas/index.html",
+  "old": "    el.querySelectorAll('.fx-rules, .fx-scroll').forEach((x, i) => { if (kept[i]) { x.scrollTop = kept[i][0]; x.scrollLeft = kept[i][1]; } });",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "bins-ui-hold-stuck",
+  "file": "games/taas/index.html",
+  "old": "['touchend', 'touchcancel'].forEach(k => window.addEventListener(k, ev => { touching = ev.touches.length; if (!touching) holdPart = null; }, { passive: true }));",
+  "new": "['touchend', 'touchcancel'].forEach(k => window.addEventListener(k, ev => { touching = ev.touches.length; }, { passive: true })); /* @negtest */"
+ },
+ {
+  "name": "bins-ui-top-not-reversed",
+  "file": "games/taas/index.html",
+  "old": ".fx-half.fx-mine { flex-direction: column-reverse; }",
+  "new": ".fx-half.fx-mine { flex-direction: column; } /* @negtest */"
+ },
+ {
+  "name": "bins-ui-bottom-reversed",
+  "file": "games/taas/index.html",
+  "old": ".fx-half.fx-bins { flex-direction: column; }",
+  "new": ".fx-half.fx-bins { flex-direction: column-reverse; } /* @negtest */"
+ },
+ {
+  "name": "bins-ui-top-auto",
+  "file": "games/taas/index.html",
+  "old": "'<div class=\"fx-half fx-mine\" style=\"width:' + w + 'px;height:' + h + 'px\">'",
+  "new": "'<div class=\"fx-half fx-mine\" style=\"width:' + w + 'px\">' /* @negtest */"
+ },
+ {
+  "name": "bins-ui-bottom-auto",
+  "file": "games/taas/index.html",
+  "old": "'<div class=\"fx-half fx-bins\" style=\"width:' + w + 'px;height:' + h + 'px\">'",
+  "new": "'<div class=\"fx-half fx-bins\" style=\"width:' + w + 'px\">' /* @negtest */"
+ },
+ {
+  "name": "bins-ui-no-placeholder",
+  "file": "games/taas/index.html",
+  "old": "    const ph = icon => '<span class=\"fx-opt off fx-ph\"",
+  "new": "    const ph = icon => /* @negtest */ '' && '<span class=\"fx-opt off fx-ph\""
+ },
+ {
+  "name": "bins-ui-take-hidden",
+  "file": "games/taas/index.html",
+  "old": "'px\">' + rows(takes, 'take') + '</div>'",
+  "new": "'px\">' + rows([], 'take') + '</div>' /* @negtest */"
+ },
+ {
+  "name": "bins-ui-rack-static",
+  "file": "games/taas/index.html",
+  "old": "    shown.forEach((k, i) => { const p = RACK_AT[i];",
+  "new": "    [].forEach((k, i) => { const p = RACK_AT[i]; /* @negtest */"
+ },
+ {
+  "name": "bins-ui-cash-whole",
+  "file": "games/taas/index.html",
+  "old": "const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });",
+  "new": "const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US'); /* @negtest */"
+ },
+ {
+  "name": "bins-ui-usd-whole",
+  "file": "games/taas/index.html",
+  "old": "  const usd = n => '$' + (Math.abs(n - Math.round(n)) < 0.005 ? String(Math.round(n)) : (+n).toFixed(2));",
+  "new": "  const usd = n => '$' + Math.round(n); /* @negtest */"
+ },
+ {
+  "name": "bins-ui-no-restock-float",
+  "file": "games/taas/index.html",
+  "old": "        case 'restock': FLOAT.push(",
+  "new": "        case 'restock': /* @negtest */ break; FLOAT.push("
  }
 ]

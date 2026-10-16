@@ -20,20 +20,20 @@
  {
   "name": "log-free",
   "file": "games/taas/index.html",
-  "old": "    logCost: 1,",
-  "new": "    logCost: 0, /* @negtest */"
+  "old": "    logCost: 0.1, ",
+  "new": "    logCost: 0, /* @negtest */ "
  },
  {
   "name": "saw-free",
   "file": "games/taas/index.html",
-  "old": "    sawCost: 1, extractCost: 1,",
-  "new": "    sawCost: 0, extractCost: 1, /* @negtest */"
+  "old": "    sawCost: 0.1, extractCost: 0.1,",
+  "new": "    sawCost: 0, extractCost: 0.1, /* @negtest */"
  },
  {
   "name": "extract-free",
   "file": "games/taas/index.html",
-  "old": "    sawCost: 1, extractCost: 1,",
-  "new": "    sawCost: 1, extractCost: 0, /* @negtest */"
+  "old": "    sawCost: 0.1, extractCost: 0.1,",
+  "new": "    sawCost: 0.1, extractCost: 0, /* @negtest */"
  },
  {
   "name": "wait-no-cost",
@@ -80,14 +80,14 @@
  {
   "name": "price-not-scaled",
   "file": "games/taas/index.html",
-  "old": "fair = c.item === st.want, p = paid(s, priceOf(st.want));",
+  "old": "fair = c.item === st.want, p = paid(s, st.want);",
   "new": "fair = c.item === st.want, p = priceOf(st.want); /* @negtest */"
  },
  {
   "name": "wrong-free",
   "file": "games/taas/index.html",
-  "old": "    s.money += p; s.earned += p;\n    if (fair) s.satisfaction",
-  "new": "    if (fair) { s.money += p; s.earned += p; } /* @negtest */\n    if (fair) s.satisfaction"
+  "old": "    s.money = cents(s.money + p); s.earned = cents(s.earned + p);\n    if (fair) s.satisfaction",
+  "new": "    if (fair) { s.money = cents(s.money + p); s.earned = cents(s.earned + p); } /* @negtest */\n    if (fair) s.satisfaction"
  },
  {
   "name": "wrong-no-hit",
@@ -164,14 +164,14 @@
  {
   "name": "recycle-no-take",
   "file": "games/taas/index.html",
-  "old": "      if (b.kind === 'recycle') kindsIn(s.recycle).forEach(q => opts.push(",
-  "new": "      if (false) kindsIn(s.recycle).forEach(q => opts.push( /* @negtest */ "
+  "old": "      kindsIn(store(s, b.kind)).forEach(q => opts.push(",
+  "new": "      if (false) kindsIn(store(s, b.kind)).forEach(q => opts.push( /* @negtest */ "
  },
  {
-  "name": "rack-takes-sap",
+  "name": "rack-takes-planks",
   "file": "games/taas/index.html",
-  "old": "    rack: id => kindOf(id) === 'log',",
-  "new": "    rack: id => kindOf(id) === 'log' || kindOf(id) === 'sappy', /* @negtest */"
+  "old": "    rack: id => LOGS.indexOf(id) >= 0,",
+  "new": "    rack: id => LOGS.indexOf(id) >= 0 || kindOf(id) === 'plank', /* @negtest */"
  },
  {
   "name": "saw-takes-gnarled",
@@ -194,8 +194,8 @@
  {
   "name": "rack-ignored",
   "file": "games/taas/index.html",
-  "old": "    if (s.rack.length) return { log: s.rack.shift(), mine: true };",
-  "new": "    /* @negtest */"
+  "old": "    return { log: s.rack.shift(), mine };",
+  "new": "    return { log: buyLogs(s, 1)[0], mine }; /* @negtest */"
  },
  {
   "name": "player-presses-any",
@@ -236,8 +236,8 @@
  {
   "name": "logs-all-medium",
   "file": "games/taas/index.html",
-  "old": "    return { log: roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * Z[sizeOf(id)]]), 'log.m'), mine: false };",
-  "new": "    return { log: roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * (sizeOf(id) === 'm' ? 1 : 0)]), 'log.m'), mine: false }; /* @negtest */"
+  "old": "    for (let i = 0; i < n; i++) out.push(roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * Z[sizeOf(id)]]), 'log.m'));",
+  "new": "    for (let i = 0; i < n; i++) out.push(roll(s, 'log', LOGS.map(id => [id, Q[kindOf(id)] * (sizeOf(id) === 'm' ? 1 : 0)]), 'log.m')); /* @negtest */"
  },
  {
   "name": "press-anytime",
@@ -476,7 +476,7 @@
  {
   "name": "slot-free",
   "file": "games/taas/index.html",
-  "old": "    s.money -= p; r.slots++; r.rules.push(null);",
+  "old": "    s.money = cents(s.money - p); r.slots++; r.rules.push(null);",
   "new": "    r.slots++; r.rules.push(null); /* @negtest */"
  },
  {
@@ -512,7 +512,7 @@
  {
   "name": "hire-free",
   "file": "games/taas/index.html",
-  "old": "      s.money -= o.price; s.hired++;",
+  "old": "      s.money = cents(s.money - o.price); s.hired++;",
   "new": "      s.hired++; /* @negtest */"
  },
  {
@@ -602,8 +602,8 @@
  {
   "name": "load-floors-money",
   "file": "games/taas/index.html",
-  "old": "      s.money = Math.round(+s.money) || 0;",
-  "new": "      s.money = Math.max(0, Math.round(+s.money) || 0); /* @negtest */"
+  "old": "      s.money = cents(+s.money || 0);",
+  "new": "      s.money = Math.max(0, cents(+s.money || 0)); /* @negtest */"
  },
  {
   "name": "delay-not-from-start",
@@ -742,5 +742,119 @@
   "file": "games/taas/index.html",
   "old": "against: false, outSlip: false, huntSlip: false, wait: CFG.wait.start,",
   "new": "against: false, outSlip: false, huntSlip: false, wait: 0, /* @negtest */"
+ },
+ {
+  "name": "bins-no-start-logs",
+  "file": "games/taas/index.html",
+  "old": "    s.rack = buyLogs(s, CFG.startLogs);   // free",
+  "new": "    s.rack = []; /* @negtest */   // free"
+ },
+ {
+  "name": "bins-start-logs-billed",
+  "file": "games/taas/index.html",
+  "old": "    s.rack = buyLogs(s, CFG.startLogs);   // free",
+  "new": "    s.rack = buyLogs(s, CFG.startLogs); spend(s, 'bought', 10); /* @negtest */   // free"
+ },
+ {
+  "name": "bins-restock-free",
+  "file": "games/taas/index.html",
+  "old": "    spend(s, 'bought', CFG.restock.cost);",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "bins-restock-every-pull",
+  "file": "games/taas/index.html",
+  "old": "    if (!s.rack.length) restock(s);",
+  "new": "    if (s.rack.length < 1e9) restock(s); /* @negtest */"
+ },
+ {
+  "name": "bins-restock-five",
+  "file": "games/taas/index.html",
+  "old": "    const logs = buyLogs(s, CFG.restock.n);",
+  "new": "    const logs = buyLogs(s, 5); /* @negtest */"
+ },
+ {
+  "name": "bins-yours-at-back",
+  "file": "games/taas/index.html",
+  "old": "to.splice(s.rackMine++, 0, item);",
+  "new": "to.push(item); /* @negtest */"
+ },
+ {
+  "name": "bins-never-yours",
+  "file": "games/taas/index.html",
+  "old": "    const mine = s.rackMine > 0;",
+  "new": "    const mine = false; /* @negtest */"
+ },
+ {
+  "name": "bins-take-recycle-only",
+  "file": "games/taas/index.html",
+  "old": "      kindsIn(store(s, b.kind)).forEach(q =>",
+  "new": "      if (b.kind === 'recycle') /* @negtest */ kindsIn(store(s, b.kind)).forEach(q =>"
+ },
+ {
+  "name": "bins-take-keeps-yours",
+  "file": "games/taas/index.html",
+  "old": "if (b.kind === 'rack' && i < s.rackMine) s.rackMine--;",
+  "new": "/* @negtest */"
+ },
+ {
+  "name": "bins-rack-normal-only",
+  "file": "games/taas/index.html",
+  "old": "    rack: id => LOGS.indexOf(id) >= 0,",
+  "new": "    rack: id => kindOf(id) === 'log', /* @negtest */"
+ },
+ {
+  "name": "bins-press-dollar",
+  "file": "games/taas/index.html",
+  "old": "    logCost: 0.1, ",
+  "new": "    logCost: 1, /* @negtest */ "
+ },
+ {
+  "name": "bins-saw-dollar",
+  "file": "games/taas/index.html",
+  "old": "    sawCost: 0.1, extractCost: 0.1,",
+  "new": "    sawCost: 1, extractCost: 0.1, /* @negtest */"
+ },
+ {
+  "name": "bins-money-not-cents",
+  "file": "games/taas/index.html",
+  "old": "function spend(s, what, n) { s.money = cents(s.money - n);",
+  "new": "function spend(s, what, n) { s.money = s.money - n; /* @negtest */"
+ },
+ {
+  "name": "bins-no-floor",
+  "file": "games/taas/index.html",
+  "old": "return p === null ? null : Math.max(floorOf(item), cents(",
+  "new": "return p === null ? null : Math.max(0 /* @negtest */, cents("
+ },
+ {
+  "name": "bins-price-whole-dollars",
+  "file": "games/taas/index.html",
+  "old": "Math.max(floorOf(item), cents(p * s.satisfaction / 100));",
+  "new": "Math.max(floorOf(item), Math.round(p * s.satisfaction / 100)); /* @negtest */"
+ },
+ {
+  "name": "bins-plank-floor-1",
+  "file": "games/taas/index.html",
+  "old": "    floor: { log: 1, plank: 1.1,",
+  "new": "    floor: { log: 1, plank: 1, /* @negtest */"
+ },
+ {
+  "name": "bins-cut-floor-plank",
+  "file": "games/taas/index.html",
+  "old": "    if (CUTS.indexOf(k) >= 0) return F.cut;",
+  "new": "    if (CUTS.indexOf(k) >= 0) return F.plank; /* @negtest */"
+ },
+ {
+  "name": "bins-old-save-no-logs",
+  "file": "games/taas/index.html",
+  "old": "      else { s.rackMine = s.rack.length; s.rack = s.rack.concat(buyLogs(s, CFG.startLogs)); }",
+  "new": "      else { s.rackMine = s.rack.length; } /* @negtest */"
+ },
+ {
+  "name": "bins-load-mine-unclamped",
+  "file": "games/taas/index.html",
+  "old": "s.rackMine = Math.max(0, Math.min(s.rack.length, Math.floor(d.rackMine)));",
+  "new": "s.rackMine = d.rackMine; /* @negtest */"
  }
 ]

@@ -1,14 +1,32 @@
 [
- {"name": "ev-demand-doubles", "file": "games/taas/index.html",
+ {
+  "name": "ev-demand-doubles",
+  "file": "games/taas/index.html",
   "old": "shop: { first: 12, every: [8, 10, 12, 14, 16],",
-  "new": "shop: { first: 12, every: [4, 5, 6, 7, 8], /* @negtest */"},
- {"name": "ev-never-pauses", "file": "games/taas/index.html",
+  "new": "shop: { first: 12, every: [4, 5, 6, 7, 8], /* @negtest */"
+ },
+ {
+  "name": "ev-never-pauses",
+  "file": "games/taas/index.html",
   "old": "      if (follows(s, r, 'delay')) { r.state = 'pause';",
-  "new": "      if (false && follows(s, r, 'delay')) { r.state = 'pause'; /* @negtest */"},
- {"name": "ev-wait-always-max", "file": "games/taas/index.html",
+  "new": "      if (false && follows(s, r, 'delay')) { r.state = 'pause'; /* @negtest */"
+ },
+ {
+  "name": "ev-wait-always-max",
+  "file": "games/taas/index.html",
   "old": "function pause(r, dt) { r.t += dt; if (r.t >= r.wait ||",
-  "new": "function pause(r, dt) { r.t += dt; if (r.t >= CFG.wait.max /* @negtest */ ||"},
- {"name": "ev-wait-billed", "file": "games/taas/index.html",
+  "new": "function pause(r, dt) { r.t += dt; if (r.t >= CFG.wait.max /* @negtest */ ||"
+ },
+ {
+  "name": "ev-wait-billed",
+  "file": "games/taas/index.html",
   "old": "note(r, 'waited'); ev(s, 'paused', { by: r.id, wait: r.wait }); return; }",
-  "new": "note(r, 'waited'); spend(s, 'logs', 3); /* @negtest */ ev(s, 'paused', { by: r.id, wait: r.wait }); return; }"}
+  "new": "note(r, 'waited'); spend(s, 'logs', 3); /* @negtest */ ev(s, 'paused', { by: r.id, wait: r.wait }); return; }"
+ },
+ {
+  "name": "ev-logs-free",
+  "file": "games/taas/index.html",
+  "old": "    spend(s, 'bought', CFG.restock.cost);",
+  "new": "    /* @negtest */"
+ }
 ]

@@ -60,6 +60,9 @@ const STOCKERS = ['stockOnly', 'smallOut', 'largeOut', 'roughOut'];
 // next rolls of that name come up)
 const calm = () => ({ log: many('log.m'), think: many(false) });
 const shut = s => { s.shop.next = 1e9; return s; };   // nobody comes in
+// the planer's input bin holds just these logs, none of them yours (the next to roll in first);
+// once they are gone it restocks, and the restock's logs are the 'log' dice
+const feed = (s, logs) => { s.rack = logs.slice(); s.rackMine = 0; return s; };
 function onFree(s, pts) { return pts.every(p => F.free(s, p.x, p.y)); }
 // geometry, not the pathing grid: a walked segment keeps 0.1 m clear of every solid footprint
 function segFree(s, from, pts) {
@@ -78,7 +81,7 @@ function segFree(s, from, pts) {
 // a run that already has both robots, by the real route: earn it, walk to the dock, hire, assign
 function staffed(seed, jobs, force) {
   const s = F.newGame(seed || 1);
-  if (force) Object.keys(force).forEach(k => { s.force[k] = (s.force[k] || []).concat(force[k]); });
+  if (force) Object.keys(force).forEach(k => { if (k === 'log') feed(s, force.log); else s.force[k] = (s.force[k] || []).concat(force[k]); });
   s.money = C.hire[0] + C.hire[1];
   (jobs || ['operate', 'stock']).forEach(job => {
     F.tap(s, { kind: 'dock' }); until(s, x => F.bubbleOpen(x) && F.bubbleOpen(x).kind === 'dock', 30);
@@ -120,7 +123,10 @@ function queue(s, n) {
   ok(F.priceOf('plank.s') === 2 && F.priceOf('plank.l') === 8 && F.priceOf('sap') === 1 && cut('s').join() === '3,3,3' && cut('m').join() === '6,6,6' && cut('l').join() === '12,12,12',
     'the CD\'s prices: planks $2 / $4 / $8 by length, sap $1, and two 2"x4"s, four 2"x2"s or sixteen dowel rods $3 / $6 / $12 by the length they came from', [F.priceOf('plank.s'), F.priceOf('plank.l'), F.priceOf('sap')].concat(cut('s'), cut('l')).join());
   ok(C.stalls.length === 1 && C.stalls[0].want === 'plank.m', 'for now only medium planks are sold: the counter has one stall, for medium planks (the CD)');
-  ok(C.logCost === 1 && C.fixCost === 5 && C.sawCost === 1 && C.extractCost === 1, 'the planer costs $1 a log, fixing a sap jam $5, the table saw and the sap extractor $1 a thing (the CD\'s numbers)', [C.logCost, C.fixCost, C.sawCost, C.extractCost].join());
+  ok(C.logCost === 0.1 && C.fixCost === 5 && C.sawCost === 0.1 && C.extractCost === 0.1, 'every machine costs $0.10 for each thing it processes, the planer, the table saw and the sap extractor (electricity and wear, the CD 2026-10-16), and fixing a sap jam $5', [C.logCost, C.fixCost, C.sawCost, C.extractCost].join());
+  const fl = ['log.s', 'sappy.l', 'plank.s', 'plank.l', 'rough.m', 'b2x4.s', 'dowels.l', 'sap', 'carving.owl'].map(F.floorOf);
+  ok(fl.join() === '1,1,1.1,1.1,1.1,1.2,1.2,0.1,1' && C.floor.plank === F.cents(C.floor.log + C.logCost) && C.floor.cut === F.cents(C.floor.plank + C.sawCost),
+    'what each thing cost to make, the least it ever sells for: a log $1, any plank $1.10 and any cut $1.20 (the CD\'s numbers: a log and the machines\' runs), sap $0.10, a carving $1', fl.join());
   ok(C.satWait === 0.1 && C.shop.max >= 4, 'each customer waiting costs 0.1% of customer satisfaction a second (the CD\'s number), and the shop holds a line of ' + P.max);
   ok(JSON.stringify(C.slots) === '[5,10,15,20,25]' && C.slots.reduce((a, b) => a + b, 0) * C.hire.length === 150, 'instruction slots cost $5 / $10 / $15 / $20 / $25 for each robot (the CD\'s numbers)', C.slots.join());
   ok(F.RULES.length === 14 && F.RULES.every(q => RULE_TEXT[q.id] === q.text), 'the instruction pool is fourteen, word for word', F.RULES.map(q => q.text).join(' | '));
@@ -173,8 +179,7 @@ function queue(s, n) {
 
 /* ---------- 3. the planer by hand, your arms, and the counter ---------- */
 {
-  const s = shut(F.newGame());
-  s.force.log = many('log.m');
+  const s = feed(shut(F.newGame()), many('log.m'));
   ok(s.money === 0 && s.satisfaction === 100 && F.ready(s) && s.machine.log === 'log.m' && !s.robots.length && !s.bin.length && !s.avatar.inv.length && learnt(s) === '' && F.known(s).map(q => q.id).join() === 'delay',
     'a new factory: $0, customer satisfaction at 100%, a normal medium log on the planer, empty arms, no robots, and only the delay on the instruction list');
   F.tap(s, { kind: 'machine' });
@@ -225,14 +230,14 @@ function queue(s, n) {
   ok(s.avatar.inv.join() === 'plank.s' && s.recycle.join() === 'rough.m', 'and a tap takes them back out: anything put in the recycle bin can be had back (the CD)', s.avatar.inv.join());
   F.tap(s, { kind: 'floor', x: 3, y: 9 }); F.step(s, 0.05);
   ok(!F.bubbleOpen(s) && !F.options(s).length, 'walking away closes the bubble');
-  // the empty recycle bin and an empty pair of arms: one greyed choice
+  // the empty recycle bin and an empty pair of arms: nothing to choose
   const e = shut(F.newGame());
   F.tap(e, { kind: 'recycle' }); until(e, x => !!F.bubbleOpen(x), 20);
   o = F.options(e);
-  ok(o.length === 1 && !o[0].enabled && !F.choose(e, o[0].id), 'with nothing to put in and nothing in it, the recycle bin\'s bubble shows one greyed choice');
+  ok(!!F.bubbleOpen(e) && !o.length && !F.choose(e, 'none') && !F.choose(e, 'take:log.m') && !F.choose(e, 'put:log.m'), 'with nothing to put in and nothing in it, the recycle bin\'s bubble opens with nothing to choose, and nothing can be put in or taken out');
 
   // you at the planer always get it right
-  const g = shut(F.newGame()); g.force.log = ['log.s', 'sappy.m', 'log.l', 'log.m'];
+  const g = feed(shut(F.newGame()), ['log.s', 'sappy.m', 'log.l', 'log.m'].concat(many('log.m', 5)));
   g.machine.log = 'gnarled.m';
   F.tap(g, { kind: 'machine' });
   until(g, x => x.machine.phase === 'run', 20);
@@ -241,16 +246,16 @@ function queue(s, n) {
     'with a gnarled log on the belt you toss it in the recycle bin, and the small, sap and large logs after it, and press on the normal medium log (a sap log never jams your press)', rec.map(e => e.item).join());
   until(g, x => x.bin.length > 0, 10);
   ok(g.bin.join() === 'plank.m' && g.spent === C.logCost && learnt(g) === '', 'so your plank is a medium plank, a toss costs nothing, and no instruction joins the list (you made no mistake)', g.spent);
-  // the rack: logs you put there yourself roll in next, and you press them whatever their size
-  const k = shut(F.newGame()); k.force.log = many('gnarled.m');
-  k.avatar.inv.push('log.l', 'log.s', 'gnarled.s', 'sappy.m');
+  // the planer's input bin (its rack): logs you put there yourself roll in next, and you press them whatever their size
+  const k = feed(shut(F.newGame()), many('gnarled.m', 3));
+  k.avatar.inv.push('log.l', 'log.s', 'gnarled.s', 'sappy.m', 'plank.m');
   F.tap(k, { kind: 'rack' }); until(k, x => !!F.bubbleOpen(x), 20);
   o = F.options(k);
-  ok(o.map(x => x.id).join() === 'put:log.s,put:log.l', 'at the planer\'s rack the bubble offers the normal logs in your arms, and nothing else', o.map(x => x.id).join());
+  ok(o.map(x => x.id + ':' + x.count).join() === 'put:log.s:1,put:log.l:1,put:gnarled.s:1,put:sappy.m:1,take:gnarled.m:3', 'at the planer\'s input bin the bubble offers every log in your arms, sap and gnarled ones too (any log, the CD), and each kind in the bin to take out', o.map(x => x.id).join());
   F.choose(k, 'put:log.l'); F.choose(k, 'put:log.s');
   const many3 = shut(F.newGame()); many3.avatar.inv.push('log.m', 'log.m', 'log.m', 'plank.m'); F.tap(many3, { kind: 'rack' }); until(many3, x => !!F.bubbleOpen(x), 20); F.choose(many3, 'put:log.m');
-  ok(many3.rack.join() === 'log.m,log.m,log.m' && many3.avatar.inv.join() === 'plank.m', 'one tap puts every one of that kind in, however many you carry', many3.rack.join());
-  ok(k.rack.join() === 'log.l,log.s' && k.avatar.inv.slice().sort().join() === 'gnarled.s,sappy.m', 'they go on the rack', k.rack.join());
+  ok(many3.rack.slice(0, 3).join() === 'log.m,log.m,log.m' && many3.rack.length === C.startLogs + 3 && many3.rackMine === 3 && many3.avatar.inv.join() === 'plank.m', 'one tap puts every one of that kind in, however many you carry, in front of the logs bought', many3.rack.join());
+  ok(k.rack.join() === 'log.l,log.s,gnarled.m,gnarled.m,gnarled.m' && k.rackMine === 2 && k.avatar.inv.slice().sort().join() === 'gnarled.s,plank.m,sappy.m', 'they go in the bin, yours first, in the order you put them', k.rack.join());
   F.tap(k, { kind: 'machine' }); until(k, x => x.machine.phase === 'run', 10);
   until(k, x => x.machine.phase === 'ready' && x.machine.staged >= 1, 10);
   F.tap(k, { kind: 'machine' }); until(k, x => x.machine.phase === 'run', 10);
@@ -258,7 +263,7 @@ function queue(s, n) {
   ok(k.bin.join() === 'plank.m,plank.l' && k.machine.log === 'log.s' && k.machine.mine, 'the log on the belt first, then yours: you press a large log you racked yourself (a large plank)', k.bin.join());
   until(k, x => x.machine.phase === 'ready' && x.machine.staged >= 1, 10);
   F.tap(k, { kind: 'machine' }); until(k, x => x.bin.length === 3, 15);
-  ok(k.bin[2] === 'plank.s' && k.machine.log === 'gnarled.m' && !k.machine.mine, 'and the small one; then the pile again', k.bin.join());
+  ok(k.bin[2] === 'plank.s' && k.machine.log === 'gnarled.m' && !k.machine.mine && k.rackMine === 0, 'and the small one; then the logs bought again', k.bin.join());
 }
 
 /* ---------- 4. the counter's customers ---------- */
@@ -324,8 +329,9 @@ function queue(s, n) {
     'a small plank in the medium plank stall: the customer pays $4 for a medium plank, gets something else, and customer satisfaction drops ' + C.satHit, wrong.paid + ' / ' + s.satisfaction.toFixed(2));
   // what customers pay is the stall's price times customer satisfaction (the CD, 2026-10-15)
   const paidAt = sat => { const t = shut(F.newGame()); queue(t, 1); t.stalls[0].stock.push({ item: 'plank.m', by: 'player' }); until(t, x => x.shop.people[0].state === 'pay', 5); t.satisfaction = sat; until(t, x => take(x, 'sold').length > 0, 5); return take(t, 'sold')[0].paid; };
-  const pays = [100, 85, 70, 50, 30].map(paidAt);
-  ok(pays.join() === [100, 85, 70, 50, 30].map(v => Math.round(4 * (v - 0.02) / 100)).join() && pays[0] === 4 && pays[4] === 1, 'as customer satisfaction falls, so does what they pay: $4 at 100%, $3 at 85% and 70%, $2 at 50%, $1 at 30%', pays.join());
+  const pays = [100, 85, 70, 50, 30, 20, 10].map(paidAt);
+  ok(pays.slice(0, 5).every((p, i) => F.cents(p) === p && Math.abs(p - 4 * [100, 85, 70, 50, 30][i] / 100) <= 0.05) && pays[0] === 4 && pays.slice(5).join() === '1.1,1.1',
+    'as customer satisfaction falls, so does what they pay, to the cent: $4 at 100%, about $3.40 at 85%, $2.80 at 70%, $2 at 50%, $1.20 at 30%; and never below what a plank cost to make: $1.10 at 20% and at 10% (the CD, 2026-10-16)', pays.join());
   s = shut(F.newGame()); queue(s, 1); s.stalls[0].stock.push({ item: 'plank.m', by: 'player' }); s.satisfaction = 70;
   until(s, x => take(x, 'sold').length > 0, 10);
   ok(s.satisfaction > 70 + C.satUp - 0.05 && s.satisfaction < 70 + C.satUp + 0.6, 'a fair sale wins a point back (and customers forget a little while it pays)', s.satisfaction.toFixed(2));
@@ -667,14 +673,14 @@ function stockCycle(bin, force, rules) {
   F.choose(s, 'put:sappy.l');
   const m1 = s.money;
   F.tap(s, { kind: 'extract' }); until(s, x => x.extract.phase === 'run', 20);
-  ok(m1 - s.money === C.extractCost && !s.extract.in.length, 'a tap on the extractor presses it: $' + C.extractCost);
+  ok(F.cents(m1 - s.money) === C.extractCost && !s.extract.in.length, 'a tap on the extractor presses it: $' + C.extractCost);
   until(s, x => x.extract.out.length === 1 + C.sapUnits.l, C.extractSec + 4);
   ok(s.extract.out.slice().sort().join() === ['log.l'].concat(many('sap', C.sapUnits.l)).sort().join() && C.sapUnits.s === 1 && C.sapUnits.m === 2 && C.sapUnits.l === 4,
     'a large sap log gives up 4 units of sap and a clean large log (1 / 2 / 4 by size, the CD\'s numbers)', s.extract.out.join());
   F.tap(s, { kind: 'extractOut' }); until(s, x => !x.avatar.act && x.avatar.task.arrived, 20);
   F.tap(s, { kind: 'rack' }); until(s, x => !!F.bubbleOpen(x), 30);
   F.choose(s, 'put:log.l');
-  ok(s.rack.join() === 'log.l', 'the clean log can go on the planer\'s rack (the CD)');
+  ok(s.rack[0] === 'log.l' && s.rackMine === 1, 'the clean log can go in the planer\'s input bin, and rolls in next (the CD)', s.rack.join());
   // the bench
   F.tap(s, { kind: 'benchIn' }); until(s, x => !!F.bubbleOpen(x), 30);
   s.avatar.inv.push('gnarled.s');
@@ -777,8 +783,8 @@ function stockCycle(bin, force, rules) {
     x.events.forEach(e => { if (e.kind === 'hired' || e.kind === 'slot') bought += e.price; });
     x.events = [];
     const inside = x.shop.people.filter(c => c.state !== 'out').length;
-    if (!Number.isInteger(x.money) || x.money !== 200 + x.earned - x.spent - bought) worst = 'money ' + x.money + ' is not earned ' + x.earned + ' less running costs ' + x.spent + ' and purchases ' + bought;
-    else if (x.spent !== x.costs.logs + x.costs.fixes + x.costs.saw + x.costs.extract) worst = 'spent ' + x.spent + ' is not its parts ' + JSON.stringify(x.costs);
+    if (F.cents(x.money) !== x.money || Math.abs(x.money - (200 + x.earned - x.spent - bought)) > 1e-6) worst = 'money ' + x.money + ' is not earned ' + x.earned + ' less running costs ' + x.spent + ' and purchases ' + bought;
+    else if (Math.abs(x.spent - (x.costs.logs + x.costs.fixes + x.costs.saw + x.costs.extract + x.costs.bought)) > 1e-6) worst = 'spent ' + x.spent + ' is not its parts ' + JSON.stringify(x.costs);
     else if (x.satisfaction < C.satMin || x.satisfaction > 100) worst = 'satisfaction ' + x.satisfaction;
     else if (!F.free(x, x.avatar.x, x.avatar.y)) worst = 'avatar inside something at ' + x.avatar.x.toFixed(2) + ',' + x.avatar.y.toFixed(2);
     else if (x.robots.some(r => !F.free(x, r.x, r.y))) worst = 'a robot inside something';
@@ -789,7 +795,7 @@ function stockCycle(bin, force, rules) {
     else if (x.robots.some(r => r.slots > C.slots.length || r.rules.length !== r.slots || r.rules.some(id => id !== null && !x.seen[id]) || new Set(r.rules.filter(Boolean)).size !== r.rules.filter(Boolean).length)) worst = 'a robot\'s instructions ' + JSON.stringify(x.robots.map(r => r.rules));
   });
   const tl = s.tally.player;
-  ok(!worst && s.robots.length >= 1 && s.spent > 0 && tl.stocked + tl.sawn + tl.extracted + tl.carved > 0, 'over 400 random taps and page visits: money is always what was earned less the running costs (logs, fixes, cuts) and purchases, satisfaction in bounds, nobody walks into anything, every bin and your arms hold only things, the stall and the shop never overfill, customers stay in the shop, instructions only ever seen ones',
+  ok(!worst && s.robots.length >= 1 && s.spent > 0 && tl.stocked + tl.sawn + tl.extracted + tl.carved > 0, 'over 400 random taps and page visits: money is always whole cents and what was earned less the running costs (logs pressed and bought, fixes, cuts) and purchases, satisfaction in bounds, nobody walks into anything, every bin and your arms hold only things, the stall and the shop never overfill, customers stay in the shop, instructions only ever seen ones',
     worst || (s.robots.length + ' robots, $' + s.money + ', ' + JSON.stringify(tl)));
   const a = play(F.newGame(8), 80), text = F.save(a), b = F.load(text);
   const strip = x => JSON.stringify(Object.assign({}, x, { events: [] }));
@@ -802,14 +808,14 @@ function stockCycle(bin, force, rules) {
   const raw = JSON.parse(F.save(h));
   Object.assign(raw, { money: 'lots', spent: -9, satisfaction: 400, seen: { bogus: true } });
   raw.robots[0].slots = 9; raw.robots[0].rules = ['sap', 'sap', 'nonsense', 'price']; raw.robots[0].name = 'x'.repeat(40); raw.robots[1].job = 'sell';
-  raw.machine.log = 'stone'; raw.bin = ['plank.m', 'brick', 'plank']; raw.avatar.inv = ['sap', 7, 'carving.dragon']; raw.rack = ['sappy.m', 'log.s'];
+  raw.machine.log = 'stone'; raw.bin = ['plank.m', 'brick', 'plank']; raw.avatar.inv = ['sap', 7, 'carving.dragon']; raw.rack = ['sappy.m', 'stone', 'plank.m', 'log.s']; raw.rackMine = 9;
   raw.stalls = [{ want: 'plank.s', stock: Array(9).fill({ item: 'plank.m', by: 0 }) }];
   raw.shop = { people: [{ id: 1, x: 2, y: 1.15, state: 'dance' }, { id: 2, x: 3, y: 1.15, state: 'wait' }], next: 'soon', n: 3 };
   const hacked = F.load(JSON.stringify(raw));
   ok(hacked && hacked.money === 0 && hacked.spent === 0 && hacked.satisfaction === 100 && hacked.robots[0].slots === 5 && hacked.robots[0].rules.join() === 'sap,,,price,' && hacked.robots[0].name.length === C.nameMax && hacked.robots[1].job === null &&
-    hacked.seen.price && !hacked.seen.bogus && hacked.machine.log === 'log.m' && hacked.bin.join() === 'plank.m' && hacked.avatar.inv.join() === 'sap' && hacked.rack.join() === 'log.s' &&
+    hacked.seen.price && !hacked.seen.bogus && hacked.machine.log === 'log.m' && hacked.bin.join() === 'plank.m' && hacked.avatar.inv.join() === 'sap' && hacked.rack.join() === 'sappy.m,log.s' && hacked.rackMine === 2 &&
     hacked.stalls[0].want === 'plank.m' && hacked.stalls[0].stock.length === C.stallCap && hacked.shop.people.length === 1 && Number.isFinite(hacked.shop.next),
-    'a hand-edited save is clamped: money, what was spent, satisfaction, slots, instructions, a long name, an old job, an unknown log or thing, a sap log on the rack, an overfull stall, a customer doing something else', hacked && JSON.stringify([hacked.money, hacked.robots[0].rules, hacked.bin, hacked.avatar.inv, hacked.rack, hacked.stalls[0].stock.length, hacked.shop.people.length]));
+    'a hand-edited save is clamped: money, what was spent, satisfaction, slots, instructions, a long name, an old job, an unknown log or thing, a stone or a plank in the planer\'s input bin and more of it yours than it holds, an overfull stall, a customer doing something else', hacked && JSON.stringify([hacked.money, hacked.robots[0].rules, hacked.bin, hacked.avatar.inv, hacked.rack, hacked.stalls[0].stock.length, hacked.shop.people.length]));
   raw.money = -37;
   ok(F.load(JSON.stringify(raw)).money === -37, 'and money below zero is kept: logs cost money');
 }
@@ -922,7 +928,7 @@ function stockCycle(bin, force, rules) {
   // same outcome for each, only later
   const alone = wait => {
     const t = opCycle('log.m', { slip: many(false, 5000) }, ['sappy', 'gnarled', 'medium'].concat(wait ? ['delay'] : []));
-    t.force.log = []; t.force.think = [];
+    feed(t, []); t.force.think = [];
     if (wait) F.setWait(t, 0, wait);
     const out = [];
     for (let k = 0; k < 12000; k++) { F.step(t, 0.05); t.events.forEach(e => { if (e.kind === 'outcome') out.push(e.what); }); t.events = []; t.bin.length = 0; }
@@ -976,6 +982,87 @@ function stockCycle(bin, force, rules) {
   const without = tenMin(0), withIt = tenMin(3);
   ok(without.end >= 12 && withIt.most <= 3, 'overproduction: without a wait the output bin piles up with medium planks nobody buys; told to wait 3 s a log (about the customers\' pace) the operator keeps it to a handful',
     'without: ' + without.end + ' at the end; with 3 s: ' + withIt.end + ' at the end, ' + withIt.most + ' at most (satisfaction ' + without.sat.toFixed(0) + '% vs ' + withIt.sat.toFixed(0) + '%)');
+}
+
+/* ---------- 13. the planer's input bin, and taking things back out (the CD, 2026-10-16) ---------- */
+{
+  // a new factory: 10 logs in the bin, free; the first log on the in-feed as always
+  const s = shut(F.newGame(77));
+  const ok10 = s.rack.length === C.startLogs && s.rack.every(k => F.LOGS.indexOf(k) >= 0) && s.rackMine === 0;
+  ok(C.startLogs === 10 && C.restock.n === 10 && C.restock.cost === 10 && C.logCost === 0.1 && ok10 && s.money === 0 && s.spent === 0 && s.machine.log === 'log.m' && F.ready(s),
+    'a new factory starts with 10 logs in the planer\'s input bin, none of them yours and none paid for, and a normal medium log on the in-feed (the CD: 10 to start, 10 more for $10, and $0.10 a press)', s.rack.join());
+  const many5 = Array.from({ length: 300 }, (_, i) => F.newGame(1000 + i)).reduce((a, g) => a.concat(g.rack), []);
+  const share = (pred) => many5.filter(pred).length / many5.length;
+  ok(Math.abs(share(k => F.sizeOf(k) === 'm') - C.logs.size.m) < 0.04 && Math.abs(share(k => F.kindOf(k) === 'sappy') - C.logs.quality.sappy) < 0.03,
+    'they are drawn the way logs are bought: about ' + Math.round(C.logs.size.m * 100) + '% medium and ' + Math.round(C.logs.quality.sappy * 100) + '% sap logs over 300 factories', share(k => F.sizeOf(k) === 'm').toFixed(3) + ' medium, ' + share(k => F.kindOf(k) === 'sappy').toFixed(3) + ' sappy');
+  // when the planer needs a log and the bin is empty: 10 more, for $10, the 'log' dice
+  const r = feed(shut(F.newGame(3)), []);
+  r.force.log = ['log.s', 'log.l', 'gnarled.m', 'sappy.s', 'log.m', 'log.m', 'log.m', 'log.m', 'log.m', 'log.m', 'gnarled.l'];
+  F.tap(r, { kind: 'machine' }); until(r, x => x.machine.phase === 'run', 10);
+  const before = r.money;
+  ok(!take(r, 'restock').length && r.rack.length === 0 && r.machine.log === 'log.m', 'with the bin empty and a log on the in-feed, pressing it buys nothing yet');
+  until(r, x => x.machine.phase === 'ready', 10);
+  const rs = take(r, 'restock');
+  ok(rs.length === 1 && rs[0].n === 10 && rs[0].cost === 10 && rs[0].logs.join() === 'log.s,log.l,gnarled.m,sappy.s,log.m,log.m,log.m,log.m,log.m,log.m' && before - r.money === C.restock.cost && r.costs.bought === 10 && r.force.log.join() === 'gnarled.l' &&
+    r.machine.log === 'log.s' && r.rack.length === 9 && r.rackMine === 0,
+    'when the planer needs its next log and the bin is empty, 10 more arrive for $10 (ten \'log\' dice, no more) and the first of them rolls in', JSON.stringify(rs.map(e => e.logs)) + ' / $' + (before - r.money));
+  // emptying it by hand costs nothing until the planer needs a log
+  const h = shut(F.newGame(5));
+  F.tap(h, { kind: 'rack' }); until(h, x => !!F.bubbleOpen(x), 20);
+  F.options(h).filter(o => o.group === 'take').forEach(o => F.choose(h, o.id));
+  ok(!h.rack.length && h.avatar.inv.length === C.startLogs && h.money === 0 && !take(h, 'restock').length && !F.options(h).some(o => o.group === 'take'),
+    'every log can be taken out of the planer\'s input bin by hand (a tap a kind), and an empty bin buys nothing by itself', h.avatar.inv.length + ' in your arms, $' + h.money);
+  h.machine.log = 'log.m'; F.tap(h, { kind: 'machine' }); until(h, x => x.machine.phase === 'run', 10); until(h, x => x.machine.phase === 'ready', 10);
+  ok(take(h, 'restock').length === 1 && h.money === -C.logCost - C.restock.cost && h.rack.length === C.restock.n - 1, 'until the planer needs its next log: then it restocks, and a press and a restock cost $' + F.cents(C.logCost + C.restock.cost).toFixed(2), '$' + h.money);
+  // logs you put in roll in before the ones bought; taking a kind out takes yours too
+  const y = feed(shut(F.newGame(6)), ['log.m', 'log.l', 'log.m']);
+  y.avatar.inv.push('log.s', 'log.s', 'gnarled.m');
+  F.tap(y, { kind: 'rack' }); until(y, x => !!F.bubbleOpen(x), 20);
+  F.choose(y, 'put:log.s'); F.choose(y, 'put:gnarled.m');
+  const putIn = y.rack.join() + '/' + y.rackMine;
+  F.choose(y, 'take:log.m');
+  const tookM = y.rack.join() + '/' + y.rackMine + '/' + count(y.avatar.inv, 'log.m');
+  F.choose(y, 'take:log.s');
+  ok(putIn === 'log.s,log.s,gnarled.m,log.m,log.l,log.m/3' && tookM === 'log.s,log.s,gnarled.m,log.l/3/2' && y.rack.join() === 'gnarled.m,log.l' && y.rackMine === 1 && take(y, 'took').every(e => e.at === 'rack'),
+    'logs you put in go in front of the ones bought; taking a kind out takes every one of it, yours and the bought ones alike', [putIn, tookM, y.rack.join() + '/' + y.rackMine].join(' | '));
+  // the other input bins give things back too (the CD: a plank in the saw, then sell it)
+  const w = shut(F.newGame(8));
+  w.avatar.inv.push('plank.m', 'plank.s', 'sappy.l', 'rough.m');
+  F.tap(w, { kind: 'sawIn' }); until(w, x => !!F.bubbleOpen(x), 30);
+  F.choose(w, 'put:plank.m'); F.choose(w, 'put:plank.s');
+  const sawOpts = F.options(w).map(o => o.id).join();
+  F.choose(w, 'take:plank.m');
+  const sawOk = sawOpts === 'take:plank.s,take:plank.m' && w.saw.in.join() === 'plank.s' && count(w.avatar.inv, 'plank.m') === 1;
+  F.tap(w, { kind: 'extractIn' }); until(w, x => !!F.bubbleOpen(x), 30);
+  F.choose(w, 'put:sappy.l'); F.choose(w, 'take:sappy.l');
+  const exOk = !w.extract.in.length && count(w.avatar.inv, 'sappy.l') === 1;
+  F.tap(w, { kind: 'benchIn' }); until(w, x => !!F.bubbleOpen(x), 30);
+  F.choose(w, 'put:rough.m'); F.choose(w, 'take:rough.m');
+  const beOk = !w.bench.in.length && count(w.avatar.inv, 'rough.m') === 1;
+  ok(sawOk && exOk && beOk && take(w, 'took').map(e => e.at).join() === 'sawIn,extractIn,benchIn', 'what you put in the table saw\'s, the sap extractor\'s or the bench\'s input bin can be taken back out into your arms (the CD: change your mind and sell the plank)', [sawOpts, sawOk, exOk, beOk].join(' / '));
+  F.tap(w, { kind: 'counter' }); until(w, x => !x.avatar.act && x.avatar.task && x.avatar.task.arrived, 30);
+  ok(w.stalls[0].stock.length === 1 && w.stalls[0].stock[0].item === 'plank.m', 'and the plank taken back out of the saw\'s bin goes on the counter to sell');
+  // no bin has a limit
+  const big = shut(F.newGame(9));
+  for (let i = 0; i < 40; i++) big.avatar.inv.push('log.m');
+  for (let i = 0; i < 300; i++) big.avatar.inv.push('plank.s');
+  F.tap(big, { kind: 'rack' }); until(big, x => !!F.bubbleOpen(x), 20); F.choose(big, 'put:log.m');
+  F.tap(big, { kind: 'recycle' }); until(big, x => !!F.bubbleOpen(x), 20); F.choose(big, 'put:plank.s');
+  ok(big.rack.length === C.startLogs + 40 && big.rackMine === 40 && big.recycle.length === 300 && !big.avatar.inv.length, 'no bin has a limit: 50 logs in the planer\'s input bin, 300 small planks in the recycle bin (the CD)', big.rack.length + ', ' + big.recycle.length);
+  // a robot on the planer: the same bin, the same restocks
+  const o = staffed(12, ['operate', null]); shut(o);
+  feed(o, []);
+  let restocks = 0, pulled = 0;
+  for (let k = 0; k < 6000; k++) { F.step(o, 0.05); o.events.forEach(e => { if (e.kind === 'restock') restocks++; if (e.kind === 'press' && e.at === 'planer') pulled++; }); o.events = []; if (o.machine.phase === 'jam') { o.machine.dirt = 0.001; o.avatar.act = { kind: 'clean', t: 0 }; } o.bin.length = 0; o.recycle.length = 0; }
+  ok(restocks >= 3 && o.costs.bought === restocks * C.restock.cost && o.costs.logs === F.cents(pulled * C.logCost) && o.rack.length < C.restock.n, 'a robot on the planer works through the same bin, and it restocks the same way: $10 for ten, and $0.10 a press on top', restocks + ' restocks, ' + pulled + ' presses');
+  // saves: what is yours in the bin is kept; a save from before the bin gets its 10 logs
+  const sv = feed(shut(F.newGame(10)), ['log.l', 'log.m', 'sappy.s']); sv.rackMine = 1;
+  const back = F.load(F.save(sv));
+  ok(back && back.rack.join() === 'log.l,log.m,sappy.s' && back.rackMine === 1, 'a save keeps the planer\'s input bin and which logs in it are yours');
+  const old = JSON.parse(F.save(sv)); old.rack = ['log.s', 'log.l']; delete old.rackMine; delete old.costs.bought;
+  const was = F.load(JSON.stringify(old));
+  ok(was && was.rack.length === 2 + C.startLogs && was.rack.slice(0, 2).join() === 'log.s,log.l' && was.rackMine === 2 && was.costs.bought === 0 && was.money === sv.money,
+    'a save made before the bin of bought logs keeps its rack as yours, gets the 10 a new factory starts with behind them, free (no version bump)', was && was.rack.join());
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);

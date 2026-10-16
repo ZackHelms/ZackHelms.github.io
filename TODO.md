@@ -11,7 +11,12 @@ backlog entry here.
 
 ## Now
 
-- (none)
+- [taas] **Four stalls and eight robots in the robot factory** (the CD, 2026-10-16):
+  stalls 2-4 bought for $50 / $100 / $150 and set by tapping (unsold stock to your
+  arms), customers picking a stall at random, one stocking robot per stall with an
+  "Only stock X" per item, robots for slots 02-04 that make no mistakes yet, robots
+  $20 to $160. The CD's brief and four answers are recorded; run it one step a turn:
+  "Run the next open step of `.claude/plans/taasstalls.stalls-arc.md`".
 
 ## Needs Zack
 
@@ -39,13 +44,14 @@ backlog entry here.
   random events on top of the scripted story, and keep the planning-board look or
   restyle in Neon Arcade. Then overrule anything wrong in its "assumed, not decided"
   table; every number in the engine is a first-draft guess.
-- [repo] Delete the remote branches **`cyoa2-step3`**, **`taas-storefront`** and **`taas-delay`**
+- [repo] Delete the remote branches **`cyoa2-step3`**, **`taas-storefront`**, **`taas-delay`** and **`taas-bins`**
   (GitHub > branches). `cyoa2-step3` is a safety copy pushed mid-session on
   2026-10-10 (`8020174`, work in progress); everything in it shipped in
   `3ea55c4` on `main`. `taas-storefront` (`80d4df2`) is the storefront's side
   branch; everything in it shipped in `5bcc0e7` on `main` (2026-10-16). `taas-delay` is the
   delay's side branch; everything in it shipped on `main` in one commit (2026-10-16, "a delay
-  between a robot's tasks"). A remote session cannot delete them: the agent proxy refuses ref deletion and API writes
+  between a robot's tasks"). `taas-bins` is the bins brief's; everything in it shipped on `main` in
+  one commit (2026-10-16, "bins you can take from"). A remote session cannot delete them: the agent proxy refuses ref deletion and API writes
   (`.claude/zmh/producer.md` § Environment).
 - [cyoa2] **Play a tale with only the script** (the default now: no key, no
   cost), then give Claude one area at a time in Settings and play on. That is
