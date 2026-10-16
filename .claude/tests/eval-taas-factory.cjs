@@ -24,6 +24,13 @@
  *                  filling up, as in the CD's third-brief playtest)
  *   operator first hands-on, but its first robot goes on the planer (as in the first builds);
  *                  after two minutes of money falling it moves that robot to stocking
+ *   paced          the supervisor, for an hour, until its operator holds its whole plan and a stall's
+ *                  worth of medium planks waits in the output bin behind a full stall; then it puts
+ *                  "Wait between tasks" in the operator's next slot (buying one), leaves the slider
+ *                  where it starts, and once a minute nudges it a second: longer while the bin holds
+ *                  more than a stall's worth and is not falling, shorter when it holds fewer than two
+ *                  or a customer waits at an empty stall (the CD's delay, 2026-10-16). It is set
+ *                  beside the supervisor played for the same hour.
  * A persona that instructs works to one PLAN, an optimal path through the instructions as they
  * join the list (it skips the ones that prevent nothing, and "Put medium logs in recycle bin",
  * which on a plank line throws the good logs away); once a robot holds its whole plan it resets
@@ -33,7 +40,9 @@
  * Then it asserts the shape the mode exists to teach (the first robot comes quickly, robots alone
  * stall on their first jam, instructions pay, an uninstructed stocker wears customer satisfaction
  * down while an instructed one keeps it, an instruction about another job is worth nothing, agents
- * without instructions are not free speed, a line left alone fills the shop with waiting customers)
+ * without instructions are not free speed, a line left alone fills the shop with waiting customers,
+ * a line that makes more than it sells fills its output bin with planks it paid for, and a delay
+ * between the operator's logs ends that without starving the customers, and pays)
  * and that **a valid optimal path exists and works**: every kind of trouble the floor can make has
  * an instruction that fixes it and that instruction joins the list in real play; the plan, followed,
  * leaves no junk piling up in the output bin, hardly anyone waiting and evals that are almost all
@@ -42,6 +51,8 @@
  * is a first-draft guess; change a row only if the CD changes the design it describes.
  *
  * Usage: node .claude/tests/eval-taas-factory.cjs      Final line: TAAS-FACTORY-EVAL: GREEN | RED
+ *        EVAL_WAITS=1 adds a sweep (not asserted): the paced persona with the slider left at 2, 3, 4
+ *        and 5 s, against the supervisor, over seeds 1-8, an hour each (~10 s more).
  */
 'use strict';
 const fs = require('fs');
@@ -62,17 +73,19 @@ const other = job => job === 'operate' ? 'stock' : 'operate';
 const junkOf = s => s.bin.filter(k => k !== WANT).length;
 const count = (arr, k) => arr.filter(x => x === k).length;
 
-function persona(kind, minutes, seed) {
+function persona(kind, minutes, seed, fixedWait) {
   const s = F.newGame(seed || 1), DT = 0.05, END = minutes * 60;
   const mark = {}, at = (k) => { if (mark[k] === undefined) mark[k] = s.t; };
   let jamSeen = -1, satLow = 100, lastNet = 0, page = null, bought = 0, swap = false;
   const perMin = [], junkMin = [], waitMin = [], satMin = [];
   let waitSum = 0, waitN = 0;
   const resetAt = {};
+  const plankMin = [], waits = [];
+  let paceAsk = false, paceTo = null, lookAt = 0, lastPlanks = 0;
   const idle = () => !s.avatar.path.length && !s.avatar.act;
   const busyWith = (k, id) => s.avatar.task && s.avatar.task.kind === k && (id === undefined || s.avatar.task.id === id) && (s.avatar.path.length || s.avatar.act);
   const want = (k, id) => { if (!busyWith(k, id)) F.tap(s, id === undefined ? { kind: k } : { kind: k, id }); };
-  const instructs = ['hands-on', 'supervisor', 'crossed', 'stocker only', 'stock planks', 'operator first'].indexOf(kind) >= 0;
+  const instructs = ['paced', 'hands-on', 'supervisor', 'crossed', 'stocker only', 'stock planks', 'operator first'].indexOf(kind) >= 0;
   const handsOn = kind === 'hands-on' || kind === 'operator first';
   const planFor = r => {
     if (!instructs || !r.job || (kind === 'stocker only' || kind === 'stock planks') && r.job !== 'stock') return [];
@@ -97,7 +110,7 @@ function persona(kind, minutes, seed) {
     if (sk && PLAN.stock.every(id => sk.rules.indexOf(id) >= 0)) at('stock4');
     if (Math.floor(s.t / 60) > perMin.length) {
       const net = s.earned - s.spent;
-      perMin.push(net - lastNet); lastNet = net; junkMin.push(junkOf(s)); waitMin.push(waitSum / waitN); satMin.push(s.satisfaction); waitSum = 0; waitN = 0;
+      perMin.push(net - lastNet); lastNet = net; junkMin.push(junkOf(s)); waitMin.push(waitSum / waitN); satMin.push(s.satisfaction); plankMin.push(count(s.bin, WANT)); waitSum = 0; waitN = 0;
     }
     s.robots.forEach(r => { const plan = planFor(r); if (plan.length && resetAt[r.id] === undefined && plan.every(id => r.rules.indexOf(id) >= 0)) { F.resetEvals(s, r.id); resetAt[r.id] = s.t; } });
     const m = s.machine, bub = F.bubbleOpen(s), a = s.avatar;
@@ -107,6 +120,14 @@ function persona(kind, minutes, seed) {
       for (let id = nextFor(r); id && afford(r); id = nextFor(r)) {
         if (r.rules.indexOf(null) < 0) F.buySlot(s, r.id);
         F.setRule(s, r.id, r.rules.indexOf(null), id);
+      }
+      if (paceAsk && r.job === 'operate') {
+        if (r.rules.indexOf('delay') < 0 && (r.rules.indexOf(null) >= 0 || F.buySlot(s, r.id))) F.setRule(s, r.id, r.rules.indexOf(null), 'delay');
+        if (r.rules.indexOf('delay') >= 0) {
+          if (paceTo !== null) F.setWait(s, r.id, paceTo); else if (fixedWait !== undefined) F.setWait(s, r.id, fixedWait);
+          at('paced'); waits.push(r.wait); lookAt = s.t + 60; lastPlanks = count(s.bin, WANT);
+        }
+        paceAsk = false; paceTo = null;
       }
       page = null;
       continue;
@@ -126,6 +147,15 @@ function persona(kind, minutes, seed) {
     if (F.slotsOpen(s)) { const r = s.robots.find(x => nextFor(x) && afford(x)); if (r) { want('robot', r.id); continue; } }
     // the way out of an operator hired first: once money has fallen two minutes running, move it to stocking
     if (kind === 'operator first' && s.hired === 1 && op && perMin.length >= 3 && perMin.slice(-2).every(v => v < 0)) { swap = true; want('robot', op.id); continue; }
+    // the paced supervisor: the delay goes in once planks pile up behind a full stall, then the slider is tuned by the bin
+    if (kind === 'paced' && op && mark.paced === undefined && mark.op4 !== undefined && room() === 0 && count(s.bin, WANT) >= C.stallCap && afford(op)) { paceAsk = true; want('robot', op.id); continue; }
+    if (kind === 'paced' && op && mark.paced !== undefined && fixedWait === undefined && s.t >= lookAt) {
+      const planks = count(s.bin, WANT), short = F.waitingNow(s) > 0 && !s.stalls[0].stock.length;
+      let to = planks < 2 || short ? op.wait - 1 : planks > C.stallCap && planks >= lastPlanks ? op.wait + 1 : op.wait;
+      to = Math.max(C.wait.min, Math.min(C.wait.max, to));
+      lookAt = s.t + 60; lastPlanks = planks;
+      if (to !== op.wait) { paceAsk = true; paceTo = to; want('robot', op.id); continue; }
+    }
     if (!handsOn && s.hired >= 2) continue;   // supervisors only clean, hire and instruct
     // your arms: medium planks to the counter, anything else to the recycle bin
     if (count(a.inv, WANT) && room() > 0) { want('counter'); continue; }
@@ -138,20 +168,22 @@ function persona(kind, minutes, seed) {
   }
   const fmt = k => mark[k] === undefined ? '-' : (mark[k] / 60).toFixed(1) + 'm';
   const last5 = perMin.slice(-5).reduce((x, y) => x + y, 0) / 5;
-  return { kind, s, mark, fmt, satLow, perMin, last5, junkMin, waitMin, satMin, resetAt, bought };
+  return { kind, s, mark, fmt, satLow, perMin, last5, junkMin, waitMin, satMin, resetAt, bought, plankMin, waits };
 }
 
 const DEBUG = process.env.EVAL_DEBUG;
 const runs = ['hands-on', 'supervisor', 'walks away', 'uninstructed', 'crossed', 'stocker only', 'stock planks', 'operator first'].map(k => persona(k, 30, 7));
+const hour = [persona('paced', 60, 7), persona('supervisor', 60, 7)];
+hour.forEach(r => { r.kind += ' 1h'; });
 const stocker = r => r.s.robots.find(x => x.job === 'stock');
 const stocked = r => { const x = stocker(r); return x ? (x.record.stock || 0) + Object.keys(x.record).filter(k => /^misstock/.test(k)).reduce((n, k) => n + x.record[k], 0) : 0; };
 const looked = r => { const x = stocker(r); return x ? (x.record.looking || 0) + (x.record['looking!'] || 0) : 0; };
 const evals = (r, job) => { const x = r.s.robots.find(q => q.job === job); if (!x) return null; const n = x.tally.good + x.tally.soso + x.tally.bad; return { n, green: n ? +(x.tally.good / n).toFixed(2) : 0, red: x.tally.bad }; };
 const avg = (arr, n) => { const v = arr.slice(-n); return v.reduce((x, y) => x + y, 0) / Math.max(1, v.length); };
 console.log('persona        $20    robot1  robot2  rule1  op x4  stk x4  earned  costs  $/min net(last5)  sat end/min  served/wrong  waiting(last10)  stocked/looking  junk');
-runs.forEach(r => console.log(r.kind.padEnd(13) + ['$20', 'robot 1', 'robot 2', 'first rule', 'op4', 'stock4'].map(k => r.fmt(k).padStart(7)).join(' ') + String(r.s.earned).padStart(8) + String(r.s.spent).padStart(7) + r.last5.toFixed(1).padStart(17)
+runs.concat(hour).forEach(r => console.log(r.kind.padEnd(13) + ['$20', 'robot 1', 'robot 2', 'first rule', 'op4', 'stock4'].map(k => r.fmt(k).padStart(7)).join(' ') + String(r.s.earned).padStart(8) + String(r.s.spent).padStart(7) + r.last5.toFixed(1).padStart(17)
   + ('  ' + Math.round(r.s.satisfaction) + '/' + Math.round(r.satLow)).padStart(13) + (r.s.shop.served + '/' + r.s.shop.wrong).padStart(14) + avg(r.waitMin, 10).toFixed(2).padStart(17) + (stocked(r) + '/' + looked(r)).padStart(17) + String(junkOf(r.s)).padStart(6)));
-if (DEBUG) runs.forEach(r => console.log(r.kind, JSON.stringify(r.s.seen), r.s.robots.map(x => x.name + ':' + x.job + ':' + JSON.stringify(x.rules) + JSON.stringify(x.record)).join(' | '), 'sat/min ' + r.satMin.map(Math.round).join(','), 'wait/min ' + r.waitMin.map(v => v.toFixed(1)).join(',')));
+if (DEBUG) runs.concat(hour).forEach(r => console.log(r.kind, JSON.stringify(r.s.seen), r.s.robots.map(x => x.name + ':' + x.job + ':' + JSON.stringify(x.rules) + JSON.stringify(x.record)).join(' | '), 'sat/min ' + r.satMin.map(Math.round).join(','), 'wait/min ' + r.waitMin.map(v => v.toFixed(1)).join(',')));
 const R = Object.fromEntries(runs.map(r => [r.kind, r]));
 const ho = R['hands-on'], sup = R['supervisor'], un = R['uninstructed'];
 
@@ -201,9 +233,37 @@ ok(fills.some(r => r.kind === 'stock planks') && !stuck.length, 'where an output
   'filled: ' + fills.map(r => r.kind + ' (' + junkOf(r.s) + ')').join(', ') + (stuck.length ? '; NO WAY OUT for ' + stuck.map(r => r.kind).join(', ') : ''));
 const so = R['stocker only'];
 ok(junkOf(so.s) <= 3 && Math.max.apply(null, so.junkMin.slice(-10)) <= 5 && so.s.satisfaction >= 90, 'and a stocker given its whole plan keeps the bin clear even behind an operator told nothing (it recycles what it cannot stock), though that line pays for every junk log', junkOf(so.s) + ' left; by minute ' + so.junkMin.join(','));
+
+/* ---------- the delay between tasks (the CD, 2026-10-16): overproduction, and its cure ---------- */
+const [pc, sh] = hour, after = pc.mark.paced === undefined ? [] : pc.satMin.slice(Math.ceil(pc.mark.paced / 60));
+const bins = r => r.plankMin.join(','), tail = (r, n) => r.plankMin.slice(-n);
+console.log('paced 1h: delay put in at ' + pc.fmt('paced') + ', waits ' + pc.waits.join(',') + ' s; medium planks in the bin by minute ' + bins(pc) + ' (supervisor 1h: ' + bins(sh) + ')');
+ok(tail(sh, 1)[0] >= 10 * C.stallCap && tail(sh, 20).every((v, k, a) => !k || v >= a[k - 1] - 2) && tail(sh, 1)[0] > tail(sh, 20)[0] + 2 * C.stallCap,
+  'a line that makes more than it sells fills its output bin with medium planks once the stall is stocked: the supervisor\'s keeps climbing for its last twenty minutes, each one a log paid for and never sold',
+  'by minute ' + bins(sh));
+ok(pc.mark.paced !== undefined && Math.max.apply(null, tail(pc, 20)) <= 3 * C.stallCap && tail(pc, 1)[0] < tail(sh, 1)[0] / 4,
+  'told to wait between tasks, and the slider tuned by what piles up, the operator stops it: in the paced hour\'s last twenty minutes the bin never holds more than three stalls\' worth',
+  'put in at ' + pc.fmt('paced') + ', waits ' + pc.waits.join(',') + ' s; by minute ' + bins(pc));
+ok(pc.s.satisfaction >= 90 && avg(pc.waitMin, 10) < 1 && pc.s.shop.served >= 0.95 * sh.s.shop.served && Math.min.apply(null, after.length ? after : [0]) >= 50,
+  'without starving the customers: they are served as often as without the delay, hardly anyone waits at the end, and customer satisfaction ends where it was',
+  'served ' + pc.s.shop.served + ' vs ' + sh.s.shop.served + ', waiting ' + avg(pc.waitMin, 10).toFixed(2) + ', satisfaction ' + Math.round(pc.s.satisfaction) + '% (lowest after the delay ' + Math.round(Math.min.apply(null, after.length ? after : [0])) + '%)');
+ok(pc.s.spent < sh.s.spent && pc.s.money > sh.s.money && pc.s.money - sh.s.money > C.slots[C.slots.length - 1],
+  'and it pays: fewer logs pressed for nothing leaves more money at the end of the hour than the slot it took cost',
+  'money ' + pc.s.money + ' vs ' + sh.s.money + ', running costs ' + pc.s.spent + ' vs ' + sh.s.spent + ', bought ' + pc.bought + ' vs ' + sh.bought);
+
 // the books balance: money is what was earned, less what the machines cost and what was bought
-ok(runs.every(r => r.s.money === r.s.earned - r.s.spent - r.bought), 'every persona\'s money is what it earned, less the running costs and its purchases', runs.map(r => r.kind + ':' + r.s.money).join(' '));
+ok(runs.concat(hour).every(r => r.s.money === r.s.earned - r.s.spent - r.bought), 'every persona\'s money is what it earned, less the running costs and its purchases', runs.concat(hour).map(r => r.kind + ':' + r.s.money).join(' '));
+
+// not asserted: how a slider left at one value does, seed by seed (EVAL_WAITS=1)
+if (process.env.EVAL_WAITS) {
+  const seeds = [1, 2, 3, 4, 5, 6, 7, 8], base = seeds.map(sd => persona('supervisor', 60, sd));
+  [undefined, 2, 3, 4, 5].forEach(w => {
+    const rr = seeds.map(sd => persona('paced', 60, sd, w));
+    console.log('WAITS ' + (w === undefined ? 'tuned' : w + ' s  ') + ' bin at 1h ' + rr.map(r => tail(r, 1)[0]).join('/') + ' (none: ' + base.map(r => tail(r, 1)[0]).join('/') + ')  satisfaction ' + rr.map(r => Math.round(r.s.satisfaction)).join('/') +
+      '  money vs no delay ' + rr.map((r, k) => (r.s.money >= base[k].s.money ? '+' : '') + (r.s.money - base[k].s.money)).join('/'));
+  });
+}
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);
-console.log('TAAS-FACTORY-EVAL: ' + (failed ? 'RED' : 'GREEN'));
+console.log('TAAS-FACTORY-EVAL: ' + (failed ? 'RED' : process.env.TAAS_PAGE ? 'PASS-ON-COPY' : 'GREEN'));
 process.exit(failed ? 1 : 0);
