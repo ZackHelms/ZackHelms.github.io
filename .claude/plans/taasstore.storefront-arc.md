@@ -48,6 +48,10 @@ step 4).
     footprints, not the page's keys. Verified: page GREEN 83/83, the break's copy RED.
   - `money-stale` (the wall's money board drawn from `shownMoney` instead of `s.money`):
     not yet classified.
+  - `saw-never-spins` (`const a0 = run ? clock * 22 : 0.3;` -> `const a0 = 0.3;`, the
+    table saw's blade angle frozen): not yet classified. The page suite claims "the saw's
+    blade spinning only while it cuts"; find why that row did not see a frozen blade (it
+    may compare frames that differ for another reason, e.g. the cut piece moving).
 - **Placeholders left in the docs for step 2:** `@UICAUGHT@` (twice in `.claude/taas.md`),
   `@UIMISSES@` (once in `.claude/taas.md`), `@UIROW@` (once in `.claude/tests/README.md`).
 - **For the report (step 4):**
