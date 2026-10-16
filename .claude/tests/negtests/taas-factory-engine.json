@@ -422,8 +422,8 @@
  {
   "name": "misstock-green",
   "file": "games/taas/index.html",
-  "old": "    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good' };",
-  "new": "    stock: 'good', misstock: 'good', looking: 'soso', recycle: 'good' }; /* @negtest */"
+  "old": "    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' };",
+  "new": "    stock: 'good', misstock: 'good', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' }; /* @negtest */"
  },
  {
   "name": "jam-yellow",
@@ -604,5 +604,143 @@
   "file": "games/taas/index.html",
   "old": "      s.money = Math.round(+s.money) || 0;",
   "new": "      s.money = Math.max(0, Math.round(+s.money) || 0); /* @negtest */"
+ },
+ {
+  "name": "delay-not-from-start",
+  "file": "games/taas/index.html",
+  "old": "    { id: 'delay', job: null, text: 'Wait between tasks', wait: true, start: true }",
+  "new": "    { id: 'delay', job: null, text: 'Wait between tasks', wait: true } /* @negtest */"
+ },
+ {
+  "name": "delay-wait-skipped",
+  "file": "games/taas/index.html",
+  "old": "      if (follows(s, r, 'delay')) { r.state = 'pause'; note(r, 'waited');",
+  "new": "      if (follows(s, r, 'delay')) { r.state = 'idle'; /* @negtest */ note(r, 'waited');"
+ },
+ {
+  "name": "delay-wait-twice",
+  "file": "games/taas/index.html",
+  "old": "  function pause(r, dt) { r.t += dt; if (r.t >= r.wait ||",
+  "new": "  function pause(r, dt) { r.t += dt; if (r.t >= 2 * r.wait || /* @negtest */"
+ },
+ {
+  "name": "delay-after-looking",
+  "file": "games/taas/index.html",
+  "old": "        if (r.t >= CFG.lookSec) { r.state = 'idle'; r.t = 0; }",
+  "new": "        if (r.t >= CFG.lookSec) done(s, r); /* @negtest */"
+ },
+ {
+  "name": "delay-slip-at-zero",
+  "file": "games/taas/index.html",
+  "old": "    if (has(r, 'delay') && r.wait > 0) {",
+  "new": "    if (has(r, 'delay')) { /* @negtest */"
+ },
+ {
+  "name": "delay-slip-never-rolled",
+  "file": "games/taas/index.html",
+  "old": "      if (follows(s, r, 'delay')) {",
+  "new": "      if (has(r, 'delay')) { /* @negtest */"
+ },
+ {
+  "name": "delay-setwait-no-range",
+  "file": "games/taas/index.html",
+  "old": "Number.isInteger(sec) || sec < W.min || sec > W.max) return false;",
+  "new": "Number.isInteger(sec)) return false; /* @negtest */"
+ },
+ {
+  "name": "delay-setwait-rounds",
+  "file": "games/taas/index.html",
+  "old": "    if (!r || typeof sec !== 'number' || !Number.isInteger(sec) || sec < W.min",
+  "new": "    if (!r || typeof sec !== 'number' || !Number.isFinite(sec) || sec < W.min /* @negtest */"
+ },
+ {
+  "name": "delay-load-drops-wait",
+  "file": "games/taas/index.html",
+  "old": "        r.wait = typeof r.wait === 'number' && Number.isFinite(r.wait) ? Math.max(CFG.wait.min, Math.min(CFG.wait.max, Math.round(r.wait))) : CFG.wait.start;",
+  "new": "        r.wait = CFG.wait.start; /* @negtest */"
+ },
+ {
+  "name": "delay-load-wait-unclamped",
+  "file": "games/taas/index.html",
+  "old": "        r.wait = typeof r.wait === 'number' && Number.isFinite(r.wait) ? Math.max(CFG.wait.min, Math.min(CFG.wait.max, Math.round(r.wait))) : CFG.wait.start;",
+  "new": "        r.wait = typeof r.wait === 'number' ? r.wait : CFG.wait.start; /* @negtest */"
+ },
+ {
+  "name": "delay-load-seen-no-start",
+  "file": "games/taas/index.html",
+  "old": "      s.seen = startSeen();   // a save from before the delay gets it on the list too",
+  "new": "      s.seen = {}; /* @negtest */"
+ },
+ {
+  "name": "delay-release-leaves-pause",
+  "file": "games/taas/index.html",
+  "old": "    r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;\n  }\n  function stepRobot",
+  "new": "    r.state = r.state === 'pause' ? 'pause' : 'idle'; /* @negtest */ r.t = 0; r.path = []; r.goal = null;\n  }\n  function stepRobot"
+ },
+ {
+  "name": "delay-stocker-never-waits",
+  "file": "games/taas/index.html",
+  "old": "        r.t += dt; if (r.t >= CFG.coolSec) done(s, r);",
+  "new": "        r.t += dt; if (r.t >= CFG.coolSec) { r.state = 'idle'; r.t = 0; } /* @negtest */"
+ },
+ {
+  "name": "delay-operator-no-wait-after-toss",
+  "file": "games/taas/index.html",
+  "old": "credit(s, r.id, 'reject:' + log); done(s, r); }",
+  "new": "credit(s, r.id, 'reject:' + log); r.state = 'idle'; r.t = 0; } /* @negtest */"
+ },
+ {
+  "name": "delay-operator-no-wait-after-flick",
+  "file": "games/taas/index.html",
+  "old": "        if (r.t >= CFG.tossSec) { r.think = false; done(s, r); }",
+  "new": "        if (r.t >= CFG.tossSec) { r.think = false; r.state = 'idle'; r.t = 0; } /* @negtest */"
+ },
+ {
+  "name": "delay-operator-no-wait-after-press",
+  "file": "games/taas/index.html",
+  "old": "        if (m.phase !== 'run' || m.by !== r.id) { r.think = false; done(s, r); }",
+  "new": "        if (m.phase !== 'run' || m.by !== r.id) { r.think = false; r.state = 'idle'; r.t = 0; } /* @negtest */"
+ },
+ {
+  "name": "delay-pause-not-a-state",
+  "file": "games/taas/index.html",
+  "old": "'place', 'cool', 'pause'];",
+  "new": "'place', 'cool']; /* @negtest */"
+ },
+ {
+  "name": "delay-slip-not-noted",
+  "file": "games/taas/index.html",
+  "old": "      note(r, 'straight!'); ev(s, 'straight', { by: r.id });",
+  "new": "      ev(s, 'straight', { by: r.id }); /* @negtest */"
+ },
+ {
+  "name": "delay-waited-not-green",
+  "file": "games/taas/index.html",
+  "old": "waited: 'good', straight: 'good' };",
+  "new": "waited: 'soso', straight: 'good' }; /* @negtest */"
+ },
+ {
+  "name": "delay-wait-read-at-start",
+  "file": "games/taas/index.html",
+  "old": "  function pause(r, dt) { r.t += dt; if (r.t >= r.wait || !has(r, 'delay')) { r.state = 'idle';",
+  "new": "  function pause(r, dt) { r.t += dt; if (r.t >= (r.pw = r.pw || r.wait) || !has(r, 'delay')) { r.pw = 0; /* @negtest */ r.state = 'idle';"
+ },
+ {
+  "name": "delay-removed-keeps-waiting",
+  "file": "games/taas/index.html",
+  "old": "if (r.t >= r.wait || !has(r, 'delay')) {",
+  "new": "if (r.t >= r.wait) { /* @negtest */"
+ },
+ {
+  "name": "delay-wait-after-beaten-toss",
+  "file": "games/taas/index.html",
+  "old": "          else { r.state = 'idle'; r.t = 0; }   // you pressed the planer first: it handled no log",
+  "new": "          else done(s, r); /* @negtest */"
+ },
+ {
+  "name": "delay-new-robot-wait-zero",
+  "file": "games/taas/index.html",
+  "old": "against: false, outSlip: false, huntSlip: false, wait: CFG.wait.start,",
+  "new": "against: false, outSlip: false, huntSlip: false, wait: 0, /* @negtest */"
  }
 ]

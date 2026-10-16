@@ -12,7 +12,9 @@
  * the $5 to scrub a jam, the stocker robot and its instructions, slots 02-04 (the table saw,
  * the sap extractor, the hand crafting bench), hiring, the two jobs, every mistake a robot can
  * make and what it does, the instruction list and its slots, the 1-in-20 slip, an instruction
- * about another job doing nothing, the rates as MEASURED over real play, and saving.
+ * about another job doing nothing, the rates as MEASURED over real play, saving, and the delay
+ * between tasks (the CD, 2026-10-16: an instruction for every robot, on the list from the start,
+ * holding 0-60 whole seconds).
  * Numbers come from FACTORY.CFG, so a retune never turns this red, except where the CD set them.
  * The page around the engine is drive-taas-factory-ui.cjs.
  *
@@ -99,8 +101,11 @@ const RULE_TEXT = {
   sap: 'Never put sap on input log', sappy: 'Put sap logs in recycle bin', gnarled: 'Put gnarled logs in recycle bin',
   medium: 'Only input medium logs', smallLog: 'Put small logs in recycle bin', largeLog: 'Put large logs in recycle bin', mediumLog: 'Put medium logs in recycle bin',
   output: 'Only output medium wood planks', stockOnly: 'Only stock medium planks', price: 'Sell medium wood planks for $4',
-  smallOut: 'Put small planks in recycle bin', largeOut: 'Put large planks in recycle bin', roughOut: 'Put gnarled planks in recycle bin'
+  smallOut: 'Put small planks in recycle bin', largeOut: 'Put large planks in recycle bin', roughOut: 'Put gnarled planks in recycle bin',
+  delay: 'Wait between tasks'   // the delay (the CD, 2026-10-16; the wording assumed)
 };
+// the instructions on the list that a mistake put there (the delay is on it from the start)
+const learnt = s => F.known(s).filter(q => !q.start).map(q => q.id).join();
 // customers standing in the shop, as if they had walked in: in line, place 0 at the stall
 function queue(s, n) {
   for (let k = 0; k < n; k++) s.shop.people.push({ id: s.shop.n++, x: L.SHOP.x0 - k * P.gap, y: L.SHOP.lineY, state: 'in', t: 0, stall: 0, item: null, by: null, wrong: false });
@@ -118,8 +123,8 @@ function queue(s, n) {
   ok(C.logCost === 1 && C.fixCost === 5 && C.sawCost === 1 && C.extractCost === 1, 'the planer costs $1 a log, fixing a sap jam $5, the table saw and the sap extractor $1 a thing (the CD\'s numbers)', [C.logCost, C.fixCost, C.sawCost, C.extractCost].join());
   ok(C.satWait === 0.1 && C.shop.max >= 4, 'each customer waiting costs 0.1% of customer satisfaction a second (the CD\'s number), and the shop holds a line of ' + P.max);
   ok(JSON.stringify(C.slots) === '[5,10,15,20,25]' && C.slots.reduce((a, b) => a + b, 0) * C.hire.length === 150, 'instruction slots cost $5 / $10 / $15 / $20 / $25 for each robot (the CD\'s numbers)', C.slots.join());
-  ok(F.RULES.length === 13 && F.RULES.every(q => RULE_TEXT[q.id] === q.text), 'the instruction pool is thirteen, word for word', F.RULES.map(q => q.text).join(' | '));
-  ok(F.RULES.filter(q => q.job === 'operate').map(q => q.id).join() === 'sap,sappy,gnarled,medium,smallLog,largeLog,mediumLog,output' && F.RULES.filter(q => q.job === 'stock').map(q => q.id).join() === 'stockOnly,price,smallOut,largeOut,roughOut', 'eight are about running the planer, five about stocking the counter');
+  ok(F.RULES.length === 14 && F.RULES.every(q => RULE_TEXT[q.id] === q.text), 'the instruction pool is fourteen, word for word', F.RULES.map(q => q.text).join(' | '));
+  ok(F.RULES.filter(q => q.job === 'operate').map(q => q.id).join() === 'sap,sappy,gnarled,medium,smallLog,largeLog,mediumLog,output' && F.RULES.filter(q => q.job === 'stock').map(q => q.id).join() === 'stockOnly,price,smallOut,largeOut,roughOut' && F.RULES.filter(q => q.job !== 'operate' && q.job !== 'stock').map(q => q.id).join() === 'delay', 'eight are about running the planer, five about stocking the counter, and one, the delay, about every job');
   // wood has two dimensions (the CD): every size of every quality
   ok(F.LOGS.length === 9 && F.SIZES.join() === 's,m,l' && ['log', 'gnarled', 'sappy'].every(q => F.SIZES.every(z => F.LOGS.indexOf(q + '.' + z) >= 0)), 'a log has a size (small, medium, large) and a quality (normal, gnarled, sappy): nine kinds', F.LOGS.join());
   ok(F.SIZES.every(z => F.makes('log.' + z) === 'plank.' + z && F.makes('gnarled.' + z) === 'rough.' + z && F.makes('sappy.' + z) === 'jam'), 'the planer makes a normal log a plank of its size, a gnarled one a gnarled plank of its size, and any sap log jams it (the CD)');
@@ -170,8 +175,8 @@ function queue(s, n) {
 {
   const s = shut(F.newGame());
   s.force.log = many('log.m');
-  ok(s.money === 0 && s.satisfaction === 100 && F.ready(s) && s.machine.log === 'log.m' && !s.robots.length && !s.bin.length && !s.avatar.inv.length && !F.known(s).length,
-    'a new factory: $0, customer satisfaction at 100%, a normal medium log on the planer, empty arms, no robots, no instructions');
+  ok(s.money === 0 && s.satisfaction === 100 && F.ready(s) && s.machine.log === 'log.m' && !s.robots.length && !s.bin.length && !s.avatar.inv.length && learnt(s) === '' && F.known(s).map(q => q.id).join() === 'delay',
+    'a new factory: $0, customer satisfaction at 100%, a normal medium log on the planer, empty arms, no robots, and only the delay on the instruction list');
   F.tap(s, { kind: 'machine' });
   const walked = s.avatar.path.length > 0;
   until(s, x => x.machine.phase === 'run', 10);
@@ -235,7 +240,7 @@ function queue(s, n) {
   ok(rec.map(e => e.item).join() === 'gnarled.m,log.s,sappy.m,log.l' && rec.every(e => e.by === 'player' && e.from === 'in') && g.machine.log === 'log.m' && g.machine.by === 'player' && g.tally.player.tossed === 4 && !take(g, 'jam').length,
     'with a gnarled log on the belt you toss it in the recycle bin, and the small, sap and large logs after it, and press on the normal medium log (a sap log never jams your press)', rec.map(e => e.item).join());
   until(g, x => x.bin.length > 0, 10);
-  ok(g.bin.join() === 'plank.m' && g.spent === C.logCost && !F.known(g).length, 'so your plank is a medium plank, a toss costs nothing, and no instruction joins the list (you made no mistake)', g.spent);
+  ok(g.bin.join() === 'plank.m' && g.spent === C.logCost && learnt(g) === '', 'so your plank is a medium plank, a toss costs nothing, and no instruction joins the list (you made no mistake)', g.spent);
   // the rack: logs you put there yourself roll in next, and you press them whatever their size
   const k = shut(F.newGame()); k.force.log = many('gnarled.m');
   k.avatar.inv.push('log.l', 'log.s', 'gnarled.s', 'sappy.m');
@@ -421,7 +426,7 @@ function opCycle(log, force, rules) {
 {
   let s = opCycle('log.m');
   until(s, x => x.bin.length > 0, 20);
-  ok(s.bin.join() === 'plank.m' && s.robots[0].tally.good === 1 && s.robots[0].record.plank === 1 && !F.known(s).length, 'a normal medium log: a medium plank, a green mark in the robot\'s evals, and nothing joins the list');
+  ok(s.bin.join() === 'plank.m' && s.robots[0].tally.good === 1 && s.robots[0].record.plank === 1 && learnt(s) === '', 'a normal medium log: a medium plank, a green mark in the robot\'s evals, and nothing joins the list');
   s = opCycle('log.m', { think: [true] });
   until(s, x => dist(x.robots[0], SP.operate) < 0.07, 30);
   const t0 = s.t;
@@ -447,7 +452,7 @@ function opCycle(log, force, rules) {
       'a ' + log + ' log goes in (for $' + C.logCost + ') and ' + made + ' comes out: yellow, and the instructions that would have kept it out join the list (' + joined + ')', s.bin.join() + ' / ' + ids);
   });
   s = opCycle('gnarled.m'); until(s, x => x.bin.length > 0, 20);
-  ok(F.known(s).map(q => q.id).join() === 'gnarled,output', 'and once the gnarled plank lands in the bin, "' + RULE_TEXT.output + '" joins too', F.known(s).map(q => q.id).join());
+  ok(learnt(s) === 'gnarled,output', 'and once the gnarled plank lands in the bin, "' + RULE_TEXT.output + '" joins too', learnt(s));
   s = opCycle('log.s'); until(s, x => x.bin.length > 0, 20);
   ok(s.seen.mediumLog && !s.seen.largeLog, '"' + RULE_TEXT.mediumLog + '" rides in with the small-log one; the large-log one waits for a large log');
   for (const z of ['m', 's']) {
@@ -509,9 +514,9 @@ function stockCycle(bin, force, rules) {
   for (let i = 0; i < 7; i++) { const m = s.money; if (F.buySlot(s, 0)) paid.push(m - s.money); }
   ok(paid.join() === C.slots.join() && s.robots[0].slots === 5 && F.slotPrice(s, 0) === null && s.robots[0].rules.every(x => x === null), 'slots cost ' + C.slots.map(p => '$' + p).join(' / ') + ' in order, five at most, each one empty', paid.join());
   ok(s.robots[1].slots === 0 && F.slotPrice(s, 1) === 5, 'and buying them for one robot buys nothing for the other');
-  ok(!F.known(s).length && !F.setRule(s, 0, 0, 'sap') && s.robots[0].rules[0] === null, 'no instruction can be given before its mistake has been seen');
+  ok(learnt(s) === '' && !F.setRule(s, 0, 0, 'sap') && s.robots[0].rules[0] === null, 'no instruction can be given before its mistake has been seen');
   s.seen.sap = true; s.seen.gnarled = true;
-  ok(F.known(s).map(q => q.id).join() === 'sap,gnarled' && F.setRule(s, 0, 0, 'sap') && s.robots[0].rules[0] === 'sap', 'once seen it is in the list, and it goes in a slot');
+  ok(learnt(s) === 'sap,gnarled' && F.setRule(s, 0, 0, 'sap') && s.robots[0].rules[0] === 'sap', 'once seen it is in the list, and it goes in a slot');
   ok(!F.setRule(s, 0, 1, 'sap') && F.setRule(s, 0, 1, 'gnarled') && !F.setRule(s, 0, 5, 'gnarled') && !F.setRule(s, 0, 0.5, 'gnarled') && !F.setRule(s, 0, 2, 'nonsense'), 'once per robot, only in a slot it has, and only from the pool', JSON.stringify(s.robots[0].rules));
   s.money = 5; F.buySlot(s, 1);
   ok(F.setRule(s, 1, 0, 'sap') && s.robots[1].rules[0] === 'sap', 'both robots may hold the same instruction');
@@ -807,6 +812,170 @@ function stockCycle(bin, force, rules) {
     'a hand-edited save is clamped: money, what was spent, satisfaction, slots, instructions, a long name, an old job, an unknown log or thing, a sap log on the rack, an overfull stall, a customer doing something else', hacked && JSON.stringify([hacked.money, hacked.robots[0].rules, hacked.bin, hacked.avatar.inv, hacked.rack, hacked.stalls[0].stock.length, hacked.shop.people.length]));
   raw.money = -37;
   ok(F.load(JSON.stringify(raw)).money === -37, 'and money below zero is kept: logs cost money');
+}
+
+/* ---------- 12. the delay between tasks (the CD, 2026-10-16) ---------- */
+// "Add an instruction that lets me add a delay between iterations of its task ... a positive
+// integer 0,1,2,...,60 seconds." Every robot can take it, it is on the list from the start, it slips
+// 1 in 20, and an operator's iteration is every log it handles
+{
+  const D = F.RULES.find(q => q.id === 'delay'), W = C.wait;
+  let s = F.newGame(61);
+  ok(D && D.job === null && D.wait === true && s.seen.delay && W.min === 0 && W.max === 60, 'the delay is one instruction for every job, on the list in a new factory before any mistake, and holds whole seconds from 0 to 60 (the CD\'s numbers)', JSON.stringify(D));
+  s = staffed(61, ['operate', 'stock']);
+  ok(s.robots.every(r => r.wait === W.start) && [0, 1].every(id => { s.money += F.slotPrice(s, id); return F.buySlot(s, id) && F.setRule(s, id, 0, 'delay'); }) && s.robots.every(r => r.rules.join() === 'delay'),
+    'every robot can take it, the operator and the stocker at once, with no mistake seen first; each robot starts at ' + W.start + ' s (assumed: 0 would look like it does nothing)', JSON.stringify(s.robots.map(r => [r.wait, r.rules])));
+  const raw = JSON.parse(F.save(s));
+  delete raw.seen.delay; raw.robots.forEach(r => { delete r.wait; });
+  const old = F.load(JSON.stringify(raw)), bare = F.load(JSON.stringify(Object.assign(JSON.parse(F.save(F.newGame(62))), { seen: { gnarled: true } })));
+  ok(old && old.seen.delay && old.robots.every(r => r.wait === W.start) && old.robots[0].rules.join() === 'delay' && bare && bare.seen.delay && bare.seen.gnarled,
+    'a save made before the delay loads with it on the list (held by no robot too) and every robot at ' + W.start + ' s (no version bump: nobody loses a factory)');
+  const tries = [[0, true], [60, true], [17, true], [-1, false], [61, false], [2.5, false], [NaN, false], [Infinity, false], ['5', false], [null, false], [undefined, false]];
+  const wrong = tries.filter(([v, want]) => { const before = s.robots[0].wait, got = F.setWait(s, 0, v); return got !== want || s.robots[0].wait !== (want ? v : before); });
+  ok(!wrong.length && !F.setWait(s, 7, 5) && take(s, 'waitset').length === 3, 'the wait takes a whole number of seconds from 0 to 60 and nothing else: -1, 61, 2.5, NaN, Infinity, \'5\', null and nothing are refused, not rounded, and leave it as it was', wrong.map(x => String(x[0])).join());
+  F.setRule(s, 1, 0, null);
+  ok(F.setWait(s, 1, 9) && s.robots[1].wait === 9 && F.setRule(s, 1, 0, 'delay') && s.robots[1].wait === 9, 'it can be set with the instruction in no slot: the robot keeps the number until the instruction goes back in');
+  ok(F.gradeOf('waited') === 'good' && F.gradeOf('straight!') === 'soso', 'in the evals a wait is green, and going straight on against its instructions yellow');
+}
+{
+  // an operator: every log it handles is one iteration, and the wait comes after it
+  const gap = (log, rules, wait, slip) => {
+    const s = opCycle(log, { slip: slip || many(false, 20) }, rules);
+    if (wait !== undefined) F.setWait(s, 0, wait);
+    until(s, x => take(x, 'press').length > 1 && x.robots[0].state !== 'press', 40);
+    const p = take(s, 'press'), end = take(s, 'made').concat(take(s, 'recycled')).sort((a, b) => a.t - b.t)[0], first = log === 'log.m' ? p[1] : p[0];
+    return { s, end: end && end.t, paused: take(s, 'paused')[0], press: first && first.t, r: s.robots[0] };
+  };
+  // the same gap give or take the 0.05 s steps it is counted in (a state ends on the step after)
+  const near = (got, want) => got >= want - 0.06 && got <= want + 0.26;
+  const plain = gap('log.m', null), told = gap('log.m', ['delay'], 3);
+  ok(told.paused && told.paused.wait === 3 && near(told.paused.t, told.end + 0.05) && near(told.press - told.paused.t, 3 + C.pressSec) && near(plain.press - plain.end, C.stageSec + C.pressSec) && told.r.record.waited === 1,
+    'told to wait 3 s, an operator waits 3 s once the cut is out and then presses the next log; without it, it presses as soon as the log has rolled in', 'told ' + (told.press - told.end).toFixed(2) + ' s, plain ' + (plain.press - plain.end).toFixed(2) + ' s');
+  const toss = gap('gnarled.m', ['gnarled', 'delay'], 3), toss0 = gap('gnarled.m', ['gnarled']);
+  ok(toss.paused && near(toss.paused.t, toss.end) && near(toss.press - toss.end, 3 + C.pressSec) && near(toss0.press - toss0.end, C.stageSec + C.pressSec) && toss.r.record['reject:gnarled.m'] === 1,
+    'and after each log it tosses in the recycle bin (the next log rolls in while it waits)', 'told ' + (toss.press - toss.end).toFixed(2) + ' s, plain ' + (toss0.press - toss0.end).toFixed(2) + ' s');
+  let s = opCycle('gnarled.m', { slip: many(false, 20) }, ['output', 'delay']); F.setWait(s, 0, 3);
+  until(s, x => take(x, 'paused').length > 0, 20);
+  const caught = take(s, 'recycled').find(e => e.from === 'out'), pz = take(s, 'paused')[0];
+  ok(caught && pz && near(pz.t - caught.t, C.tossSec) && !take(s, 'press').slice(1).length, 'and after it flicks a bad cut off the out-feed into the recycle bin', caught && pz && (pz.t - caught.t).toFixed(2));
+  const slip = gap('log.m', ['delay'], 3, [true, false]);
+  ok(!take(slip.s, 'paused').length && take(slip.s, 'straight').length === 1 && slip.r.record['straight!'] === 1 && !slip.r.record.waited && near(slip.press - slip.end, C.stageSec + C.pressSec),
+    'on a slip (1 in 20) it goes straight on: no wait, and a yellow line in its evals', JSON.stringify(slip.r.record));
+  const zero = gap('log.m', ['delay'], 0, []);
+  ok(!take(zero.s, 'paused').length && !take(zero.s, 'straight').length && near(zero.press - zero.end, C.stageSec + C.pressSec) && zero.s.force.slip.length === 0 && !zero.r.record.waited,
+    'told to wait 0 s it goes straight on, with no line in its evals');
+  s = opCycle('log.m', { slip: many(false, 20) }, ['delay']); F.setWait(s, 0, 30);
+  until(s, x => x.robots[0].state === 'pause', 20); run(s, 2);
+  F.setWait(s, 0, 1); F.step(s, 0.05);
+  ok(s.robots[0].state === 'idle' || s.robots[0].state === 'press', 'a shorter wait set while it waits counts at once', s.robots[0].state);
+  s = opCycle('log.m', { slip: many(false, 20) }, ['delay']); F.setWait(s, 0, 30);
+  until(s, x => x.robots[0].state === 'pause', 20); run(s, 2);
+  F.setRule(s, 0, 0, null); F.step(s, 0.05);
+  ok(s.robots[0].state === 'idle' || s.robots[0].state === 'press', 'and taking the instruction out of its slot ends the wait', s.robots[0].state);
+  s = opCycle('gnarled.m', { slip: many(false, 20) }, ['gnarled', 'delay']); F.setWait(s, 0, 3);
+  until(s, x => x.robots[0].state === 'reject', 20);
+  s.avatar.x = SP.press.x; s.avatar.y = SP.press.y; F.tap(s, { kind: 'machine' });
+  until(s, x => x.robots[0].state !== 'reject', 3);
+  const yours = take(s, 'recycled');
+  ok(yours.length === 1 && yours[0].by === 'player' && s.robots[0].state === 'idle' && !take(s, 'paused').length && !s.robots[0].record.waited && !s.robots[0].record['reject:gnarled.m'],
+    'a log you toss yourself while the robot is lifting it is a log it did not handle, so no wait follows', JSON.stringify(yours.map(e => e.by)) + ' ' + s.robots[0].state);
+}
+{
+  // a stocker: one thing out of the bin, stocked or recycled, is one iteration; a look is not
+  const at = (s, kind) => take(s, kind).map(e => e.t);
+  const near = (got, want) => got >= want - 0.06 && got <= want + 0.26;
+  let s = stockCycle(['plank.m', 'plank.m'], { slip: many(false, 20) }, ['delay']); F.setWait(s, 1, 4);
+  until(s, x => x.stalls[0].stock.length === 2, 30);
+  const st = at(s, 'stocked'), pz = take(s, 'paused');
+  let p = stockCycle(['plank.m', 'plank.m'], {}); until(p, x => x.stalls[0].stock.length === 2, 30);
+  const st0 = at(p, 'stocked'), cycle = C.coolSec + C.reachSec + C.placeSec;
+  ok(pz.length >= 1 && near(st[1] - st[0], cycle + 4) && near(st0[1] - st0[0], cycle), 'told to wait 4 s, a stocker waits 4 s after each stocking', (st[1] - st[0]).toFixed(2) + ' s vs ' + (st0[1] - st0[0]).toFixed(2) + ' s');
+  s = stockCycle(['plank.s', 'plank.m'], { slip: many(false, 20) }, ['smallOut', 'delay']); F.setWait(s, 1, 4);
+  until(s, x => x.stalls[0].stock.length === 1, 30);
+  const rc = take(s, 'recycled')[0], pr = take(s, 'paused')[0], sk = take(s, 'stocked')[0];
+  ok(rc && pr && sk && pr.t > rc.t && pr.t < sk.t && near(sk.t - rc.t, C.coolSec + 4 + C.reachSec + C.placeSec), 'and after each thing it puts in the recycle bin', rc && sk && (sk.t - rc.t).toFixed(2));
+  s = stockCycle(['plank.s', 'plank.m'], { slip: many(false, 20), find: [false, true] }, ['stockOnly', 'delay']); F.setWait(s, 1, 4);
+  until(s, x => x.stalls[0].stock.length === 1, 30); run(s, 1);
+  const lk = take(s, 'looking')[0], sk2 = take(s, 'stocked')[0], pz2 = take(s, 'paused');
+  ok(lk && sk2 && pz2.length === 1 && pz2[0].t > sk2.t && near(sk2.t - lk.t, C.lookSec + C.reachSec + C.placeSec), 'but not after a "looking for plank": what it turned up went back, so its job is not done', lk && sk2 && (sk2.t - lk.t).toFixed(2) + ' s, ' + pz2.length + ' waits');
+}
+{
+  // the wait changes when, never what
+  const day = (wait, rules) => {
+    const t = staffed(31, ['operate', 'stock']);
+    if (wait !== null) { instruct(t, 0, ['delay']); instruct(t, 1, ['delay']); F.setWait(t, 0, wait); F.setWait(t, 1, wait); }
+    if (rules) instruct(t, 0, rules);
+    t.events = [];
+    const log = [];
+    for (let k = 0; k < 6000; k++) {
+      F.step(t, 0.05);
+      t.events.forEach(e => { if (e.kind === 'outcome' || e.kind === 'sold' || e.kind === 'recycled' || e.kind === 'looking' || e.kind === 'customer') log.push(e.kind + ':' + (e.what || e.sale || e.item || '')); });
+      t.events = [];
+      if (t.machine.phase === 'jam') { t.machine.dirt = 0.001; t.avatar.act = { kind: 'clean', t: 0 }; }
+    }
+    return { log: log.join(), money: t.money, seed: t.seed, sat: t.satisfaction };
+  };
+  const none = day(null), zero = day(0), three = day(3);
+  ok(none.log.length > 200 && zero.log === none.log && zero.money === none.money && zero.seed === none.seed && three.log !== none.log,
+    'a wait of 0 s rolls no die: a day with both robots told to wait 0 s is the same day as one without the instruction, roll for roll (and at 3 s it is not)', none.money + ' vs ' + zero.money);
+  // an operator alone, nobody in the shop, slips held off: the same logs in the same order, and the
+  // same outcome for each, only later
+  const alone = wait => {
+    const t = opCycle('log.m', { slip: many(false, 5000) }, ['sappy', 'gnarled', 'medium'].concat(wait ? ['delay'] : []));
+    t.force.log = []; t.force.think = [];
+    if (wait) F.setWait(t, 0, wait);
+    const out = [];
+    for (let k = 0; k < 12000; k++) { F.step(t, 0.05); t.events.forEach(e => { if (e.kind === 'outcome') out.push(e.what); }); t.events = []; t.bin.length = 0; }
+    return out;
+  };
+  const fast = alone(0), slow = alone(4);
+  ok(slow.length >= 40 && fast.length > slow.length * 1.5 && slow.join() === fast.slice(0, slow.length).join(), 'the wait changes when, never what: told to wait 4 s, an operator handles the same logs in the same order with the same outcomes, only fewer of them in ten minutes', slow.length + ' logs vs ' + fast.length);
+}
+{
+  // taken off its job, sent to rest, saved and loaded while it waits
+  let s = staffed(63, ['operate', 'stock'], { slip: many(false, 40) }); shut(s);
+  instruct(s, 0, ['delay']); F.setWait(s, 0, 40);
+  until(s, x => x.robots[0].state === 'pause', 40);
+  const since = s.t;
+  s.force = {};   // a save keeps the dice, never a test's queued rolls
+  const text = F.save(s), back = F.load(text);
+  ok(back && back.robots[0].state === 'pause' && Math.abs(back.robots[0].t - s.robots[0].t) < 1e-9 && back.robots[0].wait === 40, 'saved while it waits, it loads still waiting, as far through its wait as it was');
+  run(s, 3); run(back, 3);
+  ok(JSON.stringify(Object.assign({}, s, { events: [] })) === JSON.stringify(Object.assign({}, back, { events: [] })), 'and carries on identically');
+  F.tap(s, { kind: 'robot', id: 0 }); until(s, x => !!F.bubbleOpen(x), 30);
+  const waiting = s.robots[0].state === 'pause';
+  F.choose(s, 'job:rest');
+  const rested = s.robots[0].state;
+  F.tap(s, { kind: 'robot', id: 0 }); until(s, x => !!F.bubbleOpen(x), 40);
+  F.choose(s, 'job:operate'); F.step(s, 0.05);
+  const back2 = s.robots[0].job === 'operate' && s.robots[0].state !== 'pause';
+  s.events = [];
+  until(s, x => take(x, 'press').some(e => e.by === 0), 40);
+  const again = take(s, 'press').find(e => e.by === 0);
+  ok(waiting && rested !== 'pause' && back2 && again && again.t < since + 40, 'sent to rest while it waits it stops waiting, and given its job back it starts on it before its 40 s wait would have run out (no robot stuck waiting)', rested + (again ? ', pressed ' + (again.t - since).toFixed(1) + ' s in' : ''));
+  const raw = JSON.parse(text), bad = [[99, 60], [-3, 0], [2.6, 3], ['x', W0()], [null, W0()]];
+  function W0() { return C.wait.start; }
+  const off = bad.filter(([v, want]) => { raw.robots[0].wait = v; const l = F.load(JSON.stringify(raw)); return !l || l.robots[0].wait !== want; });
+  ok(!off.length, 'a bad wait in a save is clamped to a whole number from 0 to 60, or set to ' + C.wait.start + ' s when it is not a number', off.map(x => String(x[0])).join());
+}
+{
+  // overproduction (the CD's open question 2): an instructed operator and stocker, ten minutes
+  const tenMin = wait => {
+    const s = staffed(51, ['operate', 'stock']);
+    instruct(s, 0, ['sappy', 'gnarled', 'medium'].concat(wait ? ['delay'] : []));
+    instruct(s, 1, ['smallOut', 'largeOut', 'roughOut']);
+    if (wait) F.setWait(s, 0, wait);
+    let most = 0;
+    for (let k = 0; k < 12000; k++) {
+      F.step(s, 0.05); s.events = [];
+      if (s.machine.phase === 'jam') { s.machine.dirt = 0.001; s.avatar.act = { kind: 'clean', t: 0 }; }
+      most = Math.max(most, count(s.bin, 'plank.m'));
+    }
+    return { end: count(s.bin, 'plank.m'), most, sat: s.satisfaction };
+  };
+  const without = tenMin(0), withIt = tenMin(3);
+  ok(without.end >= 12 && withIt.most <= 3, 'overproduction: without a wait the output bin piles up with medium planks nobody buys; told to wait 3 s a log (about the customers\' pace) the operator keeps it to a handful',
+    'without: ' + without.end + ' at the end; with 3 s: ' + withIt.end + ' at the end, ' + withIt.most + ' at most (satisfaction ' + without.sat.toFixed(0) + '% vs ' + withIt.sat.toFixed(0) + '%)');
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);

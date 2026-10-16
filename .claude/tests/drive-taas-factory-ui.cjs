@@ -21,7 +21,12 @@
  * bubbles (the recycle bin's put and take, an input bin, the saw's three cuts), the build badge
  * in the bottom right corner in both modes, the info panel opened from the menu, saves that
  * survive a reload without touching the formal mode's, re-measuring after a resize while hidden,
- * and the chrome and bubble all on screen at phone, landscape and desktop sizes. Frames are
+ * the chrome and bubble all on screen at phone, landscape and desktop sizes, people who keep
+ * their hair turned toward the camera (customers and the avatar under its hat), and the delay
+ * between tasks (on the list from the start; its slider and - / + under the slot, set in the
+ * engine, stopping at 0 and 60, never redrawn under a dragging finger, surviving a reload; its
+ * evals lines; the pause sign over a waiting robot and its emptying ring, read off pixels; the
+ * slot row at 320 and 390 wide; Info). Frames are
  * stepped through the page's own test hook (TAAS_FACTORY, paused), so time is exact; input goes
  * through real touch events.
  *
@@ -437,14 +442,14 @@ const server = http.createServer((req, res) => {
     await page.tap('[data-panel="buy"]');
     await step(0.05);
     const pk = await H(() => ({ money: window.TAAS_FACTORY.s.money + window.TAAS_FACTORY.s.spent - window.TAAS_FACTORY.s.earned, slots: window.TAAS_FACTORY.s.robots[0].slots, rules: [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent), pick: window.TAAS_FACTORY.page.pick }));
-    ok(pk.money === before - 5 && pk.slots === 1 && pk.pick === 0 && pk.rules.join('|') === 'Never put sap on input log|Put gnarled logs in recycle bin', 'unlocking a slot takes $5 and opens the list straight away: only the instructions for mistakes already seen', JSON.stringify(pk));
+    ok(pk.money === before - 5 && pk.slots === 1 && pk.pick === 0 && pk.rules.join('|') === 'Never put sap on input log|Put gnarled logs in recycle bin|Wait between tasks', 'unlocking a slot takes $5 and opens the list straight away: only the instructions for mistakes already seen, and the delay (on the list from the start)', JSON.stringify(pk));
     await page.tap('[data-panel="rule:sap"]');
     await step(0.05);
     const set = await H(() => ({ rules: window.TAAS_FACTORY.s.robots[0].rules, slot: document.querySelector('.fx-slot.filled') && document.querySelector('.fx-slot.filled').textContent, picker: !!document.querySelector('.fx-picker'), next: document.querySelector('[data-panel="buy"]').textContent }));
     ok(set.rules.join() === 'sap' && set.slot === 'Never put sap on input log' && !set.picker && set.next === 'Unlock this slot: $10', 'tapping an instruction puts it in the slot, closes the list, and the next slot asks $10', JSON.stringify(set));
     await page.tap('[data-panel="buy"]'); await step(0.05);
     const dup = await H(() => [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent + ':' + b.disabled));
-    ok(dup.length === 2 && /slot 1\):true$/.test(dup[0]) && /:false$/.test(dup[1]), 'in the next slot\'s list, the instruction it already holds is greyed and says where', JSON.stringify(dup));
+    ok(dup.length === 3 && /slot 1\):true$/.test(dup[0]) && /:false$/.test(dup[1]) && /:false$/.test(dup[2]), 'in the next slot\'s list, the instruction it already holds is greyed and says where', JSON.stringify(dup));
     await page.tap('[data-panel="cancel"]'); await step(0.05);
     ok(!(await H(() => !!document.querySelector('.fx-picker'))) && (await H(() => window.TAAS_FACTORY.s.robots[0].rules.join())) === 'sap,', 'Cancel closes the list and leaves the slot empty');
     await page.fill('#fx-rp-name', '  <b>Planky</b>  ');
@@ -731,6 +736,160 @@ const server = http.createServer((req, res) => {
     await step(4.5);
     const cut = await S();
     ok(cut.saw.out.join() === 'b2x2.l' && cut.money === m0 - 1, 'a tap on a cut presses the saw ($1), and four large 2"x2"s land in its output bin', cut.saw.out.join() + ' / ' + (m0 - cut.money));
+  });
+  /* ---------- 16. people keep their hair facing the camera (the CD, 2026-10-16) ---------- */
+  // turned toward the camera the head was drawn over the hair, so customers went bald and the avatar lost the hair under
+  // its hat. One person alone through the hook (standing, arms down), its pixels sorted by the shading bands of its hair
+  // and skin colours (the page's own, read from the source), in boxes round its head's centre measured in metres: the
+  // crown above the centre, the face below it, either side of the head under the hat
+  await section('16. hair', async () => {
+    const hex = ((SRC.match(/const CUST_HAIR = \[([^\]]*)\]/) || ['', ''])[1].match(/#[0-9a-f]{6}/g)) || [], col = SRC.match(/skin: '(#[0-9a-f]{6})', hair: '(#[0-9a-f]{6})'/) || [];
+    const look = await H(([hex, skin, avHair]) => {
+      const T = window.TAAS_FACTORY;
+      const band = h => { const n = parseInt(h.slice(1), 16); return [0, 1, 2].map(k => { const m = [1, 0.85, 0.68][k], t = [0, 0.05, 0.16][k], f = (v, c) => Math.round(Math.min(255, Math.max(0, v * m * (1 - t) + c * t))); return [f(n >> 16 & 255, 60), f(n >> 8 & 255, 70), f(n & 255, 120)]; }); };
+      const near = (d, i, B) => B.some(c => Math.abs(d[i] - c[0]) + Math.abs(d[i + 1] - c[1]) + Math.abs(d[i + 2] - c[2]) < 24);
+      const out = {};
+      for (const who of [1, 2, 'avatar']) {
+        const H = band(who === 'avatar' ? avHair : hex[(who * 3) % hex.length]), K = band(skin);
+        out[who] = {};
+        for (const [nm, yaw] of [-0.7, -0.35, 0, 0.35, 0.7].map(e => [Math.round(e * 180 / Math.PI), Math.PI / 2 + e]).concat([['up', -Math.PI / 2]])) {
+          const sp = T.person(who, yaw), k = sp.dpr, S = sp.S, d = sp.c.getContext('2d').getImageData(0, 0, sp.c.width, sp.c.height).data, W = sp.c.width, [hx, hy] = sp.head;
+          const cnt = (x0, x1, y0, y1, B) => { let n = 0; for (let y = Math.round((hy + y0 * S) * k); y < Math.round((hy + y1 * S) * k); y++) for (let x = Math.round((hx + x0 * S) * k); x < Math.round((hx + x1 * S) * k); x++) { const i = (y * W + x) * 4; if (d[i + 3] > 200 && near(d, i, B)) n++; } return n; };
+          out[who][nm] = { crown: cnt(-0.15, 0.15, -0.27, -0.08, H), bare: cnt(-0.15, 0.15, -0.27, -0.08, K), face: cnt(-0.12, 0.12, 0.02, 0.2, K), sides: cnt(-0.3, -0.12, -0.15, 0.08, H) + cnt(0.12, 0.3, -0.15, 0.08, H) };
+        }
+      }
+      return out;
+    }, [hex, col[1], col[2]]);
+    const turned = who => Object.keys(look[who] || {}).filter(n => n !== 'up').map(n => [n, look[who][n]]), up = who => (look[who] || {}).up || {};
+    const say = who => JSON.stringify(look[who]);
+    const cust = [1, 2].filter(w => !(turned(w).length === 5 && turned(w).every(([, r]) => r.crown >= 0.75 * up(w).crown && r.bare < 40 && r.face > 200)));
+    ok(hex.length === 5 && !cust.length, 'a customer turned toward the camera keeps its hair (the CD\'s bald customers): as much on its crown as seen from behind, from 40 degrees either side of straight down, with its face below',
+      cust.map(say).join(' ') + (hex.length === 5 ? '' : ' hair colours ' + hex.join()));
+    const back = [1, 2].filter(w => !(up(w).crown > 300 && up(w).bare < 20 && up(w).face < 20));
+    ok(!back.length, 'and seen from behind it is all hair still, crown and nape: the hair opens over the face only', back.map(say).join(' '));
+    const av = turned('avatar');
+    ok(av.length === 5 && av.every(([, r]) => r.sides >= 0.4 * up('avatar').sides && r.face > 200), 'the avatar too: turned toward the camera, hair shows under the hard hat either side of its head, with its face below', say('avatar'));
+  });
+  /* ---------- 17. the delay between tasks: its slider, its steppers, the waiting robot (the CD, 2026-10-16) ---------- */
+  await section('17. delay', async () => {
+    // two robots on staff, the operator on the planer with medium logs only, and no mistake seen yet
+    const staff = async (seed) => {
+      await fresh(seed);
+      await H(() => {
+        const T = window.TAAS_FACTORY, s = T.s;
+        s.money = 60; s.shop.next = 1e9;
+        ['operate', 'stock'].forEach(job => { FACTORY.tap(s, { kind: 'dock' }); for (let i = 0; i < 600 && !FACTORY.bubbleOpen(s); i++) FACTORY.step(s, 0.05); FACTORY.choose(s, 'hire'); FACTORY.choose(s, 'job:' + job); });
+        s.robots[1].job = null; s.robots[1].state = 'idle';
+        s.force.log = Array(400).fill('log.m'); s.force.think = Array(400).fill(false); s.force.slip = Array(400).fill(false);
+        s.money = 100; s.events = []; T.view.camY = T.view.minY; T.tick(1 / 60);
+      });
+    };
+    await staff(17);
+    await H(() => window.TAAS_FACTORY.openRobot(0));
+    await page.tap('[data-panel="buy"]'); await step(0.05);
+    const list = await H(() => ({ seen: FACTORY.known(window.TAAS_FACTORY.s).map(q => q.id).join(), rules: [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent) }));
+    ok(list.seen === 'delay' && list.rules.join('|') === 'Wait between tasks', 'with no mistake seen yet, a new slot\'s list offers the delay, and only the delay', JSON.stringify(list));
+    await page.tap('[data-panel="rule:delay"]'); await step(0.05);
+    const put = await H(() => { const w = document.querySelector('.fx-wait'), sl = document.getElementById('fx-wait'); return { slot: document.querySelector('.fx-slot.filled') && document.querySelector('.fx-slot.filled').textContent, wait: window.TAAS_FACTORY.s.robots[0].wait, row: !!w && w.closest('li') === document.querySelector('.fx-slot.filled').closest('li'), type: sl && sl.type, min: sl && sl.min, max: sl && sl.max, step: sl && sl.step, value: sl && sl.value, out: w && w.querySelector('output').textContent, steps: w ? w.querySelectorAll('[data-panel^="wait:"]').length : 0 }; });
+    ok(put.slot === 'Wait between tasks' && put.wait === 5 && put.row && put.type === 'range' && put.min === '0' && put.max === '60' && put.step === '1' && put.value === '5' && put.out === '5 s' && put.steps === 2,
+      'in a slot, the delay shows its wait under it: a slider from 0 to 60 a second at a time, at 5 s, with a - and a + either side', JSON.stringify(put));
+    await page.tap('[data-panel="wait:1"]'); await step(0.05);
+    const up1 = await H(() => ({ wait: window.TAAS_FACTORY.s.robots[0].wait, out: document.querySelector('.fx-wait output').textContent, value: document.getElementById('fx-wait').value }));
+    await page.tap('[data-panel="wait:-1"]'); await step(0.05); await page.tap('[data-panel="wait:-1"]'); await step(0.05);
+    const dn2 = await H(() => ({ wait: window.TAAS_FACTORY.s.robots[0].wait, out: document.querySelector('.fx-wait output').textContent, value: document.getElementById('fx-wait').value }));
+    ok(up1.wait === 6 && up1.out === '6 s' && up1.value === '6' && dn2.wait === 4 && dn2.out === '4 s' && dn2.value === '4', '+ sets the robot\'s wait a second longer and - a second shorter, in the engine, on the slider and in the figure', JSON.stringify([up1, dn2]));
+    // the ends, by the keyboard on the slider (which also keeps its focus through the page redrawing)
+    await page.focus('#fx-wait'); await page.keyboard.press('End'); await step(0.05);
+    const hi = await H(() => ({ wait: window.TAAS_FACTORY.s.robots[0].wait, out: document.querySelector('.fx-wait output').textContent, plus: document.querySelector('[data-panel="wait:1"]').disabled, minus: document.querySelector('[data-panel="wait:-1"]').disabled, focus: document.activeElement && document.activeElement.id }));
+    await page.keyboard.press('ArrowRight'); await step(0.05);
+    const hi2 = await H(() => window.TAAS_FACTORY.s.robots[0].wait);
+    await page.keyboard.press('Home'); await step(0.05);
+    const lo = await H(() => ({ wait: window.TAAS_FACTORY.s.robots[0].wait, out: document.querySelector('.fx-wait output').textContent, plus: document.querySelector('[data-panel="wait:1"]').disabled, minus: document.querySelector('[data-panel="wait:-1"]').disabled }));
+    const below = await H(() => FACTORY.setWait(window.TAAS_FACTORY.s, 0, -1));
+    ok(hi.wait === 60 && hi.out === '60 s' && hi.plus && !hi.minus && hi.focus === 'fx-wait' && hi2 === 60 && lo.wait === 0 && lo.out === '0 s' && lo.minus && !lo.plus && !below,
+      'it stops at 60 (+ greyed) and at 0 (- greyed), and the slider keeps the keyboard while the page redraws', JSON.stringify({ hi, hi2, lo, below }));
+    // a drag on the slider, with real touches, while the operator works and its evals change under it every few frames
+    await page.tap('[data-panel="wait:1"]'); await page.tap('[data-panel="wait:1"]'); await page.tap('[data-panel="wait:1"]'); await step(0.05);
+    const cdp = await ctx.newCDPSession(page);
+    const geo = await H(() => { const e = document.getElementById('fx-wait'), r = e.getBoundingClientRect(); e.__mine = true; return { l: r.left, w: r.width, y: r.top + r.height / 2, rec: JSON.stringify(window.TAAS_FACTORY.s.robots[0].record) }; });
+    const at = v => geo.l + 8 + (geo.w - 16) * v / 60;
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: at(3), y: geo.y }] });
+    let same = true, mid = null;
+    for (let i = 1; i <= 10; i++) {
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: at(3 + 4.5 * i), y: geo.y }] });
+      await H(() => { const r = window.TAAS_FACTORY.s.robots[0]; r.record.plank = (r.record.plank || 0) + 1; });   // its evals change under the finger (staged: the robot is mid-wait)
+      await step(0.5);
+      const q = await H(() => { const e = document.getElementById('fx-wait'); return { mine: !!(e && e.__mine), wait: window.TAAS_FACTORY.s.robots[0].wait, out: document.querySelector('.fx-wait output').textContent }; });
+      if (!q.mine) same = false;
+      if (i === 5) mid = q;
+    }
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await step(0.05);
+    const end = await H(() => { const r = window.TAAS_FACTORY.s.robots[0], e = document.getElementById('fx-wait'); return { wait: r.wait, value: e.value, out: document.querySelector('.fx-wait output').textContent, redrawn: !e.__mine, rec: JSON.stringify(r.record), saved: JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.indexOf('taas.factory.v') === 0) || 'null') || 'null') }; });
+    const savedWait = end.saved && end.saved.robots && end.saved.robots[0].wait;
+    ok(same && mid && Math.abs(mid.wait - 25) <= 3 && mid.out === mid.wait + ' s' && Math.abs(end.wait - 48) <= 3 && end.value === String(end.wait) && end.out === end.wait + ' s' && end.rec !== geo.rec && end.redrawn && savedWait === end.wait,
+      'a drag on the slider is never redrawn under the finger: the wait and its figure follow it to the end while the robot\'s evals change, the page catches up on release, and the wait is saved', JSON.stringify({ same, mid, end: Object.assign({}, end, { saved: savedWait, rec: end.rec === geo.rec ? 'unchanged' : 'changed' }) }));
+    await page.tap('[data-panel="wait:1"]');
+    // read the save before any frame runs (the page also saves every 2 s of frames and on leaving, which would hide a stepper that never saves)
+    const want = await H(() => ({ wait: window.TAAS_FACTORY.s.robots[0].wait, saved: (JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.indexOf('taas.factory.v') === 0)) || '{}').robots || [{}])[0].wait }));
+    await go('?mode=robot-factory');
+    await page.waitForFunction(() => window.TAAS_FACTORY && window.TAAS_FACTORY.on);
+    const back = await H(() => { const T = window.TAAS_FACTORY; T.paused = true; T.openRobot(0); T.tick(1 / 60); return { wait: T.s.robots[0].wait, value: document.getElementById('fx-wait') && document.getElementById('fx-wait').value, out: document.querySelector('.fx-wait output') && document.querySelector('.fx-wait output').textContent }; });
+    ok(want.wait === end.wait + 1 && want.saved === want.wait && back.wait === want.wait && back.value === String(want.wait) && back.out === want.wait + ' s', 'a tap on + is saved at once, and the wait survives a reload, on the slider and in the engine', JSON.stringify({ want, back }));
+    await H(() => window.TAAS_FACTORY.closePanel());
+    // the evals: the operator waits, then slips once and goes straight on
+    await staff(18);
+    const ev = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s;
+      FACTORY.buySlot(s, 0); FACTORY.setRule(s, 0, 0, 'delay'); FACTORY.setWait(s, 0, 1);
+      s.force.slip = [false, false, true].concat(Array(40).fill(false));
+      for (let i = 0; i < 1200; i++) FACTORY.step(s, 0.05);   // a walk to the planer, then a log every 5 s or so
+      T.openRobot(0); T.tick(1 / 60);
+      return [...document.querySelectorAll('.fx-evals .fx-rec tr')].map(tr => tr.querySelector('.fx-dot').className.replace('fx-dot ', '') + '|' + tr.textContent.replace(/\d+$/, ''));
+    });
+    ok(ev.includes('good|Waited between tasks') && ev.includes('soso|Went straight on, against its instructions') && ev.indexOf('good|Waited between tasks') < ev.indexOf('soso|Went straight on, against its instructions'),
+      'its evals count each wait in green and the time it went straight on, against its instructions, in yellow below it', JSON.stringify(ev));
+    await H(() => window.TAAS_FACTORY.closePanel());
+    // the waiting robot, read off pixels: the engine and the dust held, the clock still, the robot idle and then pausing
+    const sign = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s, r = s.robots[0], k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      window.__step = FACTORY.step; window.__rnd = Math.random; FACTORY.step = () => {}; Math.random = () => 0.999;
+      T.view.camY = Math.min(T.view.maxY, Math.max(T.view.minY, T.screen(0, r.y, 0)[1] + T.view.camY - 400));
+      const grab = () => { r.moodT = 0; T.tick(0); const p = T.screen(r.x, r.y, 1.3); const d = g.getImageData(Math.round((p[0] - 18) * k), Math.round((p[1] - 36) * k), Math.round(36 * k), Math.round(40 * k)).data; let teal = 0, white = 0; for (let i = 0; i < d.length; i += 4) { if (Math.abs(d[i] - 22) < 30 && Math.abs(d[i + 1] - 179) < 30 && Math.abs(d[i + 2] - 165) < 30) teal++; if (d[i] > 240 && d[i + 1] > 240 && d[i + 2] > 240) white++; } return { teal, white, px: Array.from(d) }; };
+      r.state = 'idle'; r.t = 0; const idle = grab();
+      r.state = 'pause'; r.wait = 10; r.t = 1; const early = grab();
+      r.t = 8; const late = grab();
+      r.state = 'idle'; r.t = 0;
+      FACTORY.step = window.__step; Math.random = window.__rnd;
+      let changed = 0; for (let i = 0; i < idle.px.length; i += 4) if (Math.abs(idle.px[i] - early.px[i]) + Math.abs(idle.px[i + 1] - early.px[i + 1]) + Math.abs(idle.px[i + 2] - early.px[i + 2]) > 60) changed++;
+      return { idle: [idle.teal, idle.white], early: [early.teal, early.white], late: [late.teal, late.white], changed };
+    });
+    ok(sign.changed > 300 && sign.idle[0] < 10 && sign.early[1] > sign.idle[1] + 300 && sign.early[0] > 2.5 * sign.late[0] && sign.late[0] > 20,
+      'a robot waiting between tasks shows a pause sign over its head (none while it works), with a ring that empties as the wait runs out', JSON.stringify(sign));
+    // the slot row at phone sizes: everything inside the page, nothing on anything, every button a finger wide
+    const bad = [];
+    for (const [w, h] of [[320, 568], [390, 844]]) {
+      await page.setViewportSize({ width: w, height: h });
+      await H(() => { const T = window.TAAS_FACTORY; T.closePanel(); T.openRobot(0); T.tick(1 / 60); });
+      const r = await H(() => {
+        const b = e => { const q = e.getBoundingClientRect(); return { l: q.left, r: q.right, t: q.top, b: q.bottom, w: q.width, h: q.height }; };
+        const li = document.querySelector('.fx-waits'), body = document.getElementById('fx-panel-body');
+        return { body: b(body), li: li && b(li), kids: li ? ['.fx-slot', '.fx-x', '[data-panel="wait:-1"]', '#fx-wait', '[data-panel="wait:1"]', 'output'].map(sel => [sel, b(li.querySelector(sel))]) : [], wide: document.scrollingElement.scrollWidth > innerWidth || body.scrollWidth > body.clientWidth + 1 };
+      });
+      if (!r.li) { bad.push(w + 'x' + h + ' no slot holding the delay'); continue; }
+      if (r.wide) bad.push(w + 'x' + h + ' sideways scroll');
+      r.kids.forEach(([n, q]) => { if (q.l < r.li.l - 0.5 || q.r > r.li.r + 0.5) bad.push(w + 'x' + h + ' ' + n + ' outside its row'); });
+      r.kids.filter(([n]) => n !== 'output' && n !== '.fx-slot').forEach(([n, q]) => { if ((n === '#fx-wait' ? q.w : Math.min(q.w, q.h)) < 44) bad.push(w + 'x' + h + ' ' + n + ' under 44 px (' + Math.round(n === '#fx-wait' ? q.w : Math.min(q.w, q.h)) + ')'); });
+      for (let i = 0; i < r.kids.length; i++) for (let j = i + 1; j < r.kids.length; j++) { const [a, p] = r.kids[i], [c, q] = r.kids[j]; if (!(p.r <= q.l + 0.5 || q.r <= p.l + 0.5 || p.b <= q.t + 0.5 || q.b <= p.t + 0.5)) bad.push(w + 'x' + h + ' ' + a + ' over ' + c); }
+      if (r.li.r > r.body.r || r.li.l < r.body.l) bad.push(w + 'x' + h + ' row outside the page');
+    }
+    await H(() => window.TAAS_FACTORY.closePanel());
+    await page.setViewportSize({ width: 390, height: 844 });
+    ok(!bad.length, 'at 320 and 390 wide the slot, its cross, the - and +, the slider and the figure all sit inside the row, none on another, each button a finger wide', bad.join('; '));
+    await H(() => window.TAAS_FACTORY.showInfo());
+    const info = await H(() => document.getElementById('fx-panel-body').textContent);
+    await H(() => window.TAAS_FACTORY.closePanel());
+    ok(/Wait between tasks/.test(info) && /0 to 60 seconds \(5 to begin with\)/.test(info) && /a wait between tasks, as told/.test(info), 'Info tells of the delay: on the list from the start, 0 to 60 seconds, 5 to begin with, and a wait as told is green', (info.match(/One is on the list[^.]*\.[^.]*\./) || [''])[0]);
   });
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
   await section('12. badge', async () => {

@@ -298,5 +298,131 @@
   "file": "games/taas/index.html",
   "old": "<div id=\"build-badge\" style=\"position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;",
   "new": "<!-- @negtest --><div id=\"build-badge\" style=\"position:fixed;top:2px;right:6px;"
+ },
+ {
+  "name": "hair-old-whole",
+  "file": "games/taas/index.html",
+  "old": "const hairCap = (nu, nv, col) => hairOver(ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, nu, nv, col, 1), 0.1);",
+  "new": "const hairCap = (nu, nv, col) => /* @negtest */ ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, nu, nv, col, 1);"
+ },
+ {
+  "name": "hair-sorts-by-own-centre",
+  "file": "games/taas/index.html",
+  "old": "    return { v, f, e: edgesOf(f), c: p.c, ol: p.ol, bias: p.bias, cx: 0, cy: 0, cz: 0 };",
+  "new": "    return { v, f, e: edgesOf(f), c: p.c, ol: p.ol, bias: p.bias, cx: p.cx, cy: p.cy, cz: p.cz }; /* @negtest */"
+ },
+ {
+  "name": "hair-no-face-opening",
+  "file": "games/taas/index.html",
+  "old": "      return x <= 0 || z / (fc.length - 1) >= zh;",
+  "new": "      return true || x <= 0 || z / (fc.length - 1) >= zh; /* @negtest */"
+ },
+ {
+  "name": "hair-cap-inside-head",
+  "file": "games/taas/index.html",
+  "old": "      return x <= 0 || z / (fc.length - 1) >= zh;",
+  "new": "      const n = fc.length - 1; let y = 0; for (let i = 1; i < fc.length; i++) y += v[fc[i] * 3 + 1]; return (x / n / 0.22) ** 2 + (y / n / 0.23) ** 2 + (z / n / 0.21) ** 2 > 1; /* @negtest */"
+ },
+ {
+  "name": "hair-drawn-first",
+  "file": "games/taas/index.html",
+  "old": "{ p: P.hair, M: headM, bias: 0.001 });",
+  "new": "{ p: P.hair, M: headM, bias: -0.004 }); /* @negtest */"
+ },
+ {
+  "name": "delay-ui-no-slider",
+  "file": "games/taas/index.html",
+  "old": "        if (q && q.wait) h += '<div class=\"fx-wait\">",
+  "new": "        if (false && q && q.wait) /* @negtest */ h += '<div class=\"fx-wait\">"
+ },
+ {
+  "name": "delay-ui-redraw-mid-drag",
+  "file": "games/taas/index.html",
+  "old": "    if (sig === pageSig || holdWait) return;",
+  "new": "    if (sig === pageSig) return; /* @negtest */"
+ },
+ {
+  "name": "delay-ui-hold-never-set",
+  "file": "games/taas/index.html",
+  "old": "  ['pointerdown', 'touchstart'].forEach(k => panelEl.addEventListener(k, ev => { if (ev.target.id === 'fx-wait') holdWait = true; }",
+  "new": "  [].forEach(k => panelEl.addEventListener(k, ev => { if (ev.target.id === 'fx-wait') holdWait = true; } /* @negtest */"
+ },
+ {
+  "name": "delay-ui-wait-not-in-sig",
+  "file": "games/taas/index.html",
+  "old": "JSON.stringify([r.name, r.job, r.slots, r.rules, r.wait, known.map",
+  "new": "JSON.stringify([r.name, r.job, r.slots, r.rules, /* @negtest */ known.map"
+ },
+ {
+  "name": "delay-ui-steppers-both-add",
+  "file": "games/taas/index.html",
+  "old": "if (F.setWait(s, id, r.wait + +act.slice(5)))",
+  "new": "if (F.setWait(s, id, r.wait + 1)) /* @negtest */"
+ },
+ {
+  "name": "delay-ui-stepper-no-save",
+  "file": "games/taas/index.html",
+  "old": "if (F.setWait(s, id, r.wait + +act.slice(5))) { SND.sfx('tick'); save(); } }",
+  "new": "if (F.setWait(s, id, r.wait + +act.slice(5))) { SND.sfx('tick'); } } /* @negtest */"
+ },
+ {
+  "name": "delay-ui-slider-no-save",
+  "file": "games/taas/index.html",
+  "old": "if (ev.target.id === 'fx-wait') { holdWait = false; save(); } });",
+  "new": "if (ev.target.id === 'fx-wait') { holdWait = false; } }); /* @negtest */"
+ },
+ {
+  "name": "delay-ui-plus-never-greyed",
+  "file": "games/taas/index.html",
+  "old": "(r.wait >= C.wait.max ? ' disabled' : '') + '>+</button>",
+  "new": "'' /* @negtest */ + '>+</button>"
+ },
+ {
+  "name": "delay-ui-focus-lost",
+  "file": "games/taas/index.html",
+  "old": "    if (back && !back.disabled) back.focus({ preventScroll: true });",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "delay-ui-no-pause-sign",
+  "file": "games/taas/index.html",
+  "old": "    if (r.state === 'pause') pauseSign(",
+  "new": "    if (false) /* @negtest */ pauseSign("
+ },
+ {
+  "name": "delay-ui-ring-never-empties",
+  "file": "games/taas/index.html",
+  "old": "    const left = 1 - clamp(u, 0, 1);",
+  "new": "    const left = 1; /* @negtest */"
+ },
+ {
+  "name": "delay-ui-no-doing-waited",
+  "file": "games/taas/index.html",
+  "old": "    waited: () => 'Waited between tasks', straight: () => 'Went straight on'",
+  "new": "    straight: () => 'Went straight on' /* @negtest */"
+ },
+ {
+  "name": "delay-ui-straight-misworded",
+  "file": "games/taas/index.html",
+  "old": "straight: () => 'Went straight on'\n",
+  "new": "straight: () => 'Skipped its wait' /* @negtest */\n"
+ },
+ {
+  "name": "delay-ui-slider-overflows",
+  "file": "games/taas/index.html",
+  "old": ".fx-wait input { flex: 1; width: 0; min-width: 0;",
+  "new": ".fx-wait input { flex: 1; /* @negtest */"
+ },
+ {
+  "name": "delay-ui-steppers-small",
+  "file": "games/taas/index.html",
+  "old": ".fx-step { flex: 0 0 44px; height: 44px;",
+  "new": ".fx-step { flex: 0 0 30px; height: 30px; /* @negtest */"
+ },
+ {
+  "name": "delay-ui-no-info",
+  "file": "games/taas/index.html",
+  "old": "One is on the list from the start and suits any robot: <b>Wait between tasks</b>.",
+  "new": "/* @negtest */"
  }
 ]

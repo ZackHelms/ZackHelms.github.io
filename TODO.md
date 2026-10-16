@@ -39,12 +39,13 @@ backlog entry here.
   random events on top of the scripted story, and keep the planning-board look or
   restyle in Neon Arcade. Then overrule anything wrong in its "assumed, not decided"
   table; every number in the engine is a first-draft guess.
-- [repo] Delete the remote branches **`cyoa2-step3`** and **`taas-storefront`**
+- [repo] Delete the remote branches **`cyoa2-step3`**, **`taas-storefront`** and **`taas-delay`**
   (GitHub > branches). `cyoa2-step3` is a safety copy pushed mid-session on
   2026-10-10 (`8020174`, work in progress); everything in it shipped in
   `3ea55c4` on `main`. `taas-storefront` (`80d4df2`) is the storefront's side
-  branch; everything in it shipped in `5bcc0e7` on `main` (2026-10-16). A remote session cannot
-  delete it: the agent proxy refuses ref deletion and API writes
+  branch; everything in it shipped in `5bcc0e7` on `main` (2026-10-16). `taas-delay` is the
+  delay's side branch; everything in it shipped on `main` in one commit (2026-10-16, "a delay
+  between a robot's tasks"). A remote session cannot delete them: the agent proxy refuses ref deletion and API writes
   (`.claude/zmh/producer.md` § Environment).
 - [cyoa2] **Play a tale with only the script** (the default now: no key, no
   cost), then give Claude one area at a time in Settings and play on. That is

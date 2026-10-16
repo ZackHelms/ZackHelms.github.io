@@ -302,6 +302,13 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 .fx-slot.buy { background: #fff; border-color: #1d2430; }
 .fx-slot.buy:disabled, .fx-slot.locked { opacity: .5; }
 .fx-x { flex: 0 0 44px; border: 2px solid #e1e6ea; border-radius: 10px; background: #fff; color: #b0382c; display: flex; align-items: center; justify-content: center; }
+.fx-slots li.fx-waits { flex-wrap: wrap; }
+.fx-wait { flex: 1 0 100%; min-width: 0; display: flex; align-items: center; gap: 6px; padding-left: 24px; }
+.fx-step { flex: 0 0 44px; height: 44px; border: 2px solid #16b3a5; border-radius: 10px; background: #fff; color: #11786e; font: 800 20px/1 var(--mono); touch-action: manipulation; }
+.fx-step:disabled { opacity: .4; }
+.fx-wait input { flex: 1; width: 0; min-width: 0; height: 44px; margin: 0; accent-color: #16b3a5; }
+.fx-wait output { flex: 0 0 2.8em; text-align: right; font: 700 14px var(--mono); color: #1d2430; }
+@media (max-width: 360px) { .fx-wait { padding-left: 0; } }   /* a phone this narrow needs the slider's length more than the indent */
 .fx-rules { display: flex; flex-direction: column; gap: 6px; max-height: 42vh; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 2px; }
 .fx-rule { text-align: left; border: 2px solid #1d2430; border-radius: 10px; background: #fff; padding: 10px 12px; font: 600 14px/1.3 var(--mono); color: #1d2430; touch-action: manipulation; }
 .fx-rule.on { background: #dcf6f2; border-color: #16b3a5; }
@@ -318,7 +325,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-16 03:06 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-16 16:51 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -662,6 +669,7 @@ const FACTORY = (function () {
     // what a robot does when no instruction covers it (each robot rolls its own dice)
     uninstructed: { think: 0.25 },   // an operator stops to think first (no instruction covers this yet)
     slip: 0.05,             // a robot ignores an instruction it has 1 time in 20, and does what it would have done without it
+    wait: { min: 0, max: 60, start: 5 },   // the delay between tasks: whole seconds, 0-60 (the CD, 2026-10-16); 5 until set
     // the right price of each thing (the CD, 2026-10-15); for now only medium planks are sold.
     // cut: two 2"x4"s, four 2"x2"s or sixteen dowel rods, by the length of the plank they came from
     price: { plank: { s: 2, m: 4, l: 8 }, sap: 1, cut: { s: 3, m: 6, l: 12 } },
@@ -722,6 +730,11 @@ const FACTORY = (function () {
   // input log" (no robot pours sap), "Put medium logs in recycle bin" (for a factory that wants
   // something else; on a plank line it throws the good logs away) and "Sell medium wood planks for
   // $4" (the stall sets the price; a stocker never names one).
+  // One row is different (the CD, 2026-10-16): the delay belongs to no one job (`job: null`, every
+  // robot consults it), is on the list from the start (`start`) rather than after a mistake, and
+  // carries a number, the robot's own `r.wait` in whole seconds (`wait`): after each iteration of
+  // its task, a robot that holds it waits that long before the next (an operator's iteration is a
+  // log handled, a stocker's a thing taken out of the bin and stocked or recycled).
   const RULES = [
     { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: ['sappy'] },
     { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin', rejects: { quality: ['sappy'] } },
@@ -735,10 +748,13 @@ const FACTORY = (function () {
     { id: 'price', job: 'stock', text: 'Sell medium wood planks for $4', joins: ['stockOnly'] },
     { id: 'smallOut', job: 'stock', text: 'Put small planks in recycle bin', recycles: { kind: ['plank'], size: ['s'] } },
     { id: 'largeOut', job: 'stock', text: 'Put large planks in recycle bin', recycles: { kind: ['plank'], size: ['l'] } },
-    { id: 'roughOut', job: 'stock', text: 'Put gnarled planks in recycle bin', recycles: { kind: ['rough'] } }
+    { id: 'roughOut', job: 'stock', text: 'Put gnarled planks in recycle bin', recycles: { kind: ['rough'] } },
+    { id: 'delay', job: null, text: 'Wait between tasks', wait: true, start: true }
   ];
   const RULE = {};
   RULES.forEach(q => { RULE[q.id] = q; });
+  // the instructions on the list before any mistake: the delay (the CD, 2026-10-16)
+  function startSeen() { const o = {}; RULES.forEach(q => { if (q.start) o[q.id] = true; }); return o; }
   const matches = (m, id) => !!m && (!m.quality || m.quality.indexOf(kindOf(id)) >= 0) && (!m.kind || m.kind.indexOf(kindOf(id)) >= 0) && (!m.size || m.size.indexOf(sizeOf(id)) >= 0);
   const rejectsLog = (q, log) => matches(q.rejects, log);
   const recyclesItem = (q, item) => matches(q.recycles, item);
@@ -817,7 +833,7 @@ const FACTORY = (function () {
       bench: { in: [], out: [], item: null, t: 0, design: null },
       stalls: CFG.stalls.map(q => ({ want: q.want, stock: [] })),
       shop: { people: [], next: CFG.shop.first, n: 0, served: 0, wrong: 0 },
-      seen: {},                     // rule id -> true once a robot has made the mistake it prevents
+      seen: startSeen(),            // rule id -> true once a robot has made the mistake it prevents (or from the start)
       avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0, inv: [] },
       robots: [], bubble: null,
       tally: { player: { made: 0, pressed: 0, tossed: 0, stocked: 0, fixed: 0, sawn: 0, extracted: 0, carved: 0 } },
@@ -883,6 +899,17 @@ const FACTORY = (function () {
     }
     r.rules[slot] = rule;
     ev(s, 'instructed', { id, slot, rule });
+    return true;
+  }
+  // how long a robot waits between tasks when it holds the delay: a whole number of seconds,
+  // 0-60, and nothing else (a fraction, a string or a number out of range is refused, not
+  // rounded). It may be set with the instruction in no slot: the robot keeps the number, and it
+  // counts once the instruction is in a slot
+  function setWait(s, id, sec) {
+    const r = s.robots[id], W = CFG.wait;
+    if (!r || typeof sec !== 'number' || !Number.isInteger(sec) || sec < W.min || sec > W.max) return false;
+    r.wait = sec;
+    ev(s, 'waitset', { id, wait: sec });
     return true;
   }
   function rename(s, id, name) {
@@ -1025,7 +1052,7 @@ const FACTORY = (function () {
   // action, then ':' and the thing it was done to; a trailing '!' means it was done against the
   // robot's own instructions (it slipped), which turns a green action yellow and leaves red red.
   const GRADE = { plank: 'good', think: 'soso', cut: 'soso', jam: 'bad', reject: 'good', caught: 'good',
-    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good' };
+    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' };
   function gradeOf(key) {
     const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
     return against && g === 'good' ? 'soso' : g;
@@ -1373,7 +1400,7 @@ const FACTORY = (function () {
     const i = s.robots.length, r = SPOT.rest[i];
     return { id: i, name: CFG.names[i], x: r.x, y: r.y, yawT: r.face, path: [], dist: 0, job: null, state: 'unbox', t: 0,
       goal: null, think: false, check: false, hunt: null, carry: null, mood: null, moodT: 0,
-      against: false, outSlip: false, huntSlip: false,
+      against: false, outSlip: false, huntSlip: false, wait: CFG.wait.start,
       slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {}, since: s.t };
   }
   function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'stock' ? SPOT.stock : SPOT.rest[r.id]; }
@@ -1421,7 +1448,11 @@ const FACTORY = (function () {
       }
       case 'reject':
         r.yawT = N; r.t += dt;
-        if (r.t >= CFG.tossSec) { const log = m.log; if (rejectLog(s, r.id)) credit(s, r.id, 'reject:' + log); r.state = 'idle'; r.t = 0; }
+        if (r.t >= CFG.tossSec) {
+          const log = m.log;
+          if (rejectLog(s, r.id)) { credit(s, r.id, 'reject:' + log); done(s, r); }
+          else { r.state = 'idle'; r.t = 0; }   // you pressed the planer first: it handled no log
+        }
         return;
       case 'dawdle':
         r.t += dt; if (r.t >= CFG.dawdleSec) { r.state = 'press'; r.t = 0; }
@@ -1434,15 +1465,33 @@ const FACTORY = (function () {
           r.t = 0;
         }
         return;
-      case 'wait':
-        if (m.phase !== 'run' || m.by !== r.id) { r.state = 'idle'; r.t = 0; r.think = false; }
+      case 'wait':   // the cut is out (or the planer has jammed): that log has been handled
+        if (m.phase !== 'run' || m.by !== r.id) { r.think = false; done(s, r); }
         return;
       case 'flick':   // tossing a bad cut from the out-feed into the recycle bin
         r.yawT = 0.2; r.t += dt;
-        if (r.t >= CFG.tossSec) { r.state = 'idle'; r.t = 0; r.think = false; }
+        if (r.t >= CFG.tossSec) { r.think = false; done(s, r); }
+        return;
+      case 'pause':
+        pause(r, dt);
         return;
     }
   }
+  // the end of one iteration of a robot's task (the CD, 2026-10-16): a robot that holds the delay
+  // waits r.wait seconds before the next, unless it slips (1 in 20) and goes straight on. A wait
+  // of 0 is no wait and rolls no die, so a day with the delay at 0 s is the same day as one without
+  // it, roll for roll
+  function done(s, r) {
+    r.t = 0;
+    if (has(r, 'delay') && r.wait > 0) {
+      if (follows(s, r, 'delay')) { r.state = 'pause'; note(r, 'waited'); ev(s, 'paused', { by: r.id, wait: r.wait }); return; }
+      note(r, 'straight!'); ev(s, 'straight', { by: r.id });
+    }
+    r.state = 'idle';
+  }
+  // waiting between tasks: r.wait is read every step, so a shorter wait set mid-pause ends it
+  // sooner, and taking the instruction out of its slot ends it at once
+  function pause(r, dt) { r.t += dt; if (r.t >= r.wait || !has(r, 'delay')) { r.state = 'idle'; r.t = 0; } }
   // the stocker's turn between the planer's output bin and the stall: "stock the sales counter with
   // the items in this bin" (the CD, 2026-10-15). Without an instruction it takes the next thing and
   // puts it in the stall, whatever it is (a red mark in its evals for anything but a medium plank:
@@ -1515,14 +1564,17 @@ const FACTORY = (function () {
           r.carry = null; r.against = false; r.state = 'cool'; r.t = 0;
         }
         return;
-      case 'cool':
-        r.t += dt; if (r.t >= CFG.coolSec) { r.state = 'idle'; r.t = 0; }
+      case 'cool':   // a thing out of the bin and stocked or recycled: one iteration (a look is not one)
+        r.t += dt; if (r.t >= CFG.coolSec) done(s, r);
+        return;
+      case 'pause':
+        pause(r, dt);
         return;
     }
   }
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
-  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'place', 'cool'];
+  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'place', 'cool', 'pause'];
   const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m' };
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
@@ -1665,7 +1717,7 @@ const FACTORY = (function () {
       };
       s.robots = s.robots.slice(0, CFG.hire.length);
       s.hired = s.robots.length;
-      s.seen = {};
+      s.seen = startSeen();   // a save from before the delay gets it on the list too
       Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true && RULE[k]) s.seen[k] = true; });
       s.robots.forEach((r, i) => {
         r.id = i;
@@ -1683,6 +1735,9 @@ const FACTORY = (function () {
         r.tally = r.tally && typeof r.tally === 'object' ? { good: r.tally.good | 0, soso: r.tally.soso | 0, bad: r.tally.bad | 0 } : { good: 0, soso: 0, bad: 0 };
         r.since = Number.isFinite(+r.since) ? Math.min(+r.since, s.t) : 0;
         r.against = !!r.against; r.outSlip = !!r.outSlip; r.huntSlip = !!r.huntSlip;
+        // the delay: whole seconds in bounds; a save from before it (or a bad number) gets the default
+        r.wait = typeof r.wait === 'number' && Number.isFinite(r.wait) ? Math.max(CFG.wait.min, Math.min(CFG.wait.max, Math.round(r.wait))) : CFG.wait.start;
+        r.t = typeof r.t === 'number' && Number.isFinite(r.t) ? Math.max(0, r.t) : 0;
         if (!isItem(r.carry)) r.carry = null;
         if (typeof r.hunt !== 'boolean') r.hunt = null;
         if (STATES.indexOf(r.state) < 0 || ((r.state === 'drop' || r.state === 'place') && !r.carry)) release(s, r);
@@ -1707,7 +1762,7 @@ const FACTORY = (function () {
   }
 
   return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, RULES, BASE, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, keepers,
-    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, known, slotsOpen, slotPrice, buySlot, setRule, rename,
+    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, known, slotsOpen, slotPrice, buySlot, setRule, setWait, rename,
     resetEvals, ready, canMill, store, waitingNow, kindsIn, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
 if (typeof module !== 'undefined') module.exports = FACTORY;
@@ -2495,6 +2550,19 @@ const MODE = (function () {
     return { v, f: p.f, e: p.e, c: p.c, ol: p.ol, bias: p.bias, cx: c[0], cy: c[1], cz: c[2] };
   }
   const recol = (p, cols) => Object.assign({}, p, { c: cols });
+  // hair over a head whose centre is the origin: the hair less its facets in front of the head's
+  // centre and below the hairline zh, so the face shows, sorted by the head's centre so it can be
+  // drawn just after the head. Two whole ellipsoids sorted by their own centres swap order as a
+  // person turns, and facing the camera the head was drawn over the hair (the CD's bald customers,
+  // 2026-10-16). drawPrim inks the open edge, which reads as the hairline
+  function hairOver(p, zh) {
+    const v = p.v, f = p.f.filter(fc => {
+      let x = 0, z = 0;
+      for (let i = 1; i < fc.length; i++) { x += v[fc[i] * 3]; z += v[fc[i] * 3 + 2]; }
+      return x <= 0 || z / (fc.length - 1) >= zh;
+    });
+    return { v, f, e: edgesOf(f), c: p.c, ol: p.ol, bias: p.bias, cx: 0, cy: 0, cz: 0 };
+  }
 
   /* ---------- shading: three flat bands, shadows pushed cool ---------- */
   const SHADE = new Map();
@@ -2934,12 +3002,14 @@ const MODE = (function () {
     ctx.drawImage(sp.c, Math.round(X * k) / k, Math.round(Y * k) / k, sp.c.width / k, sp.c.height / k);
   }
   /* the avatar: a chibi in a hard hat, joints as matrices, a walk cycle driven by distance */
+  // the hair: an ellipsoid a little behind and above the head, open over the face below 0.1 m
+  const hairCap = (nu, nv, col) => hairOver(ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, nu, nv, col, 1), 0.1);
   const AV = (function () {
     const P = {
       torso: ell(0, 0, 0.17, 0.12, 0.15, 0.18, 8, 5, COL.shirt, 0.85),
       hips: ell(0, 0, 0.02, 0.11, 0.14, 0.08, 8, 4, COL.pants, 0.8),
       head: ell(0, 0, 0, 0.22, 0.23, 0.21, 10, 6, COL.skin, 1),
-      hair: ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, 10, 6, COL.hair, 1),
+      hair: hairCap(10, 6, COL.hair),
       hat: ell(-0.03, 0, 0.15, 0.19, 0.205, 0.1, 10, 5, COL.hat, 0.9),
       brim: box(-0.2, -0.025, 0.2, 0.15, 0.025, 0.262, COL.hatBrim),
       arm: ell(0, 0, -0.09, 0.05, 0.05, 0.11, 7, 4, COL.shirt, 1),
@@ -2961,7 +3031,7 @@ const MODE = (function () {
     const shirt = CUST_SHIRT[k % CUST_SHIRT.length], hair = CUST_HAIR[(k * 3) % CUST_HAIR.length], pants = CUST_PANTS[(k * 5) % CUST_PANTS.length];
     // the avatar's shapes with fewer facets: there can be seven customers on screen at once
     return (CUST[k] = { torso: ell(0, 0, 0.17, 0.12, 0.15, 0.18, 7, 4, shirt, 0.85), hips: ell(0, 0, 0.02, 0.11, 0.14, 0.08, 6, 3, pants, 0.8),
-      head: ell(0, 0, 0, 0.22, 0.23, 0.21, 8, 5, COL.skin, 1), hair: ell(-0.04, 0, 0.03, 0.22, 0.245, 0.2, 8, 5, hair, 1),
+      head: ell(0, 0, 0, 0.22, 0.23, 0.21, 8, 5, COL.skin, 1), hair: hairCap(8, 5, hair),
       bun: k % 3 === 1 ? ell(-0.2, 0, 0.1, 0.09, 0.09, 0.09, 6, 3, hair, 1) : null,
       arm: ell(0, 0, -0.09, 0.05, 0.05, 0.11, 5, 3, shirt, 1), hand: ell(0, 0, -0.205, 0.055, 0.055, 0.055, 5, 3, COL.skin, 1),
       thigh: ell(0, 0, -0.065, 0.058, 0.058, 0.08, 5, 3, pants, 1), shin: ell(0, 0, -0.06, 0.05, 0.05, 0.075, 5, 3, pants, 1), boot: AV.boot });
@@ -2992,7 +3062,7 @@ const MODE = (function () {
     parts.push({ p: P.hips, M: rootM });
     parts.push({ p: P.torso, M: chain(rootM, Ms(1, 1, 1 + breathe * 3)) });
     const headM = chain(rootM, Mt(0, 0, 0.55 + breathe), My(o.headP || 0));
-    parts.push({ p: P.head, M: headM }, { p: P.hair, M: headM, bias: -0.004 });
+    parts.push({ p: P.head, M: headM }, { p: P.hair, M: headM, bias: 0.001 });   // the hair sorts as the head, just after it
     if (P.hat) parts.push({ p: P.hat, M: headM, bias: 0.002 }, { p: P.brim, M: headM, bias: 0.001 });
     if (P.bun) parts.push({ p: P.bun, M: headM, bias: -0.006 });
     [['L', 1, o.armL, o.abL, hipL, kneeL], ['R', -1, o.armR, o.abR, hipR, kneeR]].forEach(([side, sgn, arm, ab, hip, knee]) => {
@@ -3101,18 +3171,24 @@ const MODE = (function () {
     const look = id % (CUST_SHIRT.length * 5), key = look + '|' + face.toFixed(2);
     let sp = PERSON_BAKE.get(key);
     if (sp) return sp;
+    sp = bakePerson(id, custParts(id), face, o);
+    PERSON_BAKE.set(key, sp);
+    return sp;
+  }
+  // one person standing still in a canvas of their own, feet at (-ox, -oy) in CSS px; head: the
+  // head's centre there (the suites look at one person alone through this)
+  function bakePerson(id, P, face, o) {
     const S = VW.S, w = Math.ceil(1.0 * S), up = Math.ceil((0.35 * SE + 1.45 * CE) * S) + 6, h = up + Math.ceil(0.35 * SE * S) + 6;
     const c = document.createElement('canvas');
     c.width = Math.round(w * VW.dpr); c.height = Math.round(h * VW.dpr);
     const g = c.getContext('2d');
     g.scale(VW.dpr, VW.dpr);
     const keep = ctx, ox = VW.ox, cam = VW.camY;
+    let head;
     ctx = g; VW.ox = w / 2; VW.camY = -up;
-    try { drawPerson({ id, x: 0, y: 0 }, custParts(id), { yaw: face, walk: 0, d: 0, px: 0 }, o); }
+    try { const hc = apply(drawPerson({ id, x: 0, y: 0 }, P, { yaw: face, walk: 0, d: 0, px: 0 }, o), 0, 0, 0.55); head = [PX(hc[0]), PY(hc[1], hc[2])]; }
     finally { ctx = keep; VW.ox = ox; VW.camY = cam; }
-    sp = { c, ox: -w / 2, oy: -up };
-    PERSON_BAKE.set(key, sp);
-    return sp;
+    return { c, ox: -w / 2, oy: -up, head };
   }
   // eyes and cheeks, in 2D over the head when the face is toward the camera
   function drawFace(headM, v) {
@@ -3208,14 +3284,32 @@ const MODE = (function () {
     const hx = PX(top[0]), hy = PY(top[1], top[2]);
     if (r.state === 'dawdle') dots(hx, hy);
     else if (r.state === 'look') lens(hx, hy);
-    if (r.moodT > 0 && r.mood && r.mood !== 'stuck') badge(hx, hy, r.mood, r.moodT);
-    else if (r.mood === 'stuck' && r.moodT > 0) badge(hx, hy, 'stuck', 1);
+    const live = r.moodT > 0 && r.mood;
+    if (r.state === 'pause') pauseSign(hx + (live ? 27 : 0), hy, r.wait > 0 ? r.t / r.wait : 1);   // beside the last task's badge while that is up
+    if (live && r.mood !== 'stuck') badge(hx, hy, r.mood, r.moodT);
+    else if (live) badge(hx, hy, 'stuck', 1);
+  }
+  // a robot waiting between tasks: a pause sign, with a ring that empties as the wait runs out
+  function pauseSign(x, y, u) {
+    const R = 12, cy = y - 16;
+    ctx.save();
+    ctx.fillStyle = '#ffffff'; ctx.strokeStyle = INK; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x, cy, R, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = INK;
+    rrect(ctx, x - 5, cy - 5.5, 3.6, 11, 1.2); ctx.fill();
+    rrect(ctx, x + 1.4, cy - 5.5, 3.6, 11, 1.2); ctx.fill();
+    const left = 1 - clamp(u, 0, 1);
+    if (left > 0.001) {
+      ctx.strokeStyle = '#16b3a5'; ctx.lineWidth = 3.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(x, cy, R + 1, -Math.PI / 2, -Math.PI / 2 + left * Math.PI * 2); ctx.stroke();
+    }
+    ctx.restore();
   }
   const easeBack = u => { const c = 1.7; return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2); };
   function drawRobotFace(r, headM, v) {
     const facing = Math.cos(v.yaw - Math.PI / 2);
     if (facing <= 0.12) return;
-    const mood = r.moodT > 0 ? r.mood : r.state === 'dawdle' ? 'soso' : null;
+    const mood = r.moodT > 0 ? r.mood : r.state === 'dawdle' ? 'soso' : r.state === 'pause' ? 'calm' : null;
     const glow = '#7ff0ff';
     ctx.save();
     ctx.strokeStyle = mood === 'bad' || mood === 'stuck' ? '#ff6b6b' : mood === 'good' ? '#7dff9a' : mood === 'soso' ? '#ffe066' : glow;
@@ -3228,6 +3322,7 @@ const MODE = (function () {
       else if (mood === 'bad') { ctx.moveTo(x - q, y - q); ctx.lineTo(x + q, y + q); ctx.moveTo(x + q, y - q); ctx.lineTo(x - q, y + q); ctx.stroke(); }
       else if (mood === 'soso') { ctx.moveTo(x - q, y); ctx.lineTo(x + q, y); ctx.stroke(); }
       else if (mood === 'stuck') { ctx.arc(x, y, q * 0.8, 0, Math.PI * 2); ctx.stroke(); }
+      else if (mood === 'calm') { ctx.arc(x, y - q * 0.45, q * 0.8, Math.PI * 0.15, Math.PI * 0.85); ctx.stroke(); }   // eyes shut, at ease
       else { const blink = Math.sin(clock * 1.1 + r.id * 3) > 0.97 ? 0.2 : 1; ctx.ellipse(x, y, q * 0.55, q * 1.1 * blink, 0, 0, Math.PI * 2); ctx.fill(); }
     });
     ctx.restore();
@@ -3876,11 +3971,11 @@ const MODE = (function () {
       '<p><b>Slots 02 to 04</b> are yours to run for now. The table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length ($' + C.sawCost + '); the sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer ($' + C.extractCost + '); at the bench you carve gnarled wood into something to keep. For now only medium planks are sold. Their prices when they are: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length.</p>' +
       '<p>Each robot\'s page ends in its <b>evals</b>: what it has done, counted, with a dot for how it went. Reset them to start counting again after you change its instructions.</p>' +
       '<ul>' +
-      '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a medium plank put in the stall.</li>' +
+      '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a medium plank put in the stall; a wait between tasks, as told.</li>' +
       '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; any other log cut into a plank; a reach that came up with something other than a medium plank; anything done against the robot\'s own instructions.</li>' +
       '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the planer until you scrub it clean yourself; anything else put in the medium plank stall, which a customer will pay for as a medium plank.</li>' +
       '<li><b>The stocker</b> takes from the planer\'s output bin and fills the stall. Told to stock only medium planks, it leaves everything else where it is and hunts for one: each reach finds one as often as medium planks make up the bin, and a reach that comes up with something else is a "looking for plank". Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up.</li>' +
-      '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing. Robots can run the planer and stock the counter; the other slots are yours.</li>' +
+      '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job does nothing. One is on the list from the start and suits any robot: <b>Wait between tasks</b>. Under its slot you set how long, ' + C.wait.min + ' to ' + C.wait.max + ' seconds (' + C.wait.start + ' to begin with), and the robot waits that long after each log it handles and each thing it stocks or recycles. Robots can run the planer and stock the counter; the other slots are yours.</li>' +
       '</ul>' +
       '<h3>Measured since each robot\'s evals were last reset</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Green</th><th>Yellow</th><th>Red</th><th>Green %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
       '<p class="fx-small">You: ' + T.made + ' planks made, ' + T.tossed + ' logs tossed, ' + T.stocked + ' stocked, ' + T.fixed + ' jams fixed, ' + T.sawn + ' sawn, ' + T.extracted + ' sap logs pressed, ' + T.carved + ' carved. Customers served: ' + s.shop.served + (s.shop.wrong ? ' (' + s.shop.wrong + ' sold something else)' : '') + '. Earned in all: $' + s.earned + '; spent running the machines: $' + s.spent + ' (logs $' + s.costs.logs + ', jams $' + s.costs.fixes + ', saw $' + s.costs.saw + ', extractor $' + s.costs.extract + ').</p>' +
@@ -3899,7 +3994,8 @@ const MODE = (function () {
     stock: () => 'Put a medium plank in the stall',
     misstock: x => 'Put ' + NAME(x) + ' in the medium plank stall',
     looking: () => 'Looking for plank',
-    recycle: x => 'Put ' + NAME(x) + ' in the recycle bin'
+    recycle: x => 'Put ' + NAME(x) + ' in the recycle bin',
+    waited: () => 'Waited between tasks', straight: () => 'Went straight on'
   };
   const DOING_ORDER = Object.keys(DOING);
   function doing(key) {
@@ -3928,19 +4024,22 @@ const MODE = (function () {
     const r = s.robots[pageBot], dyn = document.getElementById('fx-rp-dyn');
     if (!r || !dyn) return;
     const price = F.slotPrice(s, r.id), open = F.slotsOpen(s), known = F.known(s);
-    const sig = JSON.stringify([r.name, r.job, r.slots, r.rules, known.map(q => q.id), open, price !== null && s.money >= price, r.record, pickSlot, Math.floor((s.t - r.since) / 60)]);
-    if (sig === pageSig) return;
+    const sig = JSON.stringify([r.name, r.job, r.slots, r.rules, r.wait, known.map(q => q.id), open, price !== null && s.money >= price, r.record, pickSlot, Math.floor((s.t - r.since) / 60)]);
+    if (sig === pageSig || holdWait) return;   // never under a finger on the wait's slider: it would be a new slider, and the drag would stop
     pageSig = sig;
     const base = F.BASE[r.job];
     let h = '<div class="fx-sec"><div class="fx-h"><span>Base prompt</span><span>' + JOB_NAME(r.job) + '</span></div>' +
       '<div class="fx-base' + (base ? '' : ' none') + '">' + (base ? esc(base) : 'No job, so no base prompt.') + '</div></div>';
     h += '<div class="fx-sec"><div class="fx-h"><span>Instructions</span><span>' + r.rules.filter(Boolean).length + ' of ' + r.slots + ' slots</span></div><ol class="fx-slots">';
     for (let k = 0; k < C.slots.length; k++) {
-      h += '<li><b>' + (k + 1) + '</b>';
+      const q = k < r.slots && r.rules[k] && F.RULES.find(x => x.id === r.rules[k]);
+      h += '<li' + (q && q.wait ? ' class="fx-waits"' : '') + '><b>' + (k + 1) + '</b>';
       if (k < r.slots) {
-        const q = r.rules[k] && F.RULES.find(x => x.id === r.rules[k]);
         h += '<button class="fx-slot ' + (q ? 'filled' : 'empty') + (pickSlot === k ? ' picking' : '') + '" data-panel="pick:' + k + '">' + (q ? esc(q.text) : '+ add an instruction') + '</button>';
         if (q) h += '<button class="fx-x" data-panel="clear:' + k + '" aria-label="Remove this instruction">' + CROSS + '</button>';
+        if (q && q.wait) h += '<div class="fx-wait"><button class="fx-step" data-panel="wait:-1" aria-label="One second less"' + (r.wait <= C.wait.min ? ' disabled' : '') + '>-</button>' +
+          '<input type="range" id="fx-wait" min="' + C.wait.min + '" max="' + C.wait.max + '" step="1" value="' + r.wait + '" aria-label="Seconds to wait between tasks">' +
+          '<button class="fx-step" data-panel="wait:1" aria-label="One second more"' + (r.wait >= C.wait.max ? ' disabled' : '') + '>+</button><output for="fx-wait">' + r.wait + ' s</output></div>';
       } else if (k === r.slots) {
         const can = open && s.money >= C.slots[k];
         h += '<button class="fx-slot buy" data-panel="buy"' + (can ? '' : ' disabled') + '>' + (open ? 'Unlock this slot: $' + C.slots[k] : '$' + C.slots[k] + ' once both robots are on staff') + '</button>';
@@ -3963,12 +4062,31 @@ const MODE = (function () {
       (rec ? '<div class="fx-scroll"><table class="fx-rec"><tbody>' + rec + '</tbody></table></div>' : '<p class="fx-small">Nothing yet.</p>') +
       '<div class="fx-row"><button class="fx-ghost" data-panel="evals-reset"' + (rec ? '' : ' disabled') + '>Reset evals</button></div></div>';
     h += '<div class="fx-row"><button class="fx-ghost" data-panel="close">Close</button></div>';
+    const had = document.activeElement && dyn.contains(document.activeElement) ? document.activeElement : null, sel = had && (had.id ? '#' + had.id : had.dataset.panel ? '[data-panel="' + had.dataset.panel + '"]' : '');
     dyn.innerHTML = h;
+    const back = sel && dyn.querySelector(sel);   // a keyboard on the slider or a stepper keeps its place
+    if (back && !back.disabled) back.focus({ preventScroll: true });
   }
+  // the wait under a slot holding the delay: the slider sets it as it moves, the steppers a second at a time
+  let holdWait = false;
+  function showWait(r) {
+    const o = panelBody.querySelector('.fx-wait output'), lo = panelBody.querySelector('[data-panel="wait:-1"]'), hi = panelBody.querySelector('[data-panel="wait:1"]');
+    if (o) o.textContent = r.wait + ' s';
+    if (lo) lo.disabled = r.wait <= C.wait.min;
+    if (hi) hi.disabled = r.wait >= C.wait.max;
+  }
+  panelEl.addEventListener('input', ev => {
+    const r = panelMode === 'robot' && s.robots[pageBot];
+    if (!r || ev.target.id !== 'fx-wait') return;
+    if (F.setWait(s, r.id, +ev.target.value)) showWait(r);
+  });
+  panelEl.addEventListener('change', ev => { if (ev.target.id === 'fx-wait') { holdWait = false; save(); } });
+  ['pointerdown', 'touchstart'].forEach(k => panelEl.addEventListener(k, ev => { if (ev.target.id === 'fx-wait') holdWait = true; }, { passive: true }));
+  ['pointerup', 'pointercancel', 'touchend', 'touchcancel'].forEach(k => window.addEventListener(k, () => { holdWait = false; }, { passive: true }));
   function closePanel() {
     const inp = document.getElementById('fx-rp-name');
     if (inp && document.activeElement === inp) inp.blur();
-    panelEl.hidden = true; panelMode = 'info'; pageBot = -1; pickSlot = -1;
+    panelEl.hidden = true; panelMode = 'info'; pageBot = -1; pickSlot = -1; holdWait = false;
   }
   // how the factory works: the menu's Info in this mode
   function showInfo() { SND.init(); SND.sfx('pop'); confirmReset = false; pageBot = -1; pickSlot = -1; panelMode = 'info'; renderPanel(); panelEl.hidden = false; }
@@ -3992,6 +4110,7 @@ const MODE = (function () {
     else if (act.indexOf('rule:') === 0) { if (F.setRule(s, id, pickSlot, act.slice(5))) { pickSlot = -1; save(); } }
     else if (act === 'cancel') pickSlot = -1;
     else if (act === 'evals-reset') { if (F.resetEvals(s, id)) { SND.sfx('pop'); save(); } }
+    else if (act.indexOf('wait:') === 0) { if (F.setWait(s, id, r.wait + +act.slice(5))) { SND.sfx('tick'); save(); } }
     renderRobot();
     const pk = act.indexOf('pick:') === 0 || act === 'buy' ? panelBody.querySelector('.fx-picker') : null;
     if (pk && pk.scrollIntoView) pk.scrollIntoView({ block: 'nearest' });
@@ -4114,6 +4233,9 @@ const MODE = (function () {
     get page() { return { mode: panelMode, bot: pageBot, pick: pickSlot, open: !panelEl.hidden }; },
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],
     board: boardRect, showInfo,
+    // one person alone, standing, arms down: 'avatar' or a customer's id, facing a yaw (pi/2 is down the screen)
+    person: (who, face) => Object.assign(bakePerson(who === 'avatar' ? 0 : who, who === 'avatar' ? AV : custParts(who), face,
+      { armL: 0.12, armR: 0.12, abL: 0.32, abR: 0.32, lean: 0, headP: 0, twist: 0, hold: null }), { S: VW.S, dpr: VW.dpr }),
     get on() { return on; },
     set paused(v) { paused = !!v; }, get paused() { return paused; }
   };
