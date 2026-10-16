@@ -1,6 +1,6 @@
 # taasdelay step 4 - the eval and both break lists
 
-**Status:** IN PROGRESS (eval and engine list done; the page list is running)
+**Status:** DONE 2026-10-16
 **Arc:** `.claude/plans/taasdelay.delay-arc.md` (step 2's overproduction numbers are in Results).
 **Scope:** `.claude/tests/eval-taas-factory.cjs`, `.claude/tests/negtests/taas-factory-engine.json`,
 `.claude/tests/negtests/taas-factory-ui.json`; rows added to the two drive suites if a break
@@ -85,4 +85,15 @@ says -> rows 3 and 4; each wait billed $3 -> row 4 alone.
 list): **123 of 124**; the miss is `bubble-before-arrival`, the known equivalent change
 (`bubbleOpen()`'s arrival check, which every `tap()` makes redundant; `.claude/taas.md` § Negative
 tests). All 23 `delay-*` caught.
+
+**Page break list** (`taas-factory-ui.json`, 71, against `drive-taas-factory-ui.cjs`, whole list,
+three at a time): **70 of 71**; the miss is `no-remeasure`, the known equivalent change (`enter()`'s
+`VW.w = 0`; `.claude/taas.md` § Negative tests). All 5 `hair-*` and all 16 `delay-ui-*` caught.
+`arrows-gone` is caught by section 15 stopping on a null element (`FAIL 15. bubbles played through`),
+a named section line as before. The run took over 30 minutes and its background shell was
+stopped at that limit after 48 breaks (48 caught); the other 23 ran with `--only` (22 caught,
+the miss above). `negtest.sh scan` GREEN; the runner's leftover frozen suite copy
+(`.claude/tests/.negcopies-*`, git-ignored) was deleted.
+
+No row added to either drive suite: every miss is an equivalent change already recorded.
 

@@ -1,6 +1,6 @@
 # taasdelay - TAAS robot factory: a delay between a robot's tasks (plan arc)
 
-**Status:** IN PROGRESS (steps 1-3 done; steps 4-6 open)
+**Status:** IN PROGRESS (steps 1-4 done; steps 5-6 open)
 **Requested:** 2026-10-16, the CD's answer to the storefront's open question 2 (overproduction):
 "Add an instruction that lets me add a delay between iterations of its task. Let the delay be a
 configurable value, a positive integer 0,1,2,...,60 seconds." And one more fix the same day (step
@@ -58,7 +58,7 @@ step 6).
 | 1 | Fix: people keep their hair when they face the camera (cause traced: the hair sorts behind the head) | `taasdelay.s1-hair.md` | DONE 2026-10-16 |
 | 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | DONE 2026-10-16 |
 | 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | DONE 2026-10-16 |
-| 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | open |
+| 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | DONE 2026-10-16 |
 | 5 | Docs final and gates | `taasdelay.s5-docs-gates.md` | open |
 | 6 | Ship: badge, one clean commit, fast-forward `main`, push, Pages deploy, report to the CD | `taasdelay.s6-ship.md` | open |
 
@@ -112,3 +112,20 @@ step 6).
   Every `old` in the four TAAS lists occurs once. Screenshots looked at: the robot page at 390
   and 320 (the first 320 shot put "5 s" off the panel; fixed with `width: 0` on the slider and
   `min-width: 0` on the row) and the pause signs in the scene.
+- **Step 4 (2026-10-16), the eval and the break lists:** eval `eval-taas-factory.cjs` **23** GREEN
+  (19 + 4): a ninth persona `paced` (the supervisor for an hour; once its operator holds its plan
+  and a stall's worth of medium planks waits behind a full stall it puts the delay in a fifth slot,
+  leaves the slider at 5 s and nudges it a second a minute by the bin; assumed player rule) beside
+  `supervisor` for the same hour, seed 7. Supervisor's bin 116 medium planks at the hour and
+  climbing; paced at most 12 in the last 20 min, 3 at the hour; served 297 vs 302; satisfaction
+  100%; money **$658 vs $575** (+83 after the $25 slot). Opt-in sweep `EVAL_WAITS=1` (seeds 1-8,
+  an hour, not asserted): tuned bin 3-10, 100%, +51..+120; **2 s** still overproduces (45-67),
+  +23..+65; **3 s** bin 6-37, 100% on all 8, +60..+102; **4 s** starves 4 of 8 (10-33%); **5 s
+  (the default) starves 8 of 8 (10-24%)**, -321..+53. For the CD: a 3 s start? (not changed).
+  New list `negtests/taas-factory-eval.json` (4 breaks against the eval) **4 of 4**, each new
+  row RED on its own break; the eval prints `PASS-ON-COPY` under `TAAS_PAGE`. Engine list
+  **123 of 124** (miss `bubble-before-arrival`, the known equivalent); page list **70 of 71**
+  (miss `no-remeasure`, the known equivalent); all 23 `delay-*`, 16 `delay-ui-*` and 5 `hair-*`
+  caught. No suite rows added. A background shell stops at 30 min: run the page list with a
+  longer `timeout` (it takes ~45 min at three jobs).
+
