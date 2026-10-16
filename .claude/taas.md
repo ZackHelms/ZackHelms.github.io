@@ -747,14 +747,20 @@ and the CD's prices, the robots, the evals and instructions, each robot's tally 
 1. **Hiring the operator first is a trap now.** Revenue is capped by the customers, so a first robot
    on the planer (as in every earlier build) presses every log, junk included, while you still carry
    every plank: money falls and no persona that keeps it there ever affords the second robot.
-   Moving it to stocking (one tap) recovers (measured, below). Keep the trap as a lesson, or shape it
-   (a hint, cheaper slots, or customers arriving with demand)?
+   Moving it to stocking (one tap) recovers (measured, below). **Answered 2026-10-16: the trap stays,
+   as a lesson.** The CD: "Yes. Sometimes we try creating an agent for a task that is more complex and
+   not the next best choice for an agent; if not careful we learn this the painful way."
 2. **Overproduction.** An instructed operator makes medium planks faster than customers buy them,
-   so the output bin fills with planks that cost $1 each and wait. An instruction about pace ("stop
-   when the stall is full"), or let surplus feed the saw?
+   so the output bin fills with planks that cost $1 each and wait. **Answered 2026-10-16:** "Add an
+   instruction that lets me add a delay between iterations of its task. Let the delay be a
+   configurable value, a positive integer 0,1,2,...,60 seconds." Asked the same day: **every robot**
+   can take it, it is **on the list from the start**, it **slips 1 time in 20** like any instruction,
+   and for the operator **one iteration is one log handled** (pressed or tossed). Being built: plan
+   arc `.claude/plans/taasdelay.delay-arc.md`.
 3. **Demand.** Customers come one every 8-16 s whatever happens. Should fewer come when satisfaction
    is low (and more when it is high)? That would also break the slide where a long line drops
-   satisfaction, prices fall with it and the money for instructions never comes.
+   satisfaction, prices fall with it and the money for instructions never comes. **Deferred
+   2026-10-16** (the CD: "Will deal w this later"): `TODO.md` § Later.
 4. **What sells next, and for what?** The CD priced planks of every length, sap and cut wood; gnarled
    planks and carvings have no price. Each new stall is a `CFG.stalls` row.
 5. **Robots on slots 02 to 04**: which jobs, which mistakes, which instructions?
@@ -876,7 +882,7 @@ persona's list ("NO WAY OUT" otherwise). The books balance for every persona.
 **Tuned by it**: customers first came every 6-14 s; the eval showed the line filling faster than one
 person can carry planks round, satisfaction at the floor, prices near $0 and the second robot never
 affordable, so they now come every 8-16 s (12 s on average). Hiring the operator first is the
-remaining trap (open question 1).
+remaining trap (open question 1), **kept as a lesson** by the CD's call (2026-10-16).
 
 Frame cost (`.claude/scripts/frame-budget.cjs games/taas/index.html select=#mode-btn:robot-factory
 evalFile=.claude/scripts/poses/taas-factory-busy.js`, 390x844; the busy pose: both robots at work,

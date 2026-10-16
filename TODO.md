@@ -39,9 +39,11 @@ backlog entry here.
   random events on top of the scripted story, and keep the planning-board look or
   restyle in Neon Arcade. Then overrule anything wrong in its "assumed, not decided"
   table; every number in the engine is a first-draft guess.
-- [repo] Delete the remote branch **`cyoa2-step3`** (GitHub > branches). It is
-  a safety copy pushed mid-session on 2026-10-10 (`8020174`, work in progress);
-  everything in it shipped in `3ea55c4` on `main`. A remote session cannot
+- [repo] Delete the remote branches **`cyoa2-step3`** and **`taas-storefront`**
+  (GitHub > branches). `cyoa2-step3` is a safety copy pushed mid-session on
+  2026-10-10 (`8020174`, work in progress); everything in it shipped in
+  `3ea55c4` on `main`. `taas-storefront` (`80d4df2`) is the storefront's side
+  branch; everything in it shipped in `5bcc0e7` on `main` (2026-10-16). A remote session cannot
   delete it: the agent proxy refuses ref deletion and API writes
   (`.claude/zmh/producer.md` § Environment).
 - [cyoa2] **Play a tale with only the script** (the default now: no key, no
@@ -171,6 +173,13 @@ backlog entry here.
   Source: `.claude/plans/DONE/phasacro.acrobatics-block.follow-up.md`.
 
 ## Later
+
+- [taas] **Demand in the robot factory** (the CD, 2026-10-16: "Will deal w
+  this later"). Customers come one every 8-16 s whatever happens. Should fewer
+  come when customer satisfaction is low, and more when it is high? That would
+  also break the slide where a long line drops satisfaction, prices fall with
+  it and the money for instructions never comes. Needs the CD's design first.
+  Source: `.claude/taas.md` § Open questions for the CD (factory), 3.
 
 - [cyoa2] Trace why section T's **Continue row loses its key** across the
   reload when three whole suites run at once (16 times in the 2026-10-13
