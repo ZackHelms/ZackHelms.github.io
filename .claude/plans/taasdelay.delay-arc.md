@@ -1,6 +1,6 @@
 # taasdelay - TAAS robot factory: a delay between a robot's tasks (plan arc)
 
-**Status:** IN PROGRESS (step 1 done; steps 2-6 open)
+**Status:** IN PROGRESS (steps 1-2 done; steps 3-6 open)
 **Requested:** 2026-10-16, the CD's answer to the storefront's open question 2 (overproduction):
 "Add an instruction that lets me add a delay between iterations of its task. Let the delay be a
 configurable value, a positive integer 0,1,2,...,60 seconds." And one more fix the same day (step
@@ -56,7 +56,7 @@ step 6).
 |---|---|---|---|
 | 0 | The CD's three answers recorded, the demand item in `TODO.md`, this arc | (this session) | DONE - on `main` |
 | 1 | Fix: people keep their hair when they face the camera (cause traced: the hair sorts behind the head) | `taasdelay.s1-hair.md` | DONE 2026-10-16 |
-| 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | open |
+| 2 | Engine: the delay instruction, `r.wait`, the `pause` state, evals, save/load; rules suite rows | `taasdelay.s2-engine.md` | DONE 2026-10-16 |
 | 3 | UI: the slot's slider and steppers, the waiting robot's sign, Info text; page suite rows | `taasdelay.s3-ui.md` | open |
 | 4 | Eval (does a delay end overproduction?) and both break lists (the hair too) | `taasdelay.s4-eval-negtests.md` | open |
 | 5 | Docs final and gates | `taasdelay.s5-docs-gates.md` | open |
@@ -76,3 +76,25 @@ step 6).
   `taas-factory-ui.json` (now **55** entries) and caught **5 of 5** on copies; each of the three
   new rows catches at least one. Not fixed, outside the ask: a waiting customer's look baked
   mid-blink keeps its eyes shut while it waits (traced; offer the CD a one-line fix).
+- **Step 2 (2026-10-16), the engine:** the row `{ id: 'delay', job: null, text: 'Wait between
+  tasks', wait: true, start: true }` (last in `RULES`; `start` rows go on the list through
+  `startSeen()` in `newGame()` and `load()`), `CFG.wait = { min: 0, max: 60, start: 5 }`,
+  `r.wait` (5 on a new robot), **`F.setWait(s, id, sec)`** (integers 0-60 only, refused not
+  rounded; allowed with the instruction in no slot; event `'waitset'`), the state **`pause`**
+  entered by `done(s, r)` at the end of each iteration (operator: after a toss, after the cut is
+  out or the planer jams, after a flick; stocker: after `cool`, never after a look), the eval
+  lines **`'waited'`** (green) and **`'straight!'`** (yellow; the slip), written with `note()`,
+  events **`'paused'`** `{ by, wait }` and **`'straight'`** `{ by }`. Taking the instruction out
+  ends a wait; a toss you beat the robot to is no iteration. The UI has no `DOING` text
+  for the two eval keys yet (step 3), and draws a pausing robot in its idle pose (step 3).
+  The wait overlaps the next log rolling in (0.9 s), so an operator's gap is
+  `max(wait, stageSec) + pressSec`. Rules **180** (156 + 24, section 12); page **89** (two picker
+  rows updated: the list now holds the delay from the start); eval 19; formal 43 / 39; smoke
+  GREEN. Engine break list **124** (23 `delay-*` appended; `misstock-green` re-anchored), **23 of
+  23** caught after one row was widened; the whole list is step 4's to re-run. Overproduction, seed 51, ten minutes, instructed operator and stocker: no wait
+  -> **16** medium planks in the bin (satisfaction 100%); 3 s -> **0** (1 at most). Seeds 51-53
+  sweep: 2 s keeps satisfaction 100% but the bin reaches up to 10; 3 s holds the bin but
+  satisfaction ends 38-98%; 4-5 s starves the line (11-18%). The useful band is narrow (2-3 s)
+  and the 5 s default starves customers behind a fully instructed operator: step 4 should
+  measure it and the report should put it to the CD.
+

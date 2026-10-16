@@ -662,6 +662,7 @@ const FACTORY = (function () {
     // what a robot does when no instruction covers it (each robot rolls its own dice)
     uninstructed: { think: 0.25 },   // an operator stops to think first (no instruction covers this yet)
     slip: 0.05,             // a robot ignores an instruction it has 1 time in 20, and does what it would have done without it
+    wait: { min: 0, max: 60, start: 5 },   // the delay between tasks: whole seconds, 0-60 (the CD, 2026-10-16); 5 until set
     // the right price of each thing (the CD, 2026-10-15); for now only medium planks are sold.
     // cut: two 2"x4"s, four 2"x2"s or sixteen dowel rods, by the length of the plank they came from
     price: { plank: { s: 2, m: 4, l: 8 }, sap: 1, cut: { s: 3, m: 6, l: 12 } },
@@ -722,6 +723,11 @@ const FACTORY = (function () {
   // input log" (no robot pours sap), "Put medium logs in recycle bin" (for a factory that wants
   // something else; on a plank line it throws the good logs away) and "Sell medium wood planks for
   // $4" (the stall sets the price; a stocker never names one).
+  // One row is different (the CD, 2026-10-16): the delay belongs to no one job (`job: null`, every
+  // robot consults it), is on the list from the start (`start`) rather than after a mistake, and
+  // carries a number, the robot's own `r.wait` in whole seconds (`wait`): after each iteration of
+  // its task, a robot that holds it waits that long before the next (an operator's iteration is a
+  // log handled, a stocker's a thing taken out of the bin and stocked or recycled).
   const RULES = [
     { id: 'sap', job: 'operate', text: 'Never put sap on input log', joins: ['sappy'] },
     { id: 'sappy', job: 'operate', text: 'Put sap logs in recycle bin', rejects: { quality: ['sappy'] } },
@@ -735,10 +741,13 @@ const FACTORY = (function () {
     { id: 'price', job: 'stock', text: 'Sell medium wood planks for $4', joins: ['stockOnly'] },
     { id: 'smallOut', job: 'stock', text: 'Put small planks in recycle bin', recycles: { kind: ['plank'], size: ['s'] } },
     { id: 'largeOut', job: 'stock', text: 'Put large planks in recycle bin', recycles: { kind: ['plank'], size: ['l'] } },
-    { id: 'roughOut', job: 'stock', text: 'Put gnarled planks in recycle bin', recycles: { kind: ['rough'] } }
+    { id: 'roughOut', job: 'stock', text: 'Put gnarled planks in recycle bin', recycles: { kind: ['rough'] } },
+    { id: 'delay', job: null, text: 'Wait between tasks', wait: true, start: true }
   ];
   const RULE = {};
   RULES.forEach(q => { RULE[q.id] = q; });
+  // the instructions on the list before any mistake: the delay (the CD, 2026-10-16)
+  function startSeen() { const o = {}; RULES.forEach(q => { if (q.start) o[q.id] = true; }); return o; }
   const matches = (m, id) => !!m && (!m.quality || m.quality.indexOf(kindOf(id)) >= 0) && (!m.kind || m.kind.indexOf(kindOf(id)) >= 0) && (!m.size || m.size.indexOf(sizeOf(id)) >= 0);
   const rejectsLog = (q, log) => matches(q.rejects, log);
   const recyclesItem = (q, item) => matches(q.recycles, item);
@@ -817,7 +826,7 @@ const FACTORY = (function () {
       bench: { in: [], out: [], item: null, t: 0, design: null },
       stalls: CFG.stalls.map(q => ({ want: q.want, stock: [] })),
       shop: { people: [], next: CFG.shop.first, n: 0, served: 0, wrong: 0 },
-      seen: {},                     // rule id -> true once a robot has made the mistake it prevents
+      seen: startSeen(),            // rule id -> true once a robot has made the mistake it prevents (or from the start)
       avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0, inv: [] },
       robots: [], bubble: null,
       tally: { player: { made: 0, pressed: 0, tossed: 0, stocked: 0, fixed: 0, sawn: 0, extracted: 0, carved: 0 } },
@@ -883,6 +892,17 @@ const FACTORY = (function () {
     }
     r.rules[slot] = rule;
     ev(s, 'instructed', { id, slot, rule });
+    return true;
+  }
+  // how long a robot waits between tasks when it holds the delay: a whole number of seconds,
+  // 0-60, and nothing else (a fraction, a string or a number out of range is refused, not
+  // rounded). It may be set with the instruction in no slot: the robot keeps the number, and it
+  // counts once the instruction is in a slot
+  function setWait(s, id, sec) {
+    const r = s.robots[id], W = CFG.wait;
+    if (!r || typeof sec !== 'number' || !Number.isInteger(sec) || sec < W.min || sec > W.max) return false;
+    r.wait = sec;
+    ev(s, 'waitset', { id, wait: sec });
     return true;
   }
   function rename(s, id, name) {
@@ -1025,7 +1045,7 @@ const FACTORY = (function () {
   // action, then ':' and the thing it was done to; a trailing '!' means it was done against the
   // robot's own instructions (it slipped), which turns a green action yellow and leaves red red.
   const GRADE = { plank: 'good', think: 'soso', cut: 'soso', jam: 'bad', reject: 'good', caught: 'good',
-    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good' };
+    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' };
   function gradeOf(key) {
     const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
     return against && g === 'good' ? 'soso' : g;
@@ -1373,7 +1393,7 @@ const FACTORY = (function () {
     const i = s.robots.length, r = SPOT.rest[i];
     return { id: i, name: CFG.names[i], x: r.x, y: r.y, yawT: r.face, path: [], dist: 0, job: null, state: 'unbox', t: 0,
       goal: null, think: false, check: false, hunt: null, carry: null, mood: null, moodT: 0,
-      against: false, outSlip: false, huntSlip: false,
+      against: false, outSlip: false, huntSlip: false, wait: CFG.wait.start,
       slots: 0, rules: [], tally: { good: 0, soso: 0, bad: 0 }, record: {}, since: s.t };
   }
   function homeOf(s, r) { return r.job === 'operate' ? SPOT.operate : r.job === 'stock' ? SPOT.stock : SPOT.rest[r.id]; }
@@ -1421,7 +1441,11 @@ const FACTORY = (function () {
       }
       case 'reject':
         r.yawT = N; r.t += dt;
-        if (r.t >= CFG.tossSec) { const log = m.log; if (rejectLog(s, r.id)) credit(s, r.id, 'reject:' + log); r.state = 'idle'; r.t = 0; }
+        if (r.t >= CFG.tossSec) {
+          const log = m.log;
+          if (rejectLog(s, r.id)) { credit(s, r.id, 'reject:' + log); done(s, r); }
+          else { r.state = 'idle'; r.t = 0; }   // you pressed the planer first: it handled no log
+        }
         return;
       case 'dawdle':
         r.t += dt; if (r.t >= CFG.dawdleSec) { r.state = 'press'; r.t = 0; }
@@ -1434,15 +1458,33 @@ const FACTORY = (function () {
           r.t = 0;
         }
         return;
-      case 'wait':
-        if (m.phase !== 'run' || m.by !== r.id) { r.state = 'idle'; r.t = 0; r.think = false; }
+      case 'wait':   // the cut is out (or the planer has jammed): that log has been handled
+        if (m.phase !== 'run' || m.by !== r.id) { r.think = false; done(s, r); }
         return;
       case 'flick':   // tossing a bad cut from the out-feed into the recycle bin
         r.yawT = 0.2; r.t += dt;
-        if (r.t >= CFG.tossSec) { r.state = 'idle'; r.t = 0; r.think = false; }
+        if (r.t >= CFG.tossSec) { r.think = false; done(s, r); }
+        return;
+      case 'pause':
+        pause(r, dt);
         return;
     }
   }
+  // the end of one iteration of a robot's task (the CD, 2026-10-16): a robot that holds the delay
+  // waits r.wait seconds before the next, unless it slips (1 in 20) and goes straight on. A wait
+  // of 0 is no wait and rolls no die, so a day with the delay at 0 s is the same day as one without
+  // it, roll for roll
+  function done(s, r) {
+    r.t = 0;
+    if (has(r, 'delay') && r.wait > 0) {
+      if (follows(s, r, 'delay')) { r.state = 'pause'; note(r, 'waited'); ev(s, 'paused', { by: r.id, wait: r.wait }); return; }
+      note(r, 'straight!'); ev(s, 'straight', { by: r.id });
+    }
+    r.state = 'idle';
+  }
+  // waiting between tasks: r.wait is read every step, so a shorter wait set mid-pause ends it
+  // sooner, and taking the instruction out of its slot ends it at once
+  function pause(r, dt) { r.t += dt; if (r.t >= r.wait || !has(r, 'delay')) { r.state = 'idle'; r.t = 0; } }
   // the stocker's turn between the planer's output bin and the stall: "stock the sales counter with
   // the items in this bin" (the CD, 2026-10-15). Without an instruction it takes the next thing and
   // puts it in the stall, whatever it is (a red mark in its evals for anything but a medium plank:
@@ -1515,14 +1557,17 @@ const FACTORY = (function () {
           r.carry = null; r.against = false; r.state = 'cool'; r.t = 0;
         }
         return;
-      case 'cool':
-        r.t += dt; if (r.t >= CFG.coolSec) { r.state = 'idle'; r.t = 0; }
+      case 'cool':   // a thing out of the bin and stocked or recycled: one iteration (a look is not one)
+        r.t += dt; if (r.t >= CFG.coolSec) done(s, r);
+        return;
+      case 'pause':
+        pause(r, dt);
         return;
     }
   }
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
-  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'place', 'cool'];
+  const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'place', 'cool', 'pause'];
   const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m' };
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
@@ -1665,7 +1710,7 @@ const FACTORY = (function () {
       };
       s.robots = s.robots.slice(0, CFG.hire.length);
       s.hired = s.robots.length;
-      s.seen = {};
+      s.seen = startSeen();   // a save from before the delay gets it on the list too
       Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true && RULE[k]) s.seen[k] = true; });
       s.robots.forEach((r, i) => {
         r.id = i;
@@ -1683,6 +1728,9 @@ const FACTORY = (function () {
         r.tally = r.tally && typeof r.tally === 'object' ? { good: r.tally.good | 0, soso: r.tally.soso | 0, bad: r.tally.bad | 0 } : { good: 0, soso: 0, bad: 0 };
         r.since = Number.isFinite(+r.since) ? Math.min(+r.since, s.t) : 0;
         r.against = !!r.against; r.outSlip = !!r.outSlip; r.huntSlip = !!r.huntSlip;
+        // the delay: whole seconds in bounds; a save from before it (or a bad number) gets the default
+        r.wait = typeof r.wait === 'number' && Number.isFinite(r.wait) ? Math.max(CFG.wait.min, Math.min(CFG.wait.max, Math.round(r.wait))) : CFG.wait.start;
+        r.t = typeof r.t === 'number' && Number.isFinite(r.t) ? Math.max(0, r.t) : 0;
         if (!isItem(r.carry)) r.carry = null;
         if (typeof r.hunt !== 'boolean') r.hunt = null;
         if (STATES.indexOf(r.state) < 0 || ((r.state === 'drop' || r.state === 'place') && !r.carry)) release(s, r);
@@ -1707,7 +1755,7 @@ const FACTORY = (function () {
   }
 
   return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, RULES, BASE, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, keepers,
-    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, known, slotsOpen, slotPrice, buySlot, setRule, rename,
+    gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, known, slotsOpen, slotPrice, buySlot, setRule, setWait, rename,
     resetEvals, ready, canMill, store, waitingNow, kindsIn, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
 if (typeof module !== 'undefined') module.exports = FACTORY;

@@ -438,14 +438,14 @@ const server = http.createServer((req, res) => {
     await page.tap('[data-panel="buy"]');
     await step(0.05);
     const pk = await H(() => ({ money: window.TAAS_FACTORY.s.money + window.TAAS_FACTORY.s.spent - window.TAAS_FACTORY.s.earned, slots: window.TAAS_FACTORY.s.robots[0].slots, rules: [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent), pick: window.TAAS_FACTORY.page.pick }));
-    ok(pk.money === before - 5 && pk.slots === 1 && pk.pick === 0 && pk.rules.join('|') === 'Never put sap on input log|Put gnarled logs in recycle bin', 'unlocking a slot takes $5 and opens the list straight away: only the instructions for mistakes already seen', JSON.stringify(pk));
+    ok(pk.money === before - 5 && pk.slots === 1 && pk.pick === 0 && pk.rules.join('|') === 'Never put sap on input log|Put gnarled logs in recycle bin|Wait between tasks', 'unlocking a slot takes $5 and opens the list straight away: only the instructions for mistakes already seen, and the delay (on the list from the start)', JSON.stringify(pk));
     await page.tap('[data-panel="rule:sap"]');
     await step(0.05);
     const set = await H(() => ({ rules: window.TAAS_FACTORY.s.robots[0].rules, slot: document.querySelector('.fx-slot.filled') && document.querySelector('.fx-slot.filled').textContent, picker: !!document.querySelector('.fx-picker'), next: document.querySelector('[data-panel="buy"]').textContent }));
     ok(set.rules.join() === 'sap' && set.slot === 'Never put sap on input log' && !set.picker && set.next === 'Unlock this slot: $10', 'tapping an instruction puts it in the slot, closes the list, and the next slot asks $10', JSON.stringify(set));
     await page.tap('[data-panel="buy"]'); await step(0.05);
     const dup = await H(() => [...document.querySelectorAll('.fx-rules .fx-rule')].map(b => b.textContent + ':' + b.disabled));
-    ok(dup.length === 2 && /slot 1\):true$/.test(dup[0]) && /:false$/.test(dup[1]), 'in the next slot\'s list, the instruction it already holds is greyed and says where', JSON.stringify(dup));
+    ok(dup.length === 3 && /slot 1\):true$/.test(dup[0]) && /:false$/.test(dup[1]) && /:false$/.test(dup[2]), 'in the next slot\'s list, the instruction it already holds is greyed and says where', JSON.stringify(dup));
     await page.tap('[data-panel="cancel"]'); await step(0.05);
     ok(!(await H(() => !!document.querySelector('.fx-picker'))) && (await H(() => window.TAAS_FACTORY.s.robots[0].rules.join())) === 'sap,', 'Cancel closes the list and leaves the slot empty');
     await page.fill('#fx-rp-name', '  <b>Planky</b>  ');

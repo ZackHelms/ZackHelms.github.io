@@ -23,6 +23,10 @@ is missed.
   slip never rolled, `setWait` not clamping, `load()` dropping `r.wait`, `release()` leaving
   `pause`). Run only the new names with `--only`, then classify every miss: a row missing, a row
   that cannot fail, or an equivalent change. Add rows for the first two, re-run those names.
+  **Done in step 2 (2026-10-16):** 23 breaks `delay-*` covering all of the above and more are
+  already the last 23 entries of `taas-factory-engine.json` (124 now), caught 23 of 23 (one row
+  widened after a miss; see `taasdelay.s2-engine.md`). Run the whole list once here for the
+  total; add breaks only for what step 4's eval claims rely on.
 - Page list: the same for step 3 (slider not wired, steppers not clamped, the pause sign never drawn, the picker
   hiding the delay, the evals line missing, the re-render breaking a drag). Step 1's five hair breaks are already in
   `taas-factory-ui.json` (the last five, `hair-*`), caught 5 of 5; count them in the list's total.
