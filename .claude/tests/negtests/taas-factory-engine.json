@@ -56,8 +56,8 @@
  {
   "name": "payer-waits",
   "file": "games/taas/index.html",
-  "old": "      if (c.state === 'pay') { c.t += dt; if (c.t >= P.paySec) buy(s, c); return; }",
-  "new": "      if (c.state === 'pay') { c.t += dt; waiting++; if (c.t >= P.paySec) buy(s, c); return; } /* @negtest */"
+  "old": "      if (c.state === 'pay') return;\n      if (!walkTo(c",
+  "new": "      if (c.state === 'pay') { waiting++; return; } /* @negtest */\n      if (!walkTo(c"
  },
  {
   "name": "line-no-cap",
@@ -116,20 +116,20 @@
  {
   "name": "second-in-line-buys",
   "file": "games/taas/index.html",
-  "old": "      if (k === 0 && st.stock.length) {",
-  "new": "      if (k <= 1 && st.stock.length) { /* @negtest */"
+  "old": "      if (c.at === 'stall' && st.stock.length) {",
+  "new": "      if (st.stock.length) { /* @negtest */"
  },
  {
   "name": "never-leave",
   "file": "games/taas/index.html",
-  "old": "      else if (towards(c, SHOP.door.x, SHOP.walkY, d)) sh.people.splice(k, 1);",
-  "new": "      else towards(c, SHOP.door.x, SHOP.walkY, d); /* @negtest */"
+  "old": "      else if (towards(c, SHOP.door.x, SHOP.laneY, d)) sh.people.splice(k, 1);",
+  "new": "      else towards(c, SHOP.door.x, SHOP.laneY, d); /* @negtest */"
  },
  {
   "name": "stall-no-cap",
   "file": "games/taas/index.html",
-  "old": "  const room = s => CFG.stallCap - s.stalls[0].stock.length;",
-  "new": "  const room = s => 99; /* @negtest */"
+  "old": "  const room = (s, i) => CFG.stallCap - s.stalls[i].stock.length;",
+  "new": "  const room = (s, i) => 99; /* @negtest */"
  },
  {
   "name": "heal-off",
@@ -344,8 +344,8 @@
  {
   "name": "price-lookalike-works",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'stockOnly');",
-  "new": "        if (r.hunt === null) { r.hunt = follows(s, r, 'stockOnly') || follows(s, r, 'price'); /* @negtest */"
+  "old": "if (r.hunt === null) { r.hunt = follows(s, r, only); r.huntSlip",
+  "new": "if (r.hunt === null) { r.hunt = follows(s, r, only) || follows(s, r, 'price'); /* @negtest */ r.huntSlip"
  },
  {
   "name": "see-never",
@@ -380,32 +380,32 @@
  {
   "name": "stocker-no-hunt",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'stockOnly'); r.huntSlip = has(r, 'stockOnly') && !r.hunt; }",
-  "new": "        if (r.hunt === null) { r.hunt = false; r.huntSlip = false; } /* @negtest */"
+  "old": "if (r.hunt === null) { r.hunt = follows(s, r, only); r.huntSlip = has(r, only) && !r.hunt; }",
+  "new": "if (r.hunt === null) { r.hunt = false; r.huntSlip = false; } /* @negtest */"
  },
  {
   "name": "hunt-per-reach",
   "file": "games/taas/index.html",
-  "old": "        if (r.hunt === null) { r.hunt = follows(s, r, 'stockOnly'); r.huntSlip",
-  "new": "        if (true) { r.hunt = follows(s, r, 'stockOnly'); r.huntSlip /* @negtest */ "
+  "old": "if (r.hunt === null) { r.hunt = follows(s, r, only); r.huntSlip",
+  "new": "if (true) { r.hunt = follows(s, r, only); /* @negtest */ r.huntSlip"
  },
  {
   "name": "find-ignores-mix",
   "file": "games/taas/index.html",
-  "old": "          if (hits && chance(s, 'find', hits / s.bin.length)) at = s.bin.indexOf(want);",
-  "new": "          if (hits && chance(s, 'find', 0.9)) at = s.bin.indexOf(want); /* @negtest */"
+  "old": "if (hits && chance(s, 'find', hits / from.length)) at = from.indexOf(want);",
+  "new": "if (hits && chance(s, 'find', 0.9)) at = from.indexOf(want); /* @negtest */"
  },
  {
   "name": "turnup-first-kind",
   "file": "games/taas/index.html",
-  "old": "            at = s.bin.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, count(s.bin, k) / n]), kinds[kinds.length - 1]) : kinds[0]);",
-  "new": "            at = s.bin.indexOf(kinds[0]); /* @negtest */"
+  "old": "at = from.indexOf(kinds.length > 1 ? roll(s, 'turnup', kinds.map(k => [k, count(from, k) / n]), kinds[kinds.length - 1]) : kinds[0]);",
+  "new": "at = from.indexOf(kinds[0]); /* @negtest */"
  },
  {
   "name": "stocker-never-recycles",
   "file": "games/taas/index.html",
-  "old": "          if (follows(s, r, out.id)) { r.carry = s.bin.splice(at, 1)[0]; r.state = 'drop'; r.t = 0; return; }",
-  "new": "          if (false) { r.carry = s.bin.splice(at, 1)[0]; r.state = 'drop'; r.t = 0; return; } /* @negtest */"
+  "old": "if (follows(s, r, out.id)) { r.carry = from.splice(at, 1)[0];",
+  "new": "if (false) { /* @negtest */ r.carry = from.splice(at, 1)[0];"
  },
  {
   "name": "recycle-rules-never-join",
@@ -416,14 +416,14 @@
  {
   "name": "looking-uncounted",
   "file": "games/taas/index.html",
-  "old": "          note(r, 'looking' + (r.against ? '!' : ''));",
-  "new": "          /* @negtest */"
+  "old": "note(r, 'looking:' + want + (r.against ? '!' : ''));",
+  "new": "/* @negtest */"
  },
  {
   "name": "misstock-green",
   "file": "games/taas/index.html",
-  "old": "    stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' };",
-  "new": "    stock: 'good', misstock: 'good', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good' }; /* @negtest */"
+  "old": "stock: 'good', misstock: 'bad', looking: 'soso',",
+  "new": "stock: 'good', misstock: 'good', /* @negtest */ looking: 'soso',"
  },
  {
   "name": "jam-yellow",
@@ -446,32 +446,32 @@
  {
   "name": "misstock-not-seen",
   "file": "games/taas/index.html",
-  "old": "          if (!right) see(s, 'stockOnly', r.id);",
-  "new": "          /* @negtest */"
+  "old": "if (!right) see(s, ONLY[want], r.id);",
+  "new": "/* @negtest */"
  },
  {
   "name": "stocker-overfills",
   "file": "games/taas/index.html",
-  "old": "        if (r.t >= CFG.placeSec && room(s) > 0) {",
-  "new": "        if (r.t >= CFG.placeSec) { /* @negtest */"
+  "old": "if (r.t >= CFG.placeSec && room(s, i) > 0) {",
+  "new": "if (r.t >= CFG.placeSec) { /* @negtest */"
  },
  {
   "name": "stocker-ignores-full",
   "file": "games/taas/index.html",
-  "old": "        if (s.bin.length && room(s) > 0) { r.state = 'reach'; r.t = 0; }",
-  "new": "        if (s.bin.length) { r.state = 'reach'; r.t = 0; } /* @negtest */"
+  "old": "if (from.length && room(s, i) > 0) { r.state = 'reach'; r.t = 0; }",
+  "new": "if (from.length) { r.state = 'reach'; r.t = 0; } /* @negtest */"
  },
  {
   "name": "release-loses-carry",
   "file": "games/taas/index.html",
-  "old": "    if (r.carry) s.bin.unshift(r.carry);",
-  "new": "    /* @negtest */"
+  "old": "if (r.carry) store(s, r.src || 'bin').unshift(r.carry);",
+  "new": "/* @negtest */"
  },
  {
   "name": "slots-before-both",
   "file": "games/taas/index.html",
-  "old": "  function slotsOpen(s) { return s.hired >= CFG.hire.length; }",
-  "new": "  function slotsOpen(s) { return s.hired >= 1; } /* @negtest */"
+  "old": "function slotsOpen(s) { return s.hired >= CFG.slotsAt; }",
+  "new": "function slotsOpen(s) { return s.hired >= 1; } /* @negtest */"
  },
  {
   "name": "slot-free",
@@ -548,8 +548,8 @@
  {
   "name": "carve-instant",
   "file": "games/taas/index.html",
-  "old": "        if (b.t >= CFG.carveSec) {",
-  "new": "        if (b.t >= 0) { /* @negtest */"
+  "old": "        b.by = 'player'; b.t += dt;\n        if (b.t >= CFG.carveSec) {",
+  "new": "        b.by = 'player'; b.t += dt;\n        if (b.t >= 0) { /* @negtest */"
  },
  {
   "name": "carve-forgets",
@@ -590,8 +590,8 @@
  {
   "name": "load-overfull-stall",
   "file": "games/taas/index.html",
-  "old": "was.filter(g => g && isItem(g.item)).slice(0, CFG.stallCap).map(",
-  "new": "was.filter(g => g && isItem(g.item)).map( /* @negtest */ "
+  "old": "was.stock.filter(g => g && isItem(g.item)).slice(0, CFG.stallCap).map(",
+  "new": "was.stock.filter(g => g && isItem(g.item)).map( /* @negtest */ "
  },
  {
   "name": "load-any-version",
@@ -674,8 +674,8 @@
  {
   "name": "delay-release-leaves-pause",
   "file": "games/taas/index.html",
-  "old": "    r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;\n  }\n  function stepRobot",
-  "new": "    r.state = r.state === 'pause' ? 'pause' : 'idle'; /* @negtest */ r.t = 0; r.path = []; r.goal = null;\n  }\n  function stepRobot"
+  "old": "    r.state = 'idle'; r.t = 0; r.path = []; r.goal = null;\n  }\n  // a robot's walk to a spot",
+  "new": "    r.state = r.state === 'pause' ? 'pause' : 'idle'; /* @negtest */ r.t = 0; r.path = []; r.goal = null;\n  }\n  // a robot's walk to a spot"
  },
  {
   "name": "delay-stocker-never-waits",
@@ -704,8 +704,8 @@
  {
   "name": "delay-pause-not-a-state",
   "file": "games/taas/index.html",
-  "old": "'place', 'cool', 'pause'];",
-  "new": "'place', 'cool']; /* @negtest */"
+  "old": "'place', 'cool', 'pause', 'carve'];",
+  "new": "'place', 'cool', 'carve']; /* @negtest */"
  },
  {
   "name": "delay-slip-not-noted",
@@ -716,8 +716,8 @@
  {
   "name": "delay-waited-not-green",
   "file": "games/taas/index.html",
-  "old": "waited: 'good', straight: 'good' };",
-  "new": "waited: 'soso', straight: 'good' }; /* @negtest */"
+  "old": "recycle: 'good', waited: 'good', straight: 'good',",
+  "new": "recycle: 'good', waited: 'soso', /* @negtest */ straight: 'good',"
  },
  {
   "name": "delay-wait-read-at-start",

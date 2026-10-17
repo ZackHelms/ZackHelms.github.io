@@ -335,8 +335,10 @@ opt-in panel, per the discovery rule.
 | Tip | Where the game shows it | Evidence |
 |---|---|---|
 | **A first agent rarely pays for itself.** The first draft of an agent will likely not return what it costs: it takes time to learn where it needs instructions and guardrails, and only then does it return more than its investment, upkeep and cleanup (ROI above 1). Agents are worth it once you have the experience and the funding to support them | Factory: a robot line loses money until it holds its instructions, and the slots cost money it has not earned yet. Formal: the **J-curve** (§ Research, DORA): skill bought costs delivery before it pays back | Factory eval, seed 7, an hour (§ Measured, the bins): without the delay the robots' plans of four come at 50 / 45 minutes, and the supervisor's line nets $2.40 a minute at the end of the hour; the jams ($5 each) and the logs it recycles are the cleanup |
-| **An agent faster than demand makes waste.** Pace it before tuning anything else | Factory: an instructed operator handles about 18 logs a minute against about 5 customers; given "Wait between tasks" the moment it is hired, its plan comes at 23 / 17 minutes instead of 50 / 45, and the line clears $11.50 a minute | The same run, the paced persona against the supervisor |
+| **An agent faster than demand makes waste.** Pace it, starting the wait short | Factory: an instructed operator handles about 18 logs a minute against about 5 customers; without the delay its output bin holds 78-134 medium planks at the hour, every one paid for; given "Wait between tasks" as it is hired, 0-13, it spends less on every seed and ends the hour richer on 10 of 12. The 5 s the slider starts at starves the line on some seeds (the two that end poorer) | The eval over seeds 1-12, the paced persona against the supervisor (§ Measured, 2026-10-17). **Corrected 2026-10-17**: seed 7 alone had said the plans come "about twice as fast" (23 / 17 against 50 / 45 minutes); over twelve seeds that held on seed 7 only, and Info said so too until then |
 | **Give an agent the next best task, not the biggest.** A first robot on the planer, while you still carry every plank, presses logs nobody is selling | Factory: the operator-first trap (open question 1, kept as a lesson by the CD: "if not careful we learn this the painful way") | The eval's "operator first" persona since the storefront (§ Measured, storefront) |
+| **More agents do not make more demand.** A second stall and its robot that sell what the first sells only split the same customers and never pay; a new stall pays when it sells something worth more | Factory: customers come one every 8-16 s whatever is on the counter; a stall of medium 2x4s from the table saw pays | The eval's "second stall" and "saw line" personas, seeds 7-12 (§ Measured, 2026-10-17): $4.00 a customer as without it and $97-197 behind at two hours; with 2x4s $4.86-5.08 a customer and ahead on 5 of 6. Added 2026-10-17 (taasstalls step 4), not yet seen by the CD |
+| **An agent is only as good as what feeds it.** A stall whose thing is scarce, or whose robot fetches one thing at a time from a far bin, leaves its customers waiting, and they fill the shop so nobody else gets in; set a stall to sell only once someone can keep it stocked | Factory: the large plank stall, the one stall switched to 2x4s, a stall set before its robot is hired | The eval's "large planks", "cut stall" and "set first" personas, seeds 7-12 (§ Measured, 2026-10-17): satisfaction 10-14% at two hours with the shop full, and the last sells nothing at all. Added 2026-10-17, not yet seen by the CD |
 
 When a new finding of this kind turns up (in an eval, a playtest, or the CD's report), add a row
 here and a line to the factory's Info "Tips" (`renderPanel()`), and the page suite's tips row
@@ -841,7 +843,8 @@ and the second robot at 7.7 (4.7 before logs cost money). An instructed operator
 logs a minute against 5 customers, so **a line without the delay now buys logs it never sells**:
 its plan of four instructions comes at 50 / 45 minutes. With the delay put in the moment the
 operator is hired, the plans come at 23 / 17 minutes, the line clears $11.50 a minute, and that is
-the new optimal path.
+the new optimal path. (Seed 7. Over seeds 1-12 the plans come sooner on seven, about the same on
+three, later on one and never on one; the money ends higher on ten: § Measured, 2026-10-17.)
 
 ### Assumed, not decided (Claude's choices; the CD has not ruled on these)
 
@@ -921,7 +924,8 @@ the new optimal path.
 | **The bench: one pair of hands at a time**: you cannot carve while its robot carves (your tap does nothing), it waits while you carve, and a carving left half done is finished by whoever comes next | `carve()`, `carver()`, `bench.by` | One bench, one piece on it |
 | **Slot robots' base prompts**: "Use the table saw to cut planks.", "Use the sap extractor to take the sap out of sap logs.", "Carve gnarled wood into decorative pieces at the bench."; every stall's robot keeps "Stock the sales counter with the items in this bin." (the CD: the same for each) | `BASE` | The planer's is the model |
 | **Saves still version 3** with the robots: a second robot on one job, a job for a stall not bought, a bad cut or a carry with nothing carried are cleared by `load()` | `load()` | As the stalls |
-| **The eval's personas still hire two** (the planer's and the first stall's) until step 4 rebuilds them for the stalls and the slots | `eval-taas-factory.cjs` | Otherwise they would hire a third and shuffle jobs |
+| **The eval's one-line personas still hire two** (the planer's and the first stall's): their claims are about one line's instructions, and they keep seed 7's numbers exactly (the persona was rebuilt to grow and plays byte for byte as before when it does not) | `eval-taas-factory.cjs` | Growing them would mix two questions in every row |
+| **The eval's growing personas** (taasstalls step 4): the paced persona that, once both robots hold their plans, buys a stall (which sells nothing, so nobody comes for it), hires its robot and then sets what it sells, each step when it can pay and keep $20; takes out of a robot's slots any instruction its new plan has not got (for a large plank stall the operator's "Only input medium logs" and "Only output medium wood planks" and the first stall's "Put large planks in recycle bin"); carries medium planks from the planer's bin to the table saw only while the saw's two bins hold less than a stall's worth, sap logs out of the recycle bin to the extractor and its clean logs back to the planer's input bin, and gnarled wood to the bench; and, once growing, also shortens the delay whenever a customer waits at any empty stall | `eval-taas-factory.cjs` (`G`, `GROW`) | Assumed players, each choice traced to a first try that failed for the persona's reason: buying and setting a stall in one go locked the shop (kept, as the "set first" persona); feeding the saw every plank moved the waste from the planer to the saw (130 2x4s in its bin on seed 7 at 90 minutes); pacing by medium planks alone ran the delay up to 60 s behind a large plank stall |
 | **The counter on screen** (taasstalls step 3): each stall bought has its tray on the counter and its label on the counter's front, the price first at the label's west end and then the thing in capitals ("$8 LARGE PLANKS", "$6 MEDIUM 2x4s", "$1 SAP" at full satisfaction); a stall bought with nothing set has a blank label; an empty place is a dashed outline on the counter's top with a white plus in the middle | `sceneObjects()` (`stall0`-`stall3`, `plate0`-`plate3`, each `{ stall }`), `onFloor()`, `drawPlate(i)`, `drawPlace(i)`, `PLATE_NAME` | The plus is the affordance (no caption). Price first because the robots that never move stand in front of a label's east end: the first stall's in front of the second's, the second's at the planer's bin in front of the first's |
 | **A stall's tray sorts in front of the counter it sits on**: since the storefront brief it sorted behind it, so the counter's top hid all of the tray but its back rim (traced: key 2.26 against the counter's 2.30) | `sceneObjects()` (`ct[3] + 0.052`) | A bug, found in step 3's first screenshot |
 | **A tap reaches the front-most thing drawn under the finger**: of the sprite boxes a tap lands in, the front-most with paint within the 8 px tap pad wins, and only if none has paint there the front-most box, as before | `hitTest()`, `inked()` | The planer's box (its chimney, plus the pad) reached over the second and third stalls' labels, so a tap on either went to the planer |
@@ -976,7 +980,25 @@ the new optimal path.
    slowly (the plan of four at about 50 minutes; 23 with the delay put in first) and the delay is
    now the first instruction a player needs. Is that the lesson you want, or should demand, the log
    price or the restock size move? (The four stalls planned next add demand only by splitting the
-   same customers between stalls.)
+   same customers between stalls.) **Measured with the four stalls (2026-10-17):** they do: a stall
+   changes what a customer pays, never how many come, so growing pays only by selling something worth
+   more and only while it is kept supplied (§ Measured, 2026-10-17).
+12. **Should a customer give up?** A customer waits at an empty stall for ever (the CD's "waits there
+   if it is empty") and six in the shop is the most, so a stall that nobody stocks, or whose thing is
+   scarce, fills the shop with its customers and nobody else is served: a stall set before its robot is
+   hired sells nothing for the rest of the game, and a large plank stall ends customer satisfaction at
+   10-13% (§ Measured, 2026-10-17). Leaving after a while (costing satisfaction as they go) would cap
+   it. Not changed: the CD's call.
+13. **Should a robot carry things between machines?** Planks reach the table saw, sap logs the
+   extractor and gnarled wood the bench only in your arms: a slot robot only presses and a stall robot
+   only stocks, so every growing persona that sells cuts or sap carries by hand.
+14. **One thing a trip.** A stall's robot walks one thing at a time from its bin (the CD: "fetch an
+   item"). From the saw's output bin to the first stall that is about 10.7 m there and back, about 4.4
+   a minute, below the shop's 5 customers a minute, so the one stall switched to 2x4s starves while a
+   second stall of 2x4s (half the customers) keeps up. Carry more, bring the saw nearer, or keep it as
+   a lesson?
+15. **The bench earns nothing.** Carvings have no price (open question 4), so the bench's robot carves
+   what no stall can sell.
 
 Answered by this brief: what the bays hold (slots 02 to 04), whether a jam should cost more than
 time ($5 to fix), how what is not a plank leaves the bin (your arms, and the stocker's recycle
@@ -1206,6 +1228,86 @@ press $1, logs free) the plans came at 11 and 14 minutes. "Operator first" ends 
 reason that is the persona's, not the game's: its second robot is given the stocking job, which
 swaps the first one (already moved to stocking) to rest, so nobody but the person runs the planer,
 and the person never presses a log nobody will buy.
+
+### Measured (2026-10-17, the stalls: the delay over twelve seeds, and growing the factory)
+
+`node .claude/tests/eval-taas-factory.cjs` (about a minute). taasstalls step 4.
+
+**The delay, restated over seeds 1-12.** One row had gone red with the stalls: "without the delay
+it takes over twice as long" (the supervisor's operator plan at 45.3 minutes, the paced one's at
+24.1). Measured on `main` and here over seeds 1-12 it held on seed 7 only, so it was luck, and
+every claim about the delay is now made over the twelve. An hour each, the paced persona against
+the supervisor:
+
+| Seed | paced: delay in | plans (op / stock, min) | bin at 1h | lowest satisfaction after | money | supervisor: plans | bin | money |
+|---|---|---|---|---|---|---|---|---|
+| 1 | 9.3m | 28 / 20 | 5 | 73% | $309 | 34 / 28 | 99 | $139 |
+| 2 | 9.3m | 33 / 26 | 0 | 48% | $272 | 37 / 25 | 101 | $95 |
+| 3 | 8.3m | 22 / - | 3 | 89% | $380 | 25 / 21 | 99 | $118 |
+| 4 | 9.8m | 31 / 25 | 5 | 79% | $203 | 30 / 27 | 78 | $83 |
+| 5 | 9.5m | 25 / 17 | 4 | 91% | $291 | 26 / 21 | 100 | $165 |
+| 6 | 7.7m | - / - | 0 | 11% | -$305 | 34 / 29 | 105 | $130 |
+| 7 | 7.7m | 24 / 17 | 2 | 85% | $377 | 45 / 39 | 87 | $55 |
+| 8 | 9.2m | 26 / 19 | 1 | 67% | $331 | 38 / 30 | 121 | $95 |
+| 9 | 11.6m | 30 / 21 | 3 | 53% | $294 | 34 / 29 | 97 | $89 |
+| 10 | 8.6m | 48 / 41 | 4 | 33% | $89 | 24 / 21 | 83 | $154 |
+| 11 | 6.4m | 23 / 14 | 13 | 80% | $322 | 22 / 15 | 134 | $137 |
+| 12 | 6.6m | 29 / 24 | 8 | 59% | $257 | 28 / 22 | 101 | $112 |
+
+What holds on every seed: without the delay the bin holds ten stalls' worth at the hour and is
+still climbing (78-134 planks); with it the bin never holds more than three stalls' worth in the
+last twenty minutes (at most 13); the paced line spends less. What holds on most: it ends the hour
+richer (10 of 12), and both plans are whole inside the hour (10 of 12). The two seeds that end
+poorer (6 and 10) are the two where the 5 s the slider starts at starved the line (traced: on both,
+customers waited 4-5 on average within a few minutes of the delay going in, satisfaction fell to 11%
+and 33%, prices with it, and on seed 6 money went below zero and the operator's plan was never whole).
+How long the plans take varies too much to claim more: the operator's plan comes sooner with the
+delay on seven seeds, about the same on three, later on one and never on one. **The Tip changed
+with it** (§ Tips: "pace it, starting the wait short", where Info had said "about twice as fast").
+
+**Growing the factory.** Seven growing personas (§ Assumed, "The eval's growing personas"), two
+hours each on seeds 7-12, beside the paced line that never grows ($674-922 at two hours, $4.00 a
+customer, 8.4-11.2 net $ a minute over the last 20 minutes):
+
+| Persona | invested | all bought by | $ a customer, last 20 min | net $/min, last 20 min | money at 2h against the line | satisfaction at 2h |
+|---|---|---|---|---|---|---|
+| second stall (medium planks again, its robot) | $160 | 35-68 min | $3.99-4.00 | 7.1-11.2 | -$97 to -$197 on every seed | 100% |
+| saw line (a stall of medium 2x4s, a saw robot, its robot; you carry planks to the saw) | $190 | 47-72 | $4.86-5.08 | 12.3-14.2 | -$54 to +$181, ahead on 5 of 6 | 100% |
+| all medium (four stalls, three of 2x4s) | $660 | 81-109 | $5.43-5.56 | 14.9-17.8 | -$178 to -$487 on every seed | 100% |
+| cut stall (the one stall switched to 2x4s, a saw robot) | $60 | 33-64 | $1.20 | -10.0 to -12.6 | -$1,084 to -$1,714 | 10-14% |
+| large planks (a stall of large planks, its robot) | $140 | 35-69 | $1.10-1.43 | -10.6 to -13.2 | -$780 to -$1,733 | 10-13% |
+| set first (a stall set to sell before its robot) | $50 | never | none served | -15.3 to -17.0 | -$1,701 to -$2,261 | 10% |
+| full house (four stalls: planks, two of 2x4s, sap; all eight robots) | $965 | 99-114 (not by 2h on seed 10) | $3.51-4.76 | 9.6-17.2 | -$519 to -$732 on every seed | 90-100% |
+
+Four hours (seeds 7, 8, 11; printed, not asserted): the saw line is $567-633 ahead, all medium
+$517-680 ahead and still earning the most a minute (15.1-19.0 against the line's 8.1-9.8), the
+second stall $140-260 behind.
+
+What it shows (each a row, over every seed it grew on unless it says otherwise):
+- **Stalls change what a customer pays, never how many come**: one every 8-16 s whatever is on
+  the counter. A second stall selling the same thing never pays.
+- **A stall pays when it sells something worth more and is kept supplied**: medium 2x4s ($6) from
+  medium planks, which the planer makes plenty of, raise what a customer pays by about a fifth; the
+  saw line is ahead within two hours on most seeds, four stalls of 2x4s earn the most but take
+  between two and four hours to pay back $660.
+- **A stall whose thing is scarce takes the shop with it**: large planks come from about one log in
+  nine (15% of logs are large, 75% of those normal), half the customers come for them, they fill the
+  six places in the shop and wait, and fewer of the others get in.
+- **A stall nobody stocks locks the shop for good**: set to sell before its robot is hired, its
+  customers fill the shop and never leave, nothing else sells, and the robot is never affordable.
+- **One robot fetching one thing a trip cannot serve every customer**: the one stall switched to
+  2x4s has its robot walk about 10.7 m from the saw's output bin and back for each, about 4.4 a
+  minute against the shop's 5 (traced: 372 stocked in 85 minutes), so the line grows and satisfaction
+  drains; a second stall of 2x4s, with half the customers, keeps up.
+- **Buying everything does not pay**: with sap at $1 taking a quarter of the customers from the
+  $4 and $6 stalls a customer pays less than with the saw line alone, the bench's robot carves what
+  no stall can sell, and the factory ends two hours behind the one that never grew.
+
+Traced on the way (the persona's fault, fixed in the persona): feeding the saw every plank in the
+planer's bin made 207 2x4s for 77 sold (130 left in its output bin, seed 7 at 90 minutes), the waste
+moved from the planer to the saw; and the paced slider rule, reading only the medium planks in the
+planer's bin, ran the delay up to 60 s behind a large plank stall (medium planks pile up behind the
+full medium stall when large plank customers fill the shop), which starved the large planks further.
 
 ### Negative tests (factory)
 

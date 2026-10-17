@@ -28,5 +28,29 @@
   "file": "games/taas/index.html",
   "old": "    spend(s, 'bought', CFG.restock.cost);",
   "new": "    /* @negtest */"
+ },
+ {
+  "name": "ev-one-price",
+  "file": "games/taas/index.html",
+  "old": "function paid(s, item) { const p = priceOf(item);",
+  "new": "function paid(s, item) { const p = priceOf('plank.m'); /* @negtest */"
+ },
+ {
+  "name": "ev-first-stall-only",
+  "file": "games/taas/index.html",
+  "old": "const open = openStalls(s), stall = open.length > 1 ? roll(",
+  "new": "const open = openStalls(s), stall = open.length > 99 /* @negtest */ ? roll("
+ },
+ {
+  "name": "ev-customers-give-up",
+  "file": "games/taas/index.html",
+  "old": "      c.t = c.state === 'wait' ? c.t + dt : 0;   // how long it has been standing there",
+  "new": "      c.t = c.state === 'wait' ? c.t + dt : 0; if (c.t > 30) { c.state = 'out'; c.t = 0; return; } /* @negtest */"
+ },
+ {
+  "name": "ev-carver-idle",
+  "file": "games/taas/index.html",
+  "old": "        if ((b.item || b.in.length) && !yours) { r.state = 'carve'; r.t = 0; }",
+  "new": "        if (false /* @negtest */ && (b.item || b.in.length) && !yours) { r.state = 'carve'; r.t = 0; }"
  }
 ]

@@ -2,8 +2,8 @@
  {
   "name": "counter-untappable",
   "file": "games/taas/index.html",
-  "old": "    ['counter', 'counter'], ['stall', 'counter'],",
-  "new": "    /* @negtest */"
+  "old": "    if (ct) inR(spriteRect('counter'), ",
+  "new": "    if (false /* @negtest */ && ct) inR(spriteRect('counter'), "
  },
  {
   "name": "recycle-untappable",
@@ -32,14 +32,14 @@
  {
   "name": "dock-untappable",
   "file": "games/taas/index.html",
-  "old": "['benchOutFront', 'benchOut'], ['dockPanel', 'dock']];",
-  "new": "['benchOutFront', 'benchOut']]; /* @negtest */"
+  "old": "['benchOutFront', 'benchOut'], ['dockPanel', 'dock']]",
+  "new": "['benchOutFront', 'benchOut']] /* @negtest */"
  },
  {
   "name": "tap-keys-flat",
   "file": "games/taas/index.html",
-  "old": "if (sp) inR(spriteRect(id), { t: { kind }, key: sp.key }); });",
-  "new": "if (sp) inR(spriteRect(id), { t: { kind }, key: 0 }); }); /* @negtest */"
+  "old": "{ t: Object.assign({ kind }, more), key: sp.key, sp }); });",
+  "new": "{ t: Object.assign({ kind }, more), key: 0, sp }); }); /* @negtest */"
  },
  {
   "name": "floor-maps-wrong",
@@ -122,19 +122,19 @@
  {
   "name": "plate-full-price",
   "file": "games/taas/index.html",
-  "old": "    const now = F.priceNow(s, WANT()), full = F.priceOf(WANT()), price = usd(now);",
-  "new": "    const now = F.priceOf(WANT()), full = F.priceOf(WANT()), price = usd(now); /* @negtest */"
+  "old": "const now = F.priceNow(s, want), full = F.priceOf(want)",
+  "new": "const now = F.priceOf(want) /* @negtest */, full = F.priceOf(want)"
  },
  {
   "name": "plate-never-amber",
   "file": "games/taas/index.html",
-  "old": "    ctx.textAlign = 'right'; ctx.fillStyle = now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';",
-  "new": "    ctx.textAlign = 'right'; ctx.fillStyle = '#7ff09a'; /* @negtest */"
+  "old": "ctx.textAlign = 'left'; ctx.fillStyle = now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';",
+  "new": "ctx.textAlign = 'left'; ctx.fillStyle = '#7ff09a'; /* @negtest */"
  },
  {
   "name": "plate-label-gone",
   "file": "games/taas/index.html",
-  "old": "    ctx.fillText('MEDIUM PLANKS', r.x + pad, cy + 0.5);",
+  "old": "    ctx.fillText(name, r.x + 2 * pad + pw, cy + 0.5);",
   "new": "    /* @negtest */"
  },
  {
@@ -206,8 +206,8 @@
  {
   "name": "stall-stock-undrawn",
   "file": "games/taas/index.html",
-  "old": "    s.stalls[0].stock.forEach((g, i) => items.push(",
-  "new": "    [].forEach((g, i) => items.push( /* @negtest */ "
+  "old": "st.stock.forEach((g, i) => items.push(",
+  "new": "[].forEach((g, i) => items.push( /* @negtest */ "
  },
  {
   "name": "customers-undrawn",
@@ -218,8 +218,8 @@
  {
   "name": "hourglass-gone",
   "file": "games/taas/index.html",
-  "old": "    if (c.state === 'wait' && c.t > 0.8) hourglass(hx, hy);",
-  "new": "    if (false) hourglass(hx, hy); /* @negtest */"
+  "old": "if (c.state === 'wait' && c.t > 0.8) { if (c.at === 'line')",
+  "new": "if (false && c.state === 'wait' && c.t > 0.8) { /* @negtest */ if (c.at === 'line')"
  },
  {
   "name": "carry-count-gone",
@@ -242,8 +242,8 @@
  {
   "name": "job-aria-old",
   "file": "games/taas/index.html",
-  "old": "'job:stock': 'Stock the sales counter',",
-  "new": "'job:stock': 'Sell from the bin', /* @negtest */"
+  "old": "aria = 'Stock stall ' + (o.i + 1)",
+  "new": "aria = 'Sell from the bin ' + (o.i + 1) /* @negtest */"
  },
  {
   "name": "names-sizeless",
@@ -254,8 +254,8 @@
  {
   "name": "misstock-words",
   "file": "games/taas/index.html",
-  "old": "    misstock: x => 'Put ' + NAME(x) + ' in the medium plank stall',",
-  "new": "    misstock: x => 'Put ' + NAME(x) + ' in the stall', /* @negtest */"
+  "old": "misstock: x => { const w = String(x).split('@'); return 'Put ' + NAME(w[0]) + ' in the ' + (w[1] ?",
+  "new": "misstock: x => { const w = String(x).split('@'); return 'Put ' + NAME(w[0]) + ' in the stall'; /* @negtest */ return 'Put ' + NAME(w[0]) + ' in the ' + (w[1] ?"
  },
  {
   "name": "evals-reset-dead",
@@ -344,8 +344,8 @@
  {
   "name": "delay-ui-wait-not-in-sig",
   "file": "games/taas/index.html",
-  "old": "part('slots', JSON.stringify([r.job, r.slots, r.rules, r.wait, open",
-  "new": "part('slots', JSON.stringify([r.job, r.slots, r.rules, /* @negtest */ open"
+  "old": "part('slots', JSON.stringify([JOB_NAME(r.job), r.cut, r.slots, r.rules, r.wait, open",
+  "new": "part('slots', JSON.stringify([JOB_NAME(r.job), r.cut, r.slots, r.rules, /* @negtest */ open"
  },
  {
   "name": "delay-ui-steppers-both-add",
