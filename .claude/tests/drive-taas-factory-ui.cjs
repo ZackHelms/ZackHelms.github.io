@@ -895,7 +895,7 @@ const server = http.createServer((req, res) => {
     await H(() => window.TAAS_FACTORY.showInfo());
     const info = await H(() => document.getElementById('fx-panel-body').textContent);
     await H(() => window.TAAS_FACTORY.closePanel());
-    ok(/Wait between tasks/.test(info) && /0 to 60 seconds \(5 to begin with\)/.test(info) && /a wait between tasks, as told/.test(info), 'Info tells of the delay: on the list from the start, 0 to 60 seconds, 5 to begin with, and a wait as told is green', (info.match(/One is on the list[^.]*\.[^.]*\./) || [''])[0]);
+    ok(/on the list from the start and suits any robot: Wait between tasks/.test(info) && /0 to 60 seconds \(5 to begin with\)/.test(info) && /a wait between tasks, as told/.test(info), 'Info tells of the delay: on the list from the start, 0 to 60 seconds, 5 to begin with, and a wait as told is green', (info.match(/One is on the list[^.]*\.[^.]*\./) || [''])[0]);
   });
   /* ---------- 18. the picker that stays put, and bins you can take from (the CD, 2026-10-16) ---------- */
   await section('18. bins', async () => {
