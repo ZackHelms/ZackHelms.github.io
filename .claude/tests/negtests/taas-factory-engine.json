@@ -856,5 +856,11 @@
   "file": "games/taas/index.html",
   "old": "s.rackMine = Math.max(0, Math.min(s.rack.length, Math.floor(d.rackMine)));",
   "new": "s.rackMine = d.rackMine; /* @negtest */"
+ },
+ {
+  "name": "stalls-fetch-crowded",
+  "file": "games/taas/index.html",
+  "old": "    bin: [SPOT.stock, { x: 4.95, y: 3.0, face: S }, { x: 5.45, y: 3.75, face: W_ }, { x: 5.45, y: 4.55, face: W_ }],",
+  "new": "    bin: [SPOT.stock, { x: 4.2, y: 3.0, face: S }, { x: 4.6, y: 3.0, face: S }, { x: 5.0, y: 3.0, face: S }], /* @negtest */"
  }
 ]

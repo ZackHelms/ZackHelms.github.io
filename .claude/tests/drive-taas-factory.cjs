@@ -1293,6 +1293,11 @@ const atHome = (s, r) => r.state === 'idle' && dist(r, F.homeOf(s, r)) < 0.07;
     });
   }
   ok(!boxed.length, 'however many robots are still packed in their crates, every robot unpacked can walk from its pad to every post, and back (one cell of floor between any two crates)', boxed.slice(0, 5).join(', '));
+  // the robots waiting at one output bin stand a robot's width apart (2026-10-17: at 0.4 m two
+  // stall robots at the planer's bin were drawn one over the other)
+  const close = [];
+  Object.keys(SP.fetch).forEach(b => SP.fetch[b].forEach((p, i) => SP.fetch[b].forEach((q, j) => { if (i < j && dist(p, q) < 0.75) close.push(b + ' ' + (i + 1) + '/' + (j + 1) + ' ' + dist(p, q).toFixed(2)); })));
+  ok(!close.length, 'at each output bin the four stalls\' robots wait at least 0.75 m apart, a robot\'s width', close.join(', '));
   ok(posts.every(([name, q]) => F.free(F.newGame(), q.x, q.y)) && [0, 8].every(n => { const s = F.newGame(); s.hired = n; const p = F.path(s, SP.start, SP.dock); return p.length && dist(p[p.length - 1], SP.dock) < 0.15 && segFree(s, SP.start, p); }),
     'every post stands on free floor, and the dock is reached with every crate packed or none');
   // instruction slots open once two robots are on staff, not only once all are

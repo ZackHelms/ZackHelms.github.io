@@ -502,5 +502,149 @@
   "file": "games/taas/index.html",
   "old": "      '<h3>Tips</h3><ul class=\"fx-tips\">' +",
   "new": "      '<h3>Tips</h3><ul>' + /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-trays-always",
+  "file": "games/taas/index.html",
+  "old": "const onFloor = q => !(q.crate !== undefined && s.hired > q.crate) && !(q.stall !== undefined && !s.stalls[q.stall].bought);",
+  "new": "const onFloor = q => !(q.crate !== undefined && s.hired > q.crate); /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-tray-behind-counter",
+  "file": "games/taas/index.html",
+  "old": "L.STALLS.forEach((st, i) => add('stall' + i, ct[3] + 0.052, [",
+  "new": "L.STALLS.forEach((st, i) => add('stall' + i, st.y1 + 0.06 /* @negtest */, ["
+ },
+ {
+  "name": "stalls-ui-no-place",
+  "file": "games/taas/index.html",
+  "old": "    const q = L.STALLS[i], S = VW.S, x0 = PX(q.x0 + 0.05), x1 = PX(q.x1 - 0.05), y0 = PY(q.y0 + 0.02, q.z), y1 = PY(q.y1 - 0.02, q.z);\n    if (y0 > VW.h || y1 < 0) return;",
+  "new": "    const q = L.STALLS[i], S = VW.S, x0 = PX(q.x0 + 0.05), x1 = PX(q.x1 - 0.05), y0 = PY(q.y0 + 0.02, q.z), y1 = PY(q.y1 - 0.02, q.z);\n    if (y0 > VW.h || y1 < 0 || 1) return; /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-plate-first-only",
+  "file": "games/taas/index.html",
+  "old": "const S = VW.S, r = boardRect('plate', i), pad = 0.07 * S, want = s.stalls[i].want;",
+  "new": "const S = VW.S, r = boardRect('plate', 0), pad = 0.07 * S, want = s.stalls[i].want; /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-plate-name-fixed",
+  "file": "games/taas/index.html",
+  "old": "price = usd(now), name = PLATE_NAME(want);",
+  "new": "price = usd(now), name = 'MEDIUM PLANKS'; /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-stock-first-only",
+  "file": "games/taas/index.html",
+  "old": "s.stalls.forEach((st, k) => { const q = L.STALLS[k]; st.stock.forEach(",
+  "new": "s.stalls.slice(0, 1).forEach((st, k) => { const q = L.STALLS[k]; /* @negtest */ st.stock.forEach("
+ },
+ {
+  "name": "stalls-ui-counter-first-stall",
+  "file": "games/taas/index.html",
+  "old": "if (ct) inR(spriteRect('counter'), { t: { kind: 'stall', i: stallUnder((x - VW.ox) / VW.S) }, key: ct.key, sp: ct });",
+  "new": "if (ct) inR(spriteRect('counter'), { t: { kind: 'stall', i: 0 }, key: ct.key, sp: ct }); /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-tap-by-box",
+  "file": "games/taas/index.html",
+  "old": "return (hits.find(h => !h.sp || inked(h.sp, x, y, pad)) || hits[0]).t;",
+  "new": "return hits[0].t; /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-sell-flat",
+  "file": "games/taas/index.html",
+  "old": "else if (sells) bubbleEl.innerHTML = stallRows(opts);",
+  "new": "else if (sells) bubbleEl.innerHTML = opts.map(optButton).join(''); /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-sell-no-price",
+  "file": "games/taas/index.html",
+  "old": "inner = mini(o.item); label = usd(o.price); aria = 'Sell '",
+  "new": "inner = mini(o.item); label = ''; /* @negtest */ aria = 'Sell '"
+ },
+ {
+  "name": "stalls-ui-buy-no-picture",
+  "file": "games/taas/index.html",
+  "old": "    stall: '<svg viewBox=\"0 0 40 34\"",
+  "new": "    stall: /* @negtest */ '' && '<svg viewBox=\"0 0 40 34\""
+ },
+ {
+  "name": "stalls-ui-bubble-over-stall",
+  "file": "games/taas/index.html",
+  "old": "under = y - h - 14 < VW.hudBottom + 6 && yb + h <= VW.h - 6;",
+  "new": "under = false; /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-slot-jobs-buttons",
+  "file": "games/taas/index.html",
+  "old": "    else if (o.icon === 'sell') {",
+  "new": "    else if (/^job:(saw|extract|carve)$/.test(o.id)) inner = ICON.button; /* @negtest */\n    else if (o.icon === 'sell') {"
+ },
+ {
+  "name": "stalls-ui-stock-tile-generic",
+  "file": "games/taas/index.html",
+  "old": "inner = w ? mini(w) : ICON.stock; label = String(o.i + 1);",
+  "new": "inner = ICON.stock; label = String(o.i + 1); /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-no-cut-row",
+  "file": "games/taas/index.html",
+  "old": "    if (F.jobKind(r.job) === 'saw') h += '<div class=\"fx-sec\"><div class=\"fx-h\"><span>Cut</span>",
+  "new": "    if (F.jobKind(r.job) === 'saw' && 0 /* @negtest */) h += '<div class=\"fx-sec\"><div class=\"fx-h\"><span>Cut</span>"
+ },
+ {
+  "name": "stalls-ui-cut-not-set",
+  "file": "games/taas/index.html",
+  "old": "else if (act.indexOf('cut:') === 0) { if (r.cut !== act.slice(4) && F.setCut(s, id, act.slice(4))) save(); }",
+  "new": "else if (act.indexOf('cut:') === 0) { /* @negtest */ }"
+ },
+ {
+  "name": "stalls-ui-carry-not-held",
+  "file": "games/taas/index.html",
+  "old": "if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'place', both: r.state === 'carry' };",
+  "new": "if (r.carry && r.state !== 'carry') /* @negtest */ hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'place', both: r.state === 'carry' };"
+ },
+ {
+  "name": "stalls-ui-line-hourglass-over",
+  "file": "games/taas/index.html",
+  "old": "if (c.at === 'line') hourglass(hx + 0.27 * VW.S, hy + 0.26 * VW.S, 0.7); else hourglass(hx, hy);",
+  "new": "hourglass(hx, hy); /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-no-dock-bay",
+  "file": "games/taas/index.html",
+  "old": "ctx.fillStyle = 'rgba(22,179,165,0.08)'; ctx.fillRect(PX(dk[0]), PY(dk[1], 0), (dk[2] - dk[0]) * S, (dk[3] - dk[1]) * SE * S);",
+  "new": "/* @negtest */"
+ },
+ {
+  "name": "stalls-ui-info-both",
+  "file": "games/taas/index.html",
+  "old": "slots cost ' + money$(C.slots) + ' for each robot, once two robots are on staff.",
+  "new": "slots cost ' + money$(C.slots) + ' for each robot, once both are on staff. /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-job-name-no-thing",
+  "file": "games/taas/index.html",
+  "old": "return 'stocking stall ' + (F.stallOfJob(j) + 1) + (st && st.want ? ', ' + SELL_NAME(st.want) : ''); }",
+  "new": "return 'stocking stall ' + (F.stallOfJob(j) + 1); } /* @negtest */"
+ },
+ {
+  "name": "stalls-ui-wanted-medium",
+  "file": "games/taas/index.html",
+  "old": "sub: wrong ? 'wanted ' + NAME(e.want || C.stalls.start) + ': satisfaction -'",
+  "new": "sub: wrong ? 'wanted ' + NAME(C.stalls.start) /* @negtest */ + ': satisfaction -'"
+ },
+ {
+  "name": "stalls-ui-bake-key-short",
+  "file": "games/taas/index.html",
+  "old": "    const key = JSON.stringify(o);\n    let sp = ROBOT_BAKE.get(key);",
+  "new": "    const key = JSON.stringify(Object.assign({}, o, { bulb: 0, mood: 0 })); /* @negtest */\n    let sp = ROBOT_BAKE.get(key);"
+ },
+ {
+  "name": "stalls-ui-bake-unbounded",
+  "file": "games/taas/index.html",
+  "old": "if (robotBakeBytes <= ROBOT_BAKE_BYTES || k0 === key) break;",
+  "new": "break; /* @negtest */"
  }
 ]

@@ -1,6 +1,6 @@
 # taasstalls - TAAS robot factory: four stalls, eight robots (plan arc)
 
-**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; branch `taas-stalls`)
+**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; step 3 done 2026-10-17: the page; branch `taas-stalls`)
 **Requested:** 2026-10-16, inside the CD's answer to the bins brief (`.claude/plans/DONE/taasbins.md`,
 which ships the first half: bins you take from, logs bought 10 for $10, $0.10 a run, the floor).
 Verbatim:
@@ -59,7 +59,7 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
 | 0 | The CD's brief and four answers recorded (this file) | DONE 2026-10-16 |
 | 1 | Engine: stalls (buy, set, unsold to arms), customers picking a stall, prices per stall; rules suite rows | DONE 2026-10-16 |
 | 2 | Engine: eight robots, stall jobs and "Only stock X" per item, slot 02-04 jobs; rules suite rows | DONE 2026-10-16 |
-| 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | open |
+| 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | DONE 2026-10-17 |
 | 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | open |
 | 5 | Docs final and gates | open |
 | 6 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
@@ -154,3 +154,46 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
   one pair of hands, no slip on the slots, the delay on a slot robot, saves new and old, and a quarter
   hour with all eight where every stall sells and nothing wrong is stocked); page 111 unchanged (its
   job ids and eval line updated); eval 23 of 24 (above). `gates.sh` GREEN (formal 43 / 39 untouched).
+
+### Step 3 (2026-10-17): the page
+
+- **Settled** (each an assumed row in `.claude/taas.md`, from "The counter on screen" to "Info"): a tray
+  and a label for each stall bought, the label's price first at its west end (the robots that never
+  move stand in front of a label's east end) and then the thing in capitals; a blank label on a stall
+  with nothing set; an empty place a dashed outline with a white plus. The stall's bubble: the 13
+  things in four rows, each with its picture and what a customer pays now. A bubble with no room over
+  its thing goes under it. The robots' job buttons: a stall's shows what it sells and its number, and
+  the saw, the extractor and the bench each have a picture of their own; a stall robot's job name says
+  what it stocks. The saw robot's page has its cut (three buttons, `setCut()`). The dock's bay painted
+  round the panel and all eight pads (the panel art itself stays where its solid is, step 2). The back
+  line's hourglasses beside the head at 70%. A stall's robot walks its thing over in both claws; the
+  bench's robot holds a chisel and throws chips. A wrong sale says what was wanted. Info rewritten for
+  four stalls, eight robots and slots 02-04.
+- **Engine, one change**: the robots waiting at one output bin stand 0.8 m apart (`SPOT.fetch`; they
+  were 0.4 m apart and drawn one over the other); a rules row checks it.
+- **Two bugs found and fixed**: a stall's tray sorted behind the counter it sits on since the
+  storefront brief, so the counter's top hid all of it but its back rim (traced: key 2.26 against
+  2.30). And a tap on the second or third stall's label reached the planer: the planer's box (its
+  chimney, plus the tap pad) reaches over them though nothing of it is drawn there. A tap now goes to
+  the front-most thing with paint under the finger (`inked()`), falling back to the box as before.
+- **Frame cost**: with four stalls and eight robots (new pose `taas-factory-eight.js`) the scene missed
+  a frame in two (33.3 ms median, 81-89 of 149 over), and the robots alone were to blame (stubbed out: 1
+  over; customers, labels or things: still 60-67). Robots are now baked by pose (rounded, keyed on every
+  field the bake reads, least recently used out within 12 MB, each canvas the size of what it draws):
+  0-1 of 149 over in three runs; the old busy pose as before. A busy quarter hour without the budget
+  bakes 335 poses (17 MB), so the budget is really used.
+- **A flaky row, traced before it was trusted**: the new bulb-and-eyes row went red on two unrelated
+  breaks under parallel load. Cause: the hire's crate bits and sparks are flung with `Math.random()`, the
+  suite's one half-second tick left some alive, and every later `tick(0)` froze them, sometimes over the
+  bulb. The setup now lets them burn out; three suites at once came back green.
+- **Interim until step 4**: the eval's personas still hire two (unchanged; their stall spot is the same).
+- **Suites**: rules 259 -> 260 (the fetch spots' spacing); page 111 -> 129 (section 19: the counter at the
+  start, buying an empty place by real taps, the 13-thing bubble, the bubble off its stall, setting a
+  stall and its label, stock on its own tray, taps on every tray and label at three sizes, the jobs'
+  pictures, the saw robot's cut by a real tap, a stall robot's page, the wrong-sale float, a robot
+  drawn holding its thing; section 20: the back line's hourglasses, the dock of eight and its bay,
+  sold out at eight, Info; section 21: the robot bake keeps the bulb and the face, and its budget).
+  Break lists: page 84 -> 108 (24 `stalls-ui-*`, all caught, the three that met the flaky row re-run after it was
+  fixed), engine 143 -> 144 (`stalls-fetch-crowded`, caught); step 4 re-runs both whole lists. Formal
+  untouched.
+
