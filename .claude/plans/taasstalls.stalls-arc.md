@@ -1,6 +1,6 @@
 # taasstalls - TAAS robot factory: four stalls, eight robots (plan arc)
 
-**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; step 3 done 2026-10-17: the page; step 4 done 2026-10-17: the eval and the break lists; branch `taas-stalls`)
+**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; step 3 done 2026-10-17: the page; step 4 done 2026-10-17: the eval and the break lists; step 5 done 2026-10-17: the docs and gates; branch `taas-stalls`)
 **Requested:** 2026-10-16, inside the CD's answer to the bins brief (`.claude/plans/DONE/taasbins.md`,
 which ships the first half: bins you take from, logs bought 10 for $10, $0.10 a run, the floor).
 Verbatim:
@@ -83,7 +83,12 @@ no curly quotes or en/em dashes); label anything inferred, assumed or sourced ("
 call it a hypothesis. Don't ask the CD about deleting remote branches. Ask before writing code only
 if a design question is genuinely unclear.
 
-Step 5 notes (from step 4): suite counts are rules 260, page 129, eval 32 (about a minute;
+Step 6 notes (from step 5): gates GREEN on a4e45a9 and the step 5 commit; `CLAUDE.md`,
+`games/CLAUDE.md` and `.claude/tests/README.md` are shared with other sessions, so after the rev-list
+check sanity-check their TAAS lines survived any merge. The report to the CD: the two new Tips, open
+questions 12-15, and the delay Tip's correction ("about twice as fast" held on seed 7 only).
+
+Step 5 notes (from step 4, done): suite counts are rules 260, page 129, eval 32 (about a minute;
 `EVAL_SEEDS` / `EVAL_GROW_SEEDS`); break lists engine 144 (143 caught), page 108 (107), eval 9 (9),
 the misses the two known equivalent changes. CLAUDE.md's TAAS row and games/taas bullet, and
 games/CLAUDE.md's TAAS entry, still describe the Tips as three (now five) and one stall. Step 6's
@@ -98,7 +103,7 @@ report must include the two new Tips and open questions 12-15, which the CD has 
 | 2 | Engine: eight robots, stall jobs and "Only stock X" per item, slot 02-04 jobs; rules suite rows | DONE 2026-10-16 |
 | 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | DONE 2026-10-17 |
 | 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | DONE 2026-10-17 |
-| 5 | Docs final and gates | open |
+| 5 | Docs final and gates | DONE 2026-10-17 |
 | 6 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
 
 ## Results (append, do not rewrite)
@@ -282,3 +287,34 @@ report must include the two new Tips and open questions 12-15, which the CD has 
   no "Only stock" wording exists for a carving, and was replaced). Page **107 of 108** (the miss the known equivalent `no-remeasure`; one new miss, `delay-ui-no-info`, traced to a row that only asked Info to mention "Wait between tasks", which the corrected Tip also does: the row now reads the sentence, and the break is caught). No row was flaky: the rows that catch the most breaks catch related ones only.
 - **Suites**: rules 260 (unchanged), page 129 (the tips row rewritten for five tips and the corrected
   wording), eval 24 -> 32 GREEN, now about a minute (it was 3 s). Formal untouched: 43 / 39 / 9. `gates.sh games/taas/index.html --eval` GREEN. Frame cost with the eight-robot pose: 16.7 ms median, 0 of 149 over (only Info's text changed on the page).
+
+### Step 5 (2026-10-17): the docs and the gates
+
+- **`.claude/taas.md`** read whole for one stall and two robots. Added **§ Four stalls and eight robots
+  (CD, 2026-10-16) - stated**: the CD's words, the four answers, what was built and a pointer to the
+  measurements. The storefront's "What was built" keeps its words (it is the 2026-10-15 build) under a
+  note naming what the stalls changed; the bins brief's "not built here" now points to the new
+  section. **Architecture**: `SELLS`, the four `stalls`, the `stall` die, the "Only stock X" rows
+  (`only`, `ONLY`), a stall's places and bubble (`buystall`, `sell:`, `stallPrice()`, `openStalls()`),
+  the shop's three rows (`SHOP`, `walkTo()`), the robots' jobs and posts (`jobKind()`, `homeOf()`,
+  `SPOT.fetch`, `srcOf()`, `go()`, `release()`), `stocker()` per stall, `miller()` and `setCut()`,
+  `carver()`, the new events, `drawPlate(i)`, the robot bake (`robotSprite()`, 12 MB), `inked()` and
+  `stallUnder()` in the hit test, `robotBake()` on the test hook (each name read in the code).
+  **How to change it**: "a new stall" (it pointed at the plan) became "another thing on sale" (a price
+  and a floor put it in `SELLS`; it needs an `ONLY_TEXT` wording, since the "Only stock" rows are built
+  from `SELLS` as the engine loads, a `srcOf()` bin, a name) and "a fifth stall"; a slot robot's job.
+  **Open questions** 4 and 5 updated (5 has its first answer, "nothing yet", built), 11's "planned
+  next" marked inferred. Header counts (260 / 129 / 32, ~4,800 lines), two assumed rows (the stall's
+  six, the interim stocker row marked superseded), the break lists' old counts labelled as before the
+  stalls, and a History entry for 2026-10-17.
+- **`.claude/tests/README.md`**: the three factory rows (rules ~5 s / 260 with sections 14-15; page
+  ~2 min / 129 with sections 19-21 and five Tips; eval about a minute / 32 with the twelve seeds,
+  growing, `EVAL_SEEDS` / `EVAL_GROW_SEEDS`); break lists 144 / 143, 108 / 107, 9 / 9. Two stale
+  phrases gone ("only medium planks sell", "the two jobs a robot can have").
+- **`CLAUDE.md`**: the games/taas bullet (up to four stalls, up to eight robots, logs ten for $10, it
+  said $1 a log) and the TAAS row (the stalls and their four answers in place of "planned", five Tips).
+  **`games/CLAUDE.md`**: the TAAS entry (~4,800 lines, the stalls, eight robots, robots baked by pose;
+  "every log costs $1 at the planer" gone, stale since the bins brief).
+- **Gates**: `gates.sh games/taas/index.html --eval` GREEN (3 min 14 s); `check-inline-js` GREEN;
+  formal 43 / 39 / 9; factory 260 / 129 / 32. The page is unchanged since step 4, so the frame cost and
+  the break lists stand as measured there. No code changed in this step.
