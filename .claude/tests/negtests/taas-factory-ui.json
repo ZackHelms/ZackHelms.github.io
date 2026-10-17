@@ -602,8 +602,8 @@
  {
   "name": "stalls-ui-carry-not-held",
   "file": "games/taas/index.html",
-  "old": "if (r.carry) hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'place', both: r.state === 'carry' };",
-  "new": "if (r.carry && r.state !== 'carry') /* @negtest */ hold = { parts: ITEM_MODEL[r.carry], scale: 0.6, up: r.state === 'place', both: r.state === 'carry' };"
+  "old": "    if (r.carry) hold = r.carry;\n",
+  "new": "    if (r.carry && r.state !== 'carry') hold = r.carry; /* @negtest */\n"
  },
  {
   "name": "stalls-ui-line-hourglass-over",
