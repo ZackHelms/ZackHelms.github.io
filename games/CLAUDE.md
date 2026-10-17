@@ -1018,7 +1018,7 @@ voice against a stand-in for OpenAI's speech service, and other phones as browse
 contexts joined over real WebRTC). Detailed context:
 `.claude/cyoa2.md`.
 
-### TAAS (`taas/index.html`, ~4,100 lines)
+### TAAS (`taas/index.html`, ~4,800 lines)
 The **Team AI Adoption Simulator**, designed with the CD on 2026-10-09 and shipped on
 2026-10-12 as the hub's 3rd card (after CYOA2 and CYOA). Not a scene but a **management
 sim rendered as a DOM page**: a roadmap tracker of eight quarters across the top, the
@@ -1043,13 +1043,16 @@ floor, a walk cycle driven by distance), presses the planer's glowing red button
 planks from its output bin round to a **sales counter** along the back wall and recycles what
 will not sell; customers walk in from the left, line up across the counter, pay for a medium
 plank at $4 times **customer satisfaction** (which starts at 100%) and cost 0.1% of it a second
-each while they wait. Wood has a size and a quality, so sappy logs jam the planer ($5 to scrub)
+each while they wait. Since 2026-10-17 the counter holds **up to four stalls** (three bought for
+$50, $100 and $150), each set by a tap to sell one of 13 things, and each customer picks an open
+stall at random. Wood has a size and a quality, so sappy logs jam the planer ($5 to scrub)
 and gnarled ones make planks with holes; slots 02-04 hold a table saw, a sap extractor and a hand
-crafting bench, worked by hand. Robots hired as **AI agents** run the planer or stock the counter
-and make mistakes with causes (a small, large or gnarled plank in the medium stall is sold, and
-satisfaction drops). Every log costs $1 at the planer, so money can go red, and a stocker told to
-stock only medium planks has to hunt the output bin for them unless it is told to recycle each
-kind. Each mistake
+crafting bench, worked by hand or by a robot. Up to eight robots hired as **AI agents** ($20 to
+$160) run the planer, stock a stall each (fetching one thing a trip from the bin its thing comes
+out of) or work slots 02-04, and the planer's and the stalls' make mistakes with causes (a small,
+large or gnarled plank in the medium plank stall is sold, and satisfaction drops). Money can go
+red, and a stall's robot told to stock only its thing has to hunt its bin for it unless it is told
+to recycle each kind. Each mistake
 you see adds an instruction to a list, and each robot has its own named page: its base prompt, then five instruction slots
 bought with cash ($5-$25), which it follows but for a 1-in-20 slip, and its **Evals**: what
 it did, red only for a blocker or a hit to customer satisfaction, resettable. One instruction
@@ -1057,7 +1060,8 @@ is on every robot's list from the start (2026-10-16): a **delay between tasks**,
 slider from 0 to 60 s under its slot, which ends overproduction when it is tuned. Since the same
 day logs are bought ten for $10 into the planer's input bin, a machine run costs $0.10, nothing
 sells below what it cost to make, and every bin you put things in gives them back. Static scenery is baked per scale and blitted on
-whole device pixels, the canvas is capped at 2x, and the busy scene holds 60 fps.
+whole device pixels, robots are baked by pose, the canvas is capped at 2x, and the busy scene
+(four stalls, eight robots) holds 60 fps.
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`
 (rules, pure node), `drive-taas-ui.cjs` (the page in Chromium) and `eval-taas.cjs` (balance
 shape, opt-in) for the formal mode; `drive-taas-factory.cjs`, `drive-taas-factory-ui.cjs`

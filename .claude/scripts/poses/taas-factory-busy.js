@@ -9,7 +9,7 @@
   const F = FACTORY, s = F.newGame(7), run = n => { for (let k = 0; k < n; k++) F.step(s, 0.05); };
   s.money = 60;
   F.tap(s, { kind: 'dock' }); run(400);
-  F.choose(s, 'hire'); F.choose(s, 'job:stock');
+  F.choose(s, 'hire'); F.choose(s, 'job:stock:0');
   F.tap(s, { kind: 'dock' }); run(20);
   F.choose(s, 'hire'); F.choose(s, 'job:operate');
   s.money = 100; s.seen.stockOnly = true; F.buySlot(s, 0); F.setRule(s, 0, 0, 'stockOnly');
@@ -22,7 +22,7 @@
   run(300);
   s.stalls[0].stock.length = 0; s.shop.people.length = 0;
   for (let k = 0; k < 5; k++) s.shop.people.push({ id: 90 + k, x: F.LAYOUT.SHOP.x0 - k * 0.62, y: F.LAYOUT.SHOP.lineY, state: 'wait', t: 3, stall: 0, item: null, by: null, wrong: false });
-  s.shop.people.push({ id: 99, x: 2.2, y: F.LAYOUT.SHOP.walkY, state: 'out', t: 0.5, stall: 0, item: 'plank.m', by: 0, wrong: false });
+  s.shop.people.push({ id: 99, x: 2.2, y: F.LAYOUT.SHOP.laneY, state: 'out', t: 0.5, stall: 0, item: 'plank.m', by: 0, wrong: false });
   s.saw.phase = 'idle'; F.store(s, 'sawIn').length && (s.saw.phase = 'run', s.saw.item = s.saw.in.shift(), s.saw.cut = 'b2x2', s.saw.t = 0.3);
   s.extract.phase = 'run'; s.extract.item = s.extract.in.shift(); s.extract.t = 0.5;
   s.avatar.inv.push('plank.m', 'plank.s', 'log.l', 'sap');

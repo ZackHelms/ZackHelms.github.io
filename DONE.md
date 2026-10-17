@@ -1,5 +1,14 @@
 # DONE — done log
 
+- 2026-10-17 [taas] **Four stalls and eight robots in the robot factory** (the CD,
+  2026-10-16): stalls 2-4 bought for $50 / $100 / $150 and set by tapping to one of
+  13 things (unsold stock to your arms), customers picking a stall at random, one
+  stocking robot per stall with an "Only stock X" per thing, robots for the saw,
+  the extractor and the bench that make no mistakes yet, robots $20 to $160. Two
+  new Tips and open questions 12-15 from the eval's growing personas; the delay
+  Tip corrected over twelve seeds. Suites 260 / 129 / 32; plan
+  `.claude/plans/DONE/taasstalls.stalls-arc.md`.
+
 - 2026-10-13 [cyoa2] **The second negative-test pass, finished**: 688 breaks
   at the last three pushes and step 4 (voice 122, script 190, table 129, book
   154, step 4 93), every one caught by a named row or written up as having no

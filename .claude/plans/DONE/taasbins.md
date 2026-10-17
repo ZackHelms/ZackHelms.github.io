@@ -1,6 +1,6 @@
 # taasbins - TAAS robot factory: the picker that jumps, bins you can take from, a planer bin of bought logs
 
-**Status:** IMPLEMENTED 2026-10-16 (part 1; one commit on `main`. Part 2 is `.claude/plans/taasstalls.stalls-arc.md`)
+**Status:** IMPLEMENTED 2026-10-16 (part 1; one commit on `main`. Part 2 is `.claude/plans/DONE/taasstalls.stalls-arc.md`)
 **Requested:** 2026-10-16, the CD, after playing the delay build (quotes verbatim):
 
 - "Fix this bug where I am scrolling in the list of instructions to select one and it unexpectedly
