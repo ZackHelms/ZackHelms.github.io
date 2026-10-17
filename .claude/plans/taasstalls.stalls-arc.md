@@ -1,6 +1,6 @@
 # taasstalls - TAAS robot factory: four stalls, eight robots (plan arc)
 
-**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; step 3 done 2026-10-17: the page; branch `taas-stalls`)
+**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; step 3 done 2026-10-17: the page; step 4 done 2026-10-17: the eval and the break lists; branch `taas-stalls`)
 **Requested:** 2026-10-16, inside the CD's answer to the bins brief (`.claude/plans/DONE/taasbins.md`,
 which ships the first half: bins you take from, logs bought 10 for $10, $0.10 a run, the floor).
 Verbatim:
@@ -60,7 +60,7 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
 | 1 | Engine: stalls (buy, set, unsold to arms), customers picking a stall, prices per stall; rules suite rows | DONE 2026-10-16 |
 | 2 | Engine: eight robots, stall jobs and "Only stock X" per item, slot 02-04 jobs; rules suite rows | DONE 2026-10-16 |
 | 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | DONE 2026-10-17 |
-| 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | open |
+| 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | DONE 2026-10-17 |
 | 5 | Docs final and gates | open |
 | 6 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
 
@@ -197,3 +197,51 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
   fixed), engine 143 -> 144 (`stalls-fetch-crowded`, caught); step 4 re-runs both whole lists. Formal
   untouched.
 
+### Step 4 (2026-10-17): the eval and both break lists
+
+- **The eval's persona rebuilt to grow** (`G` in `persona()`; assumed players, each an assumed row in
+  `.claude/taas.md`, "The eval's growing personas"): once both robots hold their plans it buys a stall,
+  hires its robot, then sets what the stall sells, each step when it can pay and keep $20; takes out of
+  a robot's slots what its new plan has not got; carries what no robot carries (planks to the saw while
+  the saw's bins hold less than a stall's worth, sap logs to the extractor and its clean logs back,
+  gnarled wood to the bench); and, growing, also shortens the delay when a customer waits at any empty
+  stall. Without `G` the persona plays byte for byte as before (the one-line table identical). The
+  one-line personas keep two robots on purpose (their rows are about one line's instructions).
+- **The red row was luck, and the delay's claims are restated over seeds 1-12** (an hour each, paced
+  against supervisor). Every seed: without the delay the bin holds ten stalls' worth at the hour and
+  climbs (78-134 planks); with it, never more than three stalls' worth in the last 20 minutes (at most
+  13); the paced line spends less. Most seeds (asserted three in four): it ends richer (10/12), both
+  plans whole inside the hour (10/12). The two that end poorer (6, 10) are the two the 5 s start
+  starved (satisfaction 11% and 33% after the delay went in; traced). The operator's plan comes sooner
+  with the delay on 7 seeds, about the same on 3, later on 1, never on 1: no timing claim is made.
+  "Over twice as long" is gone, and so are seed 7's "inside 25 minutes", "without starving" and
+  "it pays" (each restated over the twelve).
+- **The Tip "an agent faster than demand makes waste" was not measured as told**: Info said the plans
+  come "about twice as fast" (seed 7 only). Now "Pace it: ... it buys fewer logs, and most of the time it
+  ends up richer. But start the wait short ...". The waste half holds on every seed.
+- **Growing the factory, seven personas** (two hours, seeds 7-12, beside the paced line that never grows,
+  $674-922): a second stall of the same thing never pays (-$97 to -$197; $4.00 a customer); the saw line
+  (2x4s, $190) pays on 5 of 6 ($4.86-5.08 a customer); four stalls of planks and 2x4s ($660) earn the
+  most a minute (14.9-17.8) but repay only between two and four hours; the one stall switched to 2x4s, a
+  large plank stall, and a stall set before its robot all lock the shop (satisfaction 10-14%, the last
+  selling nothing at all); everything ($965, all eight robots, sap) ends $519-732 behind. Four hours
+  (seeds 7, 8, 11, printed): saw line +$567-633, all medium +$517-680. Numbers and traces in
+  `.claude/taas.md` § Measured (2026-10-17).
+- **Traced causes** (each a row): customers never leave an empty stall and six fill the shop (set first,
+  large planks: about one log in nine is a large normal one); a stall's robot fetches one thing a trip,
+  10.7 m from the saw's bin to the first stall, about 4.4 a minute against 5 customers (cut stall: 372
+  stocked in 85 minutes). Persona faults found and fixed first: feeding the saw every plank (130 2x4s
+  left in its bin), a slider rule reading only medium planks (the delay at 60 s behind a large plank
+  stall).
+- **Two Tips added** (Info and `.claude/taas.md` § Tips; not yet seen by the CD): "More agents do not
+  make more demand", "An agent is only as good as what feeds it". **Four open questions** (12-15):
+  should a customer give up, should a robot carry between machines, one thing a trip, the bench earns
+  nothing.
+- **Break lists**: the stale breaks repointed at the current code, 22 engine and 11 page, none retired
+  (each still had code to break). Each suite run once on the unbroken page first (260 / 129 / 32 green).
+  Engine **143 of 144** caught (the miss is the known equivalent `bubble-before-arrival`); no row catches
+  more than six breaks, all related. Eval **9 of 9** (four new: `ev-one-price`, `ev-first-stall-only`,
+  `ev-customers-give-up`, `ev-carver-idle`; a fifth, carvings priced, crashed the engine on load, since
+  no "Only stock" wording exists for a carving, and was replaced). Page **107 of 108** (the miss the known equivalent `no-remeasure`; one new miss, `delay-ui-no-info`, traced to a row that only asked Info to mention "Wait between tasks", which the corrected Tip also does: the row now reads the sentence, and the break is caught). No row was flaky: the rows that catch the most breaks catch related ones only.
+- **Suites**: rules 260 (unchanged), page 129 (the tips row rewritten for five tips and the corrected
+  wording), eval 24 -> 32 GREEN, now about a minute (it was 3 s). Formal untouched: 43 / 39 / 9. `gates.sh games/taas/index.html --eval` GREEN. Frame cost with the eight-robot pose: 16.7 ms median, 0 of 149 over (only Info's text changed on the page).

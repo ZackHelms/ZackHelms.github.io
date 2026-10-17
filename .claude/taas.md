@@ -1311,9 +1311,29 @@ full medium stall when large plank customers fill the shop), which starved the l
 
 ### Negative tests (factory)
 
-`.claude/tests/negtests/taas-factory-engine.json` (**143** breaks, against `drive-taas-factory.cjs`),
-`taas-factory-ui.json` (**84**, against `drive-taas-factory-ui.cjs`) and `taas-factory-eval.json`
-(**5**, against `eval-taas-factory.cjs`; `ev-logs-free` added 2026-10-16): **142, 83 and 5 caught** (2026-10-16, later, every break in each list re-run on copies). The bins brief (2026-10-16, later) added 19
+**taasstalls step 4 (2026-10-17), every list re-run whole on copies**: engine **143 of 144** caught,
+page **107 of 108**, eval **9 of 9**; each suite was run once on the unbroken page first (260 / 129 / 32
+green). The misses are the two known equivalent changes below (`bubble-before-arrival`,
+`no-remeasure`). **33 breaks were stale** (their "old" text no longer appeared exactly once, from
+steps 1-3): 22 engine (the shop's line, payment and leaving; the stocker's hunt, recycle, looking
+and misstock lines, now per stall and per bin; `room()` per stall; `release()`; `slotsOpen()`;
+the bench; the stall load; the delay's state and grade) and 11 page (the counter's tap, the
+dock's, the tap keys, the stall's label and its price colour, the stock on the trays, the
+hourglass, a stall job's aria label, the misstock words, the slots part's signature). All were
+repointed at the current code and caught; none was retired, since each still had code to break.
+One page miss was new and real: `delay-ui-no-info` (the delay's sentence in Info deleted) went
+unseen because its row only asked that Info mention "Wait between tasks", which the corrected Tip
+also does; the row now reads the sentence itself, and the break is caught. The eval gained four
+breaks for the growth rows (`ev-one-price`, every stall priced as a medium plank; `ev-first-stall-only`,
+every customer for the first stall; `ev-customers-give-up`, a customer leaves after 30 s; `ev-carver-idle`,
+the bench's robot never carves); a fifth, carvings given a price, crashed the engine on load (no
+"Only stock" wording exists for a carving) and was replaced by `ev-carver-idle`. No row was flaky:
+the rows that catch most breaks (the taps at six sizes, 7; a stall's label, 5; the hair, 5) catch
+related ones only. The page list takes about 80 minutes at three jobs, the engine's 4, the eval's 3.
+
+`.claude/tests/negtests/taas-factory-engine.json` (**144** breaks, against `drive-taas-factory.cjs`),
+`taas-factory-ui.json` (**108**, against `drive-taas-factory-ui.cjs`) and `taas-factory-eval.json`
+(**9**, against `eval-taas-factory.cjs`; `ev-logs-free` added 2026-10-16, four for the stalls 2026-10-17): **142, 83 and 5 caught** (2026-10-16, later, every break in each list re-run on copies). The bins brief (2026-10-16, later) added 19
 engine breaks (`bins-*`: no starting logs or billed ones, a free restock, one every pull, five not
 ten, yours at the back or never yours, takes only at the recycle bin, a take that forgets yours,
 the rack taking only normal logs, $1 a press or a saw run, money not to the cent, no floor, whole
