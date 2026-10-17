@@ -52,6 +52,43 @@ suites and their break lists, `.claude/taas.md`, `.claude/tests/README.md`, `CLA
 - **Saves**: version 4, migrating a v3 factory (its stall becomes stall 1, its robots keep their
   jobs), or no bump with `load()` filling the new fields: decide by what the migration needs.
 
+## Resume here (a session told "continue with the next step in this arc file")
+
+1. Read `CLAUDE.md` (concurrent sessions push to `main`; never author a merge commit on `main`;
+   `git fetch origin main` and re-check `git rev-list --count HEAD..origin/main` immediately before
+   any push to `main`).
+2. Read this file in full: the brief, the four answers, the steps table and every step's Results.
+3. Read `.claude/taas.md`: § Tips; § Robot factory mode's assumed-not-decided table (the rows from
+   "Stalls: ..." on are this arc's); § Open questions (factory); the newest § Measured; § Negative
+   tests (factory).
+4. Run the first step in the table that is not DONE, and only that one. Then: tick it, append a
+   Results section (append, never rewrite), commit to `taas-stalls`, push the branch, stop and report.
+   **Never push to `main` before step 6.**
+
+Tools and gates:
+- `.claude/scripts/gates.sh games/taas/index.html` (add `--eval` for the evals);
+  `node .claude/scripts/check-inline-js.cjs games/taas/index.html` after every edit to the page.
+- Playwright: `NODE_PATH=/opt/node-tools/node_modules`; Chromium at `/opt/pw-browsers/chromium`.
+- Break lists on copies, after running the suite once on the unbroken page:
+  `NODE_PATH=/opt/node-tools/node_modules python3 .claude/scripts/negtest-copies.py .claude/tests/negtests/taas-factory-ui.json --page-env TAAS_PAGE --jobs 3 --freeze .claude/tests/drive-taas-factory-ui.cjs -- node .claude/tests/drive-taas-factory-ui.cjs`
+  (the page list takes about 80 minutes; never edit the page while it runs).
+- Frame cost: `.claude/scripts/frame-budget.cjs games/taas/index.html select=#mode-btn:robot-factory evalFile=.claude/scripts/poses/taas-factory-eight.js`; never measure while other Chromium jobs run.
+- Formal mode must stay at 43 (`drive-taas`) / 39 (`drive-taas-ui`) / 9 (`eval-taas`). Saves stay version 3.
+- Ship (step 6): stamp the badge with `.claude/scripts/stamp-badge.sh` and read it back from the
+  file; fast-forward `main` after the rev-list check; verify the Pages run with `mcp__github__actions_list`.
+
+The CD's standing preferences: keep replies short; plain ASCII only (straight quotes, plain hyphens,
+no curly quotes or en/em dashes); label anything inferred, assumed or sourced ("inferred:",
+"assumed:", "source: X"). A cause reported to the CD must have been traced in code or data, otherwise
+call it a hypothesis. Don't ask the CD about deleting remote branches. Ask before writing code only
+if a design question is genuinely unclear.
+
+Step 5 notes (from step 4): suite counts are rules 260, page 129, eval 32 (about a minute;
+`EVAL_SEEDS` / `EVAL_GROW_SEEDS`); break lists engine 144 (143 caught), page 108 (107), eval 9 (9),
+the misses the two known equivalent changes. CLAUDE.md's TAAS row and games/taas bullet, and
+games/CLAUDE.md's TAAS entry, still describe the Tips as three (now five) and one stall. Step 6's
+report must include the two new Tips and open questions 12-15, which the CD has not seen.
+
 ## Steps (one per session turn, then `/compact`; each ends: tick here, Results, commit to branch `taas-stalls`, push the branch)
 
 | # | Step | Status |
