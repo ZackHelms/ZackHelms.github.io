@@ -817,7 +817,7 @@ always recover my operating costs and slowly restore customer satisfaction given
 same answer asked for **up to four stalls** ($50, $100, $150), set by tapping, with one stocking
 robot each, and **robots for slots 02 to 04**; four answers on those (customers pick a stall at
 random; slot robots make no mistakes yet; robots +$20 each, $20 to $160; an "Only stock X" per
-item) are recorded with their plan, `.claude/plans/taasstalls.stalls-arc.md`, and were built after
+item) are recorded with their plan, `.claude/plans/DONE/taasstalls.stalls-arc.md`, and were built after
 this brief (§ Four stalls and eight robots, below).
 
 **What was built.**
@@ -871,7 +871,7 @@ other slots 2,3,4.**" Four answers the same day, before any code:
 | What do the six new robots cost? | **+$20 each**: $20, $40, $60, $80, $100, $120, $140, $160 |
 | How do the stall robots' instructions keep them right? | **Rules per item**: one "Only stock X" instruction for each item a stall can sell (Only stock small planks, Only stock 2x4s, ...), joining the list as each mistake is seen |
 
-Built in steps 1-4 on branch `taas-stalls` (plan arc `.claude/plans/taasstalls.stalls-arc.md`, its
+Built in steps 1-4 on branch `taas-stalls` (plan arc `.claude/plans/DONE/taasstalls.stalls-arc.md`, its
 Results per step). Each choice the CD did not make is an assumed row below, from "Stalls: ..." on.
 
 **What was built.**
@@ -1524,7 +1524,7 @@ top.
 ## History
 
 - 2026-10-17: **four stalls and eight robots** (the CD's answer to the bins brief, and four answers;
-  plan arc `.claude/plans/taasstalls.stalls-arc.md`, built in steps on branch `taas-stalls`): three
+  plan arc `.claude/plans/DONE/taasstalls.stalls-arc.md`, built in steps on branch `taas-stalls`): three
   more places on the counter bought for $50 / $100 / $150, each stall set by tapping to one of the 13
   things with a price, the unsold stock into your arms; customers pick an open stall at random and
   wait in one line along the back wall when theirs is taken; six more robots ($20 to $160, a dock of
@@ -1549,7 +1549,7 @@ top.
   to make. The eval's players stop pressing at eight planks waiting and play an hour, and the paced
   one puts the delay in first (the new optimal path). Rules 194, page 110, eval 24; break lists
   142 of 143, 82 of 83 and 5 of 5 caught (the two misses the known equivalents). The four stalls and eight robots asked in the same answer are planned in
-  `.claude/plans/taasstalls.stalls-arc.md`.
+  `.claude/plans/DONE/taasstalls.stalls-arc.md`.
 - 2026-10-16: **a delay between tasks** (the CD's answer to overproduction, and four answers):
   "Wait between tasks" on every robot's list from the start, a slider 0-60 s (5 to begin with)
   under its slot, a wait after each log handled and each thing stocked or recycled under a pause

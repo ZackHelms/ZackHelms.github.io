@@ -1,6 +1,6 @@
 # taasstalls - TAAS robot factory: four stalls, eight robots (plan arc)
 
-**Status:** IN PROGRESS (steps 1-2 done 2026-10-16: the engine's stalls and customers, its eight robots; step 3 done 2026-10-17: the page; step 4 done 2026-10-17: the eval and the break lists; step 5 done 2026-10-17: the docs and gates; branch `taas-stalls`)
+**Status:** IMPLEMENTED 2026-10-17 (one commit on `main`; steps 0-6 done; built on branch `taas-stalls`)
 **Requested:** 2026-10-16, inside the CD's answer to the bins brief (`.claude/plans/DONE/taasbins.md`,
 which ships the first half: bins you take from, logs bought 10 for $10, $0.10 a run, the floor).
 Verbatim:
@@ -104,7 +104,7 @@ report must include the two new Tips and open questions 12-15, which the CD has 
 | 3 | UI: the counter's four stalls and labels, the stall bubble, the dock of eight, the robot page's jobs, the slot robots at work; page suite rows | DONE 2026-10-17 |
 | 4 | Eval (personas with stalls and slot robots; the economy) and both break lists | DONE 2026-10-17 |
 | 5 | Docs final and gates | DONE 2026-10-17 |
-| 6 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
+| 6 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | DONE 2026-10-17 |
 
 ## Results (append, do not rewrite)
 
@@ -318,3 +318,15 @@ report must include the two new Tips and open questions 12-15, which the CD has 
 - **Gates**: `gates.sh games/taas/index.html --eval` GREEN (3 min 14 s); `check-inline-js` GREEN;
   formal 43 / 39 / 9; factory 260 / 129 / 32. The page is unchanged since step 4, so the frame cost and
   the break lists stand as measured there. No code changed in this step.
+
+### Step 6 (2026-10-17): ship
+
+- Badge stamped and read back from the file: `build 2026-10-17 23:39 UTC`. `INLINE-JS: GREEN` and
+  `GATES: GREEN` after the stamp (formal 43 / 39 / 9; factory 260 / 129 / 32, the evals as run in
+  step 5 since only the badge changed).
+- `git rev-list --count HEAD..origin/main` was 0 at the fetch before the push, so nothing of another
+  session's had to be merged and the shared files' TAAS lines are as step 5 left them.
+- The branch went to `main` as one commit (its tree is the branch's last commit), a fast-forward of
+  `origin/main`; this file moved to `.claude/plans/DONE/` in that commit. The branch `taas-stalls`
+  keeps the step-by-step history. The Pages verdict is in the CD's report.
+
