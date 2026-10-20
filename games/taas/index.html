@@ -73,6 +73,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 .mrow output { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .msnd.off .mrow:not(.mhead) { opacity: .45; }
 .mhead { font: 600 15px var(--body); }
+/* the factory's Prices (taasgoals, 2026-10-20): what a robot and a stall cost, - / + a dollar a tap */
+.mprice { margin: 0 0 2px; padding: 8px 10px 10px; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 8px; }
+#menu-prices[hidden], html:not([data-mode="robot-factory"]) #menu-prices { display: none; }
+.mstep output { font: 600 13px var(--mono); color: var(--ink); font-variant-numeric: tabular-nums; }
+.msteps { display: flex; gap: 6px; }
+.msteps button { width: 40px; height: 32px; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: none; color: var(--ink); font: 700 18px var(--body); line-height: 1; touch-action: manipulation; }
+.msteps button:disabled { opacity: .35; }
 #snd-on { min-width: 52px; height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--line); background: none; color: var(--muted); font: 600 12px var(--body); }
 #snd-on[aria-checked="true"] { background: var(--sp); border-color: var(--sp); color: var(--panel); }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
@@ -370,6 +377,11 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
     <label class="mrow"><span>Music</span><output id="vol-music-out">100%</output><input type="range" id="vol-music" data-vol="music" min="0" max="100" step="5" value="100"></label>
     <label class="mrow"><span>Ambient sounds</span><output id="vol-amb-out">100%</output><input type="range" id="vol-amb" data-vol="amb" min="0" max="100" step="5" value="100"></label>
     <label class="mrow"><span>Sound effects</span><output id="vol-sfx-out">100%</output><input type="range" id="vol-sfx" data-vol="sfx" min="0" max="100" step="5" value="100"></label>
+  </div>
+  <div class="mprice" id="menu-prices" role="group" aria-labelledby="price-lbl" hidden>
+    <div class="mrow mhead"><span id="price-lbl">Prices</span></div>
+    <div class="mrow mstep"><span>Robot <output id="price-robot">$1</output></span><span class="msteps"><button type="button" data-price="robot" data-by="-1" aria-label="Robot price down">-</button><button type="button" data-price="robot" data-by="1" aria-label="Robot price up">+</button></span></div>
+    <div class="mrow mstep"><span>Stall <output id="price-stall">$1</output></span><span class="msteps"><button type="button" data-price="stall" data-by="-1" aria-label="Stall price down">-</button><button type="button" data-price="stall" data-by="1" aria-label="Stall price up">+</button></span></div>
   </div>
   <a class="mi" id="menu-exit" href="../index.html">Exit game <small>to the games list</small></a>
 </div>
@@ -2597,9 +2609,11 @@ const MODE = (function () {
   function on(m, h) { hooks[m] = h; if (cur === m && h.enter) h.enter(); }
   // the menu's Info: each mode says how it works in its own way
   function info() { if (hooks[cur] && hooks[cur].info) hooks[cur].info(); }
+  // the menu has just opened: a mode with settings of its own fills them in (the factory's Prices)
+  function menu() { if (hooks[cur] && hooks[cur].menu) hooks[cur].menu(); }
   sel.addEventListener('change', () => { SND.init(); set(sel.value); sel.blur(); });
   set(pick());
-  return { set, on, info, get current() { return cur; }, NAMES };
+  return { set, on, info, menu, get current() { return cur; }, NAMES };
 })();
 
 /* The menu (the CD, 2026-10-14), in place of the hub's back button and the mute button: Info
@@ -2617,6 +2631,8 @@ const MODE = (function () {
     const v = SND.vol;
     menu.querySelectorAll('input[data-vol]').forEach(inp => { inp.value = Math.round(v[inp.dataset.vol] * 100); out(inp).textContent = inp.value + '%'; });
     document.getElementById('menu-info-sub').textContent = SUB[MODE.current] || '';
+    document.getElementById('menu-prices').hidden = MODE.current !== 'robot-factory';
+    MODE.menu();
   }
   function open() { SND.init(); sync(); menu.hidden = false; scrim.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
   function close() { menu.hidden = true; scrim.hidden = true; btn.setAttribute('aria-expanded', 'false'); }
@@ -3326,7 +3342,8 @@ const MODE = (function () {
       box(R[0], R[1], 0.54, R[2], R[1] + 0.08, 0.64, COL.recycleRim, COL.recycleRimTop), box(R[0], R[3] - 0.08, 0.54, R[2], R[3], 0.64, COL.recycleRim, COL.recycleRimTop),
       box(R[0], R[1] + 0.08, 0.54, R[0] + 0.08, R[3] - 0.08, 0.64, COL.recycleRim, COL.recycleRimTop), box(R[2] - 0.08, R[1] + 0.08, 0.54, R[2], R[3] - 0.08, 0.64, COL.recycleRim, COL.recycleRimTop)
     ], { decal: decalRecycle });
-    // slots 02 and 03: an input bin, the in-feed, the machine, its console, the out-feed, an output bin
+    // the table saw (slot 04) and the sap extractor (slot 02): an input bin, the in-feed, the machine,
+    // its console, the out-feed, an output bin
     [['saw', ROWY.saw], ['extract', ROWY.extract]].forEach(([k, y]) => {
       const ib = inBin(SO[k + 'In']), ob = outBin(SO[k + 'Out']);
       add(k + 'InBack', SO[k + 'In'][1], ib.back);
@@ -3360,7 +3377,7 @@ const MODE = (function () {
       box(2.47, ey - 0.03, 1.25, 2.84, ey + 0.03, 1.3, COL.tool), box(2.79, ey - 0.03, 1.1, 2.85, ey + 0.03, 1.3, COL.tool),
       box(eq[0] + 0.15, eq[3] - 0.05, 0.5, 2.55, eq[3] - 0.03, 0.66, COL.yellow)
     ], { decal: (g, ox, oy, S) => frontText(g, ox, oy, S, (eq[0] + 0.15 + 2.55) / 2, eq[3] - 0.03, 0.58, 'SAP EXTRACTOR', 0.062, INK, 800), shake: 'extract' });
-    // slot 04: a hand crafting bench between an input bin and an output bin, and no machine (the CD)
+    // slot 03: a hand crafting bench between an input bin and an output bin, and no machine (the CD)
     const hi = inBin(SO.benchIn), ho = outBin(SO.benchOut), hq = SO.bench;
     add('benchInBack', SO.benchIn[1], hi.back);
     add('benchInFront', SO.benchIn[3] + 0.01, hi.front);
@@ -3461,13 +3478,15 @@ const MODE = (function () {
       const ox = VW.ox - x0, oy = -y0;
       ps.forEach(p => drawPrim(g, p, I3, ox, oy, VW.S, outlinePx()));
       if (ob.decal) ob.decal(g, ox, oy, VW.S);
-      return { id: ob.id, key: ob.key, c, x: x0, y: y0, w: x1 - x0, h: y1 - y0, crate: ob.crate, stall: ob.stall, shake: ob.shake };
+      return { id: ob.id, key: ob.key, c, x: x0, y: y0, w: x1 - x0, h: y1 - y0, crate: ob.crate, stall: ob.stall, shake: ob.shake, slot: F.slotOf(ob.id) };
     });
     return sprites;
   }
   const outlinePx = () => clamp(VW.S * 0.05, 2, 4.4);
-  // a robot's crate is gone once it is hired, and a stall's tray and label are there once it is bought
-  const onFloor = q => !(q.crate !== undefined && s.hired > q.crate) && !(q.stall !== undefined && !s.stalls[q.stall].bought);
+  // a robot's crate is gone once it is hired, a stall's tray and label are there once it is bought,
+  // and a slot's machine and bins once the goal that unlocks it is met (2026-10-20: until then the bay
+  // is empty floor with its number painted, and nothing in it answers a tap)
+  const onFloor = q => !(q.crate !== undefined && s.hired > q.crate) && !(q.stall !== undefined && !s.stalls[q.stall].bought) && !(q.slot && !F.unlocked(s, q.slot));
   function spriteRect(id) { const sp = (sprites || []).find(q => q.id === id); return sp && onFloor(sp) ? { x: sp.x, y: sp.y - VW.camY, w: sp.w, h: sp.h } : null; }
 
   /* ---------- live models: every thing in the factory, by kind and size ---------- */
@@ -3996,6 +4015,7 @@ const MODE = (function () {
 
   /* ---------- particles and floating numbers ---------- */
   const FX = [], FLOAT = [], FLY = [];
+  const ARRIVE = {};   // a slot's machine fading in, by its job: seconds since its goal was met
   function puff(x, y, z, kind, n) {
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, sp = kind === 'smoke' ? 0.15 : kind === 'spark' ? 1.2 : 0.7;
@@ -4012,7 +4032,8 @@ const MODE = (function () {
       if (p.kind !== 'smoke') p.vz -= 4 * dt;
       if (p.z < 0) { p.z = 0; p.vz = 0; p.vx *= 0.5; }
     }
-    for (let i = FLOAT.length - 1; i >= 0; i--) { FLOAT[i].age += dt; if (FLOAT[i].age > 1.3) FLOAT.splice(i, 1); }
+    for (let i = FLOAT.length - 1; i >= 0; i--) { FLOAT[i].age += dt; if (FLOAT[i].age > (FLOAT[i].life || 1.3)) FLOAT.splice(i, 1); }
+    Object.keys(ARRIVE).forEach(k => { ARRIVE[k] += dt; if (ARRIVE[k] >= ARRIVE_SEC) delete ARRIVE[k]; });
     for (let i = FLY.length - 1; i >= 0; i--) { FLY[i].age += dt; if (FLY[i].age > FLY[i].dur) FLY.splice(i, 1); }
   }
   function drawFx() {
@@ -4035,10 +4056,17 @@ const MODE = (function () {
   }
   function drawFloats() {
     FLOAT.forEach(f => {
-      const u = f.age / 1.3, x = PX(f.x), y = PY(f.y, f.z) - 34 * u;
+      const u = f.age / (f.life || 1.3), y = PY(f.y, f.z) - 34 * u;
+      let x = PX(f.x), size = Math.round(clamp(VW.S * 0.32, 15, 26));
       ctx.save();
       ctx.globalAlpha = 1 - Math.max(0, u - 0.6) / 0.4;
-      ctx.font = '800 ' + Math.round(clamp(VW.S * 0.32, 15, 26)) + 'px "Bricolage Grotesque", system-ui, sans-serif';
+      ctx.font = '800 ' + size + 'px "Bricolage Grotesque", system-ui, sans-serif';
+      if (f.fit) {   // a long line (a machine arriving): shrunk to the screen's width and kept on it
+        const w = ctx.measureText(f.text).width, room = VW.w - 24;
+        if (w > room) { size = Math.max(10, size * room / w); ctx.font = '800 ' + size.toFixed(1) + 'px "Bricolage Grotesque", system-ui, sans-serif'; }
+        const half = Math.min(room, ctx.measureText(f.text).width) / 2;
+        x = clamp(x, 12 + half, VW.w - 12 - half);
+      }
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.strokeText(f.text, x, y);
       ctx.fillStyle = f.color; ctx.fillText(f.text, x, y);
@@ -4061,7 +4089,7 @@ const MODE = (function () {
   let floorC = null, floorKey = '';
   function drawFloor() {
     ctx.fillStyle = COL.back; ctx.fillRect(0, 0, VW.w, VW.h);
-    const key = VW.S.toFixed(3) + '|' + VW.dpr + '|' + VW.ox + '|' + Math.min(s.hired, L.CRATES.length);
+    const key = VW.S.toFixed(3) + '|' + VW.dpr + '|' + VW.ox + '|' + Math.min(s.hired, L.CRATES.length) + '|' + s.goal;   // (the goal: which bays have their machines' shadows)
     if (!floorC || floorKey !== key) {
       floorKey = key;
       const top = Math.floor(PY(0, 0) + VW.camY) - 2, bot = Math.ceil(PY(L.H, 0) + VW.camY + 0.3 * CE * VW.S) + 2;
@@ -4119,7 +4147,7 @@ const MODE = (function () {
     });
     // soft contact shadows under everything that stands
     ctx.fillStyle = 'rgba(30,40,55,0.16)';
-    Object.keys(SO).forEach(k => { if (k === 'wall' || k === 'counter') return; const q = SO[k]; ctx.fillRect(PX(q[0]) + 3, PY(q[1], 0) - 2, (q[2] - q[0]) * S + 4, (q[3] - q[1]) * SE * S + 4); });
+    Object.keys(SO).forEach(k => { if (k === 'wall' || k === 'counter' || !F.placeOpen(s, k)) return; const q = SO[k]; ctx.fillRect(PX(q[0]) + 3, PY(q[1], 0) - 2, (q[2] - q[0]) * S + 4, (q[3] - q[1]) * SE * S + 4); });
     ctx.fillRect(PX(0), PY(SO.counter[1], 0) - 2, L.W * S, (SO.counter[3] - SO.counter[1]) * SE * S + 5);
     L.CRATES.forEach((q, i) => { if (s.hired <= i) ctx.fillRect(PX(q[0]) + 3, PY(q[1], 0) - 2, (q[2] - q[0]) * S + 4, (q[3] - q[1]) * SE * S + 4); });
   }
@@ -4229,8 +4257,19 @@ const MODE = (function () {
   // and anyone walking by the wall passes in front. The stall's label is drawn on the counter.
   const FONT = (function () { const cs = getComputedStyle(document.documentElement); return { display: cs.getPropertyValue('--display').trim() || 'sans-serif', mono: cs.getPropertyValue('--mono').trim() || 'monospace' }; })();
   const SAT_COL = v => v >= 85 ? '#4fd07a' : v >= 60 ? '#f2b632' : '#ff6b6b';
-  const WANT = () => C.stalls.start;
-  const goalText = () => 'Sell medium planks for $' + F.priceOf(WANT());
+  // the goal now, in the CD's words (2026-10-20): the board's yellow tag says "GOAL", so this is the
+  // rest of "Goal: Sell 50 medium planks". A goal of things counts down as they sell ("Sell 1 medium
+  // plank" at one); goal 2 says "for 10 minutes" at rest and the time left (m:ss) while it counts
+  const ONE = { plank: 'plank', b2x4: '2x4', b2x2: '2x2', dowels: 'dowel rod' };
+  const sellN = (id, n) => n + ' ' + (F.kindOf(id) === 'sap' ? 'sap' : SIZE_NAME[F.sizeOf(id)] + ' ' + (n === 1 ? ONE : PLURAL)[F.kindOf(id)]);
+  const mss = t => { const k = Math.max(0, Math.ceil(t - 1e-6)); return Math.floor(k / 60) + ':' + String(k % 60).padStart(2, '0'); };
+  function goalText() {
+    const g = F.goalNow(s);
+    if (g.done) return 'All goals met';
+    const q = g.goal;
+    if (q.item) return 'Sell ' + sellN(q.item, g.left);
+    return '>$' + q.money + ' & >' + q.sat + '% customer satisfaction for ' + (g.counting ? mss(g.t) : q.sec / 60 + ' minutes');
+  }
   function boardRect(k, i) {
     if (k === 'goal') { const x0 = PX(BOARD.goal[0]), y0 = PY(BOARD.y, BOARD.g1); return { x: x0, y: y0, w: PX(BOARD.goal[1]) - x0, h: PY(BOARD.y, BOARD.g0) - y0 }; }
     if (k === 'plate') { const P = PLATES[i || 0], x0 = PX(P.x0), y0 = PY(P.y, P.z1); return { x: x0, y: y0, w: PX(P.x1) - x0, h: PY(P.y, P.z0) - y0 }; }
@@ -4255,8 +4294,9 @@ const MODE = (function () {
     const tw = ctx.measureText(tag).width + 0.16 * S;
     ctx.fillStyle = COL.yellow; roundRect(r.x + pad, gy - tagSize * 0.75, tw, tagSize * 1.5, tagSize * 0.35);
     ctx.fillStyle = INK; ctx.textAlign = 'left'; ctx.fillText(tag, r.x + pad + 0.08 * S, gy + 0.5);
-    fitText(goalText(), '700 #px ' + FONT.display, 0.27 * S, r.w - 3 * pad - tw);
-    ctx.fillStyle = '#f5f7f9'; ctx.fillText(goalText(), r.x + 2 * pad + tw, gy + 0.5);
+    const gt = goalText();   // shrunk to fit, never cut short (the plan: no words dropped)
+    fitText(gt, '700 #px ' + FONT.display, 0.27 * S, r.w - 3 * pad - tw);
+    ctx.fillStyle = '#f5f7f9'; ctx.fillText(gt, r.x + 2 * pad + tw, gy + 0.5);
     // money: one big number; it swells green as money comes in, and goes red below zero
     r = boardRect('cash');
     const u = clamp(bumpT / 0.35, 0, 1), money = cash(s.money);
@@ -4344,6 +4384,8 @@ const MODE = (function () {
     ctx.setTransform(VW.dpr, 0, 0, VW.dpr, 0, 0);
     drawFloor();
     const m = s.machine, run = m.phase === 'run', sw = s.saw, ex = s.extract, yc = ROWY.planer;
+    // which of slots 02-04 have their machines (2026-10-20): a locked slot draws nothing live either
+    const open = { saw: F.unlocked(s, 'saw'), extract: F.unlocked(s, 'extract'), bench: F.unlocked(s, 'carve') };
     if (run || m.staged < 1 || s.belt.length) BO.planer += dt * (run ? 0.9 / C.processSec : 1.0);
     if (sw.phase === 'run' || sw.belt.length) BO.saw += dt;
     if (ex.phase === 'run' || ex.belt.length) BO.extract += dt;
@@ -4352,14 +4394,18 @@ const MODE = (function () {
     D.push({ key: 0.5005, f: drawBoards });
     s.stalls.forEach((st, i) => D.push({ key: SO.counter[3] + 0.0515, f: () => st.bought ? drawPlate(i) : drawPlace(i) }));
     D.push({ key: yc + 0.305, f: () => { beltTop(SO.inBelt[0], SO.inBelt[2], yc, BO.planer); beltTop(SO.outBelt[0], SO.outBelt[2], yc, BO.planer); } });
-    [['saw', ROWY.saw], ['extract', ROWY.extract]].forEach(([k, y]) => D.push({ key: y + 0.305, f: () => { beltTop(SO[k + 'InBelt'][0], SO[k + 'InBelt'][2], y, BO[k]); beltTop(SO[k + 'OutBelt'][0], SO[k + 'OutBelt'][2], y, BO[k]); } }));
+    [['saw', ROWY.saw], ['extract', ROWY.extract]].forEach(([k, y]) => { if (open[k]) D.push({ key: y + 0.305, f: () => { beltTop(SO[k + 'InBelt'][0], SO[k + 'InBelt'][2], y, BO[k]); beltTop(SO[k + 'OutBelt'][0], SO[k + 'OutBelt'][2], y, BO[k]); } }); });
     D.push({ key: SO.machine[3] + 0.035, f: planerWindow });
     D.push({ key: SO.machine[3] + 0.036, f: drawBeacon });
     D.push({ key: SO.console[3] + 0.005, f: () => drawButton(SO.console, F.ready(s), run, m.phase === 'jam') });
-    D.push({ key: SO.sawConsole[3] + 0.005, f: () => drawButton(SO.sawConsole, F.canMill(s, 'saw'), sw.phase === 'run') });
-    D.push({ key: SO.extractConsole[3] + 0.005, f: () => drawButton(SO.extractConsole, F.canMill(s, 'extract'), ex.phase === 'run') });
-    D.push({ key: SO.saw[3] + 0.025, f: sawBlade });
-    D.push({ key: SO.extract[3] + 0.025, f: tankLevel });
+    if (open.saw) {
+      D.push({ key: SO.sawConsole[3] + 0.005, f: () => drawButton(SO.sawConsole, F.canMill(s, 'saw'), sw.phase === 'run') });
+      D.push({ key: SO.saw[3] + 0.025, f: sawBlade });
+    }
+    if (open.extract) {
+      D.push({ key: SO.extractConsole[3] + 0.005, f: () => drawButton(SO.extractConsole, F.canMill(s, 'extract'), ex.phase === 'run') });
+      D.push({ key: SO.extract[3] + 0.025, f: tankLevel });
+    }
     // things: on the belts, in the machines, in every bin, on the counter
     const items = [];   // [kind, x, y, z, key, turn, scale]
     const beltKey = y => y + 0.31 + items.length * 0.00001;
@@ -4378,18 +4424,20 @@ const MODE = (function () {
       else { const d = clamp((it.t - C.outSec) / C.dropSec, 0, 1), sl = binSlot(q, Math.min(17, store(q).length)); items.push([it.item, x1 + (sl.x - x1) * d, y + (sl.y - y) * d, LIFT(it.item) + (sl.z - LIFT(it.item)) * d * d, q[1] + 0.02]); }
     });
     ride(s.belt, SO.bin, SO.machine[2] + 0.45, SO.bin[0] + 0.1, yc);
-    ride(sw.belt, SO.sawOut, SO.sawOutBelt[0] + 0.05, SO.sawOut[0] + 0.1, ROWY.saw);
-    ride(ex.belt, SO.extractOut, SO.extractOutBelt[0] + 0.05, SO.extractOut[0] + 0.1, ROWY.extract);
-    if (sw.phase === 'run') { const p = clamp(sw.t / C.sawSec, 0, 1); items.push([sw.item, 1.5 + 1.25 * p, ROWY.saw, 0.77, SO.saw[3] + 0.03]); }
-    if (ex.phase === 'run') { const p = clamp(ex.t / C.extractSec, 0, 1); items.push([ex.item, 1.3 + 1.0 * Math.min(1, p * 2.2), ROWY.extract, LIFT(ex.item), beltKey(ROWY.extract)]); }
+    if (open.saw) ride(sw.belt, SO.sawOut, SO.sawOutBelt[0] + 0.05, SO.sawOut[0] + 0.1, ROWY.saw);
+    if (open.extract) ride(ex.belt, SO.extractOut, SO.extractOutBelt[0] + 0.05, SO.extractOut[0] + 0.1, ROWY.extract);
+    if (open.saw && sw.phase === 'run') { const p = clamp(sw.t / C.sawSec, 0, 1); items.push([sw.item, 1.5 + 1.25 * p, ROWY.saw, 0.77, SO.saw[3] + 0.03]); }
+    if (open.extract && ex.phase === 'run') { const p = clamp(ex.t / C.extractSec, 0, 1); items.push([ex.item, 1.3 + 1.0 * Math.min(1, p * 2.2), ROWY.extract, LIFT(ex.item), beltKey(ROWY.extract)]); }
     const heap = (list, q, max) => list.slice(-(max || 18)).forEach((k, i) => { const sl = binSlot(q, i); items.push([k, sl.x, sl.y, sl.z + (isLog(k) ? LOG_R[F.sizeOf(k)] : 0), q[1] + 0.02 + i * 0.0001, sl.turn]); });
-    heap(s.bin, SO.bin); heap(sw.in, SO.sawIn); heap(sw.out, SO.sawOut); heap(ex.in, SO.extractIn); heap(ex.out, SO.extractOut);
-    heap(s.bench.in, SO.benchIn); heap(s.bench.out, SO.benchOut);
+    heap(s.bin, SO.bin);
+    if (open.saw) { heap(sw.in, SO.sawIn); heap(sw.out, SO.sawOut); }
+    if (open.extract) { heap(ex.in, SO.extractIn); heap(ex.out, SO.extractOut); }
+    if (open.bench) { heap(s.bench.in, SO.benchIn); heap(s.bench.out, SO.benchOut); }
     // the planer's input bin: up to six of its logs stacked on the rack, three, two and one, the next
     // to roll in on top
     const shown = s.rack.slice(0, RACK_AT.length).reverse();
     shown.forEach((k, i) => { const p = RACK_AT[i]; items.push([k, p[0], yc - 0.03, p[1] + LOG_R[F.sizeOf(k)], SO.rack[3] + 0.001 + i * 0.0001, Math.PI / 2]); });
-    if (s.bench.item) { const u = clamp(s.bench.t / C.carveSec, 0, 1); items.push([s.bench.item, 2.85, ROWY.bench - 0.05, 0.88 + (isLog(s.bench.item) ? LOG_R[F.sizeOf(s.bench.item)] : 0), SO.bench[3] + 0.03, 0, 1 - 0.25 * u]); }
+    if (open.bench && s.bench.item) { const u = clamp(s.bench.t / C.carveSec, 0, 1); items.push([s.bench.item, 2.85, ROWY.bench - 0.05, 0.88 + (isLog(s.bench.item) ? LOG_R[F.sizeOf(s.bench.item)] : 0), SO.bench[3] + 0.03, 0, 1 - 0.25 * u]); }
     s.stalls.forEach((st, k) => { const q = L.STALLS[k]; st.stock.forEach((g, i) => items.push([g.item, (q.x0 + q.x1) / 2, q.y0 + 0.12 + (i % 2) * 0.2, q.z + 0.03 + Math.floor(i / 2) * 0.065, SO.counter[3] + 0.07 + i * 0.0001, 0, 0.92])); });
     // the last few things in the recycle bin poke out of its mouth (not the ones still in the air)
     const flying = FLY.filter(f => f.recycle).length, lay = s.recycle.slice(0, Math.max(0, s.recycle.length - flying)).slice(-4);
@@ -4405,19 +4453,24 @@ const MODE = (function () {
     drawFx();
     drawFloats();
   }
+  const ARRIVE_SEC = 0.6;
   function blit(q) {
     let dx = 0;
+    const fade = q.slot && ARRIVE[q.slot] !== undefined ? clamp(ARRIVE[q.slot] / ARRIVE_SEC, 0, 1) : 1;   // a machine arriving
     if (q.shake === 'planer' && s.machine.phase === 'jam') dx = Math.sin(clock * 40) * 1.5;
     else if (q.shake === 'planer' && s.machine.phase === 'run') dx = Math.sin(clock * 55) * 0.5;
     else if (q.shake === 'extract' && s.extract.phase === 'run') dx = Math.sin(clock * 47) * 0.5;
     const y = q.y - VW.camY;
     if (y > VW.h || y + q.h < 0) return;                       // off screen
     const k = VW.dpr;                                           // land on whole device pixels: no resampling
+    if (fade < 1) ctx.globalAlpha = fade;
     ctx.drawImage(q.c, Math.round((q.x + dx) * k) / k, Math.round(y * k) / k, q.c.width / k, q.c.height / k);
+    if (fade < 1) ctx.globalAlpha = 1;
   }
 
   /* ---------- events from the engine: sound, numbers, sparks ---------- */
   const whirs = {};
+  const ARRIVED = { extract: 'the sap extractor', carve: 'the hand crafting bench', saw: 'the table saw' };
   const AT = { planer: () => [(SO.machine[0] + SO.machine[2]) / 2, ROWY.planer - 0.3, 1.5], saw: () => [2.45, ROWY.saw, 1.2], extract: () => [2.2, ROWY.extract, 1.6] };
   function drain() {
     const evs = s.events;
@@ -4470,6 +4523,18 @@ const MODE = (function () {
         }
         case 'rule': { const r = s.robots[e.by]; if (r) FLOAT.push({ x: r.x, y: r.y, z: 1.75, text: 'new instruction', color: '#7ff0ff', age: 0 }); SND.sfx('up'); break; }
         case 'slot': SND.sfx('level'); break;
+        case 'goal': {
+          // a goal met (2026-10-20): its machine arrives in its slot, with sparks, the level sound and a
+          // float naming it ("slot 02: the sap extractor")
+          const job = e.unlocks, q = SO[job === 'carve' ? 'bench' : job];
+          if (!q) break;
+          const cy = (q[1] + q[3]) / 2;
+          SND.sfx('level');
+          for (let i = 0; i < 5; i++) puff(q[0] + (q[2] - q[0]) * i / 4, cy, 0.9, 'spark', 8);
+          ARRIVE[job] = 0;
+          FLOAT.push({ x: (q[0] + q[2]) / 2, y: cy, z: 1.8, text: 'slot 0' + (F.SLOT_JOBS.indexOf(job) + 2) + ': ' + ARRIVED[job], color: '#7ff0ff', age: 0, life: 3, fit: true });
+          break;
+        }
         case 'instructed': SND.sfx('beep'); break;
         case 'notes': SND.sfx('pop'); openRobot(e.id); break;
         case 'outcome': SND.sfx(e.grade === 'good' ? 'good' : e.grade === 'soso' ? 'meh' : 'bad'); break;
@@ -4669,7 +4734,7 @@ const MODE = (function () {
   });
 
   /* ---------- HUD and the opt-in panel ---------- */
-  let shownMoney = null, shownSat = -1, bumpT = 0;
+  let shownMoney = null, shownSat = -1, shownGoal = '', bumpT = 0;
   // money is kept to the cent since a machine run costs $0.10 (the CD, 2026-10-16): the board shows
   // the cents; a price or a cost shows them only when it has some
   const cash = n => (n < 0 ? '-$' : '$') + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -4677,11 +4742,11 @@ const MODE = (function () {
   // the boards draw from the state every frame; this keeps the bump timer and the screen-reader line
   function renderHud(dt) {
     bumpT = Math.max(0, bumpT - (dt || 0));
-    const v = Math.round(s.satisfaction);
-    if (s.money === shownMoney && v === shownSat) return;
+    const v = Math.round(s.satisfaction), gt = goalText();
+    if (s.money === shownMoney && v === shownSat && gt === shownGoal) return;
     if (shownMoney !== null && s.money > shownMoney) bumpT = 0.35;
-    shownMoney = s.money; shownSat = v;
-    scoreEl.textContent = 'Money ' + cash(s.money) + '. Customer satisfaction ' + v + '%. Goal: ' + goalText() + '.';
+    shownMoney = s.money; shownSat = v; shownGoal = gt;
+    scoreEl.textContent = 'Money ' + cash(s.money) + '. Customer satisfaction ' + v + '%. Goal: ' + gt + '.';
   }
   const esc = v => String(v).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
   const JOB_NAME = j => {
@@ -4875,7 +4940,7 @@ const MODE = (function () {
     if (act === 'close') { closePanel(); return; }
     if (act === 'restart') {
       if (!confirmReset) { confirmReset = true; renderPanel(); return; }
-      confirmReset = false; s = F.newGame((Date.now() >>> 0) || 1); bubbleSig = ''; FX.length = FLOAT.length = FLY.length = 0;
+      confirmReset = false; s = F.newGame((Date.now() >>> 0) || 1, s.flat); bubbleSig = '';   // (the prices are a setting: they stay) FX.length = FLOAT.length = FLY.length = 0;
       shownMoney = null; shownSat = -1; save(); closePanel(); VW.camY = VW.minY;
       return;
     }
@@ -5041,7 +5106,26 @@ const MODE = (function () {
     set paused(v) { paused = !!v; }, get paused() { return paused; }
   };
 
-  MODE.on('robot-factory', { enter, leave, info: showInfo });
+  /* ---------- the menu's Prices (the CD, 2026-10-20: "Add settings menu options to adjust this flat
+     cost for robots and an option for sales stall cost"): - / + a dollar a tap, on this factory ---------- */
+  const priceBox = document.getElementById('menu-prices');
+  function renderPrices() {
+    if (!s) return;
+    ['robot', 'stall'].forEach(k => {
+      document.getElementById('price-' + k).textContent = usd(s.flat[k]);
+      priceBox.querySelectorAll('[data-price="' + k + '"]').forEach(b => { b.disabled = +b.dataset.by < 0 ? s.flat[k] <= C.flat.min : s.flat[k] >= C.flat.max; });
+    });
+  }
+  priceBox.addEventListener('click', e => {
+    const b = e.target.closest('[data-price]');
+    if (!b || !s || MODE.current !== 'robot-factory') return;
+    SND.init();
+    const k = b.dataset.price;
+    if (F.setFlat(s, k, s.flat[k] + +b.dataset.by)) { SND.sfx('tick'); save(); bubbleSig = null; }
+    renderPrices();
+  });
+
+  MODE.on('robot-factory', { enter, leave, info: showInfo, menu: renderPrices });
 })();
 </script>
 </body>

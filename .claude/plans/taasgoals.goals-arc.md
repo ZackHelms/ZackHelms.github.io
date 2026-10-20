@@ -247,7 +247,7 @@ question is genuinely unclear.
 | 0 | The CD's brief and four answers recorded (this file) | DONE 2026-10-20 |
 | 1 | Engine: goals and unlocks, the slots' new order, flat prices, saves; rules rows | DONE 2026-10-20 |
 | 2 | Engine: bins and stalls take anything, the stall's menu, closing, wrong-input jams; rules rows | DONE 2026-10-20 |
-| 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | open |
+| 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | DONE 2026-10-20 |
 | 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | open |
 | 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | open |
 | 6 | Docs final and gates | open |
@@ -651,6 +651,82 @@ whether the goals feel right in pace.
     includes the output bins): its personas need the new paths (take from a bin's bubble, Re-stock) and
     their claims restating; the suites' jam shortcut (`dirt = 0.001` with a `clean` act) now also puts
     the jammed log in the recycle bin.
+- **Step 3 results (2026-10-20, UI: empty bays, the slots' new order, the goal board and its countdowns, a
+  machine arriving, Prices in the menu).**
+  - **Built** (`games/taas/index.html`, factory UI and the shared menu): `bake()` tags every sprite with
+    `slot: F.slotOf(id)` and `onFloor()` hides a sprite whose slot is not `F.unlocked()`, so a locked slot's
+    machine, belts, console and bins are neither drawn nor in `spriteRect()` / `TAPS` / `hitTest()` (a tap in
+    an empty bay is a tap on the floor). `draw()` keeps everything live out of a locked slot too (belt tops,
+    the saw's and the extractor's buttons, the blade, the tank, the rides, the bins' heaps, the piece on the
+    bench). The baked floor leaves a locked slot's contact shadows off (`F.placeOpen()`), and its key gains
+    `s.goal`. Every hard-coded slot y in the UI already read `ROWY` (grepped `12.`, `13.`, `7.3`, `10.1`: none
+    left outside the layout); two stale comments fixed (the saw and extractor are slots 04 and 02, the bench 03).
+    **The board** (`goalText()` from `F.goalNow(s)`): "Sell 50 medium planks", counting down ("Sell 1 medium
+    plank" at one, singular nouns from `ONE`); ">$50 & >90% customer satisfaction for 10 minutes" at rest and
+    "... for 9:41" (m:ss, `mss()`, seconds rounded up) while it counts; "Sell 25 sap" counting down; "All goals
+    met". `drawBoards()` fits it with `fitText` (shrunk, never cut). The screen-reader line (`renderHud()`, now
+    also redrawn when the goal text changes) and Info's goal sentence read the same text. **The `goal`
+    event**: the level sound, five spark puffs along the machine, the slot's sprites fading in over 0.6 s
+    (`ARRIVE`, alpha in `blit()`), and a cyan float "slot 02: the sap extractor" / "slot 03: the hand crafting
+    bench" / "slot 04: the table saw" that lasts 3 s and is shrunk and clamped to stay on screen (`FLOAT`
+    entries gain optional `life` and `fit`). **Prices**: a `#menu-prices` group between the sound block and
+    Exit game, "Prices", then "Robot $1" and "Stall $1" with - / + buttons (`data-price`, `data-by`), plain
+    buttons and outputs (no `.mi`, no range input). It is hidden in formal by the `hidden` attribute, which
+    `sync()` sets from the mode, and by a CSS rule keyed on `html[data-mode]`. `MODE` gained a `menu()` hook
+    the menu calls when it opens. The factory registers `renderPrices`, which disables a button at
+    `C.flat.min` / `C.flat.max`, and a tap calls `F.setFlat` on the live factory and saves at once. Start over
+    is `F.newGame(seed, s.flat)`. **Pose**: `taas-factory-eight.js` sets `s.goal = CFG.goals.length` and still
+    stages its eight-robot scene (read back: goal 3, jobs operate, stock:0-3, saw, extract, carve; four stalls;
+    six customers; screenshot checked).
+  - **Page suite** `drive-taas-factory-ui.cjs`: **129 -> 145** (16 added in a new section 22, none removed).
+    Section 22: a new factory's floor (one stall for medium planks, slot 01 only, nothing of 02-04 drawn top or
+    bottom); real taps on five empty-bay spots are floor taps that open nothing; goal 1 counting down
+    50 / 47 / 1 with the singular, read off the wall's pixels and the score line; the 50th sale by the engine
+    brings the extractor (sprites, the level sound, the float's cyan pixels there and gone 4 s later, a tap
+    reaching it); goal 2's resting text; its countdown "9:41" / "9:40" and back to "10 minutes" at 89%; the long
+    line inside the board at 390 wide; goal 3 counting to "Sell 1 sap", the bench in 03 while 04 is empty, the
+    saw at 25, "All goals met" on the wall and in Info; the slots' order on screen; Start over from a factory
+    with every goal met leaves bare floor where the extractor and its bin stood (the floor key); real taps
+    on the bench, the saw and their bins at 390x844, 320x640 and 844x390, reaching them once open and the floor
+    before; Prices in the factory's menu (and the menu's `.mi` still "Info,Exit game", three ranges); the
+    steppers ($4 / $0, the dark -, the dock price, the save); the $200 cap; a reload keeping them and Start over
+    keeping them with a new factory; no Prices in formal.
+  - **Restated page rows** (same claim, the new rule): section 5 "at six sizes ... a tap on each drawn thing
+    reaches that thing" and its overlap row "where two things overlap ... the one standing in front" (now on
+    an open factory, `fresh(4, true)`, since a new factory has no slots 02-04 to tap); section 7 "it starts
+    from the goal and explains customer satisfaction" (`/The goal: Sell 50 medium planks\./` in place of
+    "Sell medium planks for $4"); section 13 "the rear wall says the goal" ("Goal: Sell 50 medium planks.").
+  - **Gates**: `gates.sh games/taas/index.html` GREEN (factory rules 358, page 145; formal 43 / 39; evals not
+    run). `check-inline-js` GREEN after every edit.
+  - **Frame cost** (eight pose, nothing else running): median 16.7 ms, p95 16.7, max 16.8, **0 of 149 over**.
+  - **Negative tests** (copies, a scratch list of 15; the repo's break lists are step 5's): all 15 caught by
+    named rows: locked sprites drawn, `spriteRect()` ignoring `onFloor`, no countdown in goal 1/3, no
+    singular, no m:ss, the score line not following the goal, the `goal` event's float gone, its level sound
+    gone, the board without `fitText`, Start over dropping the prices, Prices shown in formal, the steppers
+    never disabled, no save on a step, prices not rendered when the menu opens, and the floor key without
+    `s.goal`. That last one was first **missed**. The row written for it compared a re-bake and could not see
+    the break. Traced (a reload after `localStorage.clear()` loaded goal 3): `fresh()` clears storage, then the
+    old page's `pagehide` save writes it again, so each new page first bakes the previous row's factory. The
+    break's real symptom is grey machine shadows left in an empty bay after the goal drops. The row now checks
+    that through Start over from a finished factory and is caught. The other 14 ran on the suite before that
+    row changed; the page has not moved since.
+  - assumed: the CD's "Goal:" prefix is the board's existing yellow GOAL tag, so the white text is the rest of
+    the CD's sentence ("Sell 50 medium planks"); the screen reader says "Goal: Sell 50 medium planks." in words.
+  - assumed: the countdown shows whole seconds rounded up (9:41.2 left reads "9:42"), and "for 10 minutes"
+    whenever it is not counting (the full 600 s).
+  - assumed: a machine arriving fades in over 0.6 s with sparks along its row, and its float stays 3 s (the
+    others 1.3 s), cyan like "new instruction".
+  - assumed: Prices sits between the sound block and Exit game, has no slider and no typed amount, and saves on
+    every tap; the menu calls the mode's own `menu` hook to fill it in when it opens.
+  - assumed: a locked slot shows nothing live at all (no belt, button, blade, tank or things in its bins, even
+    a hand-edited save's), only its painted bay and numbers.
+  - **For steps 4-5:** step 4: the `jam` puff and the `cleaned` float still sit at the planer, and Info is
+    still the old text with the new goal sentence at its head (`The goal: <goalText()>.`). The bubbles for output
+    bins and stalls are step 2's minimal ones. Step 5: fold the 15 breaks above into
+    `.claude/tests/negtests/taas-factory-ui.json` (the scratch copy is not in the repo; each is one line, named
+    `s3-*`, listed above). Remember that a suite row reading the floor right after `fresh()` sees the previous
+    row's factory until something re-bakes. `FACTORY.newGame()` in the eval personas starts with slots 02-04
+    locked.
 
 ## Handoff
 

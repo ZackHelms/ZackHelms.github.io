@@ -26,7 +26,10 @@
  * between tasks (on the list from the start; its slider and - / + under the slot, set in the
  * engine, stopping at 0 and 60, never redrawn under a dragging finger, surviving a reload; its
  * evals lines; the pause sign over a waiting robot and its emptying ring, read off pixels; the
- * slot row at 320 and 390 wide; Info). Frames are
+ * slot row at 320 and 390 wide; Info), and the goals (taasgoals, 2026-10-20: a new factory's empty
+ * bays that a tap walks into, the wall's goal counting down, a machine arriving with its float, the
+ * slots' new order, the moved bench and saw tapped at three sizes, the floor re-baked with the goal,
+ * and the menu's Prices steppers, factory only). Frames are
  * stepped through the page's own test hook (TAAS_FACTORY, paused), so time is exact; input goes
  * through real touch events.
  *
@@ -254,7 +257,7 @@ const server = http.createServer((req, res) => {
     let seen = 0, pairs = 0;
     for (const [w, h] of sizes) {
       await page.setViewportSize({ width: w, height: h });
-      await fresh(4);
+      await fresh(4, true);   // every goal met: slots 02-04 have their machines to tap (taasgoals step 3)
       for (const cam of ['min', 'max']) {
         const res = await H(([want, cam]) => {
           const T = window.TAAS_FACTORY, out = [], hits = [];
@@ -352,7 +355,7 @@ const server = http.createServer((req, res) => {
     const p = await H(() => ({ open: !document.getElementById('fx-panel').hidden, menu: !document.getElementById('menu').hidden, rows: [...document.querySelectorAll('#fx-panel-body tbody tr')].map(r => r.textContent) }));
     ok(p.open && !p.menu && sub === 'How the factory works' && p.rows.length === 1 && /No robots yet/.test(p.rows[0]), 'Info in the menu ("How the factory works") closes the menu and opens the explanation, with the measured table (no robots yet)', JSON.stringify(p) + ' ' + sub);
     const words = await H(() => document.getElementById('fx-panel-body').textContent);
-    ok(/Sell medium planks for \$4/.test(words) && /Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it starts from the goal and explains customer satisfaction on its own terms, without the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
+    ok(/The goal: Sell 50 medium planks\./.test(words) && /Customer satisfaction/.test(words) && /starts at 100%/.test(words) && !/formal/i.test(words), 'it starts from the goal and explains customer satisfaction on its own terms, without the formal mode', (words.match(/formal.{0,30}/i) || [''])[0]);
     ok(/costs \$0\.10 for each thing it processes/.test(words) && /starts with 10 logs/.test(words) && /10 more arrive for \$10/.test(words) && /fixing a jam costs \$5/.test(words) && /every second each one waits costs 0.1%/.test(words) && /Satisfaction sets what customers pay/.test(words) && /never less than the thing cost to make \(\$1\.10 for a plank/.test(words),
       'and the storefront\'s rules: 10 logs to start and 10 more for $10, $0.10 a machine run, $5 to fix a jam, 0.1% a second for each customer waiting, satisfaction setting the price but never below what the thing cost to make');
     const tips = await H(() => [...document.querySelectorAll('#fx-panel-body .fx-tips li b')].map(b => b.textContent));
@@ -626,7 +629,7 @@ const server = http.createServer((req, res) => {
     ok(cap.caption > 150, 'the right-hand board is captioned in full: customer satisfaction', JSON.stringify(cap));
     // the goal (the CD, 2026-10-15): a yellow GOAL tag, then the goal in white, and it is what the screen reader hears too
     const goal = await boardInk('goal'), heard = await H(() => document.getElementById('fx-score').textContent);
-    ok(goal.amber > 150 && goal.white > 300 && /Goal: Sell medium planks for \$4\.$/.test(heard), 'the rear wall says the goal: a yellow GOAL tag and "Sell medium planks for $4"', JSON.stringify(goal) + ' ' + heard);
+    ok(goal.amber > 150 && goal.white > 300 && /Goal: Sell 50 medium planks\.$/.test(heard), 'the rear wall says the goal: a yellow GOAL tag and "Sell 50 medium planks" (the CD\'s first goal, 2026-10-20)', JSON.stringify(goal) + ' ' + heard);
     await H(() => { const T = window.TAAS_FACTORY; T.view.camY += 100; T.tick(0); });
     const moved = await H(() => window.TAAS_FACTORY.board('cash'));
     ok(Math.abs(moved.y - (g.c.y - 100)) < 0.01, 'they scroll with the floor, so a long way down they are out of sight', moved.y + ' vs ' + (g.c.y - 100));
@@ -1234,6 +1237,173 @@ const server = http.createServer((req, res) => {
       return Object.assign(T.robotBake(), { most });
     });
     ok(st.n > 20 && st.most <= st.budget && st.bytes <= st.budget, 'a quarter hour of eight robots at work bakes their poses as they come up and never holds more than the cache\'s budget', JSON.stringify(st));
+  });
+
+  /* ---------- 22. goals on the floor and the wall, and Prices in the menu (taasgoals, 2026-10-20) ---------- */
+  await section('22. goals and prices', async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await fresh(22);
+    const SLOT_IDS = ['sawInBack', 'sawInFront', 'sawInBelt', 'saw', 'sawConsole', 'sawOutBelt', 'sawOutBack', 'sawOutFront', 'extractInBack', 'extractInFront', 'extractInBelt', 'extract', 'extractConsole', 'extractOutBelt', 'extractOutBack', 'extractOutFront', 'benchInBack', 'benchInFront', 'bench', 'benchOutBack', 'benchOutFront'];
+    // a new factory: one stall (medium planks) and the planer in slot 01, and three empty bays
+    const fl = await H(ids => { const T = window.TAAS_FACTORY; const all = cam => { T.view.camY = T.view[cam + 'Y']; T.tick(0); return ids.filter(id => T.spriteRect(id)); };
+      const drawn = all('min').concat(all('max')); T.view.camY = T.view.minY; T.tick(0);
+      return { drawn, stalls: [0, 1, 2, 3].map(i => !!T.spriteRect('stall' + i)), planer: ['machine', 'rack', 'binFront', 'console'].every(id => T.spriteRect(id)), want: T.s.stalls[0].want }; }, SLOT_IDS);
+    ok(!fl.drawn.length && fl.stalls.join() === 'true,false,false,false' && fl.planer && fl.want === 'plank.m', 'a new factory has one stall, for medium planks, and only slot 01\'s planer; nothing of slots 02-04 is drawn, top or bottom', JSON.stringify(fl));
+    // an empty bay is floor: a tap where a machine or a bin will stand walks there and opens nothing
+    const bayAt = await H(() => { const L = FACTORY.LAYOUT, q = k => L.SOLID[k], mid = k => [(q(k)[0] + q(k)[2]) / 2, (q(k)[1] + q(k)[3]) / 2];
+      return { extract: mid('extract'), bench: mid('bench'), saw: mid('saw'), sawIn: mid('sawIn'), benchOut: mid('benchOut') }; });
+    const bays = [];
+    for (const k of Object.keys(bayAt)) {
+      const at = bayAt[k];
+      const p = await H(at => { const T = window.TAAS_FACTORY; T.view.camY = Math.max(T.view.minY, Math.min(T.view.maxY, T.screen(at[0], at[1], 0.5)[1] + T.view.camY - 420)); T.tick(0); return T.screen(at[0], at[1], 0.5); }, at);
+      const t = await H(p => window.TAAS_FACTORY.hitTest(p[0], p[1]), p);
+      await page.touchscreen.tap(p[0], p[1]);
+      const a = await H(() => { const s = window.TAAS_FACTORY.s; return { task: s.avatar.task && s.avatar.task.kind, bubble: s.bubble }; });
+      if (!t || t.kind !== 'floor' || a.task !== 'floor' || a.bubble) bays.push(k + ': ' + JSON.stringify([t && t.kind, a]));
+    }
+    ok(!bays.length, 'a tap where the sap extractor, the bench, the table saw or their bins will stand is a tap on the floor: the avatar walks there and nothing opens', bays.join('; '));
+    // the wall's goal counts down as medium planks sell, and the screen reader hears the same words
+    const heard = () => H(() => document.getElementById('fx-score').textContent.replace(/^.*Goal: /, ''));
+    const goalBits = () => H(() => { const T = window.TAAS_FACTORY, r = T.board('goal'), d = T.view.dpr; T.view.camY = T.view.minY; T.tick(0);
+      const im = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data;
+      let b = ''; for (let i = 0; i < im.length; i += 4) b += im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225 ? '1' : '0'; return b; });
+    const differ = (a, b) => { let n = 0; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) n++; return n; };
+    const g50 = await goalBits(), h50 = await heard();
+    await H(() => { window.TAAS_FACTORY.s.goalN = 3; });
+    const g47 = await goalBits(), h47 = await heard();
+    await H(() => { window.TAAS_FACTORY.s.goalN = 49; });
+    const g1 = await goalBits(), h1 = await heard();
+    ok(h50 === 'Sell 50 medium planks.' && h47 === 'Sell 47 medium planks.' && h1 === 'Sell 1 medium plank.' && differ(g50, g47) > 30 && differ(g47, g1) > 30,
+      'goal 1 reads "Sell 50 medium planks" and counts down as they sell, to "Sell 1 medium plank", on the wall and in the screen reader\'s line', [h50, h47, h1, differ(g50, g47), differ(g47, g1)].join(' | '));
+    // the 50th sale, by the engine: the sap extractor arrives in slot 02, with the level sound, sparks and a float naming it
+    const arrival = await H(() => {
+      const T = window.TAAS_FACTORY, s = T.s, L = FACTORY.LAYOUT, q = L.SOLID.extract, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d');
+      const heardSfx = [], was = SND.sfx; SND.sfx = n => { heardSfx.push(n); return was(n); };
+      T.view.camY = T.screen(0, L.ROW.extract, 0)[1] + T.view.camY - 420; T.tick(0);
+      const cyan = () => { const a = T.screen(0.2, (q[1] + q[3]) / 2, 2.6), b = T.screen(5.8, (q[1] + q[3]) / 2, 1.2), im = g.getImageData(0, Math.round(a[1] * k), g.canvas.width, Math.round((b[1] - a[1]) * k)).data; let n = 0; for (let i = 0; i < im.length; i += 4) if (im[i] < 170 && im[i + 1] > 215 && im[i + 2] > 215) n++; return n; };
+      const before = { rect: !!T.spriteRect('extract'), cyan: cyan() };
+      s.goalN = 50; T.tick(1 / 60);
+      for (let i = 0; i < 45; i++) T.tick(1 / 60);
+      const c = T.spriteRect('extract'), hit = c ? T.hitTest(c.x + c.w / 2, c.y + c.h * 0.6) : null;
+      const after = { goal: s.goal, rect: !!c, all: ['extractInFront', 'extractConsole', 'extractOutFront'].every(id => T.spriteRect(id)), hit: hit && hit.kind, cyan: cyan(), level: heardSfx.indexOf('level') >= 0, heard: document.getElementById('fx-score').textContent.replace(/^.*Goal: /, '') };
+      for (let i = 0; i < 240; i++) T.tick(1 / 60);
+      after.later = cyan();
+      SND.sfx = was;
+      return { before, after };
+    });
+    ok(!arrival.before.rect && arrival.after.goal === 1 && arrival.after.rect && arrival.after.all && arrival.after.hit === 'extract' && arrival.after.level && arrival.after.cyan > 300 && arrival.before.cyan < 50 && arrival.after.later < 50,
+      'the 50th medium plank sold, the sap extractor arrives in slot 02 with the level sound and a float naming it (gone a few seconds later), and a tap on it reaches it', JSON.stringify(arrival));
+    ok(arrival.after.heard === '>$50 & >90% customer satisfaction for 10 minutes.', 'then the wall reads goal 2: ">$50 & >90% customer satisfaction for 10 minutes"', arrival.after.heard);
+    // goal 2's countdown in m:ss while both hold, and back to 10 minutes when either fails
+    const rest = await goalBits();
+    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.money = 60; s.satisfaction = 100; s.shop.next = 1e9; for (let i = 0; i < Math.round(19.5 * 60); i++) T.tick(1 / 60); });
+    const counting = await goalBits(), h941 = await heard();
+    await H(() => { const T = window.TAAS_FACTORY; for (let i = 0; i < 60; i++) T.tick(1 / 60); });
+    const h940 = await heard();
+    await H(() => { const T = window.TAAS_FACTORY; T.s.satisfaction = 89; T.tick(1 / 60); });
+    const hReset = await heard();
+    ok(h941 === '>$50 & >90% customer satisfaction for 9:41.' && h940 === '>$50 & >90% customer satisfaction for 9:40.' && hReset === '>$50 & >90% customer satisfaction for 10 minutes.' && differ(rest, counting) > 30,
+      'goal 2 counts down in minutes and seconds on the wall while money is over $50 and satisfaction over 90% ("for 9:41", "for 9:40"), and says "for 10 minutes" again the moment satisfaction falls to 89%', [h941, h940, hReset, differ(rest, counting)].join(' | '));
+    // the long line fits the board: shrunk, never cut, nothing over its edges
+    const fit = await H(() => { const T = window.TAAS_FACTORY, r = T.board('goal'), d = T.view.dpr, gx = 0.05 * T.view.S; T.s.goalT = 541; T.view.camY = T.view.minY; T.tick(0);
+      const x = Math.round((r.x - gx) * d), w = Math.round((r.w + 2 * gx) * d), im = document.getElementById('fx-canvas').getContext('2d').getImageData(x, Math.round(r.y * d), w, Math.round(r.h * d)).data;
+      let white = 0, edge = 0; for (let i = 0; i < im.length; i += 4) { if (im[i] > 225 && im[i + 1] > 225 && im[i + 2] > 225) { white++; const px = (i / 4) % w; if (px < gx * d - 1 || px > w - gx * d) edge++; } } return { white, edge }; });
+    ok(fit.white > 200 && fit.edge === 0, 'goal 2\'s long line is drawn whole inside the board at 390 wide', JSON.stringify(fit));
+    // goal 3 and after
+    await H(() => { const T = window.TAAS_FACTORY, s = T.s; s.goal = 2; s.goalN = 0; s.goalT = 600; T.tick(0); });
+    const h25 = await heard();
+    await H(() => { const T = window.TAAS_FACTORY; T.s.goalN = 24; T.tick(0); });
+    const hSap1 = await heard();
+    const saw = await H(() => { const T = window.TAAS_FACTORY, s = T.s; const bench = !!T.spriteRect('bench'), sawLocked = !T.spriteRect('saw'); s.goalN = 25; T.tick(1 / 60); return { bench, sawLocked, saw: !!T.spriteRect('saw'), goal: s.goal }; });
+    const hDone = await heard();
+    await H(() => window.TAAS_FACTORY.showInfo());
+    const info = await H(() => document.getElementById('fx-panel-body').textContent);
+    await H(() => window.TAAS_FACTORY.closePanel());
+    ok(h25 === 'Sell 25 sap.' && hSap1 === 'Sell 1 sap.' && hDone === 'All goals met.' && saw.bench && saw.sawLocked && saw.saw && saw.goal === 3 && /The goal: All goals met\./.test(info),
+      'goal 3 reads "Sell 25 sap" counting down to "Sell 1 sap"; the bench stands in 03 while 04 is still empty; the 25th brings the table saw, the wall then reads "All goals met", and Info says the same', [h25, hSap1, hDone, JSON.stringify(saw)].join(' | '));
+    // the slots' order on screen: 02 the sap extractor, 03 the bench, 04 the table saw, each drawn over its own row
+    const order = await H(() => { const T = window.TAAS_FACTORY, R = FACTORY.LAYOUT.ROW; T.view.camY = T.view.minY; T.tick(0);
+      const on = (id, y) => { const r = T.spriteRect(id), p = T.screen(0, y, 0)[1]; return r && r.y < p && r.y + r.h > p ? r.y + r.h : null; };
+      return [on('machine', R.planer), on('extract', R.extract), on('bench', R.bench), on('saw', R.saw)]; });
+    ok(order.every(v => v !== null) && order[0] < order[1] && order[1] < order[2] && order[2] < order[3], 'down the floor: the planer, then the sap extractor (02), the bench (03) and the table saw (04), each drawn over its own row', JSON.stringify(order));
+    // the baked floor follows the goals: Start over from a factory with every goal met goes back to empty bays with
+    // no shadow left where the machines stood (the floor bake's key carries the goal; without it the floor baked with
+    // the machines stays up, their grey shadows on the empty bay. Traced 2026-10-20: fresh() clears storage, the old
+    // page's pagehide save writes it again, so a new page first draws the previous row's factory, goal 3 and all)
+    await fresh(25, true);
+    // (a bake at goal 3 for certain: a frame drawn at another size, then back)
+    await page.setViewportSize({ width: 430, height: 932 }); await H(() => { window.TAAS_FACTORY.layout(); window.TAAS_FACTORY.tick(0); });
+    await page.setViewportSize({ width: 390, height: 844 }); await H(() => { window.TAAS_FACTORY.layout(); window.TAAS_FACTORY.tick(0); });
+    await H(() => { const T = window.TAAS_FACTORY; T.s.money = 33; T.showInfo(); });
+    await H(() => document.querySelector('[data-panel="restart"]').click());
+    await H(() => document.querySelector('[data-panel="restart"]').click());
+    const bay = await H(() => {
+      const T = window.TAAS_FACTORY, L = FACTORY.LAYOUT, k = T.view.dpr, g = document.getElementById('fx-canvas').getContext('2d'), y = L.ROW.extract;
+      T.s.shop.next = 1e9; T.view.camY = Math.max(T.view.minY, Math.min(T.view.maxY, T.screen(0, y, 0)[1] + T.view.camY - 420)); T.tick(0);
+      const at = (x) => { const p = T.screen(x, y, 0), d = g.getImageData(Math.round(p[0] * k) - 4, Math.round(p[1] * k) - 4, 9, 9).data; let n = 0; for (let i = 0; i < d.length; i += 4) n += d[i] + d[i + 1] + d[i + 2]; return Math.round(n / (d.length / 4)); };
+      // under the sap extractor's body and its output bin, and bare bay east of them
+      return { goal: T.s.goal, money: T.s.money, drawn: !!T.spriteRect('extract'), body: at(2.45), out: at(4.45), bare: at(5.5) };
+    });
+    ok(bay.goal === 0 && bay.money === 0 && !bay.drawn && Math.abs(bay.body - bay.bare) < 12 && Math.abs(bay.out - bay.bare) < 12,
+      'Start over from a factory with every goal met goes back to an empty bay 02: bare floor where the sap extractor and its bin stood, no shadow of them left (the baked floor follows the goals)', JSON.stringify(bay));
+    // real taps on the moved bench and saw at three sizes; with slot 01 only, the same taps walk to the floor
+    let hitN = 0;
+    const miss = [];
+    for (const [w, h] of [[390, 844], [320, 640], [844, 390]]) {
+      await page.setViewportSize({ width: w, height: h });
+      for (const open of [false, true]) {
+        await fresh(23, open);
+        for (const [id, kind] of [['bench', 'bench'], ['saw', 'saw'], ['benchInFront', 'benchIn'], ['sawOutFront', 'sawOut']]) {
+          const p = await H(([id, R]) => { const T = window.TAAS_FACTORY, y = FACTORY.LAYOUT.ROW[R]; T.s.avatar.task = null; T.s.bubble = null; T.view.camY = Math.max(T.view.minY, Math.min(T.view.maxY, T.screen(0, y, 0)[1] + T.view.camY - T.view.h * 0.55)); T.tick(0);
+            const r = T.spriteRect(id); if (r) return [r.x + r.w / 2, r.y + r.h * (/Front/.test(id) ? 0.5 : 0.6)];
+            const q = FACTORY.LAYOUT.SOLID[id.replace(/Front$/, '')]; return T.screen((q[0] + q[2]) / 2, (q[1] + q[3]) / 2, /Front/.test(id) ? 0.3 : 0.6); }, [id, /^bench/.test(id) ? 'bench' : 'saw']);
+          if (p[1] < 50 || p[1] > h - 10) { miss.push(w + 'x' + h + ' ' + id + ' off screen'); continue; }
+          await page.touchscreen.tap(p[0], p[1]);
+          const got = await H(() => { const t = window.TAAS_FACTORY.s.avatar.task; return t && t.kind; });
+          if (got !== (open ? kind : 'floor')) miss.push(w + 'x' + h + (open ? ' open ' : ' locked ') + id + ' -> ' + got);
+          else hitN++;
+        }
+      }
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    ok(!miss.length && hitN === 24, 'at 390x844, 320x640 and 844x390, a real tap on the bench, the table saw and their bins in their new rows reaches them once their goals are met, and walks to the floor before', miss.join('; ') + ' (' + hitN + ' of 24)');
+    // Prices: in the factory's menu (and not in formal's), two steppers a dollar a tap, bounded, saved and kept by Start over
+    await fresh(24);
+    await page.tap('#menu-btn');
+    const pm = await H(() => { const b = document.getElementById('menu-prices'), r = b.getBoundingClientRect();
+      return { shown: !b.hidden && r.height > 40 && r.bottom <= innerHeight, rows: [...b.querySelectorAll('.mstep > span:first-child')].map(e => e.textContent.trim()), btns: b.querySelectorAll('button[data-price]').length,
+        mi: [...document.querySelectorAll('#menu .mi')].map(e => e.firstChild.textContent.trim()).join(), ranges: document.querySelectorAll('#menu input[type=range]').length, inPrices: b.querySelectorAll('input, .mi').length }; });
+    ok(pm.shown && pm.rows.join() === 'Robot $1,Stall $1' && pm.btns === 4 && pm.mi === 'Info,Exit game' && pm.ranges === 3 && pm.inPrices === 0,
+      'the factory\'s menu has Prices: "Robot $1" and "Stall $1", each with - and + (no slider, no menu item, so the menu\'s items are still Info and Exit game)', JSON.stringify(pm));
+    for (let i = 0; i < 3; i++) await page.tap('[data-price="robot"][data-by="1"]');
+    await page.tap('[data-price="stall"][data-by="-1"]');
+    const st = await H(() => ({ flat: window.TAAS_FACTORY.s.flat, robot: document.getElementById('price-robot').textContent, stall: document.getElementById('price-stall').textContent,
+      stallDown: document.querySelector('[data-price="stall"][data-by="-1"]').disabled, stallUp: document.querySelector('[data-price="stall"][data-by="1"]').disabled, dock: FACTORY.hirePrice(window.TAAS_FACTORY.s), saved: JSON.parse(localStorage.getItem('taas.factory.v' + FACTORY.CFG.version) || '{}').flat }));
+    ok(st.flat.robot === 4 && st.flat.stall === 0 && st.robot === '$4' && st.stall === '$0' && st.stallDown && !st.stallUp && st.dock === 4 && st.saved && st.saved.robot === 4 && st.saved.stall === 0,
+      'three taps on the robot\'s + make a robot $4 and one on the stall\'s - makes a stall $0, where its - goes dark; the factory charges it and the save has it at once', JSON.stringify(st));
+    await H(() => { FACTORY.setFlat(window.TAAS_FACTORY.s, 'robot', 199); window.TAAS_MENU.close(); });
+    await page.tap('#menu-btn');
+    await page.tap('[data-price="robot"][data-by="1"]');
+    const top = await H(() => ({ robot: window.TAAS_FACTORY.s.flat.robot, up: document.querySelector('[data-price="robot"][data-by="1"]').disabled, shown: document.getElementById('price-robot').textContent }));
+    await H(() => document.querySelector('[data-price="robot"][data-by="1"]').click());
+    const top2 = await H(() => window.TAAS_FACTORY.s.flat.robot);
+    ok(top.robot === 200 && top.up && top.shown === '$200' && top2 === 200, 'the robot\'s price stops at $200: its + goes dark there and does nothing', JSON.stringify(top) + ' ' + top2);
+    await H(() => { FACTORY.setFlat(window.TAAS_FACTORY.s, 'robot', 7); window.TAAS_FACTORY.save(); window.TAAS_MENU.close(); });
+    await go('?mode=robot-factory');
+    await page.waitForFunction(() => window.TAAS_FACTORY && window.TAAS_FACTORY.on);
+    await page.tap('#menu-btn');
+    const back = await H(() => [document.getElementById('price-robot').textContent, document.getElementById('price-stall').textContent].join());
+    await H(() => window.TAAS_MENU.close());
+    await H(() => { const T = window.TAAS_FACTORY; T.paused = true; T.s.money = 33; T.showInfo(); });
+    await H(() => document.querySelector('[data-panel="restart"]').click());
+    await H(() => document.querySelector('[data-panel="restart"]').click());
+    const fresh2 = await H(() => ({ money: window.TAAS_FACTORY.s.money, flat: window.TAAS_FACTORY.s.flat, goal: window.TAAS_FACTORY.s.goal }));
+    ok(back === '$7,$0' && fresh2.money === 0 && fresh2.goal === 0 && fresh2.flat.robot === 7 && fresh2.flat.stall === 0, 'the prices survive a reload, and Start over begins a new factory (no money, the first goal) at the same prices', back + ' ' + JSON.stringify(fresh2));
+    await go('?mode=formal');
+    await page.tap('#menu-btn');
+    const fm = await H(() => { const b = document.getElementById('menu-prices'); return { hidden: b.hidden, display: getComputedStyle(b).display, h: b.getBoundingClientRect().height }; });
+    await H(() => window.TAAS_MENU.close());
+    ok(fm.hidden && fm.display === 'none' && fm.h === 0, 'the formal mode\'s menu has no Prices', JSON.stringify(fm));
   });
 
   /* ---------- 12. the build badge, bottom right (the CD, fourth brief) ---------- */
