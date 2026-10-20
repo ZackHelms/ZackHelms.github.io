@@ -248,7 +248,7 @@ question is genuinely unclear.
 | 1 | Engine: goals and unlocks, the slots' new order, flat prices, saves; rules rows | DONE 2026-10-20 |
 | 2 | Engine: bins and stalls take anything, the stall's menu, closing, wrong-input jams; rules rows | DONE 2026-10-20 |
 | 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | DONE 2026-10-20 |
-| 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | open |
+| 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | DONE 2026-10-20 |
 | 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | open |
 | 6 | Docs final and gates | open |
 | 7 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
@@ -727,6 +727,87 @@ whether the goals feel right in pace.
     `s3-*`, listed above). Remember that a suite row reading the floor right after `fresh()` sees the previous
     row's factory until something re-bakes. `FACTORY.newGame()` in the eval personas starts with slots 02-04
     locked.
+- **Step 4 results (2026-10-20, UI: output-bin and stall bubbles, the green dots, CLOSED, jams drawn on slots 02-04,
+  Info rewritten).**
+  - **Built** (`games/taas/index.html`, factory UI): **the stall's first level** is three buttons of one width (class
+    `stall1`, 84 px, the icons one height) worded "Re-assign" (the stall's thing as its picture), "Re-stock" and "Close" /
+    "Open" (the zzz `ICON.rest`, `on` while closed); **its second levels** open under a short back button (`.fx-back`, 34 px
+    tall, aria "Back"): Re-assign the 13 rows of `stallRows()`, Re-stock the two halves of `binHalves()`. **Output bins**
+    already had their halves, placeholders (`F.SAMPLE`) and anchors from step 2; checked at three sizes, unchanged. **A
+    bubble too tall for over or under its thing now goes beside it** (`renderBubble()`: when the clamped box would cover the
+    anchor, left of it if it fits, else right, no tail): the Re-assign list on a landscape phone covered its own stall. A full
+    stall's put buttons keep their counts (faded, the count red, aria "No room in this stall for ...") instead of "0".
+    **`drawPlate(i)`**: a row of green dots (`DOT_COL`, one per thing, `C.stallCap` at most) across the top of the label, from
+    its west end, then the price (or **CLOSED** in red, `#ff6b6b`, while closed) and the name, both moved down to make room
+    (`cy` at 0.62 of the label, the price at most 0.6 of its height); a stall bought and not yet set draws only its dots.
+    **Jams on slots 02-04** (`slotJam(key)`, `JAM_LOOK`): an amber light flashing on top (`M_BEACON`, drawn only while
+    jammed), six grime runs (`GRIME`) down the machine's front as long as its `dirt`, so a scrub visibly shrinks them; the
+    machine shakes (`shake: 'saw'` / `'bench'` joins the extractor's tag; `blit()` asks `F.jammed()` for any tag); the saw's
+    and extractor's buttons dead; the thing that jammed it drawn stuck where it stopped (`CFG.jamAt` in); smoke from each
+    jammed machine (`SMOKE`). The `jam` event's puff and the `cleaned` event's sparks and "-$5 jam fixed" float are placed at
+    the machine that jammed (`SMOKE`, `SCRUB`, `AT` gains the bench). A tap on a jammed machine already scrubbed it (step 2's
+    engine); the suite now does it by real taps. **Info** (`renderPanel()`): the goals as a numbered list read from
+    `C.goals` (each with the machine it brings and its slot, goal 2's countdown starting again), the slots' order, "Your arms"
+    (every bin and stall the same way, any bin takes anything, nothing happens by itself), the stall's three choices, its 6,
+    the green dots, "Closing a stall", "The wrong thing in a machine" (what each machine jams on, the run paid, stopped 1.3 s
+    in, flashing until scrubbed, $5, the thing to the recycle bin, the extractor's empty run, your toss, a robot runs what it
+    is given), Prices in the menu ($0-$200, kept by Start over); the evals' yellow gains the empty run and red any wrong run;
+    the slot robots no longer "get nothing wrong yet". The Tips are unchanged: each still holds as worded (the fourth names
+    2x4s from the table saw, which now arrives with goal 3; step 5 re-measures them).
+  - **Page suite** `drive-taas-factory-ui.cjs`: **145 -> 159** (14 added in a new section 23, none removed, **no row
+    restated**: sections 7 and 20's Info rows pass on the rewritten text, which keeps their sentences). Section 23: a new
+    page loads no save after a factory with every goal met (the `fresh()` fix, below); each of the four output bins by real
+    taps (faded placeholders on both halves while empty, four different ones; your log on top and its things below; a tap
+    takes them, another puts the log in; on screen and clear of the bin); the stall's first level by a real tap on the drawn
+    tray (three words, one width, the zzz, clear of the stall); Re-assign (a short back button, 4 / 3 / 3 / 3, medium planks
+    marked) and back; Re-stock (everything carried, an empty stall's placeholder, eight planks fill it to six with two kept
+    and every put dark showing "x2", then taken back); Close and the zzz on, Open; the three levels at 390x844, 320x640 and
+    844x390, on screen, every button inside, clear of the tray and the label; the dots counted off the canvas at 0, 1 and 6
+    (a log among them green too) and above the price; CLOSED in red with the name and three dots; a robot given the wrong
+    thing jamming the extractor (a plank), the bench (a plank) and the saw (a log), red `jam:` in its evals, each with the
+    amber light (most of 45 frames), grime that shrinks from dirt 1 to 0.3, neither on the same machine unjammed; a real tap
+    on each scrubbing it ($5, the thing in the recycle bin, "jam fixed" within 1.2 m of that machine); Info's three new
+    blocks (goals and slot order; the stall's choices, dots and closing; any bin, the jams, the empty run, the toss, Prices).
+  - **`fresh()`** (the overseer's ask): the suite's server answers `/blank`, and `fresh()` goes there **before** clearing
+    storage, so the old page's `pagehide` save lands before the clear and the new page loads nothing. `loaded` keeps what the
+    new page loaded by itself; section 23's first row holds it to a new game. Proved on a copy of the suite with the old order
+    (storage cleared while the old page was up): that row alone failed (`{"goal":3,"money":77}`), the other 158 passed, so
+    no other row depends on the previous row's factory. Step 3's floor-key row still catches its break (`s3-floor-key`
+    below); its comment now says why it still bakes goal 3 itself.
+  - **Gates**: `gates.sh games/taas/index.html` GREEN (formal 43 / 39; factory rules 358; page 159; evals not run).
+    `check-inline-js` GREEN after every edit.
+  - **Frame cost** (eight pose, nothing else running): median 16.7 ms, p95 16.8, max 16.8, **0 of 149 over**.
+  - **Negative tests** (copies; the scratch list
+    `/tmp/claude-0/-home-user/7849a3ec-e84f-5892-9d27-69af77739d32/scratchpad/taasgoals-s4/breaks-s4.json`, 22 one-line
+    breaks, each named `s4-*` but `s3-floor-key`): **22 of 22 caught**, each by the row written for it: no dots, one dot at
+    most, dots not green, dots on the price, a price where CLOSED goes, CLOSED not red, the first level unequal, a tall back
+    button, no side placement, "Open" never shown, no zzz, the jam light never on, grime that ignores the dirt, no jam drawn,
+    the "jam fixed" float at the planer, one placeholder for every bin, Info without the goals, the toss, Prices or closing, a
+    full stall's puts reading "0", and step 3's floor key without the goal. Plus the suite-level break above (the old
+    `fresh()` order), caught. The jam's dead buttons, its stuck thing and its smoke have no row (drawn, seen in the
+    screenshots, not asserted).
+  - **Screenshots** (Chromium, 390x844 plus 320x640 and 844x390 for the bubbles), read and fixed: the scratch folder
+    above, `stall-first-*`, `stall-assign-*`, `stall-stock-*`, `stall-closed1-*`, `outbin-{bin,sawOut,extractOut,benchOut}-*`,
+    `dots0/1/6-*`, `closed-*`, `jam-{extract,bench,saw}-*` (`jams-crop-390x844.png`), `info-*`. Fixed on sight: the
+    landscape Re-assign list over its stall (side placement), Re-assign's word sitting higher than its neighbours' (icons one
+    height), the full stall's "0".
+  - assumed: the first level sits over the stall, as every counter bubble does, so while it is open it covers part of the
+    wall's customer satisfaction board; the second levels go under (or, on a landscape phone, beside) it.
+  - assumed: the dots' row is always kept (the price and name sit lower even with no dots), with no hollow places for the
+    empty ones; a stall bought and not yet set shows its dots and nothing else.
+  - assumed: CLOSED is red and takes up to 0.42 of the label (the price 0.3), the name stays; a closed stall's tray is
+    **not** drawn shut (the plan's optional look, not built).
+  - assumed: a jammed slot's light exists only while it is jammed (slots 02-04 have no beacon otherwise), amber like the
+    planer's; the bench shakes too; the grime is a dark brown (`#4a3524`), not the planer's sap green, since what jams a slot
+    is not sap.
+  - assumed: the side placement applies to every bubble that would otherwise cover its own thing (a robot's or a bin's on a
+    short screen too), not only a stall's.
+  - **For steps 5-6:** step 5: fold the 22 breaks (and step 3's 15, `s3-*`) into `.claude/tests/negtests/taas-factory-ui.json`;
+    the page list now runs against a suite whose server serves `/blank`. The Tips are worded as before and want re-measuring
+    (the saw now arrives last). Step 6: `.claude/taas.md` Architecture should name `drawPlate()`'s dots and CLOSED
+    (`DOT_COL`), `slotJam()` / `JAM_LOOK` / `GRIME`, the `SMOKE` / `SCRUB` / `AT` tables, the `shake` tags read through
+    `F.jammed()`, `renderBubble()`'s side placement, the `stall1` and `fx-back` classes, and the suite's `fresh()` and `loaded`;
+    `.claude/tests/README.md` the page suite at 159.
 
 ## Handoff
 

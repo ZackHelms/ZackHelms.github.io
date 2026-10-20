@@ -285,6 +285,12 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 .fx-cuts { display: flex; gap: 8px; }
 .fx-cuts .fx-opt { flex: 1 1 0; }
 .fx-bubble.stall .fx-opt { width: 58px; min-width: 58px; flex: 0 0 58px; }
+/* a stall's first level: three worded buttons of one width (the CD's words, 2026-10-20); its second
+   levels open under a short back button */
+.fx-bubble.stall1 { flex-wrap: nowrap; }
+.fx-bubble.stall1 .fx-opt { width: 84px; min-width: 84px; flex: 0 0 84px; }
+.fx-bubble.stall1 .fx-opt > svg { height: 29px; }
+.fx-bubble .fx-opt.fx-back { width: 58px; min-width: 58px; height: 34px; flex: 0 0 58px; }
 .fx-line { flex: 0 0 auto; height: 0; border-top: 2.5px solid #1d2430; margin: 0 -6px; }
 #fx-panel { position: absolute; inset: 0; z-index: 40; background: rgba(15,20,28,.55); display: flex; flex-direction: column; justify-content: flex-start; align-items: center;
   overflow-y: auto; padding: calc(48px + env(safe-area-inset-top)) 12px calc(20px + env(safe-area-inset-bottom)); }
@@ -295,6 +301,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 #fx-panel-body h2 { font: 800 22px var(--display); }
 #fx-panel-body h3 { font: 700 15px var(--display); }
 #fx-panel-body ul { list-style: disc; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+#fx-panel-body ol.fx-goals { list-style: decimal; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; margin-top: -6px; }
 #fx-panel-body table { border-collapse: collapse; width: 100%; font: 500 12px var(--mono); }
 #fx-panel-body td, #fx-panel-body th { padding: 4px 6px; border-bottom: 1px solid #e1e6ea; text-align: right; white-space: nowrap; }
 #fx-panel-body td:first-child, #fx-panel-body th:first-child { text-align: left; }
@@ -3364,7 +3371,7 @@ const MODE = (function () {
       box(1.94, sy - 0.035, 0.75, 2.96, sy + 0.035, 0.765, '#3d444d', '#3d444d', '#3d444d', { ol: 0 }),
       box(2.43, sq[1] + 0.12, 0.76, 2.47, sy - 0.02, 1.12, COL.tool), box(2.22, sy - 0.1, 1.08, 2.68, sy + 0.1, 1.16, COL.guard, COL.guard),
       box(sq[0] + 0.15, sq[3], 0.64, 2.55, sq[3] + 0.02, 0.75, COL.yellow)
-    ], { decal: (g, ox, oy, S) => frontText(g, ox, oy, S, (sq[0] + 0.15 + 2.55) / 2, sq[3] + 0.02, 0.695, 'TABLE SAW', 0.07, INK, 800) });
+    ], { decal: (g, ox, oy, S) => frontText(g, ox, oy, S, (sq[0] + 0.15 + 2.55) / 2, sq[3] + 0.02, 0.695, 'TABLE SAW', 0.07, INK, 800), shake: 'saw' });
     const eq = SO.extract, ey = ROWY.extract;
     add('extract', eq[3] + 0.02, [
       box(eq[0] - 0.05, eq[1] - 0.05, 0, eq[2] + 0.05, eq[3] + 0.05, 0.15, COL.plinth),
@@ -3392,7 +3399,7 @@ const MODE = (function () {
       box(hq[2] - 0.62, hq[1] + 0.12, 0.88, hq[2] - 0.5, hq[1] + 0.42, 0.94, COL.handle, COL.handle), box(hq[2] - 0.6, hq[1] + 0.42, 0.89, hq[2] - 0.52, hq[1] + 0.56, 0.92, '#c9d2db'),
       box(hq[2] - 0.42, hq[1] + 0.12, 0.88, hq[2] - 0.32, hq[1] + 0.36, 0.93, '#7a4a2a'), box(hq[2] - 0.4, hq[1] + 0.36, 0.89, hq[2] - 0.34, hq[1] + 0.5, 0.92, '#c9d2db'),
       box(hq[2] - 0.25, hq[1] + 0.1, 0.88, hq[2] - 0.12, hq[1] + 0.2, 1.0, COL.tool), box(hq[2] - 0.2, hq[1] + 0.2, 0.92, hq[2] - 0.17, hq[1] + 0.48, 0.95, '#7a4a2a')
-    ]);
+    ], { shake: 'bench' });
     add('dockPanel', SO.dockPanel[3], [
       box(SO.dockPanel[0], SO.dockPanel[1], 0, SO.dockPanel[2], SO.dockPanel[3], 1.25, COL.dockPanel, '#c7cfd6'),
       box(SO.dockPanel[0], SO.dockPanel[3], 0.95, SO.dockPanel[2], SO.dockPanel[3] + 0.03, 1.05, COL.accent0, COL.accent0, COL.accent0, { ol: 0 }),
@@ -4250,6 +4257,35 @@ const MODE = (function () {
     if (run) { ctx.fillStyle = '#efffc4'; for (let i = 0; i < 4; i++) { const u = (clock * 0.8 + i * 0.25) % 1; ctx.beginPath(); ctx.arc(x0 + (x1 - x0) * (0.2 + 0.2 * i), yb - (yb - yt) * u, 2.2, 0, Math.PI * 2); ctx.fill(); } }
     ctx.restore();
   }
+  // a jammed slot (the CD, 2026-10-20: a machine run on the wrong thing jams), drawn as the planer's
+  // jam is: an amber light flashing on top, grime running down its front that shrinks as you scrub
+  // it (its dirt), its console's button dead, the machine shaking (blit()) and smoke (tick())
+  const JAM_LOOK = {
+    saw: { beacon: [1.95, 12.42, 0.76], front: [1.95, 2.95, 13.3, 0.76, 0.5] },
+    extract: { beacon: [2.98, 6.98, 0.82], front: [1.95, 2.95, 7.8, 0.82, 0.6] },
+    bench: { beacon: [2.0, 9.9, 0.88], front: [2.0, 3.7, 10.5, 0.88, 0.6] }
+  };
+  const GRIME = '#4a3524';
+  function slotJam(key) {
+    const m = key === 'bench' ? s.bench : s[key], J = JAM_LOOK[key], f = J.front, S = VW.S;
+    // grime from the top of its front: six runs, each as long as the dirt left
+    ctx.save();
+    ctx.fillStyle = GRIME;
+    for (let i = 0; i < 6; i++) {
+      const x = PX(f[0] + (f[1] - f[0]) * (i + 0.5) / 6), top = PY(f[2], f[3]), len = f[4] * CE * S * (0.3 + 0.5 * Math.abs(Math.sin(i * 7.3 + clock * 0.8))) * m.dirt;
+      const wd = Math.max(3, 0.06 * S);
+      ctx.fillRect(x - wd / 2, top, wd, len); ctx.beginPath(); ctx.arc(x, top + len, wd * 0.7, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+    // the warning light
+    const b = J.beacon, on = Math.sin(clock * 10) > 0, col = on ? '!#ffb020' : '#7a5a20';
+    if (on) {
+      const x = PX(b[0]), y = PY(b[1], b[2] + 0.08), g = ctx.createRadialGradient(x, y, 0, x, y, S * 0.45);
+      g.addColorStop(0, 'rgba(255,176,32,0.6)'); g.addColorStop(1, 'rgba(255,176,32,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, S * 0.45, 0, Math.PI * 2); ctx.fill();
+    }
+    drawPrim(ctx, M_BEACON, Mt(b[0], b[1], b[2]), VW.ox, -VW.camY, S, outlinePx() * 0.7, [col, col]);
+  }
 
   /* ---------- the boards: money, customer satisfaction, the goal, and the stall's price ---------- */
   // Money and customer satisfaction on the wall (the CD, 2026-10-14) and the goal across the top
@@ -4327,24 +4363,33 @@ const MODE = (function () {
     ctx.restore();
   }
   // a stall's label on the counter: what it sells, and what a customer pays for it now (its price
-  // times customer satisfaction: amber or red when that is less than the price). A stall bought and
-  // not yet set has a blank label
+  // times customer satisfaction: amber or red when that is less than the price), or CLOSED in place
+  // of the price while it is closed. Over them a row of green dots, one for each thing in the stall
+  // (the CD, 2026-10-20: all green, whatever the thing). A stall bought and not yet set has a blank
+  // label, but for its dots
+  const DOT_COL = '#4fe07f';
   function drawPlate(i) {
-    const S = VW.S, r = boardRect('plate', i), pad = 0.07 * S, want = s.stalls[i].want;
-    if (!want || r.y > VW.h || r.y + r.h < 0) return;
-    const now = F.priceNow(s, want), full = F.priceOf(want), price = usd(now), name = PLATE_NAME(want);
+    const S = VW.S, r = boardRect('plate', i), pad = 0.07 * S, st = s.stalls[i], want = st.want;
+    if (r.y > VW.h || r.y + r.h < 0) return;
     ctx.save();
     ctx.textBaseline = 'middle';
-    const cy = r.y + r.h / 2;
-    // the price first, at the west end: a robot stocking the stall to the west of this one stands
-    // in front of this label's east end (2026-10-17)
-    const ps = fitText(price, '800 #px ' + FONT.display, 0.4 * S, r.w * 0.3);
-    const pw = ctx.measureText(price).width;
-    ctx.textAlign = 'left'; ctx.fillStyle = now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';
-    ctx.fillText(price, r.x + pad, cy + 0.5);
-    ctx.fillStyle = '#f5f7f9';
-    fitText(name, '700 #px ' + FONT.display, Math.min(0.24 * S, ps * 0.66), r.w - 3 * pad - pw);
-    ctx.fillText(name, r.x + 2 * pad + pw, cy + 0.5);
+    // the dots across the top of the label, from the west end (where the price starts)
+    const dotY = r.y + r.h * 0.2, dotR = clamp(r.h * 0.085, 1.6, 0.05 * S), n = Math.min(st.stock.length, C.stallCap);
+    ctx.fillStyle = DOT_COL;
+    for (let k = 0; k < n; k++) { ctx.beginPath(); ctx.arc(r.x + pad + dotR + k * dotR * 2.8, dotY, dotR, 0, Math.PI * 2); ctx.fill(); }
+    if (want) {
+      const now = F.priceNow(s, want), full = F.priceOf(want), price = st.closed ? 'CLOSED' : usd(now), name = PLATE_NAME(want);
+      const cy = r.y + r.h * 0.62, big = Math.min(0.4 * S, r.h * 0.6);
+      // the price first, at the west end: a robot stocking the stall to the west of this one stands
+      // in front of this label's east end (2026-10-17)
+      const ps = fitText(price, '800 #px ' + FONT.display, st.closed ? big * 0.62 : big, r.w * (st.closed ? 0.42 : 0.3));
+      const pw = ctx.measureText(price).width;
+      ctx.textAlign = 'left'; ctx.fillStyle = st.closed ? '#ff6b6b' : now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';
+      ctx.fillText(price, r.x + pad, cy + 0.5);
+      ctx.fillStyle = '#f5f7f9';
+      fitText(name, '700 #px ' + FONT.display, Math.min(0.24 * S, (st.closed ? big : ps) * 0.66), r.w - 3 * pad - pw);
+      ctx.fillText(name, r.x + 2 * pad + pw, cy + 0.5);
+    }
     ctx.restore();
   }
   // an empty place on the counter, where a stall can be bought: its outline dashed on the counter's
@@ -4392,20 +4437,22 @@ const MODE = (function () {
     const D = [];
     sp.forEach(q => { if (onFloor(q)) D.push({ key: q.key, f: () => blit(q) }); });
     D.push({ key: 0.5005, f: drawBoards });
-    s.stalls.forEach((st, i) => D.push({ key: SO.counter[3] + 0.0515, f: () => st.bought ? drawPlate(i) : drawPlace(i) }));
+    s.stalls.forEach((st, i) => D.push({ key: SO.counter[3] + 0.0515, f: () => st.bought ? drawPlate(i) : drawPlace(i) }));   // (its dots, its price or CLOSED, its name)
     D.push({ key: yc + 0.305, f: () => { beltTop(SO.inBelt[0], SO.inBelt[2], yc, BO.planer); beltTop(SO.outBelt[0], SO.outBelt[2], yc, BO.planer); } });
     [['saw', ROWY.saw], ['extract', ROWY.extract]].forEach(([k, y]) => { if (open[k]) D.push({ key: y + 0.305, f: () => { beltTop(SO[k + 'InBelt'][0], SO[k + 'InBelt'][2], y, BO[k]); beltTop(SO[k + 'OutBelt'][0], SO[k + 'OutBelt'][2], y, BO[k]); } }); });
     D.push({ key: SO.machine[3] + 0.035, f: planerWindow });
     D.push({ key: SO.machine[3] + 0.036, f: drawBeacon });
     D.push({ key: SO.console[3] + 0.005, f: () => drawButton(SO.console, F.ready(s), run, m.phase === 'jam') });
     if (open.saw) {
-      D.push({ key: SO.sawConsole[3] + 0.005, f: () => drawButton(SO.sawConsole, F.canMill(s, 'saw'), sw.phase === 'run') });
+      D.push({ key: SO.sawConsole[3] + 0.005, f: () => drawButton(SO.sawConsole, F.canMill(s, 'saw'), sw.phase === 'run', sw.phase === 'jam') });
       D.push({ key: SO.saw[3] + 0.025, f: sawBlade });
     }
     if (open.extract) {
-      D.push({ key: SO.extractConsole[3] + 0.005, f: () => drawButton(SO.extractConsole, F.canMill(s, 'extract'), ex.phase === 'run') });
+      D.push({ key: SO.extractConsole[3] + 0.005, f: () => drawButton(SO.extractConsole, F.canMill(s, 'extract'), ex.phase === 'run', ex.phase === 'jam') });
       D.push({ key: SO.extract[3] + 0.025, f: tankLevel });
     }
+    // a jammed slot: its light, its grime (taasgoals step 4)
+    [['saw', open.saw], ['extract', open.extract], ['bench', open.bench]].forEach(([k, on]) => { if (on && F.jammed(s, k)) D.push({ key: SO[k][3] + 0.03, f: () => slotJam(k) }); });
     // things: on the belts, in the machines, in every bin, on the counter
     const items = [];   // [kind, x, y, z, key, turn, scale]
     const beltKey = y => y + 0.31 + items.length * 0.00001;
@@ -4426,8 +4473,10 @@ const MODE = (function () {
     ride(s.belt, SO.bin, SO.machine[2] + 0.45, SO.bin[0] + 0.1, yc);
     if (open.saw) ride(sw.belt, SO.sawOut, SO.sawOutBelt[0] + 0.05, SO.sawOut[0] + 0.1, ROWY.saw);
     if (open.extract) ride(ex.belt, SO.extractOut, SO.extractOutBelt[0] + 0.05, SO.extractOut[0] + 0.1, ROWY.extract);
-    if (open.saw && sw.phase === 'run') { const p = clamp(sw.t / C.sawSec, 0, 1); items.push([sw.item, 1.5 + 1.25 * p, ROWY.saw, 0.77, SO.saw[3] + 0.03]); }
-    if (open.extract && ex.phase === 'run') { const p = clamp(ex.t / C.extractSec, 0, 1); items.push([ex.item, 1.3 + 1.0 * Math.min(1, p * 2.2), ROWY.extract, LIFT(ex.item), beltKey(ROWY.extract)]); }
+    // what a slot is running on, and what jammed it, stuck where it stopped (CFG.jamAt in)
+    const stuck = (m, sec) => clamp(m.phase === 'jam' ? C.jamAt / sec : m.result === 'jam' ? Math.min(m.t, C.jamAt) / sec : m.t / sec, 0, 1);
+    if (open.saw && (sw.phase === 'run' || sw.phase === 'jam') && sw.item) { const p = stuck(sw, C.sawSec); items.push([sw.item, 1.5 + 1.25 * p, ROWY.saw, 0.76 + (isLog(sw.item) ? LOG_R[F.sizeOf(sw.item)] : 0.01), SO.saw[3] + 0.03]); }
+    if (open.extract && (ex.phase === 'run' || ex.phase === 'jam') && ex.item) { const p = stuck(ex, C.extractSec); items.push([ex.item, 1.3 + 1.0 * Math.min(1, p * 2.2), ROWY.extract, LIFT(ex.item), beltKey(ROWY.extract)]); }
     const heap = (list, q, max) => list.slice(-(max || 18)).forEach((k, i) => { const sl = binSlot(q, i); items.push([k, sl.x, sl.y, sl.z + (isLog(k) ? LOG_R[F.sizeOf(k)] : 0), q[1] + 0.02 + i * 0.0001, sl.turn]); });
     heap(s.bin, SO.bin);
     if (open.saw) { heap(sw.in, SO.sawIn); heap(sw.out, SO.sawOut); }
@@ -4457,7 +4506,7 @@ const MODE = (function () {
   function blit(q) {
     let dx = 0;
     const fade = q.slot && ARRIVE[q.slot] !== undefined ? clamp(ARRIVE[q.slot] / ARRIVE_SEC, 0, 1) : 1;   // a machine arriving
-    if (q.shake === 'planer' && s.machine.phase === 'jam') dx = Math.sin(clock * 40) * 1.5;
+    if (q.shake && F.jammed(s, q.shake)) dx = Math.sin(clock * 40) * 1.5;   // any machine, jammed (the planer's look, every slot's since 2026-10-20)
     else if (q.shake === 'planer' && s.machine.phase === 'run') dx = Math.sin(clock * 55) * 0.5;
     else if (q.shake === 'extract' && s.extract.phase === 'run') dx = Math.sin(clock * 47) * 0.5;
     const y = q.y - VW.camY;
@@ -4471,7 +4520,10 @@ const MODE = (function () {
   /* ---------- events from the engine: sound, numbers, sparks ---------- */
   const whirs = {};
   const ARRIVED = { extract: 'the sap extractor', carve: 'the hand crafting bench', saw: 'the table saw' };
-  const AT = { planer: () => [(SO.machine[0] + SO.machine[2]) / 2, ROWY.planer - 0.3, 1.5], saw: () => [2.45, ROWY.saw, 1.2], extract: () => [2.2, ROWY.extract, 1.6] };
+  const AT = { planer: () => [(SO.machine[0] + SO.machine[2]) / 2, ROWY.planer - 0.3, 1.5], saw: () => [2.45, ROWY.saw, 1.2], extract: () => [2.2, ROWY.extract, 1.6], bench: () => [2.85, ROWY.bench, 1.3] };
+  // where a jammed machine smokes (the planer from its chimney), and where a scrub's sparks fly (its console; the bench's front)
+  const SMOKE = { planer: () => [SO.machine[0] + 0.97, SO.machine[1] + 0.4, 1.8], saw: () => [2.6, ROWY.saw, 1.0], extract: () => [2.55, ROWY.extract - 0.2, 1.0], bench: () => [2.85, ROWY.bench, 1.05] };
+  const SCRUB = { planer: () => [(SO.console[0] + SO.console[2]) / 2, SO.machine[3] + 0.05, 0.8], saw: () => [(SO.sawConsole[0] + SO.sawConsole[2]) / 2, SO.saw[3] + 0.05, 0.8], extract: () => [(SO.extractConsole[0] + SO.extractConsole[2]) / 2, SO.extract[3] + 0.05, 0.8], bench: () => [2.85, SO.bench[3] + 0.05, 0.8] };
   function drain() {
     const evs = s.events;
     if (!evs.length) return;
@@ -4490,10 +4542,11 @@ const MODE = (function () {
         case 'made': SND.sfx('done'); puff(SO.machine[2] + 0.05, ROWY.planer, 0.6, 'dust', 10); break;
         case 'milled': SND.sfx('done'); puff(e.at === 'saw' ? 2.45 : 2.8, e.at === 'saw' ? ROWY.saw : ROWY.extract, 0.9, 'dust', 10); break;
         case 'binned': SND.sfx('drop'); break;
-        case 'jam': { const at = e.at || 'planer'; SND.sfx('jam'); if (whirs[at]) { whirs[at].stop(); whirs[at] = null; } puff(SO.machine[0] + 0.97, SO.machine[1] + 0.4, 1.8, 'smoke', 8); break; }   // (slots 02-04's jam look: taasgoals step 4)
+        case 'jam': { const at = AT[e.at] ? e.at : 'planer', p = SMOKE[at](); SND.sfx('jam'); if (whirs[at]) { whirs[at].stop(); whirs[at] = null; } puff(p[0], p[1], p[2], 'smoke', 8); break; }   // at the machine that jammed
         case 'cleaned': {
-          SND.sfx('clean'); puff((SO.console[0] + SO.console[2]) / 2, SO.machine[3] + 0.05, 0.8, 'spark', 14);
-          if (e.cost) FLOAT.push({ x: (SO.machine[0] + SO.machine[2]) / 2, y: ROWY.planer - 0.3, z: 1.5, text: '-' + usd(e.cost), color: '#ff8a8a', sub: 'jam fixed', age: 0 });
+          const at = AT[e.at] ? e.at : 'planer', p = SCRUB[at](), q = AT[at]();
+          SND.sfx('clean'); puff(p[0], p[1], p[2], 'spark', 14);
+          if (e.cost) FLOAT.push({ x: q[0], y: q[1], z: q[2], text: '-' + usd(e.cost), color: '#ff8a8a', sub: 'jam fixed', age: 0 });
           break;
         }
         case 'customer': SND.sfx('bell'); break;
@@ -4635,7 +4688,7 @@ const MODE = (function () {
   }
   function optButton(o) {
     let inner = ICON[o.icon] || '', label = '', aria = '';
-    if (o.icon === 'put' || o.icon === 'take') { inner = mini(o.item) + ARROW[o.icon]; label = 'x' + o.count; aria = (o.icon === 'put' ? 'Put ' : 'Take ') + NAME(o.item) + (o.icon === 'put' ? ' in' : ' out') + (o.count > 1 ? ', ' + o.count : ''); if (!o.enabled) { label = '0'; aria = 'Nothing to put in'; } }
+    if (o.icon === 'put' || o.icon === 'take') { inner = mini(o.item) + ARROW[o.icon]; label = 'x' + o.count; aria = (o.icon === 'put' ? 'Put ' : 'Take ') + NAME(o.item) + (o.icon === 'put' ? ' in' : ' out') + (o.count > 1 ? ', ' + o.count : ''); if (!o.enabled) aria = 'No room in this stall for ' + NAME(o.item); }   // (a full stall: what you carry, faded, its count in red)
     else if (o.icon === 'cut') { inner = mini(o.item); label = CUT_LABEL[F.kindOf(o.item)]; aria = 'Cut into ' + NAME(o.item); }
     else if (o.icon === 'sell') { inner = mini(o.item); label = usd(o.price); aria = 'Sell ' + SELL_NAME(o.item) + ' here, ' + usd(o.price) + ' now'; }
     // a stall's first level (the CD's words, 2026-10-20) and the way back up from its second
@@ -4655,7 +4708,7 @@ const MODE = (function () {
       aria = { 'job:operate': 'Run the planer', 'job:saw': 'Run the table saw', 'job:extract': 'Run the sap extractor', 'job:carve': 'Carve at the bench', 'job:rest': 'Rest', hire: 'Hire a robot', notes: 'Instructions', buystall: 'Buy a stall here' }[o.id] || '';
       if (o.id === 'buystall' && o.price !== null) aria += ', $' + o.price;
     }
-    return '<button class="fx-opt' + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + esc(aria) + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
+    return '<button class="fx-opt' + (o.id === 'back' ? ' fx-back' : '') + (o.on ? ' on' : '') + (o.enabled ? '' : ' off') + '" data-opt="' + o.id + '" aria-label="' + esc(aria) + '"' + (o.enabled || o.on ? '' : ' disabled') + '>' + inner + (label ? '<span class="fx-lbl">' + label + '</span>' : '') + '</button>';
   }
   // a bin you put things in and take them out of (the planer's, the three input bins, the recycle
   // bin): what you carry that it takes on top, what is in it below, and a line between them that
@@ -4688,7 +4741,7 @@ const MODE = (function () {
   // saw's three cuts), each with what a customer pays for it now; the one it sells is marked
   const SELL_ROWS = [['plank', 'sap'], ['b2x4'], ['b2x2'], ['dowels']];
   const stallRows = opts => SELL_ROWS.map(ks => '<div class="fx-brow">' + opts.filter(o => o.icon === 'sell' && ks.indexOf(F.kindOf(o.item)) >= 0).map(optButton).join('') + '</div>').join('');
-  // a stall's second levels open under a back button (step 4 of taasgoals lays them out)
+  // a stall's second levels open under a short back button: Re-assign's thirteen rows, Re-stock's two halves
   const BACK_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="#1d2430" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const backRow = opts => opts.some(o => o.id === 'back') ? '<div class="fx-brow">' + optButton(opts.find(o => o.id === 'back')) + '</div>' : '';
   function renderBubble() {
@@ -4705,6 +4758,7 @@ const MODE = (function () {
         bubbleEl.classList.toggle('bin', bin);
         const sells = b.kind === 'stall' && opts.some(o => o.icon === 'sell');
         bubbleEl.classList.toggle('stall', sells);
+        bubbleEl.classList.toggle('stall1', b.kind === 'stall' && opts.some(o => o.id === 'restock'));   // Re-assign, Re-stock, Close
         if (bin) bubbleEl.innerHTML = backRow(opts) + binHalves(b, opts);
         else if (sells) bubbleEl.innerHTML = backRow(opts) + stallRows(opts);
         else if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + opts.map(optButton).join('') + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
@@ -4718,11 +4772,18 @@ const MODE = (function () {
     // over the thing it is about; where there is no room above, under it (a stall's thirteen things
     // covered the stall itself, 2026-10-17), and failing that wherever it fits
     const yb = PY(an[1], 0) + 12, under = y - h - 14 < VW.hudBottom + 6 && yb + h <= VW.h - 6;
-    const left = clamp(x - w / 2, 6, VW.w - w - 6), top = under ? yb : clamp(y - h - 14, VW.hudBottom + 6, VW.h - h - 6);
+    let left = clamp(x - w / 2, 6, VW.w - w - 6), top = under ? yb : clamp(y - h - 14, VW.hudBottom + 6, VW.h - h - 6), side = false;
+    // too tall for either (a stall's thirteen things on a landscape phone, 2026-10-20): beside the
+    // thing instead, so it never covers what it is about
+    if (x > left - 4 && x < left + w + 4 && y > top - 4 && y < top + h + 4) {
+      if (x - w - 24 >= 6) { left = x - w - 24; side = true; }
+      else if (x + 24 + w <= VW.w - 6) { left = x + 24; side = true; }
+      if (side) top = clamp(y - h / 2, VW.hudBottom + 6, VW.h - h - 6);
+    }
     bubbleEl.style.transform = 'translate(' + Math.round(left) + 'px,' + Math.round(top) + 'px)';
     bubbleEl.style.setProperty('--tail', clamp(x - left, 18, w - 18) + 'px');
-    bubbleEl.classList.toggle('under', under);
-    bubbleEl.classList.toggle('below', !under && top > y - h);
+    bubbleEl.classList.toggle('under', under && !side);
+    bubbleEl.classList.toggle('below', side || (!under && top > y - h));
   }
   bubbleEl.addEventListener('click', ev => {
     const btn = ev.target.closest('[data-opt]');
@@ -4769,18 +4830,23 @@ const MODE = (function () {
     panelBody.innerHTML =
       '<h2>Robot factory</h2>' +
       '<p><b>The goal</b>: ' + esc(goalText()) + '. The planer (slot 01) is a task you can always do yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
+      // the goals and what each brings (the CD, 2026-10-20), read from the table
+      '<p><b>Goals</b>: the wall shows one at a time, and each one met brings a machine.</p><ol class="fx-goals">' + C.goals.map(q => '<li>' + (q.item ? 'Sell ' + sellN(q.item, q.n) + '. Each one a customer buys counts, from any stall, once the goal is up' : 'More than $' + q.money + ' and more than ' + q.sat + '% customer satisfaction, both for ' + q.sec / 60 + ' minutes without a break: the wall counts the time down, and starts it again at ' + q.sec / 60 + ' minutes whenever either one fails') + '. Then <b>' + ARRIVED[q.unlocks] + '</b> arrives in slot 0' + (F.SLOT_JOBS.indexOf(q.unlocks) + 2) + '.</li>').join('') + '</ol>' +
       '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
-      '<p><b>Wood</b> comes in three sizes, small, medium and large (2\', 4\' and 8\'), and three qualities: normal, gnarled and sappy. The planer\'s input bin starts with ' + C.startLogs + ' logs, and <b>when it runs out ' + C.restock.n + ' more arrive for ' + usd(C.restock.cost) + '</b>. Of the logs bought, ' + pct(Z.s) + ' are small, ' + pct(Z.m) + ' medium and ' + pct(Z.l) + ' large; ' + pct(Q.gnarled) + ' are gnarled and ' + pct(Q.sappy) + ' sappy. The planer makes a normal log a plank of its size and a gnarled one a gnarled plank (its holes kept); any sap log jams it. <b>Every machine costs ' + usd(C.logCost) + ' for each thing it processes</b> (electricity and wear), whoever presses the button and whatever the thing, and <b>fixing a jam costs ' + usd(C.fixCost) + '</b>, so money can go below zero. You press the normal medium logs, and any normal log you put in its bin yourself (yours roll in first), and toss the rest in the recycle bin.</p>' +
-      '<p><b>Your arms</b>: tap an output bin to take everything in it, tap a stall on the counter to stock it with what you carry of what it sells (the rest stay with you), and tap the recycle bin or a machine\'s input bin to put things in or take them back out: what you carry that it takes is on top, what is in it below. No bin ever fills up.</p>' +
-      '<p><b>The sales counter</b> has room for ' + C.stalls.n + ' stalls. The first sells medium planks; tap an empty place on the counter to buy another (' + usd(s.flat.stall) + ' each), and tap any stall to choose what it sells: anything with a price. Whatever was in it comes back into your arms. The stalls need nobody: customers come in at the door, each for one of the stalls that sells something (any of them as likely), wait across the counter from it (or in the line along the back wall while someone is there) and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything else in a stall still sells as the stall\'s thing and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: a stall\'s price times it, but never less than the thing cost to make (' + usd(C.floor.plank) + ' for a plank, a log and a press; each stall\'s label shows what they pay now). Prices: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length. Each fair sale wins a point back, and customers slowly forget.</p>' +
-      '<p><b>Slots 02 to 04</b> are run by you or by a robot. The table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length (' + usd(C.sawCost) + '); the sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer\'s input bin (' + usd(C.extractCost) + '); at the bench you carve gnarled wood into something to keep.</p>' +
+      '<p><b>Wood</b> comes in three sizes, small, medium and large (2\', 4\' and 8\'), and three qualities: normal, gnarled and sappy. The planer\'s input bin starts with ' + C.startLogs + ' logs, and <b>when it runs out ' + C.restock.n + ' more arrive for ' + usd(C.restock.cost) + '</b>. Of the logs bought, ' + pct(Z.s) + ' are small, ' + pct(Z.m) + ' medium and ' + pct(Z.l) + ' large; ' + pct(Q.gnarled) + ' are gnarled and ' + pct(Q.sappy) + ' sappy. The planer makes a normal log a plank of its size and a gnarled one a gnarled plank (its holes kept). <b>Every machine costs ' + usd(C.logCost) + ' for each thing it processes</b> (electricity and wear), whoever presses the button and whatever the thing, and <b>fixing a jam costs ' + usd(C.fixCost) + '</b>, so money can go below zero. You press the normal medium logs, and any normal log you put in its bin yourself (yours roll in first), and toss the rest in the recycle bin.</p>' +
+      '<p><b>Your arms</b>: every bin and every stall works the same way. Tap it and its bubble shows what you carry on top and what is in it below: tap a thing on top to put every one of that kind in, a thing below to take them all back out. <b>Any bin takes anything</b>, the input bins, the output bins and the recycle bin alike, and no bin ever fills up. Nothing happens by itself when you get there. Put the right things in an output bin and a stall\'s robot will fetch them from it.</p>' +
+      '<p><b>The sales counter</b> has room for ' + C.stalls.n + ' stalls. The first sells medium planks; tap an empty place on the counter to buy another (' + usd(s.flat.stall) + ' each). Tap a stall for three choices: <b>Re-assign</b>, what it sells (anything with a price; whatever was in it comes back into your arms, and nothing goes in by itself); <b>Re-stock</b>, your arms and the stall\'s stock, as at a bin (a stall holds ' + C.stallCap + ', and the rest stay in your arms); and <b>Close</b>. The green dots over a stall\'s label count the things in it, one dot each. The stalls need nobody: customers come in at the door, each for one of the open stalls that sells something (any of them as likely), wait across the counter from it (or in the line along the back wall while someone is there) and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything else in a stall still sells as the stall\'s thing and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: a stall\'s price times it, but never less than the thing cost to make (' + usd(C.floor.plank) + ' for a plank, a log and a press; each stall\'s label shows what they pay now). Prices: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length. Each fair sale wins a point back, and customers slowly forget.</p>' +
+      '<p><b>Closing a stall</b>: its label says CLOSED in place of the price, and nobody new comes for it. A customer waiting for it who has not started paying goes to another open stall, or walks out if none is open, which costs nothing; while every stall is closed nobody comes in. What is in it stays (dots and all), you can still re-assign and re-stock it, its robot stands by, and <b>Open</b> puts it back.</p>' +
+      '<p><b>Slots 02 to 04</b> arrive with the goals, in this order: 02 the sap extractor, 03 the hand crafting bench, 04 the table saw. Each is run by you or by a robot. The sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer\'s input bin (' + usd(C.extractCost) + '); at the bench you carve gnarled wood into something to keep; the table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length (' + usd(C.sawCost) + ').</p>' +
+      '<p><b>The wrong thing in a machine</b>: since any bin takes anything, a machine can be run on something it is not made for, and then <b>it jams</b>. The planer jams on anything but a normal or gnarled log (a sap log, a plank, anything), the table saw on anything but a plank (gnarled ones too), the sap extractor on anything but a log, and the bench\'s chisel breaks on anything but gnarled wood (a gnarled log or a gnarled plank). The run is paid for, the machine stops ' + C.jamAt + ' seconds in, and it stays jammed, shaking and flashing amber, until you tap it and scrub it clean: <b>' + usd(C.fixCost) + '</b>, and whatever jammed it goes in the recycle bin. The sap extractor run on a log with no sap in it (a normal or a gnarled one) does not jam: <b>it runs empty</b>, ' + usd(C.extractCost) + ' for nothing, and gives the log back. You never get it wrong: at a machine whose next thing is wrong for it, you toss that thing in the recycle bin instead, one a tap. A robot runs whatever it is given, and a jam stops it until you scrub it.</p>' +
+      '<p><b>Prices</b> in the menu set what each robot and each stall costs, from $' + C.flat.min + ' to $' + C.flat.max + ' (' + usd(s.flat.robot) + ' a robot and ' + usd(s.flat.stall) + ' a stall now). Start over keeps them.</p>' +
       '<p>Each robot\'s page ends in its <b>evals</b>: what it has done, counted, with a dot for how it went. Reset them to start counting again after you change its instructions.</p>' +
       '<ul>' +
       '<li><b>Green</b>: what was asked: a medium log made into a medium plank; a log or a thing put in the recycle bin as told; a stall\'s own thing put in it; a plank cut, a sap log pressed or a carving made on slots 02 to 04; a wait between tasks, as told.</li>' +
-      '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; any other log cut into a plank; a reach that came up with something other than the stall\'s thing; anything done against the robot\'s own instructions.</li>' +
-      '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the planer until you scrub it clean yourself; anything else put in a stall, which a customer will pay for as the stall\'s thing.</li>' +
+      '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; any other log cut into a plank; a reach that came up with something other than the stall\'s thing; the sap extractor run on a log with no sap; anything done against the robot\'s own instructions.</li>' +
+      '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a machine run on the wrong thing, which jams it until you scrub it clean yourself; anything else put in a stall, which a customer will pay for as the stall\'s thing.</li>' +
       '<li><b>A stall\'s robot</b> waits at the output bin its stall\'s thing comes out of (planks the planer\'s, cut wood the saw\'s, sap the extractor\'s), takes one and walks it over; the first stall\'s, on planks, has the bin behind it and the stall in front. Told to stock only its stall\'s thing, it leaves everything else where it is and hunts for one: each reach finds one as often as that thing makes up the bin, and a reach that comes up with something else is a "looking for" it. Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up, but never its stall\'s own thing.</li>' +
-      '<li><b>Robots</b>: up to ' + C.names.length + ', ' + usd(s.flat.robot) + ' each, each to one job: the planer, a stall bought, or slots 02 to 04. The robots on slots 02 to 04 get nothing wrong yet: they press the saw or the extractor whenever there is something in its input bin and carve whatever is on the bench (the saw\'s robot makes the cut set on its page), and only one pair of hands fits at the bench.</li>' +
+      '<li><b>Robots</b>: up to ' + C.names.length + ', ' + usd(s.flat.robot) + ' each, each to one job: the planer, a stall bought, or a slot whose machine has arrived. The robots on slots 02 to 04 press the extractor or the saw whenever there is something in its input bin and carve whatever comes onto the bench, whatever it is, so the wrong thing jams it (the saw\'s robot makes the cut set on its page), and only one pair of hands fits at the bench.</li>' +
       '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once two robots are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job (or another stall\'s thing) does nothing. One is on the list from the start and suits any robot: <b>Wait between tasks</b>. Under its slot you set how long, ' + C.wait.min + ' to ' + C.wait.max + ' seconds (' + C.wait.start + ' to begin with), and the robot waits that long after each log it handles, each thing it stocks or recycles, and each thing it makes on slots 02 to 04.</li>' +
       '</ul>' +
       // what the game has taught the CD so far (the CD, 2026-10-16: "add these to a list of tips in the
@@ -5051,7 +5117,7 @@ const MODE = (function () {
     stepFx(dt);
     const mq = SO.machine;
     if (s.machine.phase === 'run' && s.machine.result !== 'jam' && Math.random() < dt * 30) puff(mq[2] + 0.03, ROWY.planer, 0.62, 'dust', 1);
-    if (s.machine.phase === 'jam' && Math.random() < dt * 3) puff(mq[0] + 0.97, mq[1] + 0.4, 1.8, 'smoke', 1);
+    ['planer', 'saw', 'extract', 'bench'].forEach(k => { if (F.jammed(s, k) && (k === 'planer' || F.placeOpen(s, k)) && Math.random() < dt * 3) { const p = SMOKE[k](); puff(p[0], p[1], p[2], 'smoke', 1); } });   // every jammed machine smokes
     if (s.saw.phase === 'run' && Math.random() < dt * 25) puff(2.45 + 0.2, ROWY.saw, 0.9, 'dust', 1);
     const carving = (s.avatar.act && s.avatar.act.kind === 'carve') || s.robots.some(r => r.job === 'carve' && r.state === 'carve');   // you or the bench's robot
     if (carving && Math.random() < dt * 14) puff(2.85, ROWY.bench - 0.05, 0.95, 'dust', 1);
