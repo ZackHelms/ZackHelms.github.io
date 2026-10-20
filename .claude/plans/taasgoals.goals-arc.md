@@ -246,7 +246,7 @@ question is genuinely unclear.
 |---|---|---|
 | 0 | The CD's brief and four answers recorded (this file) | DONE 2026-10-20 |
 | 1 | Engine: goals and unlocks, the slots' new order, flat prices, saves; rules rows | DONE 2026-10-20 |
-| 2 | Engine: bins and stalls take anything, the stall's menu, closing, wrong-input jams; rules rows | open |
+| 2 | Engine: bins and stalls take anything, the stall's menu, closing, wrong-input jams; rules rows | DONE 2026-10-20 |
 | 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | open |
 | 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | open |
 | 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | open |
@@ -516,6 +516,141 @@ whether the goals feel right in pace.
     `eval-taas-factory.cjs` was not run or edited; its personas now start with slots 02-04 locked and
     robots and stalls at $1, so the existing ones need `s.goal = 3` before any of their numbers mean
     what they did.
+- **Step 2 results (2026-10-20, engine: bins and stalls take anything, the stall's menu, closing,
+  wrong-input jams).**
+  - **Built** (`games/taas/index.html`, FACTORY block): `ACCEPTS` now names all nine bins (the four
+    input bins, the four output bins, the recycle bin), each `isItem`: nothing filters what goes in.
+    What a machine is made for is a separate table, `RIGHT` (`planer`, `saw`, `extract`, `bench`), and
+    `runOf(key, item)` says what a run comes to: `'run'`, `'empty'` (the extractor on a normal or
+    gnarled log) or `'jam'`. `MACHINES`, `stateOf()`, `jammed()`; `rejectsLog()` matches logs only.
+    State: a mill has `result` and `dirt`; the bench (`newBench()`) has `phase` ('idle' / 'jam') and
+    `dirt`; a stall has `closed`. **Bins**: `BUBBLES` gains the four output bins and `arrive()` no longer
+    starts a `pick`; a stall arrives at `{ kind: 'stall', i, menu: null }` and no longer stocks itself.
+    **Stall menu** (`options()` and a new `chooseStall()`): `menu: null` -> `assign`, `restock`, `close` /
+    `open` (icon `rest`, `on` when closed); `'assign'` -> `back` + the 13 `sell:` rows; `'stock'` -> `back`,
+    a `put:` per kind you carry (any kind; disabled once the stall holds `CFG.stallCap`) and a `take:` per
+    kind in it. A put fills to the cap as `{ item, by: 'player' }` (a `stocked` event, `tally.stocked`),
+    the rest stay in your arms; a take returns every one of a kind (`took`, `at: 'stall'`). `sell:` sets
+    the stall as before (unsold stock into your arms, its robot released) without stocking and goes back
+    to `menu: null`. **Closing**: `openStalls()` drops a closed stall; `stepShop()` admits nobody and rolls
+    no die while none is open (`open.length` guard); each customer not paying whose stall is not open
+    re-picks (`pick()`, the `stall` die only when there is a choice; a `repick` event) or, with none open,
+    walks out (`walkout`, no satisfaction cost); a closed stall's robot starts nothing new. **Jams**: the
+    mills' `startMill()` records `result` (event `press` carries it) and `stepMill()` jams `CFG.jamAt` into
+    a wrong run (event `jam { at, item, by }`, `credit(by, 'jam:' + item)`), runs an empty run its whole
+    length (the log back, `milled { empty: true }`, `credit('empty:' + log)`, `GRADE.empty = 'soso'`);
+    the bench (`benchNext()`, `jamBench()`) jams the same way and rolls no `carve` die for a wrong piece;
+    `miller()` / `carver()` wait `stuck` on a jam. `unjam(s, key, by)` is the one clean: $5, the machine
+    free, `cleaned { at, item }` and the jammed thing to the recycle bin (`recycled { from: 'jam' }`), the
+    planer's sap jam included; the avatar's `clean` act carries `on` (absent = the planer). **Your toss**:
+    `pressMill()` and `carve()` scrub a jam, else toss a wrong first thing (`tossAt()`, act `toss { on }`,
+    `tossOut()`, one a tap, `recycled { from: key }`, `tally.tossed`); a wrong piece left on the bench is
+    tossed off it; a tap on a jammed saw scrubs it (no bubble). **Saves** (`load()`): no `ACCEPTS`
+    filtering; the planer's in-feed keeps any thing; mill and bench jams kept with their `dirt` (clamped
+    0.01-1); a mill run on anything kept (its `result` worked out again); `closed` filled false; a stall
+    bubble's `menu` validated; `clean` / `toss` `on` validated (else the planer), a `press` at the bench
+    dropped. An old save's `pick` and `stock` acts stay in `ACTS` and **finish** as they began (tested).
+    Exported: `RIGHT, MACHINES, runOf, jammed`.
+  - **Rules suite** `drive-taas-factory.cjs`: **308 -> 358** (50 added in a new section 17, none
+    removed). Section 17: the bin table and `RIGHT` / `runOf` table, grades; every one of the nine bins
+    at once (nothing on arrival, anything in, anything back out); yours first in the rack whatever it is;
+    a stall's three levels, back from each, bad ids refused at each level, re-assign without stocking,
+    re-stock to six with the rest kept and a full stall refusing more, take back, a log and a carving in
+    a stall, a log sold as a medium plank (a wrong sale), an empty place only a stall to buy; close /
+    open (stock kept, re-stock and re-assign while closed); a paying customer finishing, the re-pick with
+    one choice (no die, two waiting and one walking in) and the walk over, with two choices (a die each),
+    none open (walk out, no drain), nobody admitted and no die while none open, the next walking in on
+    open; a closed stall's robot idle, back to work on open, and one already holding a thing putting it
+    in; the planer pressing a small plank under "Only input medium logs" and more (red `jam:plank.s`, no
+    instruction joins) and its scrub putting the plank in the recycle bin, the sap jam's log likewise;
+    each of slots 02-04 jamming on six or five kinds of wrong thing (1.3 s in, run charged, red, stuck,
+    nothing out, no die); the extractor's empty run on a normal and a gnarled log; a scrub at each slot
+    ($5, 2.5 s, the thing to the recycle bin, the robot carrying on) and a half scrub kept; your toss at
+    the extractor, the saw, the bench (and off it) and the planer, and never a jam by you; stall robots
+    fetching what you put in two output bins, and misstocking a wrong one red; saves (odd things in every
+    bin, both slot jams with their scrub, a closed stall, a plank on the in-feed, the bubble's level,
+    carrying on identically), an old save's `pick` and `stock` finishing, an old `clean` with no machine,
+    hand-edited `on` / `menu` / press, a customer at a closed stall in a save.
+  - **Restated rules rows** (same claim, the new path): section 3 "a tap on the planer's output bin ...
+    you take everything in it into your arms" (its bubble, a tap a kind); "a tap on the counter ... stock
+    the medium plank stall with your medium planks, and only those" (Re-stock and a put); "at the
+    planer's input bin the bubble offers every log in your arms" (and the plank). Section 4 "the stall
+    holds 6" (by Re-stock; a full stall takes no more). Section 9 "its input bin takes planks, and only
+    planks" (anything), "a tap on its output bin takes them into your arms" (its bubble), "the sap
+    extractor's input bin takes sap logs, and only sap logs" (anything), "the bench's input bin takes
+    gnarled wood" (anything), and the walk before "the clean log can go in the planer's input bin" (the
+    extractor's output bin through its bubble). Section 11's random play (the in-feed any thing; slots
+    idle / running / jammed with something to scrub; no customer waiting for a closed stall) and "a
+    hand-edited save is clamped" (a plank in the rack is kept, three of the rack yours; stalls carry
+    `closed`). Section 13 "what you put in the table saw's ... input bin can be taken back out" (the
+    bubble also offers what you still carry) and "the plank taken back out of the saw's bin goes on the
+    counter" (Re-stock). Section 14 "its bubble now offers everything a stall can sell" (the Re-assign
+    list under a back button, straight after buying), "the next costs $1 and so does the last" (the
+    first level's three buttons, Re-assign's list), "at the first stall the bubble marks what it sells"
+    (Re-assign), "choosing medium 2x4s instead" (nothing goes in by itself, back to the first level,
+    Re-stock puts them in), "choosing what it already sells changes nothing" (inside Re-assign), "a tap
+    on it stocks it ... up to 6" (Re-stock fills it to 6), the walk in "a customer waiting at a stall
+    when you change what it sells buys the new thing" (Re-assign then Re-stock), "a save from before the
+    four stalls" (`closed` in its JSON). Section 15 the walk in "set the stall to sell something else
+    while its robot carries the old thing" (Re-assign first). No row counted the recycle bin across a
+    cleaned jam (the suites' jam shortcut now adds a sap log to it; nothing it was counting moved).
+  - **Page suite** `drive-taas-factory-ui.cjs`: still **129**; restated: section 2 "a tap on the drawn
+    output bin walks over and takes the plank into your arms" (its bubble opens and a real tap on the
+    plank takes it) and "a tap on the drawn counter walks round to it and stocks the stall" (real taps
+    on Re-stock and the plank; the next row, the customer buying it, unchanged); section 15 "the sap
+    extractor's input bin offers just the sap log" (offers everything you carry: the sap log and the
+    gnarled plank); section 19 "buying it costs $1, and the bubble turns into the thirteen things"
+    (the same rows, under a back button).
+  - **Minimal UI** (no helper text beyond the CD's button words): `anchorOf()` places the four output
+    bins' bubbles over them; `renderBubble()` treats a stall's `menu: 'stock'` as a bin (`binHalves()`),
+    puts a back row (`backRow()`, a chevron icon, aria "Back") over the Re-stock halves and the Re-assign
+    rows (`stallRows()` now takes only `sell` rows); `optButton()` words the first level "Re-assign"
+    (the stall's thing as its picture), "Re-stock" and "Close" / "Open" (the zzz icon); `F.SAMPLE` has
+    placeholders for the output bins and `stall`; the `jam` event stops the whir of the machine that
+    jammed; the evals list words `empty:` ("Ran the extractor on a medium log: no sap"). **Step 4 must
+    still**: lay out the first level and the back row at three sizes, draw the slots' jams (the `jam`
+    puff and the `cleaned` float are still placed at the planer), and word Info.
+  - **Negative tests** (copies only, scratch lists; the repo's break lists are step 5's): 22 one-line
+    breaks run through `negtest-copies.py` on the rules suite, 21 caught by name, 1 crash traced to a row
+    that read a null act (fixed to fail by name, then caught: 2 rows) - ACCEPTS filtering again, a
+    gnarled plank allowed in the saw, no empty run, no mill jam, no recycle on a clean, `rejectsLog()` on
+    anything, a stall stocking itself, output bins without a bubble, no cap on a stall put, `sell:`
+    stocking, closed stalls still open, a re-pick that always rolls, arrivals with none open, a closed
+    stall's robot working, the bench rolling a design for a wrong piece, `load()` filtering the rack or
+    losing `closed`, no red on a jam, a carver not stuck, no walk-out. One more, the toss removed from
+    `pressMill()` alone, was **not** caught and is an equivalent mutant: the press act's own "changed
+    under your hand" guard tosses the thing anyway (a press later); removed from both places (and the
+    bench's toss from both of its), each was caught.
+  - **Gates**: `gates.sh games/taas/index.html` GREEN (factory rules 358, page 129; formal 43 / 39,
+    untouched; evals not run).
+  - assumed: "rough planks included" read as the table saw jamming on a gnarled plank too (it took
+    planks only before, and a cut from a plank with holes would have no meaning yet).
+  - assumed: buying a stall turns its bubble straight to Re-assign (`menu: 'assign'`, it sells nothing
+    yet); every `sell:` (the one it sells included) goes back to the first level.
+  - assumed: Re-stock's puts are disabled once the stall is full, and a put that fills it only part way
+    leaves the rest in your arms (one `stocked` event with the number that went in).
+  - assumed: a customer who walks out of a closed shop costs nothing and is not counted as served; the
+    next customer walks in as soon as a stall opens (the `next` clock is not pushed back while all are
+    closed).
+  - assumed: a closed stall's robot finishes putting in a thing already in its hands (in `place` or
+    `carry`), then starts nothing; a hunt it had decided is kept for when the stall opens.
+  - assumed: a tap on a jammed table saw scrubs it at once (no cuts bubble), as the planer; a wrong
+    piece a robot left on the bench (taken off the job before the chisel broke) is yours to toss off it.
+  - assumed: at the bench a robot's jam is one iteration (it waits the delay, if it holds it, then
+    stands stuck); a jam rolls no die anywhere (the bench rolls its `carve` die only for gnarled wood).
+  - assumed: a cleaned jam's `recycled` event comes `from: 'jam'`, a toss at a slot `from:` the slot's
+    key (`saw`, `extract`, `bench`); a mill save with a jam and a bad `cut` gets the first cut.
+  - **For steps 3-5:** step 3 should know a stall bubble's level is `s.bubble.menu` (the menu's Start
+    over and the pose are unaffected: the pose's `buystall` then `sell:` still works because buying
+    opens Re-assign). Step 4: the jams of slots 02-04 are `s.saw.phase`, `s.extract.phase`,
+    `s.bench.phase === 'jam'` (or `F.jammed(s, key)`), each with `dirt`; the `jam` / `cleaned` events
+    carry `at` and `item`; `walkout` and `repick` events exist if the page wants them; a closed stall is
+    `st.closed`. Step 5: `eval-taas-factory.cjs` (not run here) still picks up output bins by tapping
+    them and stocks stalls on arrival (`want('bin')`, `want('stall')`), chooses `sell:` from a stall's
+    first level (line 204) and treats every `F.ACCEPTS` bubble as a put-only bin (line 207, which now
+    includes the output bins): its personas need the new paths (take from a bin's bubble, Re-stock) and
+    their claims restating; the suites' jam shortcut (`dirt = 0.001` with a `clean` act) now also puts
+    the jammed log in the recycle bin.
 
 ## Handoff
 

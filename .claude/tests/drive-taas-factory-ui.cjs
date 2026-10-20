@@ -154,15 +154,25 @@ const server = http.createServer((req, res) => {
     ok(neg.red > 40 && neg.white < 5 && /^Money -\$0\.10\./.test(said), 'below zero the money board on the wall reads -$0.10, in red (money to the cent)', JSON.stringify(neg) + ' ' + said);
     const bin = await rectOf('binFront');
     await page.touchscreen.tap(centre(bin)[0], bin.y + bin.h * 0.4);
-    for (let i = 0; i < 40 && !(await H(() => window.TAAS_FACTORY.s.avatar.inv.length)); i++) await step(0.1);
+    // (2026-10-20: the output bin opens the recycle bin's bubble, and nothing comes out by itself)
+    let binOpen = false;
+    for (let i = 0; i < 40 && !binOpen; i++) { await step(0.1); binOpen = await H(() => !!document.querySelector('#fx-bubble [data-opt="take:plank.m"]')); }
+    const held0 = await H(() => window.TAAS_FACTORY.s.avatar.inv.length);
+    if (binOpen) await page.tap('#fx-bubble [data-opt="take:plank.m"]');
     await step(0.5);
     const t3 = await S();
-    ok(t3.avatar.inv.join() === 'plank.m' && !t3.bin.length && await H(() => document.getElementById('fx-bubble').hidden), 'a tap on the drawn output bin walks over and takes the plank into your arms (no bubble to answer)', t3.avatar.inv.join());
+    ok(binOpen && !held0 && t3.avatar.inv.join() === 'plank.m' && !t3.bin.length, 'a tap on the drawn output bin walks over and opens its bubble, and a real tap on the plank in it takes it into your arms (2026-10-20: it came with no bubble to answer)', t3.avatar.inv.join());
     const counter = await rectOf('counter');
     await page.touchscreen.tap(counter.x + counter.w * 0.85, counter.y + counter.h * 0.7);
-    for (let i = 0; i < 80 && !(await H(() => window.TAAS_FACTORY.s.stalls[0].stock.length)); i++) await step(0.1);
+    // (2026-10-20: the stall offers Re-assign, Re-stock and Close, and stocks nothing by itself)
+    let three = false;
+    for (let i = 0; i < 80 && !three; i++) { await step(0.1); three = await H(() => ['assign', 'restock', 'close'].every(id => !!document.querySelector('#fx-bubble [data-opt="' + id + '"]'))); }
+    const stocked0 = await H(() => window.TAAS_FACTORY.s.stalls[0].stock.length);
+    if (three) { await page.tap('#fx-bubble [data-opt="restock"]'); await step(0.05); }
+    if (await page.$('#fx-bubble [data-opt="put:plank.m"]')) await page.tap('#fx-bubble [data-opt="put:plank.m"]');
+    await step(0.5);
     const t4 = await S();
-    ok(t4.stalls[0].stock.map(g => g.item).join() === 'plank.m' && !t4.avatar.inv.length, 'a tap on the drawn counter walks round to it and stocks the stall', JSON.stringify(t4.stalls[0].stock));
+    ok(three && !stocked0 && t4.stalls[0].stock.map(g => g.item).join() === 'plank.m' && !t4.avatar.inv.length, 'a tap on the drawn counter walks round to it, and real taps on Re-stock and the plank stock the stall (2026-10-20: it stocked itself)', JSON.stringify(t4.stalls[0].stock));
     // a customer walks in from the door on the left, buys it, and the money comes in
     await H(() => { window.TAAS_FACTORY.s.shop.next = window.TAAS_FACTORY.s.t; });
     await step(0.1);
@@ -721,7 +731,8 @@ const server = http.createServer((req, res) => {
     await page.touchscreen.tap(ei.x + ei.w / 2, ei.y + ei.h / 2);
     open = false;
     for (let i = 0; i < 80 && !open; i++) { await step(0.1); open = await H(() => !!document.querySelector('#fx-bubble [data-opt="put:sappy.l"]')); }
-    ok(open && (await H(() => document.querySelectorAll('#fx-bubble [data-opt]').length)) === 1, 'the sap extractor\'s input bin offers just the sap log');
+    const exOpts = await H(() => [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => b.dataset.opt).join());
+    ok(open && exOpts === 'put:sappy.l,put:rough.m', 'the sap extractor\'s input bin offers everything you carry, the sap log and the gnarled plank (2026-10-20: every bin takes anything; it offered just the sap log)', exOpts);
     await page.tap('#fx-bubble [data-opt="put:sappy.l"]'); await step(0.05);
     const ex = await H(() => window.TAAS_FACTORY.s.extract.in.join());
     ok(ex === 'sappy.l', 'and takes it', ex);
@@ -1046,11 +1057,12 @@ const server = http.createServer((req, res) => {
     ok(open && buy && buy[0] === 'Buy a stall here, $1' && buy[1] === '$1' && buy[2] === 1, 'a tap on an empty place walks you there, and its bubble offers a stall for $1, with a picture of one', JSON.stringify(buy));
     if (await page.$('#fx-bubble [data-opt="buystall"]')) await page.tap('#fx-bubble [data-opt="buystall"]');   // (a missing button fails the rows, not the run)
     await step(0.2);
-    const sells = await H(() => [...document.querySelectorAll('#fx-bubble .fx-brow')].map(r => [...r.querySelectorAll('[data-opt]')].map(b => b.dataset.opt.slice(5) + '=' + b.textContent.trim() + (b.querySelector('svg') ? '' : '!nopic') + (b.classList.contains('on') ? '*' : ''))));
+    const sells = await H(() => [...document.querySelectorAll('#fx-bubble .fx-brow')].map(r => [...r.querySelectorAll('[data-opt^="sell:"]')].map(b => b.dataset.opt.slice(5) + '=' + b.textContent.trim() + (b.querySelector('svg') ? '' : '!nopic') + (b.classList.contains('on') ? '*' : ''))).filter(r => r.length));
+    const backBtn = await H(() => !!document.querySelector('#fx-bubble [data-opt="back"]'));
     const want = await H(() => { const s = window.TAAS_FACTORY.s; return FACTORY.SELLS.map(x => x + '=' + '$' + (Math.abs(FACTORY.priceNow(s, x) - Math.round(FACTORY.priceNow(s, x))) < 0.005 ? Math.round(FACTORY.priceNow(s, x)) : FACTORY.priceNow(s, x).toFixed(2))); });
     const t1 = await S();
-    ok(t1.money === 499 && t1.stalls[1].bought && t1.stalls[1].want === null && sells.map(r => r.length).join() === '4,3,3,3' && [].concat(...sells).slice().sort().join() === want.slice().sort().join(),
-      'buying it costs $1, and the bubble turns into the thirteen things the stall can sell, a row to a kind (planks and sap, then each of the saw\'s cuts), each with a picture and what a customer pays now, none marked', JSON.stringify(sells));
+    ok(t1.money === 499 && t1.stalls[1].bought && t1.stalls[1].want === null && backBtn && sells.map(r => r.length).join() === '4,3,3,3' && [].concat(...sells).slice().sort().join() === want.slice().sort().join(),
+      'buying it costs $1, and the bubble turns into the thirteen things the stall can sell, a row to a kind (planks and sap, then each of the saw\'s cuts), each with a picture and what a customer pays now, none marked (2026-10-20: the Re-assign list, under a back button)', JSON.stringify(sells));
     // the stall's bubble sits under the stall when there is no room over it, and never covers its tray
     const bub = await H(() => { const T = window.TAAS_FACTORY, q = FACTORY.LAYOUT.STALLS[1], b = document.getElementById('fx-bubble').getBoundingClientRect(), p = T.screen((q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, q.z); return { cover: p[0] > b.left && p[0] < b.right && p[1] > b.top && p[1] < b.bottom, on: b.top >= 0 && b.bottom <= innerHeight && b.left >= 0 && b.right <= innerWidth, under: document.getElementById('fx-bubble').classList.contains('under') }; });
     ok(!bub.cover && bub.on, 'the stall\'s bubble is on screen and does not cover the stall it is about (under it, ' + bub.under + ')', JSON.stringify(bub));

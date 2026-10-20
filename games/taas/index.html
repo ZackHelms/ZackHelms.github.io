@@ -767,14 +767,27 @@ const FACTORY = (function () {
   }
   // what a stall can sell: everything with a price (the gnarled planks and carvings have none yet)
   const SELLS = ITEMS.filter(id => priceOf(id) !== null);
-  // what each bin you can put things into takes from your arms
-  const ACCEPTS = {
-    rack: id => LOGS.indexOf(id) >= 0,                             // the planer's input bin: any log (the CD, 2026-10-16)
-    sawIn: id => kindOf(id) === 'plank',                           // the table saw's: planks
-    extractIn: id => kindOf(id) === 'sappy',                       // the sap extractor's: sap logs
-    benchIn: id => kindOf(id) === 'gnarled' || kindOf(id) === 'rough',   // the bench's: gnarled wood
-    recycle: isItem                                                // the recycle bin: anything
+  // every bin you can put things into, and what it takes from your arms: anything, in every one of
+  // them (the CD, 2026-10-20: "use the same add/remove interaction i have with the recycle bin to
+  // every input bin and output bin"; robots will move things between bins later, and get it wrong).
+  // The four input bins, the four output bins and the recycle bin
+  const ACCEPTS = {};
+  ['rack', 'sawIn', 'extractIn', 'benchIn', 'bin', 'sawOut', 'extractOut', 'benchOut', 'recycle'].forEach(k => { ACCEPTS[k] = isItem; });
+  // what each machine is made for, a separate test from what its bin takes: the planer a normal or
+  // gnarled log, the table saw a plank (a gnarled plank jams it too, assumed), the sap extractor a
+  // sap log, the bench gnarled wood. Run on anything else it jams (the CD, 2026-10-20), but for the
+  // extractor on a log with no sap, which it runs empty: the log back, and no sap
+  const RIGHT = {
+    planer: id => makes(id) !== 'jam',
+    saw: id => kindOf(id) === 'plank',
+    extract: id => kindOf(id) === 'sappy',
+    bench: id => kindOf(id) === 'gnarled' || kindOf(id) === 'rough'
   };
+  // what a run of a machine on a thing comes to: 'run' (what it is made for), 'empty' (the extractor
+  // on a normal or gnarled log) or 'jam'
+  const runOf = (key, id) => RIGHT[key](id) ? 'run' : key === 'extract' && (kindOf(id) === 'log' || kindOf(id) === 'gnarled') ? 'empty' : 'jam';
+  // the planer and slots 02-04, by the name their state goes by ('bench' for the bench's job, 'carve')
+  const MACHINES = ['planer', 'saw', 'extract', 'bench'];
 
   // The instruction pool, in the CD's words: six on 2026-10-14, the sap-log one with the third
   // brief, the size ones with the fourth, and with the storefront (2026-10-15) the stocker's. Each
@@ -817,7 +830,9 @@ const FACTORY = (function () {
   // the instructions on the list before any mistake: the delay (the CD, 2026-10-16)
   function startSeen() { const o = {}; RULES.forEach(q => { if (q.start) o[q.id] = true; }); return o; }
   const matches = (m, id) => !!m && (!m.quality || m.quality.indexOf(kindOf(id)) >= 0) && (!m.kind || m.kind.indexOf(kindOf(id)) >= 0) && (!m.size || m.size.indexOf(sizeOf(id)) >= 0);
-  const rejectsLog = (q, log) => matches(q.rejects, log);
+  // an operator's log instructions are about logs: a plank on the in-feed matches none of them, so a
+  // robot presses it and jams the planer (the CD, 2026-10-20; an instruction for it is a follow-up)
+  const rejectsLog = (q, log) => LOGS.indexOf(log) >= 0 && matches(q.rejects, log);
   const recyclesItem = (q, item) => matches(q.recycles, item);
   // the instructions that would have kept a log out of the planer (the look-alikes aside): these
   // join the list when an operator cuts it, or jams the planer with it
@@ -923,7 +938,11 @@ const FACTORY = (function () {
   const LAYOUT = { W, H, SOLID, CRATES, SPOT, SHOP, STALL, STALLS, RECYCLE, ROW };
 
   /* ---------- state ---------- */
-  function newMill() { return { in: [], phase: 'idle', t: 0, item: null, cut: null, by: null, belt: [], out: [] }; }
+  // a mill (the table saw, the sap extractor): result is what its run comes to ('run', 'empty' or
+  // 'jam'), dirt how much of a jam is left to scrub
+  function newMill() { return { in: [], phase: 'idle', t: 0, item: null, cut: null, by: null, result: null, dirt: 0, belt: [], out: [] }; }
+  // the bench: phase 'jam' once the chisel breaks on something that is not gnarled wood
+  const newBench = () => ({ in: [], out: [], item: null, t: 0, design: null, by: null, phase: 'idle', dirt: 0 });
   // what a robot and a stall cost in a factory: whole dollars in bounds, $1 each until set
   function flatOf(f) {
     const F = CFG.flat, o = { robot: F.robot, stall: F.stall };
@@ -948,9 +967,10 @@ const FACTORY = (function () {
       belt: [], bin: [],            // the planer's out-feed and its output bin
       recycle: [],                  // everything in the recycle bin, newest last
       saw: newMill(), extract: newMill(),
-      bench: { in: [], out: [], item: null, t: 0, design: null, by: null },   // by: who is carving it
+      bench: newBench(),            // by: who is carving it
       // the counter's stalls: the first bought from the start and selling medium planks
-      stalls: STALLS.map((q, i) => ({ bought: !i, want: i ? null : CFG.stalls.start, stock: [] })),
+      // closed: shut by you, so nobody comes for it (the CD, 2026-10-20)
+      stalls: STALLS.map((q, i) => ({ bought: !i, want: i ? null : CFG.stalls.start, stock: [], closed: false })),
       shop: { people: [], next: CFG.shop.first, n: 0, served: 0, wrong: 0 },
       seen: startSeen(),            // rule id -> true once a robot has made the mistake it prevents (or from the start)
       avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0, inv: [] },
@@ -1112,8 +1132,8 @@ const FACTORY = (function () {
     });
     if (a.task && !a.task.arrived && !a.path.length) arrive(s);
   }
-  // the stalls customers come for: bought, with something set to sell
-  const openStalls = s => s.stalls.map((st, i) => st.bought && st.want ? i : -1).filter(i => i >= 0);
+  // the stalls customers come for: bought, with something set to sell, and not closed
+  const openStalls = s => s.stalls.map((st, i) => st.bought && st.want && !st.closed ? i : -1).filter(i => i >= 0);
   // money is kept to the cent: every change is rounded, so $0.10 a run adds up exactly
   const cents = v => Math.round(v * 100) / 100;
   function spend(s, what, n) { s.money = cents(s.money - n); s.spent = cents(s.spent + n); s.costs[what] = cents(s.costs[what] + n); }
@@ -1248,7 +1268,7 @@ const FACTORY = (function () {
   // slots' robots make no mistakes yet (the CD): a run of the saw or the extractor, a carving
   const GRADE = { plank: 'good', think: 'soso', cut: 'soso', jam: 'bad', reject: 'good', caught: 'good',
     stock: 'good', misstock: 'bad', looking: 'soso', recycle: 'good', waited: 'good', straight: 'good',
-    sawn: 'good', extracted: 'good', carved: 'good' };
+    sawn: 'good', extracted: 'good', carved: 'good', empty: 'soso' };
   function gradeOf(key) {
     const k = String(key), against = k.slice(-1) === '!', g = GRADE[k.replace(/!$/, '').split(':')[0]] || 'soso';
     return against && g === 'good' ? 'soso' : g;
@@ -1328,7 +1348,7 @@ const FACTORY = (function () {
     m.t += dt;
     if (m.result === 'jam' && m.t >= CFG.jamAt) {
       m.phase = 'jam'; m.t = 0; m.dirt = 1;
-      ev(s, 'jam', { by: m.by, log: m.log });
+      ev(s, 'jam', { by: m.by, log: m.log, at: 'planer', item: m.log });
       if (typeof m.by === 'number' && s.robots[m.by]) { see(s, keepers(m.log), m.by); credit(s, m.by, m.what, s.robots[m.by].against); }
     } else if (m.result !== 'jam' && m.t >= CFG.processSec) {
       const item = m.result, by = m.by, r = typeof by === 'number' ? s.robots[by] : null;
@@ -1360,18 +1380,36 @@ const FACTORY = (function () {
     }
   }
 
-  /* ---------- slots 02 and 03: the table saw and the sap extractor (yours to run, for now) ---------- */
+  /* ---------- jams anywhere: a machine run on the wrong thing (the CD, 2026-10-20) ---------- */
+  // a machine's state by its name: the planer's is s.machine, the others their own
+  const stateOf = (s, key) => key === 'planer' ? s.machine : s[key];
+  const jammed = (s, key) => MACHINES.indexOf(key) >= 0 && stateOf(s, key).phase === 'jam';
+  // a jam scrubbed clean ($5, the CD): whatever the machine, the jammed thing goes in the recycle bin
+  // (one rule everywhere, the CD, 2026-10-20; until then the planer's sap log vanished), and the
+  // machine is free again (the planer's next log rolls in)
+  function unjam(s, key, by) {
+    const m = stateOf(s, key), item = key === 'planer' ? m.log : m.item;
+    if (key === 'planer') restage(s);
+    else { m.phase = 'idle'; m.t = 0; m.item = null; m.by = null; m.dirt = 0; if (key === 'bench') m.design = null; else { m.cut = null; m.result = null; } }
+    spend(s, 'fixes', CFG.fixCost);
+    ev(s, 'cleaned', { cost: CFG.fixCost, at: key, item });
+    recycle(s, item, by, 'jam');
+  }
+
+  /* ---------- slots 02 to 04: the sap extractor, the table saw (and the bench, below) ---------- */
   // a press takes the first thing in the input bin: the saw cuts a plank into two 2"x4"s, four
   // 2"x2"s or sixteen dowel rods of its length, as you choose; the extractor takes a sap log's sap
-  // (1 / 2 / 4 units by its size) and gives back a clean log of the same size. $1 a press each.
+  // (1 / 2 / 4 units by its size) and gives back a clean log of the same size. $0.10 a press each,
+  // whatever it is run on. On anything else either jams CFG.jamAt into the run, but for the
+  // extractor on a log with no sap, which runs its whole run empty and gives the log back
   function canMill(s, key) { const m = s[key]; return m.phase === 'idle' && m.in.length > 0; }
   function startMill(s, key, cut, by) {
     const m = s[key];
     if (!canMill(s, key) || (key === 'saw' && CUTS.indexOf(cut) < 0)) return false;
-    m.item = m.in.shift(); m.cut = key === 'saw' ? cut : null; m.by = by; m.phase = 'run'; m.t = 0;
+    m.item = m.in.shift(); m.cut = key === 'saw' ? cut : null; m.by = by; m.phase = 'run'; m.t = 0; m.result = runOf(key, m.item);
     const cost = key === 'saw' ? CFG.sawCost : CFG.extractCost;
     spend(s, key, cost);
-    ev(s, 'press', { by, at: key, cost, item: m.item, cut: m.cut });
+    ev(s, 'press', { by, at: key, cost, item: m.item, cut: m.cut, result: m.result });
     return true;
   }
   function millOut(key, m) {
@@ -1385,13 +1423,17 @@ const FACTORY = (function () {
     const m = s[key];
     if (m.phase === 'run') {
       m.t += dt;
-      if (m.t >= (key === 'saw' ? CFG.sawSec : CFG.extractSec)) {
-        const outs = millOut(key, m);
+      if (m.result === 'jam' && m.t >= CFG.jamAt) {   // the wrong thing: it jams, and stays jammed until scrubbed
+        m.phase = 'jam'; m.t = 0; m.dirt = 1;
+        ev(s, 'jam', { by: m.by, at: key, item: m.item });
+        credit(s, m.by, 'jam:' + m.item);   // red in a robot's evals (credit() ignores anyone else)
+      } else if (m.result !== 'jam' && m.t >= (key === 'saw' ? CFG.sawSec : CFG.extractSec)) {
+        const empty = m.result === 'empty', outs = empty ? [m.item] : millOut(key, m);   // run empty: the same log back, no sap
         outs.forEach((item, i) => m.belt.push({ item, t: -i * 0.3 }));   // one after another down the out-feed
-        if (m.by === 'player') s.tally.player[key === 'saw' ? 'sawn' : 'extracted']++;
-        else credit(s, m.by, (key === 'saw' ? 'sawn:' : 'extracted:') + m.item);   // a robot's (credit() ignores anyone else)
-        ev(s, 'milled', { at: key, item: m.item, outs, by: m.by });
-        m.phase = 'idle'; m.t = 0; m.item = null; m.cut = null; m.by = null;
+        if (m.by === 'player') { if (!empty) s.tally.player[key === 'saw' ? 'sawn' : 'extracted']++; }
+        else credit(s, m.by, (empty ? 'empty:' : key === 'saw' ? 'sawn:' : 'extracted:') + m.item);   // a robot's (credit() ignores anyone else)
+        ev(s, 'milled', { at: key, item: m.item, outs, by: m.by, empty });
+        m.phase = 'idle'; m.t = 0; m.item = null; m.cut = null; m.by = null; m.result = null;
       }
     }
     for (let k = m.belt.length - 1; k >= 0; k--) {
@@ -1447,15 +1489,28 @@ const FACTORY = (function () {
   }
   function stepShop(s, dt) {
     const P = CFG.shop, sh = s.shop;
-    const line = sh.people.filter(c => c.state !== 'out');
-    if (s.t >= sh.next && line.length < P.max) {
-      // which stall: a die only when there is a choice, so a counter with one stall rolls none
-      const open = openStalls(s), stall = open.length > 1 ? roll(s, 'stall', open.map(i => [i, 1 / open.length]), open[open.length - 1]) : open[0];
+    let line = sh.people.filter(c => c.state !== 'out');
+    // which stall: a die only when there is a choice, so a counter with one stall rolls none
+    const open = openStalls(s), pick = () => open.length > 1 ? roll(s, 'stall', open.map(i => [i, 1 / open.length]), open[open.length - 1]) : open[0];
+    // with every stall closed nobody comes in, and no die is rolled (the next walks in once one opens)
+    if (s.t >= sh.next && line.length < P.max && open.length) {
+      const stall = pick();
       const c = { id: sh.n, x: SHOP.door.x, y: SHOP.laneY, state: 'in', t: 0, stall, at: null, item: null, by: null, wrong: false };
       sh.people.push(c); line.push(c); sh.n++;
       sh.next = s.t + roll(s, 'arrive', P.every.map(v => [v, 1 / P.every.length]), P.every[P.every.length - 1]);
       ev(s, 'customer', { id: c.id, stall });
     }
+    // a stall closed under a customer not yet paying (the CD, 2026-10-20: "closed ... if i want to stop
+    // selling items in it"): it picks again among the open stalls, first come first, or, with none
+    // open, walks back out, which costs nothing (it no longer waits; assumed). One paying finishes
+    line = line.filter(c => {
+      if (c.state === 'pay' || open.indexOf(c.stall) >= 0) return true;
+      const was = c.stall;
+      if (!open.length) { c.state = 'out'; c.t = 0; c.at = null; ev(s, 'walkout', { id: c.id, at: was }); return false; }
+      c.stall = pick();
+      ev(s, 'repick', { id: c.id, from: was, to: c.stall });
+      return true;
+    });
     // paying: a card tapped, and the thing carried away
     line.forEach(c => { if (c.state === 'pay') { c.t += dt; if (c.t >= P.paySec) buy(s, c); } });
     // who stands where, first come first served: the first customer for each stall at its place,
@@ -1509,8 +1564,10 @@ const FACTORY = (function () {
     return null;
   }
   const OUTS = ['bin', 'sawOut', 'extractOut', 'benchOut'];
-  const BUBBLES = ['rack', 'sawIn', 'extractIn', 'benchIn', 'recycle', 'saw', 'dock'];
-  const PLACES = ['machine', 'stall', 'extract', 'bench', 'robot', 'floor'].concat(OUTS, BUBBLES);
+  // the places that open a bubble when you get there: every bin (the output bins too since 2026-10-20,
+  // when they stopped emptying into your arms), the table saw's cuts and the dock
+  const BUBBLES = ['rack', 'sawIn', 'extractIn', 'benchIn', 'bin', 'sawOut', 'extractOut', 'benchOut', 'recycle', 'saw', 'dock'];
+  const PLACES = ['machine', 'stall', 'extract', 'bench', 'robot', 'floor'].concat(BUBBLES);
   const stallAt = (s, i) => i === (i | 0) && i >= 0 && i < s.stalls.length;
   function spotFor(s, task) {
     const a = s.avatar;
@@ -1547,15 +1604,12 @@ const FACTORY = (function () {
     t.arrived = true;
     if (t.spot && t.spot.face !== undefined) a.yawT = t.spot.face;
     if (t.kind === 'machine') work(s);
-    else if (OUTS.indexOf(t.kind) >= 0) a.act = { kind: 'pick', t: 0, from: t.kind, done: false };
-    else if (t.kind === 'stall') {
-      // at a stall you stock it with what you carry of what it sells, and a bubble offers what it
-      // could sell instead (or, at an empty place on the counter, a stall to buy)
-      if (s.stalls[t.i].bought) a.act = { kind: 'stock', i: t.i, t: 0, done: false };
-      s.bubble = { kind: 'stall', i: t.i };
-    }
+    // at a stall a bubble offers Re-assign, Re-stock and Close (the CD's words, 2026-10-20), and
+    // nothing happens by itself (or, at an empty place on the counter, a stall to buy)
+    else if (t.kind === 'stall') s.bubble = { kind: 'stall', i: t.i, menu: null };
     else if (t.kind === 'extract') pressMill(s, 'extract');
     else if (t.kind === 'bench') carve(s);
+    else if (t.kind === 'saw' && jammed(s, 'saw')) a.act = { kind: 'clean', t: 0, on: 'saw' };   // a jammed saw: you scrub it
     else if (t.kind === 'robot') {
       const r = s.robots[t.id];
       if (r) { a.yawT = Math.atan2(r.y - a.y, r.x - a.x); s.bubble = { kind: 'robot', id: t.id }; }
@@ -1567,22 +1621,56 @@ const FACTORY = (function () {
   const yours = m => m.log === 'log.m' || (m.mine && kindOf(m.log) === 'log');
   function work(s) {
     const a = s.avatar, m = s.machine;
-    if (m.phase === 'jam') a.act = { kind: 'clean', t: 0 };
+    if (m.phase === 'jam') a.act = { kind: 'clean', t: 0, on: 'planer' };
     else if (m.phase !== 'ready') a.act = null;
     else if (m.staged < 1) a.act = { kind: 'wait', t: 0 };
     else if (!yours(m)) a.act = { kind: 'toss', t: 0, item: m.log, done: false };
     else a.act = { kind: 'press', t: 0, on: 'planer', done: false };
   }
+  // you at slots 02-04 never get it wrong either (the CD, 2026-10-20): a jam you scrub; a press when
+  // the first thing in the input bin is not what the machine is made for (a clean log in the
+  // extractor included) tosses that thing in the recycle bin instead, one a tap
+  const tossAt = (key, item) => ({ kind: 'toss', t: 0, on: key, item, done: false });
   function pressMill(s, key, cut) {
-    const a = s.avatar;
-    a.act = canMill(s, key) ? { kind: 'press', t: 0, on: key, cut: cut || null, done: false } : null;
+    const a = s.avatar, m = s[key];
+    if (m.phase === 'jam') a.act = { kind: 'clean', t: 0, on: key };
+    else if (!canMill(s, key)) a.act = null;
+    else if (!RIGHT[key](m.in[0])) a.act = tossAt(key, m.in[0]);
+    else a.act = { kind: 'press', t: 0, on: key, cut: cut || null, done: false };
+  }
+  // the thing at a slot you toss: what is on the bench and not gnarled wood (a robot left it there
+  // before the chisel broke), else the first thing in the input bin if it is not right
+  function tossOut(s, key) {
+    const m = s[key];
+    let item = null;
+    if (key === 'bench' && m.phase !== 'jam' && m.item && !RIGHT.bench(m.item)) { item = m.item; m.item = null; m.t = 0; m.design = null; m.by = null; }
+    else if (m.phase !== 'jam' && m.in.length && !RIGHT[key](m.in[0])) item = m.in.shift();
+    if (!item) return false;
+    recycle(s, item, 'player', key);
+    s.tally.player.tossed++;
+    return true;
   }
   // the bench: carve the first piece of gnarled wood in its input bin into something to keep. One
-  // pair of hands at a time: you do not carve while a robot is carving, nor it while you are
+  // pair of hands at a time: you do not carve while a robot is carving, nor it while you are. On
+  // anything else the chisel breaks CFG.jamAt in and the bench is jammed (the CD, 2026-10-20)
   const robotCarving = s => s.robots.some(r => r.job === 'carve' && r.state === 'carve');
   function carve(s) {
+    const b = s.bench, a = s.avatar, next = b.item || b.in[0];
+    if (b.phase === 'jam') a.act = { kind: 'clean', t: 0, on: 'bench' };
+    else if (!next || robotCarving(s)) a.act = null;
+    else a.act = RIGHT.bench(next) ? { kind: 'carve', t: 0 } : tossAt('bench', next);
+  }
+  // the next piece onto the bench: a design rolled only for gnarled wood (a jam rolls nothing)
+  function benchNext(s) {
     const b = s.bench;
-    s.avatar.act = (b.item || b.in.length) && !robotCarving(s) ? { kind: 'carve', t: 0 } : null;
+    b.item = b.in.shift(); b.t = 0;
+    b.design = RIGHT.bench(b.item) ? roll(s, 'carve', DESIGNS.map(d => [d, 1 / DESIGNS.length]), DESIGNS[DESIGNS.length - 1]) : null;
+  }
+  function jamBench(s, by) {
+    const b = s.bench;
+    b.phase = 'jam'; b.t = 0; b.dirt = 1;
+    ev(s, 'jam', { by, at: 'bench', item: b.item });
+    credit(s, by, 'jam:' + b.item);
   }
   function stepAvatar(s, dt) {
     const a = s.avatar;
@@ -1592,7 +1680,11 @@ const FACTORY = (function () {
       if (k.kind === 'press') {
         if (!k.done && k.t >= CFG.pressSec * 0.55) {
           k.done = true;
-          if (k.on && k.on !== 'planer') { startMill(s, k.on, k.cut, 'player'); }
+          if (k.on && k.on !== 'planer') {
+            const mm = s[k.on];
+            if (mm.phase === 'idle' && mm.in.length && !RIGHT[k.on](mm.in[0])) { a.act = tossAt(k.on, mm.in[0]); return; }   // it changed under your hand
+            startMill(s, k.on, k.cut, 'player');
+          }
           else {
             if (m.phase === 'ready' && !yours(m)) { work(s); return; }   // it changed under your hand
             if (press(s, 'player')) s.tally.player.pressed++;
@@ -1600,19 +1692,17 @@ const FACTORY = (function () {
         }
         if (k.t >= CFG.pressSec) a.act = null;
       } else if (k.kind === 'toss') {
-        if (!k.done && k.t >= CFG.tossSec * 0.5) { k.done = true; if (rejectLog(s, 'player')) s.tally.player.tossed++; }
-        if (k.t >= CFG.tossSec) work(s);
+        const slot = k.on && k.on !== 'planer';
+        if (!k.done && k.t >= CFG.tossSec * 0.5) { k.done = true; if (slot) tossOut(s, k.on); else if (rejectLog(s, 'player')) s.tally.player.tossed++; }
+        if (k.t >= CFG.tossSec) { if (slot) a.act = null; else work(s); }   // at a slot one a tap; at the planer on to the next log
       } else if (k.kind === 'wait') {
         if (m.phase !== 'ready' || m.staged >= 1) work(s);
-      } else if (k.kind === 'clean') {
-        if (m.phase !== 'jam') { a.act = null; return; }
-        m.dirt = Math.max(0, m.dirt - dt / CFG.cleanSec);
-        if (m.dirt <= 0) {
-          restage(s); a.act = null;
-          spend(s, 'fixes', CFG.fixCost); s.tally.player.fixed++;
-          ev(s, 'cleaned', { cost: CFG.fixCost });
-        }
-      } else if (k.kind === 'pick') {
+      } else if (k.kind === 'clean') {   // scrubbing a jam: the planer's, or a slot's (on)
+        const key = k.on || 'planer', mm = stateOf(s, key);
+        if (mm.phase !== 'jam') { a.act = null; return; }
+        mm.dirt = Math.max(0, mm.dirt - dt / CFG.cleanSec);
+        if (mm.dirt <= 0) { a.act = null; s.tally.player.fixed++; unjam(s, key, 'player'); }
+      } else if (k.kind === 'pick') {   // a save's act from before every bin had a bubble (2026-10-20): it finishes as it began
         if (!k.done && k.t >= CFG.pickSec * 0.5) {
           k.done = true;
           const from = store(s, k.from), got = from.splice(0, from.length);
@@ -1621,7 +1711,7 @@ const FACTORY = (function () {
           ev(s, 'picked', { from: k.from, items: got });
         }
         if (k.t >= CFG.pickSec) a.act = null;
-      } else if (k.kind === 'stock') {
+      } else if (k.kind === 'stock') {   // likewise a save's stall stocking itself: it finishes
         if (!k.done && k.t >= CFG.stockSec * 0.5) {
           k.done = true;
           const st = s.stalls[k.i], got = [];
@@ -1634,10 +1724,11 @@ const FACTORY = (function () {
         if (k.t >= CFG.stockSec) a.act = null;
       } else if (k.kind === 'carve') {
         const b = s.bench;
-        if (robotCarving(s)) { a.act = null; return; }
+        if (robotCarving(s) || b.phase === 'jam') { a.act = null; return; }
         if (!b.item) {
           if (!b.in.length) { a.act = null; return; }
-          b.item = b.in.shift(); b.t = 0; b.design = roll(s, 'carve', DESIGNS.map(d => [d, 1 / DESIGNS.length]), DESIGNS[DESIGNS.length - 1]);
+          if (!RIGHT.bench(b.in[0])) { a.act = tossAt('bench', b.in[0]); return; }   // you never carve the wrong thing
+          benchNext(s);
         }
         b.by = 'player'; b.t += dt;
         if (b.t >= CFG.carveSec) {
@@ -1791,8 +1882,8 @@ const FACTORY = (function () {
   function stocker(s, r, dt) {
     const i = stallOfJob(r.job), st = s.stalls[i], want = st.want, src = srcOf(want), from = src ? store(s, src) : [];
     switch (r.state) {
-      case 'idle':
-        if (from.length && room(s, i) > 0) { r.state = 'reach'; r.t = 0; }
+      case 'idle':   // a closed stall's robot stands at its post and starts nothing (what it holds it puts in)
+        if (!st.closed && from.length && room(s, i) > 0) { r.state = 'reach'; r.t = 0; }
         return;
       case 'reach': {
         r.yawT = S; r.t += dt;
@@ -1862,13 +1953,16 @@ const FACTORY = (function () {
         return;
     }
   }
-  // a robot on slot 02 or 03 (the CD, 2026-10-16: "nothing yet" goes wrong there): whenever the
-  // machine is idle with something in its input bin, it presses it on the first thing there, the
-  // table saw making the cut set on its page. One press, one iteration; no instruction but the delay
+  // a robot on the extractor or the table saw: whenever the machine is idle with something in its
+  // input bin, it presses it on the first thing there, the table saw making the cut set on its page.
+  // One press, one iteration; no instruction but the delay. It never looks at what it presses (the
+  // CD, 2026-10-20: wrong inputs): the wrong thing jams the machine (red in its evals) and it waits,
+  // stuck, until you scrub it; the extractor on a clean log runs empty (yellow)
   function miller(s, r, dt, key) {
     const m = s[key];
     switch (r.state) {
       case 'idle':
+        if (m.phase === 'jam') { r.mood = 'stuck'; r.moodT = 0.5; return; }
         if (canMill(s, key)) { r.state = 'press'; r.t = 0; }
         return;
       case 'press':
@@ -1883,20 +1977,24 @@ const FACTORY = (function () {
         return;
     }
   }
-  // a robot at the bench, slot 04: it carves the first piece of gnarled wood in the input bin into a
+  // a robot at the bench, slot 03: it carves the first piece of gnarled wood in the input bin into a
   // carving (the design rolled, as yours is), one after another; never while you are carving, and a
   // carving left half done on the bench it finishes. One carving, one iteration
+  // (on anything but gnarled wood the chisel breaks CFG.jamAt in: the bench is jammed, red in its
+  // evals, and it waits, stuck, until you scrub it)
   function carver(s, r, dt) {
     const b = s.bench, yours = s.avatar.act && s.avatar.act.kind === 'carve';
     switch (r.state) {
       case 'idle':
+        if (b.phase === 'jam') { r.mood = 'stuck'; r.moodT = 0.5; return; }
         if ((b.item || b.in.length) && !yours) { r.state = 'carve'; r.t = 0; }
         return;
       case 'carve': {
         r.yawT = N;
-        if (yours || (!b.item && !b.in.length)) { r.state = 'idle'; return; }
-        if (!b.item) { b.item = b.in.shift(); b.t = 0; b.design = roll(s, 'carve', DESIGNS.map(d => [d, 1 / DESIGNS.length]), DESIGNS[DESIGNS.length - 1]); }
+        if (yours || b.phase === 'jam' || (!b.item && !b.in.length)) { r.state = 'idle'; return; }
+        if (!b.item) benchNext(s);
         b.by = r.id; b.t += dt;
+        if (!RIGHT.bench(b.item)) { if (b.t >= CFG.jamAt) { jamBench(s, r.id); done(s, r); } return; }
         if (b.t >= CFG.carveSec) {
           const made = 'carving.' + b.design;
           b.out.push(made);
@@ -1915,7 +2013,10 @@ const FACTORY = (function () {
 
   /* ---------- the chat bubble: what you can do where you stand ---------- */
   const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'carry', 'place', 'cool', 'pause', 'carve'];
-  const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m' };
+  // what an empty half of a bin's bubble shows, faded: what the bin is for
+  const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m',
+    bin: 'plank.m', sawOut: 'b2x4.m', extractOut: 'sap', benchOut: 'carving.bird', stall: 'plank.m' };
+  const BACK = { id: 'back', icon: 'back', enabled: true };
   // the jobs a robot can be given now: the planer, a stall's for each stall bought, slots 02 to 04
   const jobsOpen = s => ['operate'].concat(s.stalls.map((st, i) => st.bought ? 'stock:' + i : null).filter(Boolean), SLOT_JOBS.filter(j => unlocked(s, j)));
   function bubbleOpen(s) {
@@ -1941,10 +2042,20 @@ const FACTORY = (function () {
       const p = hirePrice(s);
       return [{ id: 'hire', icon: 'robot', price: p, enabled: afford(s, p), soldOut: p === null }];
     }
-    if (b.kind === 'stall') {   // a stall: what it could sell, and what a customer pays for each now; an empty place: a stall to buy
+    if (b.kind === 'stall') {   // a stall, in two levels (the CD, 2026-10-20); an empty place: a stall to buy
       const st = s.stalls[b.i];
       if (!st.bought) { const p = stallPrice(s); return [{ id: 'buystall', icon: 'stall', price: p, enabled: afford(s, p) }]; }
-      return SELLS.map(item => ({ id: 'sell:' + item, icon: 'sell', item, price: paid(s, item), on: st.want === item, enabled: true }));
+      // Re-assign: what it could sell, and what a customer pays for each now
+      if (b.menu === 'assign') return [BACK].concat(SELLS.map(item => ({ id: 'sell:' + item, icon: 'sell', item, price: paid(s, item), on: st.want === item, enabled: true })));
+      // Re-stock: the two halves, any thing you carry on top (up to the stall's room), what is in it below
+      if (b.menu === 'stock') {
+        const opts = [BACK], rm = room(s, b.i);
+        kindsIn(a.inv).forEach(q => opts.push({ id: 'put:' + q.item, icon: 'put', item: q.item, count: q.n, enabled: rm > 0, group: 'put' }));
+        kindsIn(st.stock.map(g => g.item)).forEach(q => opts.push({ id: 'take:' + q.item, icon: 'take', item: q.item, count: q.n, enabled: true, group: 'take' }));
+        return opts;
+      }
+      return [{ id: 'assign', icon: 'assign', item: st.want, enabled: true }, { id: 'restock', icon: 'restock', count: st.stock.length, enabled: true },
+        { id: st.closed ? 'open' : 'close', icon: 'rest', on: st.closed, enabled: true }];
     }
     if (b.kind === 'robot') {   // its jobs: the planer, each stall bought, slots 02 to 04; rest; its page
       const r = s.robots[b.id];
@@ -1958,6 +2069,7 @@ const FACTORY = (function () {
     const o = options(s).find(x => x.id === id);
     if (!o || !o.enabled) return false;
     const b = s.bubble, a = s.avatar;
+    if (b.kind === 'stall' && s.stalls[b.i].bought) return chooseStall(s, b, id);
     if (id.indexOf('put:') === 0) {   // everything of that kind in your arms goes in
       const item = id.slice(4), to = store(s, b.kind);
       let n = 0;
@@ -1984,24 +2096,11 @@ const FACTORY = (function () {
       return true;
     }
     if (id.indexOf('cut:') === 0) { pressMill(s, 'saw', id.slice(4)); return true; }
-    if (id === 'buystall') {   // the stall is yours, and the bubble now offers what it could sell
+    if (id === 'buystall') {   // the stall is yours, and the bubble turns to what it could sell (it sells nothing yet; assumed)
       const st = s.stalls[b.i];
       s.money = cents(s.money - o.price); st.bought = true;
+      b.menu = 'assign';
       ev(s, 'stallbought', { i: b.i, price: o.price });
-      return true;
-    }
-    if (id.indexOf('sell:') === 0) {
-      // what the stall sells: anything still in it comes back into your arms (the CD, 2026-10-16),
-      // and you stock it with what you carry of the new thing, as a tap on it would
-      const st = s.stalls[b.i], item = id.slice(5);
-      if (st.want === item) return true;
-      // its robot drops what it was fetching for the old thing (back in that bin) and starts over
-      s.robots.forEach(r => { if (r.job === 'stock:' + b.i && (r.carry || r.hunt !== null || r.state === 'reach')) release(s, r); });
-      const back = st.stock.splice(0).map(g => g.item);
-      a.inv.push.apply(a.inv, back);
-      ev(s, 'stallset', { i: b.i, item, was: st.want, back });
-      st.want = item;
-      a.act = { kind: 'stock', i: b.i, t: 0, done: false };
       return true;
     }
     if (id === 'hire') {
@@ -2025,6 +2124,51 @@ const FACTORY = (function () {
       release(s, r); r.job = job;
       ev(s, 'assigned', { id: r.id, job });
       s.bubble = null;
+      return true;
+    }
+    return false;
+  }
+
+  // a stall bought: its first level (Re-assign, Re-stock, Close or Open), the thirteen things it can
+  // sell, and the two halves of your arms and its stock; back goes up a level
+  function chooseStall(s, b, id) {
+    const st = s.stalls[b.i], a = s.avatar;
+    if (id === 'assign' || id === 'restock') { b.menu = id === 'assign' ? 'assign' : 'stock'; return true; }
+    if (id === 'back') { b.menu = null; return true; }
+    if (id === 'close' || id === 'open') {   // closed: nobody comes for it; its stock stays (the CD, 2026-10-20)
+      st.closed = id === 'close';
+      ev(s, st.closed ? 'stallclosed' : 'stallopened', { i: b.i });
+      return true;
+    }
+    if (id.indexOf('put:') === 0) {   // as many of that kind as there is room for go in; the rest stay in your arms
+      const item = id.slice(4);
+      let n = 0;
+      for (let i = a.inv.length - 1; i >= 0 && room(s, b.i) > 0; i--) if (a.inv[i] === item) { a.inv.splice(i, 1); st.stock.push({ item, by: 'player' }); n++; }
+      s.tally.player.stocked += n;
+      ev(s, 'stocked', { by: 'player', item, n, at: b.i });
+      a.act = { kind: 'put', t: 0, dur: CFG.putSec, item };
+      return true;
+    }
+    if (id.indexOf('take:') === 0) {   // every one of that kind back out into your arms
+      const item = id.slice(5), back = [];
+      for (let i = st.stock.length - 1; i >= 0; i--) if (st.stock[i].item === item) back.unshift(st.stock.splice(i, 1)[0].item);
+      a.inv.push.apply(a.inv, back);
+      ev(s, 'took', { at: 'stall', i: b.i, item, n: back.length });
+      a.act = { kind: 'put', t: 0, dur: CFG.putSec, item };
+      return true;
+    }
+    if (id.indexOf('sell:') === 0) {
+      // what the stall sells: anything still in it comes back into your arms (the CD, 2026-10-16),
+      // and nothing goes in by itself (2026-10-20: Re-stock does that); back to the first level
+      const item = id.slice(5);
+      b.menu = null;
+      if (st.want === item) return true;
+      // its robot drops what it was fetching for the old thing (back in that bin) and starts over
+      s.robots.forEach(r => { if (r.job === 'stock:' + b.i && (r.carry || r.hunt !== null || r.state === 'reach')) release(s, r); });
+      const back = st.stock.splice(0).map(g => g.item);
+      a.inv.push.apply(a.inv, back);
+      ev(s, 'stallset', { i: b.i, item, was: st.want, back });
+      st.want = item;
       return true;
     }
     return false;
@@ -2071,7 +2215,9 @@ const FACTORY = (function () {
       s.flat = flatOf(d.flat);
       const items = (v, ok) => (Array.isArray(v) ? v : []).filter(x => isItem(x) && (!ok || ok(x)));
       const belt = v => (Array.isArray(v) ? v : []).filter(it => it && isItem(it.item)).map(it => ({ item: it.item, t: Math.min(CFG.outSec + CFG.dropSec, +it.t || 0), by: it.by }));
-      s.rack = items(d.rack, ACCEPTS.rack); s.bin = items(d.bin);
+      // every bin takes anything (2026-10-20), so a save keeps whatever is in each, wrong things too
+      const dirtOf = v => num(v) ? Math.max(0.01, Math.min(1, v)) : 1;   // a jam still to scrub (some of it, at least)
+      s.rack = items(d.rack); s.bin = items(d.bin);
       // a save from before the bin of bought logs (2026-10-16): its rack was all yours, and it gets
       // the logs a new factory starts with behind them
       if (typeof d.rackMine === 'number' && Number.isFinite(d.rackMine)) s.rackMine = Math.max(0, Math.min(s.rack.length, Math.floor(d.rackMine)));
@@ -2079,14 +2225,23 @@ const FACTORY = (function () {
       s.recycle = items(d.recycle); s.belt = belt(d.belt);
       ['saw', 'extract'].forEach(key => {
         const m = Object.assign(newMill(), d[key] && typeof d[key] === 'object' ? d[key] : {});
-        m.in = items(m.in, ACCEPTS[key + 'In']); m.out = items(m.out); m.belt = belt(m.belt);
-        if (m.phase !== 'run' || !isItem(m.item) || !ACCEPTS[key + 'In'](m.item) || (key === 'saw' && CUTS.indexOf(m.cut) < 0)) { m.phase = 'idle'; m.item = null; m.cut = null; m.by = null; }
+        m.in = items(m.in); m.out = items(m.out); m.belt = belt(m.belt);
+        // a run (on anything: what it comes to is worked out again) or a jam is kept; anything else is idle
+        const runs = m.phase === 'run' && isItem(m.item) && (key !== 'saw' || CUTS.indexOf(m.cut) >= 0);
+        if (m.phase === 'jam' && isItem(m.item)) { m.result = 'jam'; m.dirt = dirtOf(m.dirt); }
+        else if (runs) { m.result = runOf(key, m.item); m.dirt = 0; }
+        else { m.phase = 'idle'; m.item = null; m.cut = null; m.by = null; m.result = null; m.dirt = 0; }
+        if (key !== 'saw' || CUTS.indexOf(m.cut) < 0) m.cut = key === 'saw' && m.phase !== 'idle' ? CUTS[0] : null;
         m.t = Math.max(0, +m.t || 0);
         s[key] = m;
       });
-      const b = Object.assign({ in: [], out: [], item: null, t: 0, design: null, by: null }, d.bench && typeof d.bench === 'object' ? d.bench : {});
-      b.in = items(b.in, ACCEPTS.benchIn); b.out = items(b.out);
-      if (!isItem(b.item) || !ACCEPTS.benchIn(b.item) || DESIGNS.indexOf(b.design) < 0) { b.item = null; b.design = null; b.t = 0; }
+      const b = Object.assign(newBench(), d.bench && typeof d.bench === 'object' ? d.bench : {});
+      b.in = items(b.in); b.out = items(b.out);
+      // a piece on the bench: gnarled wood with its design, or the wrong thing (no design) on its way to
+      // a jam, or jammed; a save from before the bench could jam has no phase
+      const onBench = isItem(b.item) && (RIGHT.bench(b.item) ? DESIGNS.indexOf(b.design) >= 0 : b.design === null || b.design === undefined);
+      if (b.phase === 'jam' && isItem(b.item)) { b.dirt = dirtOf(b.dirt); b.design = null; }
+      else { b.phase = 'idle'; b.dirt = 0; if (!onBench) { b.item = null; b.design = null; b.t = 0; } else if (!RIGHT.bench(b.item)) b.design = null; }
       b.t = Math.max(0, Math.min(CFG.carveSec, +b.t || 0));
       s.bench = b;
       // the stalls: a save from before there were four (2026-10-16) has the first and nothing else
@@ -2094,9 +2249,10 @@ const FACTORY = (function () {
         const was = d.stalls && d.stalls[i] && typeof d.stalls[i] === 'object' ? d.stalls[i] : {}, bought = !i || was.bought === true;
         const want = bought && SELLS.indexOf(was.want) >= 0 ? was.want : i ? null : CFG.stalls.start;
         const stock = bought && Array.isArray(was.stock) ? was.stock.filter(g => g && isItem(g.item)).slice(0, CFG.stallCap).map(g => ({ item: g.item, by: g.by })) : [];
-        return { bought, want, stock };
+        return { bought, want, stock, closed: bought && was.closed === true };   // a save from before closing: open
       });
-      const open = openStalls(s);
+      // a customer keeps a stall that sells something; one at a closed stall picks again on the next step
+      const open = s.stalls.map((st, i) => st.bought && st.want ? i : -1).filter(i => i >= 0);
       const sh = d.shop && typeof d.shop === 'object' ? d.shop : {};
       s.shop = {
         people: (Array.isArray(sh.people) ? sh.people : []).filter(c => c && ['in', 'wait', 'pay', 'out'].indexOf(c.state) >= 0 && Number.isFinite(+c.x) && Number.isFinite(+c.y))
@@ -2140,18 +2296,24 @@ const FACTORY = (function () {
       const bb = s.bench.by;
       s.bench.by = s.bench.item && (bb === 'player' || (typeof bb === 'number' && s.robots[bb])) ? bb : null;
       const m = s.machine;
-      if (LOGS.indexOf(m.log) < 0) m.log = 'log.m';
-      m.mine = !!m.mine && kindOf(m.log) === 'log';
-      if (m.phase === 'run') { m.result = makes(m.log); if (!m.what) m.what = m.result === 'plank.m' ? 'plank' : 'cut:' + m.log; }
+      // the planer's in-feed keeps whatever is on it (a plank put in its input bin jams it under a robot)
+      if (!isItem(m.log)) m.log = 'log.m';
+      m.mine = !!m.mine;
+      if (m.phase === 'run') { m.result = makes(m.log); if (!m.what) m.what = m.result === 'jam' ? 'jam:' + m.log : m.result === 'plank.m' ? 'plank' : 'cut:' + m.log; }
       else if (m.phase !== 'ready' && m.phase !== 'jam') { m.phase = 'ready'; m.staged = 1; }
+      m.dirt = m.phase === 'jam' ? dirtOf(m.dirt) : 0;
       const a = s.avatar;
       a.inv = items(a.inv);
       if (a.act && ACTS.indexOf(a.act.kind) < 0) a.act = null;
+      // which machine an act is at: a save from before slots 02-04 could jam scrubbed and tossed at the planer
+      if (a.act && (a.act.kind === 'clean' || a.act.kind === 'toss') && a.act.on !== undefined && a.act.on !== null && MACHINES.indexOf(a.act.on) < 0) a.act.on = 'planer';
+      if (a.act && a.act.kind === 'press' && [undefined, null, 'planer', 'saw', 'extract'].indexOf(a.act.on) < 0) a.act = null;
       if (a.act && a.act.kind === 'stock' && !(stallAt(s, a.act.i) && s.stalls[a.act.i].bought)) a.act.i = 0;   // a save from before: the one stall
       if (a.task && a.task.kind === 'counter') a.task.kind = 'stall';
       if (a.task && a.task.kind === 'stall' && !stallAt(s, a.task.i)) a.task.i = 0;
       if (a.task && PLACES.indexOf(a.task.kind) < 0) { a.task = null; a.path = []; }
       if (s.bubble && (typeof s.bubble !== 'object' || (s.bubble.kind === 'counter' || (s.bubble.kind === 'stall' && !stallAt(s, s.bubble.i))))) s.bubble = null;
+      if (s.bubble && s.bubble.kind === 'stall') s.bubble.menu = s.stalls[s.bubble.i].bought && (s.bubble.menu === 'assign' || s.bubble.menu === 'stock') ? s.bubble.menu : null;
       s.satisfaction = Math.max(CFG.satMin, Math.min(100, +s.satisfaction || CFG.satStart));
       s.money = cents(+s.money || 0);   // money may be below zero (logs cost money); kept to the cent
       s.spent = Math.max(0, cents(+s.spent || 0));
@@ -2163,7 +2325,7 @@ const FACTORY = (function () {
     } catch (e) { return null; }
   }
 
-  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, SELLS, RULES, ONLY, BASE, SLOT_JOBS, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, keepers,
+  return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, SELLS, RULES, ONLY, BASE, SLOT_JOBS, GRADE, ACCEPTS, RIGHT, MACHINES, runOf, jammed, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, keepers,
     jobKind, stallOfJob, srcOf, jobsOpen, homeOf, slotOf, unlocked, placeOpen, goalNow, setFlat,
     gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, stallPrice, openStalls, known, slotsOpen, slotPrice, buySlot, setRule, setWait, setCut, rename,
     resetEvals, ready, canMill, store, waitingNow, kindsIn, SAMPLE, path, free, nearestFree, grid, save, load, rects, CELL };
@@ -4275,7 +4437,7 @@ const MODE = (function () {
         case 'made': SND.sfx('done'); puff(SO.machine[2] + 0.05, ROWY.planer, 0.6, 'dust', 10); break;
         case 'milled': SND.sfx('done'); puff(e.at === 'saw' ? 2.45 : 2.8, e.at === 'saw' ? ROWY.saw : ROWY.extract, 0.9, 'dust', 10); break;
         case 'binned': SND.sfx('drop'); break;
-        case 'jam': SND.sfx('jam'); if (whirs.planer) { whirs.planer.stop(); whirs.planer = null; } puff(SO.machine[0] + 0.97, SO.machine[1] + 0.4, 1.8, 'smoke', 8); break;
+        case 'jam': { const at = e.at || 'planer'; SND.sfx('jam'); if (whirs[at]) { whirs[at].stop(); whirs[at] = null; } puff(SO.machine[0] + 0.97, SO.machine[1] + 0.4, 1.8, 'smoke', 8); break; }   // (slots 02-04's jam look: taasgoals step 4)
         case 'cleaned': {
           SND.sfx('clean'); puff((SO.console[0] + SO.console[2]) / 2, SO.machine[3] + 0.05, 0.8, 'spark', 14);
           if (e.cost) FLOAT.push({ x: (SO.machine[0] + SO.machine[2]) / 2, y: ROWY.planer - 0.3, z: 1.5, text: '-' + usd(e.cost), color: '#ff8a8a', sub: 'jam fixed', age: 0 });
@@ -4398,7 +4560,7 @@ const MODE = (function () {
     switch (b.kind) {
       case 'rack': return [0.52, ROWY.planer, 0.95];
       case 'recycle': return [L.RECYCLE.x, L.RECYCLE.y, 0.85];
-      case 'sawIn': case 'extractIn': case 'benchIn': return mid(SO[b.kind], 0.7);
+      case 'sawIn': case 'extractIn': case 'benchIn': case 'bin': case 'sawOut': case 'extractOut': case 'benchOut': return mid(SO[b.kind], 0.7);
       case 'saw': return [2.45, ROWY.saw, 1.2];
       case 'dock': return [1.6, SO.dockPanel[1] + 0.15, 1.35];
       case 'stall': { const q = L.STALLS[b.i]; return [(q.x0 + q.x1) / 2, (q.y0 + q.y1) / 2, 1.0]; }
@@ -4411,6 +4573,11 @@ const MODE = (function () {
     if (o.icon === 'put' || o.icon === 'take') { inner = mini(o.item) + ARROW[o.icon]; label = 'x' + o.count; aria = (o.icon === 'put' ? 'Put ' : 'Take ') + NAME(o.item) + (o.icon === 'put' ? ' in' : ' out') + (o.count > 1 ? ', ' + o.count : ''); if (!o.enabled) { label = '0'; aria = 'Nothing to put in'; } }
     else if (o.icon === 'cut') { inner = mini(o.item); label = CUT_LABEL[F.kindOf(o.item)]; aria = 'Cut into ' + NAME(o.item); }
     else if (o.icon === 'sell') { inner = mini(o.item); label = usd(o.price); aria = 'Sell ' + SELL_NAME(o.item) + ' here, ' + usd(o.price) + ' now'; }
+    // a stall's first level (the CD's words, 2026-10-20) and the way back up from its second
+    else if (o.id === 'assign') { inner = o.item ? mini(o.item) : ICON.stock; label = 'Re-assign'; aria = 'Re-assign: choose what this stall sells'; }
+    else if (o.id === 'restock') { inner = ICON.stock; label = 'Re-stock'; aria = 'Re-stock: put things in this stall or take them out'; }
+    else if (o.id === 'close' || o.id === 'open') { inner = ICON.rest; label = o.id === 'close' ? 'Close' : 'Open'; aria = o.id === 'close' ? 'Close this stall' : 'Open this stall'; }
+    else if (o.id === 'back') { inner = BACK_ICON; aria = 'Back'; }
     else if (o.icon === 'stock') {   // a stall's job: what the stall sells (or the stocking icon while it sells nothing) and its number
       const w = s.stalls[o.i] && s.stalls[o.i].want;
       inner = w ? mini(w) : ICON.stock; label = String(o.i + 1);
@@ -4455,7 +4622,10 @@ const MODE = (function () {
   // a stall's bubble: the thirteen things it can sell, a row to a kind (planks and sap, then the
   // saw's three cuts), each with what a customer pays for it now; the one it sells is marked
   const SELL_ROWS = [['plank', 'sap'], ['b2x4'], ['b2x2'], ['dowels']];
-  const stallRows = opts => SELL_ROWS.map(ks => '<div class="fx-brow">' + opts.filter(o => ks.indexOf(F.kindOf(o.item)) >= 0).map(optButton).join('') + '</div>').join('');
+  const stallRows = opts => SELL_ROWS.map(ks => '<div class="fx-brow">' + opts.filter(o => o.icon === 'sell' && ks.indexOf(F.kindOf(o.item)) >= 0).map(optButton).join('') + '</div>').join('');
+  // a stall's second levels open under a back button (step 4 of taasgoals lays them out)
+  const BACK_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="#1d2430" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const backRow = opts => opts.some(o => o.id === 'back') ? '<div class="fx-brow">' + optButton(opts.find(o => o.id === 'back')) + '</div>' : '';
   function renderBubble() {
     const b = F.bubbleOpen(s), opts = b ? F.options(s) : [];
     const bot = b && b.kind === 'robot' ? s.robots[b.id] : null;
@@ -4465,13 +4635,13 @@ const MODE = (function () {
       if (!b) { bubbleEl.hidden = true; bubbleEl.innerHTML = ''; binLay = null; }
       else {
         bubbleEl.hidden = false;
-        const bin = !!F.ACCEPTS[b.kind];   // every bubble with put and take buttons is a bin's
+        const bin = !!F.ACCEPTS[b.kind] || (b.kind === 'stall' && b.menu === 'stock');   // every bubble with put and take buttons is a bin's (a stall's Re-stock too)
         bubbleEl.classList.toggle('robot', !!bot);
         bubbleEl.classList.toggle('bin', bin);
         const sells = b.kind === 'stall' && opts.some(o => o.icon === 'sell');
         bubbleEl.classList.toggle('stall', sells);
-        if (bin) bubbleEl.innerHTML = binHalves(b, opts);
-        else if (sells) bubbleEl.innerHTML = stallRows(opts);
+        if (bin) bubbleEl.innerHTML = backRow(opts) + binHalves(b, opts);
+        else if (sells) bubbleEl.innerHTML = backRow(opts) + stallRows(opts);
         else if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + opts.map(optButton).join('') + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
         else bubbleEl.innerHTML = opts.map(optButton).join('');
       }
@@ -4575,6 +4745,7 @@ const MODE = (function () {
     misstock: x => { const w = String(x).split('@'); return 'Put ' + NAME(w[0]) + ' in the ' + (w[1] ? NAME(w[1]).replace(/^(a|two|four|sixteen) /, '').replace(/s$/, '') : 'medium plank') + ' stall'; },
     looking: x => 'Looking for ' + (x ? NAME(x) : 'plank'),
     sawn: x => 'Cut ' + NAME(x), extracted: x => 'Took the sap out of ' + NAME(x), carved: x => 'Carved ' + NAME(x),
+    empty: x => 'Ran the extractor on ' + NAME(x) + ': no sap',
     recycle: x => 'Put ' + NAME(x) + ' in the recycle bin',
     waited: () => 'Waited between tasks', straight: () => 'Went straight on'
   };
