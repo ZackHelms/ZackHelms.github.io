@@ -245,7 +245,7 @@ question is genuinely unclear.
 | # | Step | Status |
 |---|---|---|
 | 0 | The CD's brief and four answers recorded (this file) | DONE 2026-10-20 |
-| 1 | Engine: goals and unlocks, the slots' new order, flat prices, saves; rules rows | open |
+| 1 | Engine: goals and unlocks, the slots' new order, flat prices, saves; rules rows | DONE 2026-10-20 |
 | 2 | Engine: bins and stalls take anything, the stall's menu, closing, wrong-input jams; rules rows | open |
 | 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | open |
 | 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | open |
@@ -417,6 +417,105 @@ whether the goals feel right in pace.
   `drive-taas-factory-ui.cjs` 129; eval `eval-taas-factory.cjs` 32; break lists engine 144 (143
   caught), page 108 (107), eval 9 (9); formal 43 / 39 / 9 (source: `.claude/tests/README.md` and the
   stalls arc's Results; list sizes counted from the JSON files).
+- **Step 1 results (2026-10-20, engine: goals, unlocks, the slots' new order, flat prices, saves).**
+  - **Built** (`games/taas/index.html`, FACTORY block): `CFG.goals` (the three rows as designed),
+    `CFG.flat = { robot: 1, stall: 1, min: 0, max: 200 }` in place of `CFG.hire` and
+    `CFG.stalls.prices` (`CFG.stalls` keeps `n` and `start`); state `s.goal` (0-3), `s.goalN`,
+    `s.goalT` (600), `s.flat`; `newGame(seed, flat)` carries `flat` over (through `flatOf()`, clamped
+    whole dollars, $1 each for none or nonsense) and nothing else. `buy()` counts the current goal's
+    thing (`c.item`); `stepGoal()` runs once per sub-step after `stepShop()`: a count goal is met at
+    its `n`, goal 2 counts `s.goalT` down while `s.money > 50 && Math.round(s.satisfaction) > 90` and
+    sets it back to 600 on any step where either fails. A goal met: `s.goal++`, `s.goalN = 0`,
+    `s.goalT = 600`, `clearWay()`, then `ev(s, 'goal', { n, id, unlocks })` (`n` 1-based). `ROW` is
+    `{ planer: 4.0, extract: 7.3, bench: 10.1, saw: 12.75 }` and the bench's solids and spots
+    (`benchIn`, `bench`, `benchOut`, `benchBot`) are offsets from `ROW.bench` (`by(d)`, `r2` moved above
+    the layout). `SLOT_JOBS` is `['extract', 'carve', 'saw']`; `slotOf(k)` maps a place or a SOLID key
+    to its slot's job; `unlocked(s, job)` is derived from `s.goal`; `placeOpen(s, k)`; `jobsOpen()`,
+    `tap()` and `rects()` honour it; `grid()`'s cache key is `'h' + hired + 'g' + goal`.
+    `hirePrice()` is `s.flat.robot` while fewer than `CFG.names.length` (8) are hired, `stallPrice()`
+    `s.flat.stall` while a place is left; `setFlat(s, what, dollars)`; `goalNow(s)` returns
+    `{ i, goal, done, left, t, counting }` for the board. Exported: `slotOf, unlocked, placeOpen, goalNow,
+    setFlat` (and `CFG.goals`, `CFG.flat` through `CFG`). `load()`: version 3; goal, count, countdown and
+    prices filled and clamped (below); `s.robots` sliced to `CFG.names.length`.
+  - **UI lines changed** (the minimum, ahead of steps 3-4): `renderPanel()`'s three lines that read
+    `C.hire` / `C.stalls.prices` now say `usd(s.flat.robot)` / "$1 each"; and, pulled forward from
+    step 3 because rows 02 and 04 would otherwise paint over each other, the floor's `SLOTS` bays are
+    by position from `ROWY` (02 the extractor's row, 03 the bench's, 04 the saw's: the same rectangles
+    as before). Nothing else on the page moved: the saw, extractor and bench sprites already read
+    `SO` / `ROWY`, so they draw at their new rows.
+  - **Rules suite** `drive-taas-factory.cjs`: **260 -> 308** (48 added in a new section 16, none
+    removed). Section 16: the tables; the start (one stall, medium planks, slot 01 only, $1 / $1, the
+    goal now); locked slots as empty floor, taps on their nine places refused, the floor in a bay
+    walkable, no slot job offered or chosen; goal 1 counted at the sale (not at stocking or paying), a
+    medium plank from a 2x4 stall counted, a small one not, met at 50 with its event, the count reset,
+    the extractor's job, places, footprint and a real extraction; nothing counted toward goal 3 while
+    goal 2 is up; goal 2's countdown, a reset by money at $50 and by satisfaction shown as 90% (90.4),
+    counting at 91% (90.6), no count below, a one-step dip after 5 minutes restarting the whole 10
+    minutes (money and satisfaction each), met at 600 s, no countdown while goal 1 is up; goal 3 and
+    "all goals met" (nothing more counts, no event again); every unlocked slot's posts on free floor
+    and reached from every pad with 1 or 8 robots unpacked after each goal; a robot given the new job
+    walks there and works; standing in a bay when its machine arrives, walking across it, and a robot
+    walking through it (all go round); flat prices, `setFlat` bounds and refusals, $0 free below zero,
+    the stall price, no stall price once all four are bought, `newGame(seed, flat)`; saves (new
+    round-trip mid-countdown and carrying on identically, a count part way, an old save -> all met, a
+    hand-edited save clamped, a count at 50 met on the next step); a goal rolls no die (two days roll
+    for roll identical, one meeting goal 1 at its first sale). Twelve breaks applied to copies were
+    each caught (no countdown reset, no grid key, no `clearWay`, counting by the stall's want, no tap
+    gate, no job gate, no rect gate, unrounded satisfaction, old save -> 0, no flat carry, no $0
+    exception, count not reset).
+  - **Restated rules rows** (same claim, the new rule): section 1 "eight robots, each $20 more than
+    the last" (now the flat $1 and its bounds, `C.hire` gone); "the counter has room for four stalls ...
+    $50, $100 and $150" (now the flat $1); "slots 02 to 04 have a job each" (`extract,carve,saw`); "a
+    robot slips on an instruction rarely ... names of their own" (`C.names.length === 8` in place of
+    `>= C.hire.length`). Section 2 "from the back: ... slots 01 to 04 one under another" (the new row
+    order); section 2 now runs on an open factory (`open3`), as do section 6's hiring rows, section 9,
+    section 9's "a robot can be put on any of slots 02-04", section 11's random play and its save
+    rows, section 13's "what you put in the table saw's, the sap extractor's or the bench's input bin"
+    (and the stall row after it), section 15's `crew()` (every row) and its two dock-of-eight walk rows.
+    Section 6 "at $19 the dock shows the $20 robot greyed" ($0.99 / $1), "at $20 a robot is hired" ($1),
+    "the bubble turns straight to the new robot" (slot order), "the second robot costs $40" ($1), "the
+    third to the eighth cost $60 to $160" ($1 each, and no price once sold out). Section 14 "the next
+    stall costs $50" ($1), "its bubble offers a stall for $50, out of reach with $0" ($1), "with $60 it
+    is $50" ($1.50 / $1), "the next costs $100 and the last $150" ($1 each). Section 15 "a robot can
+    stock any stall that has been bought" (the job list in slot order). Helpers: `staffed()` and
+    `crew()` give money as robots x `s.flat.robot`; `staffed()` opens the slots when given a slot job;
+    `open3(s)` sets `s.goal = 3`.
+  - **Restated page rows** (`drive-taas-factory-ui.cjs`, still **129**; `fresh(seed, open)` meets
+    every goal when `open`): section 4 "the dock offers a robot for $20" ($1) and "hiring it turns the
+    bubble to the new robot" (opened, slot order); section 11 opened, and "slots 01 to 04 each have
+    their number painted" (bays by slot order); section 15 opened (the extractor's input bin, the saw's
+    cuts); section 18 the saw's input bin row opened; section 19 opened, "a tap on an empty place ...
+    a stall for $50" ($1), "buying it costs $50" ($1, money 499), "a robot's bubble lists the planer,
+    ..." (slot order); section 20 "all eight robots cost $720" ($8) and "Info tells of the four stalls
+    and their prices, the eight robots and their prices" (the flat-price wording).
+  - **Gates:** `gates.sh games/taas/index.html` GREEN; formal 43 / 39 (formal untouched; its eval 9
+    not run, as no formal code moved).
+  - assumed: `SLOT_JOBS` in slot order (`extract, carve, saw`), so a robot's bubble lists the slots'
+    jobs top to bottom, which is also the order the goals unlock them.
+  - assumed: `setFlat()` rounds a fraction to the nearest dollar and clamps to $0-$200 (unlike
+    `setWait()`, which refuses); anything not a number, and any `what` but `robot` / `stall`, is refused
+    and changes nothing; it fires a `flatset` event.
+  - assumed: a price of $0 is free even with money below zero (`afford()`); any other price needs the
+    money, as before.
+  - assumed: `s.goalT` goes back to the full 600 whenever a goal is met, so it reads 600 everywhere but
+    while goal 2 counts down.
+  - assumed: a machine arriving takes floor that was empty, so anyone standing in its footprint steps
+    to the nearest free floor and every walk under way is replanned round it (`clearWay()`); an avatar
+    whose walk then ends where it stands arrives.
+  - assumed (`load()`): a goal that is not a finite number (missing or garbage) is all three met; a
+    fraction is floored, then clamped to 0-3; `goalN` is clamped to 0..the current goal's `n` (a count
+    at `n` meets it on the next step); `goalT` to 0..600, else 600; `flat` through `flatOf()`. A robot
+    on a slot still locked rests (the existing one-job rule); what a hand-edited save puts in a locked
+    slot's bins is kept but out of reach.
+  - **For steps 2-5:** step 2: `load()` still filters bins by `ACCEPTS` and resets the planer's in-feed
+    (untouched here). Step 3: a locked slot's sprites are still drawn and still in `TAPS` (the engine
+    refuses the tap); the baked floor's key lacks `s.goal`; Start over must call
+    `FACTORY.newGame(seed, s.flat)`; the board can read `F.goalNow(s)` and the `goal` event
+    (`{ n, id, unlocks }`); the pose `.claude/scripts/poses/taas-factory-eight.js` needs `s.goal = 3` (its
+    slot jobs are refused in a new game). Step 4: Info's three price lines are placeholders. Step 5:
+    `eval-taas-factory.cjs` was not run or edited; its personas now start with slots 02-04 locked and
+    robots and stalls at $1, so the existing ones need `s.goal = 3` before any of their numbers mean
+    what they did.
 
 ## Handoff
 

@@ -671,10 +671,10 @@ const FACTORY = (function () {
     lookSec: 0.8,           // a stocker rummaging through the bin for a medium plank and coming up with something else
     unboxSec: 0.9,
     pickSec: 0.4, putSec: 0.35, stockSec: 0.45,     // you: empty an output bin into your arms, put things in a bin, stock the counter
-    sawSec: 3, extractSec: 4, carveSec: 5,          // slot 02's table saw, slot 03's sap extractor, slot 04's bench
-    // eight robots, each $20 more than the last (the CD, 2026-10-16: one for each stall and one for
-    // each slot); instruction slots open once two are on staff
-    hire: [20, 40, 60, 80, 100, 120, 140, 160], slotsAt: 2,
+    sawSec: 3, extractSec: 4, carveSec: 5,          // the table saw (slot 04), the sap extractor (slot 02), the bench (slot 03)
+    // eight robots (the CD, 2026-10-16: one for each stall and one for each slot), each at a flat
+    // price (`flat`, below); instruction slots open once two are on staff
+    slotsAt: 2,
     names: ['Bolt', 'Sprocket', 'Widget', 'Gizmo', 'Rivet', 'Piston', 'Ratchet', 'Dynamo'],     // until you name them
     nameMax: 16,
     slots: [5, 10, 15, 20, 25],      // instruction slots: each robot's own, bought in order (the CD's prices)
@@ -701,9 +701,22 @@ const FACTORY = (function () {
     // back clean), a carving a gnarled log carved by hand
     floor: { log: 1, plank: 1.1, cut: 1.2, sap: 0.1, carving: 1 },
     // the sales counter has room for four stalls, east to west (the CD, 2026-10-16). The first is a
-    // stall from the start, for medium planks; each of the others is bought, $50, $100 and $150 in
-    // the order you buy them, and sells nothing until you choose what it sells
-    stalls: { n: 4, start: 'plank.m', prices: [50, 100, 150] },
+    // stall from the start, for medium planks; each of the others is bought at the flat price, and
+    // sells nothing until you choose what it sells
+    stalls: { n: 4, start: 'plank.m' },
+    // what a robot and a stall cost: a flat $1 each, whole dollars from `min` to `max`, set in the
+    // menu (the CD, 2026-10-20: "make the default cost of each new sales stall and robot a flat $1";
+    // the bounds assumed). The factory keeps its own (`s.flat`)
+    flat: { robot: 1, stall: 1, min: 0, max: 200 },
+    // the goals on the wall, one at a time, each unlocking a slot's machine (the CD, 2026-10-20):
+    // sell 50 medium planks (the sap extractor, slot 02); over $50 and over 90% customer satisfaction
+    // for 10 minutes, the countdown starting over whenever either fails (the bench, slot 03); and
+    // sell 25 sap (the table saw, slot 04; drafted by Claude, the CD may change it)
+    goals: [
+      { id: 'planks', item: 'plank.m', n: 50, unlocks: 'extract' },
+      { id: 'steady', money: 50, sat: 90, sec: 600, unlocks: 'carve' },
+      { id: 'sap', item: 'sap', n: 25, unlocks: 'saw' }
+    ],
     stallCap: 6,
     sapUnits: { s: 1, m: 2, l: 4 },  // the sap a small, medium and large sap log gives up in the extractor
     // customers: the first walks in after `first` seconds, the next after one of `every`; once `max`
@@ -814,8 +827,11 @@ const FACTORY = (function () {
   const BASE = { operate: 'Use the planer to refine raw materials.', stock: 'Stock the sales counter with the items in this bin.',
     saw: 'Use the table saw to cut planks.', extract: 'Use the sap extractor to take the sap out of sap logs.', carve: 'Carve gnarled wood into decorative pieces at the bench.' };
   // the jobs (the CD, 2026-10-16): the planer, one for each stall ('stock:0' stocks the first), and
-  // slots 02 to 04. A robot with no job rests (null)
-  const SLOT_JOBS = ['saw', 'extract', 'carve'];
+  // slots 02 to 04 in slot order, which is the order the goals unlock them (2026-10-20): the sap
+  // extractor, the bench, the table saw. A robot with no job rests (null)
+  const SLOT_JOBS = ['extract', 'carve', 'saw'];
+  // which slot's job a place or a footprint on the floor belongs to (null: none, always there)
+  const slotOf = k => /^extract/.test(k) ? 'extract' : /^bench/.test(k) ? 'carve' : /^saw/.test(k) ? 'saw' : null;
   const jobKind = j => typeof j === 'string' ? j.split(':')[0] : null;
   const stallOfJob = j => jobKind(j) === 'stock' ? +j.split(':')[1] : -1;
   // which output bin a stall's robot fetches its thing from: planks the planer's, cuts the saw's,
@@ -830,14 +846,16 @@ const FACTORY = (function () {
   // wait at the counter's stalls (the CD, 2026-10-15: they face you across the counter); the
   // counter, with room for four stalls; a walkway on the factory side, where the stalls are
   // stocked; then four slots, each a
-  // row: 01 the planer (once machine01), 02 the table saw, 03 the sap extractor, 04 the hand
-  // crafting bench; then the robot dock. Every row is open at its east end, so the floor is one
-  // piece: the walkway is reached round the planer's output bin.
+  // row: 01 the planer (once machine01), 02 the sap extractor, 03 the hand crafting bench, 04 the
+  // table saw (the CD, 2026-10-20: the goals unlock them in that order; the machines moved, not the
+  // numbers); then the robot dock. Every row is open at its east end, so the floor is one piece: the
+  // walkway is reached round the planer's output bin.
   const W = 6, H = 18;
-  const ROW = { planer: 4.0, saw: 7.3, extract: 10.1, bench: 12.75 };   // each slot's centre line (y)
+  const r2 = v => Math.round(v * 100) / 100;
+  const ROW = { planer: 4.0, extract: 7.3, bench: 10.1, saw: 12.75 };   // each slot's centre line (y)
   const mill = y => ({ in: [0.2, y - 0.55, 0.95, y + 0.55], inBelt: [0.95, y - 0.3, 1.75, y + 0.3], body: [1.75, y - 0.55, 3.15, y + 0.55],
     console: [2.65, y + 0.55, 3.1, y + 0.85], outBelt: [3.15, y - 0.3, 3.95, y + 0.3], out: [3.95, y - 0.55, 4.95, y + 0.55] });
-  const SAW = mill(ROW.saw), EXT = mill(ROW.extract);
+  const SAW = mill(ROW.saw), EXT = mill(ROW.extract), BY = ROW.bench, by = d => r2(BY + d);   // the bench: offsets from its row
   const SOLID = {
     wall: [0, 0, W, 0.45],
     counter: [0, 1.7, W, 2.25],
@@ -850,14 +868,13 @@ const FACTORY = (function () {
     recycle: [3.2, 4.95, 3.7, 5.45],
     sawIn: SAW.in, sawInBelt: SAW.inBelt, saw: SAW.body, sawConsole: SAW.console, sawOutBelt: SAW.outBelt, sawOut: SAW.out,
     extractIn: EXT.in, extractInBelt: EXT.inBelt, extract: EXT.body, extractConsole: EXT.console, extractOutBelt: EXT.outBelt, extractOut: EXT.out,
-    benchIn: [0.3, 12.35, 1.1, 13.25], bench: [1.8, 12.35, 3.9, 13.15], benchOut: [4.4, 12.35, 5.2, 13.25],
+    benchIn: [0.3, by(-0.4), 1.1, by(0.5)], bench: [1.8, by(-0.4), 3.9, by(0.4)], benchOut: [4.4, by(-0.4), 5.2, by(0.5)],
     dockPanel: [0.4, 15.2, 2.8, 15.5]
   };
   // the robot dock: eight crates in two rows of four in front of its panel (2026-10-16), each a
   // robot's until it is hired and its charging pad after; a cell of floor between any two, so a robot
   // unpacked anywhere can walk out whoever else is still in a crate. The panel stands where it always
   // did, low enough on the floor not to hide slot 04's painted number
-  const r2 = v => Math.round(v * 100) / 100;
   const CRATES = [0, 1, 2, 3, 4, 5, 6, 7].map(i => { const x = r2(0.55 + 1.2 * (i % 4)), y = i < 4 ? 15.7 : 16.95; return [x, y, r2(x + 0.6), r2(y + 0.6)]; });
   const N = -Math.PI / 2, E = 0, S = Math.PI / 2;
   const SPOT = {
@@ -872,11 +889,11 @@ const FACTORY = (function () {
     recycle: { x: 3.45, y: 5.9, face: N },
     sawIn: { x: 0.58, y: ROW.saw + 0.95, face: N }, saw: { x: 2.9, y: ROW.saw + 1.25, face: N }, sawOut: { x: 4.45, y: ROW.saw + 0.95, face: N },
     extractIn: { x: 0.58, y: ROW.extract + 0.95, face: N }, extract: { x: 2.9, y: ROW.extract + 1.25, face: N }, extractOut: { x: 4.45, y: ROW.extract + 0.95, face: N },
-    benchIn: { x: 0.7, y: 13.7, face: N }, bench: { x: 2.85, y: 13.6, face: N }, benchOut: { x: 4.8, y: 13.7, face: N },
+    benchIn: { x: 0.7, y: by(0.95), face: N }, bench: { x: 2.85, y: by(0.85), face: N }, benchOut: { x: 4.8, y: by(0.95), face: N },
     dock: { x: 2.65, y: 16.7, face: N },          // in the aisle between the dock's two rows of crates
     rest: CRATES.map(c => ({ x: r2((c[0] + c[2]) / 2), y: r2((c[1] + c[3]) / 2), face: S })),
     // a robot on slots 02 to 04 stands west of where you do
-    sawBot: { x: 2.15, y: ROW.saw + 1.2, face: N }, extractBot: { x: 2.15, y: ROW.extract + 1.2, face: N }, benchBot: { x: 2.1, y: 13.6, face: N }
+    sawBot: { x: 2.15, y: ROW.saw + 1.2, face: N }, extractBot: { x: 2.15, y: ROW.extract + 1.2, face: N }, benchBot: { x: 2.1, y: by(0.85), face: N }
   };
   // the counter's four stalls, east to west: the first where the one stall always stood, each of
   // the others 1.35 m further west. You stock one standing just east of it on the walkway
@@ -907,7 +924,17 @@ const FACTORY = (function () {
 
   /* ---------- state ---------- */
   function newMill() { return { in: [], phase: 'idle', t: 0, item: null, cut: null, by: null, belt: [], out: [] }; }
-  function newGame(seed) {
+  // what a robot and a stall cost in a factory: whole dollars in bounds, $1 each until set
+  function flatOf(f) {
+    const F = CFG.flat, o = { robot: F.robot, stall: F.stall };
+    if (f && typeof f === 'object') ['robot', 'stall'].forEach(k => { if (typeof f[k] === 'number' && Number.isFinite(f[k])) o[k] = Math.max(F.min, Math.min(F.max, Math.round(f[k]))); });
+    return o;
+  }
+  // the goal 2 countdown's full length (the first goal that has one)
+  const fullT = () => (CFG.goals.find(g => g.sec) || { sec: 0 }).sec;
+  // a new factory; `flat` carries the prices over from another (Start over keeps them: a setting,
+  // not progress)
+  function newGame(seed, flat) {
     const s = {
       version: CFG.version, t: 0, seed: (seed === undefined ? 20261013 : seed) >>> 0,
       money: 0, earned: 0, satisfaction: CFG.satStart, hired: 0,
@@ -929,6 +956,10 @@ const FACTORY = (function () {
       avatar: { x: SPOT.start.x, y: SPOT.start.y, yawT: SPOT.start.face, path: [], task: null, act: null, dist: 0, inv: [] },
       robots: [], bubble: null,
       tally: { player: { made: 0, pressed: 0, tossed: 0, stocked: 0, fixed: 0, sawn: 0, extracted: 0, carved: 0 } },
+      // the goals (the CD, 2026-10-20): how many are met (0 to 3; slot 02's machine arrives with the
+      // first), the current one's thing sold since it began, and goal 2's countdown in seconds
+      goal: 0, goalN: 0, goalT: fullT(),
+      flat: flatOf(flat),           // what a robot and a stall cost here
       force: {}, events: []
     };
     s.rack = buyLogs(s, CFG.startLogs);   // free: the logs a new factory starts with (the CD, 2026-10-16)
@@ -1029,9 +1060,58 @@ const FACTORY = (function () {
   // never less than it cost to make (the CD, 2026-10-16)
   function paid(s, item) { const p = priceOf(item); return p === null ? null : Math.max(floorOf(item), cents(p * s.satisfaction / 100)); }
   function priceNow(s, item) { return paid(s, item); }
-  function hirePrice(s) { return s.hired < CFG.hire.length ? CFG.hire[s.hired] : null; }
-  // the next stall's price: by how many have been bought, whichever place it goes in (null: all four are)
-  function stallPrice(s) { const n = s.stalls.filter(st => st.bought).length; return n - 1 < CFG.stalls.prices.length ? CFG.stalls.prices[n - 1] : null; }
+  // a robot and a stall each cost the factory's flat price (the CD, 2026-10-20), until all eight
+  // robots are hired / while a place on the counter is left (null: none left)
+  function hirePrice(s) { return s.hired < CFG.names.length ? s.flat.robot : null; }
+  function stallPrice(s) { return s.stalls.some(st => !st.bought) ? s.flat.stall : null; }
+  // a price you can pay: $0 is free even with money below zero (assumed)
+  const afford = (s, p) => p !== null && (p <= 0 || s.money >= p);
+  // set the flat price of a robot or a stall: whole dollars, clamped to the bounds; anything that is
+  // not a number is refused
+  function setFlat(s, what, dollars) {
+    if ((what !== 'robot' && what !== 'stall') || typeof dollars !== 'number' || !Number.isFinite(dollars)) return false;
+    const F = CFG.flat;
+    s.flat[what] = Math.max(F.min, Math.min(F.max, Math.round(dollars)));
+    ev(s, 'flatset', { what, price: s.flat[what] });
+    return true;
+  }
+
+  /* ---------- the goals (the CD, 2026-10-20) ---------- */
+  // a slot's machine is there once the goal that unlocks it is met: derived from s.goal, never stored
+  function unlocked(s, job) { const i = CFG.goals.findIndex(g => g.unlocks === job); return i < 0 || s.goal > i; }
+  // a place you can tap (or a footprint on the floor): always there, or its slot's machine has arrived
+  const placeOpen = (s, k) => { const j = slotOf(k); return !j || unlocked(s, j); };
+  // the goal now, for the wall: which (0-based), its row, what is left of it (things to sell, or
+  // seconds of the countdown) and whether the countdown is running; done once all are met
+  function goalNow(s) {
+    const g = CFG.goals[s.goal] || null;
+    return { i: s.goal, goal: g, done: !g, left: g && g.item ? Math.max(0, g.n - s.goalN) : null, t: g && g.sec ? s.goalT : null, counting: !!(g && g.sec && s.goalT < g.sec) };
+  }
+  // once per sub-step, after the shop: a goal of things sold is met at its count; goal 2 counts down
+  // while money is over $50 and the satisfaction the wall shows is over 90%, and starts over the
+  // moment either fails. A goal met unlocks its machine and the next goal starts from nothing
+  function stepGoal(s, dt) {
+    const g = CFG.goals[s.goal];
+    if (!g) return;
+    if (g.sec) {
+      if (s.money > g.money && Math.round(s.satisfaction) > g.sat) s.goalT = Math.max(0, s.goalT - dt);
+      else s.goalT = g.sec;
+      if (s.goalT > 0) return;
+    } else if (s.goalN < g.n) return;
+    s.goal++; s.goalN = 0; s.goalT = fullT();
+    clearWay(s);
+    ev(s, 'goal', { n: s.goal, id: g.id, unlocks: g.unlocks });
+  }
+  // a machine arriving takes floor that was empty: anyone standing where it now stands steps out to
+  // the nearest free floor, and anyone walking replans the rest of the walk round it
+  function clearWay(s) {
+    const a = s.avatar;
+    [a].concat(s.robots).forEach(e => {
+      if (!free(s, e.x, e.y)) { const p = nearestFree(s, e.x, e.y); e.x = p.x; e.y = p.y; }
+      if (e.path.length) e.path = path(s, e, e.path[e.path.length - 1]);
+    });
+    if (a.task && !a.task.arrived && !a.path.length) arrive(s);
+  }
   // the stalls customers come for: bought, with something set to sell
   const openStalls = s => s.stalls.map((st, i) => st.bought && st.want ? i : -1).filter(i => i >= 0);
   // money is kept to the cent: every change is rounded, so $0.10 a run adds up exactly
@@ -1042,12 +1122,12 @@ const FACTORY = (function () {
   const CELL = 0.2, GW = Math.round(W / CELL), GH = Math.round(H / CELL), PAD = 0.22, EDGE = 0.25;
   const gridCache = {};
   function rects(s) {
-    const r = Object.keys(SOLID).map(k => SOLID[k]);
+    const r = Object.keys(SOLID).filter(k => placeOpen(s, k)).map(k => SOLID[k]);   // a slot not yet unlocked is empty floor
     CRATES.forEach((c, i) => { if (s.hired <= i) r.push(c); });
     return r;
   }
   function grid(s) {
-    const key = 'h' + Math.min(s.hired, CRATES.length);
+    const key = 'h' + Math.min(s.hired, CRATES.length) + 'g' + Math.max(0, Math.min(CFG.goals.length, s.goal | 0));
     if (gridCache[key]) return gridCache[key];
     const g = new Uint8Array(GW * GH), rs = rects(s);
     for (let j = 0; j < GH; j++) for (let i = 0; i < GW; i++) {
@@ -1360,6 +1440,8 @@ const FACTORY = (function () {
     if (fair) s.satisfaction = Math.min(100, s.satisfaction + CFG.satUp);
     else { s.satisfaction = Math.max(CFG.satMin, s.satisfaction - CFG.satHit); s.shop.wrong++; }
     s.shop.served++;
+    const g = CFG.goals[s.goal];
+    if (g && g.item && c.item === g.item) s.goalN++;   // the goal's thing carried away, whatever the stall was set to
     c.state = 'out'; c.t = 0; c.wrong = !fair;
     ev(s, 'sold', { item: c.item, paid: p, sale: fair ? 'fair' : 'wrong', by: c.by, id: c.id, x: c.x, y: c.y, at: c.stall, want: st.want });
   }
@@ -1451,6 +1533,7 @@ const FACTORY = (function () {
     if (!task || PLACES.indexOf(task.kind) < 0) return;
     if (task.kind === 'robot' && !s.robots[task.id]) return;
     if (task.kind === 'stall' && !stallAt(s, task.i)) return;
+    if (!placeOpen(s, task.kind)) return;   // a slot whose machine has not arrived: an empty bay
     a.act = null; s.bubble = null;
     a.task = Object.assign({ arrived: false }, task);
     const spot = spotFor(s, a.task);
@@ -1834,7 +1917,7 @@ const FACTORY = (function () {
   const STATES = ['unbox', 'idle', 'move', 'reject', 'dawdle', 'press', 'wait', 'flick', 'reach', 'look', 'drop', 'carry', 'place', 'cool', 'pause', 'carve'];
   const SAMPLE = { rack: 'log.m', sawIn: 'plank.m', extractIn: 'sappy.m', benchIn: 'gnarled.m', recycle: 'log.m' };
   // the jobs a robot can be given now: the planer, a stall's for each stall bought, slots 02 to 04
-  const jobsOpen = s => ['operate'].concat(s.stalls.map((st, i) => st.bought ? 'stock:' + i : null).filter(Boolean), SLOT_JOBS);
+  const jobsOpen = s => ['operate'].concat(s.stalls.map((st, i) => st.bought ? 'stock:' + i : null).filter(Boolean), SLOT_JOBS.filter(j => unlocked(s, j)));
   function bubbleOpen(s) {
     const b = s.bubble, a = s.avatar;
     if (!b || !a.task || !a.task.arrived || a.path.length) return null;
@@ -1856,11 +1939,11 @@ const FACTORY = (function () {
     }
     if (b.kind === 'dock') {
       const p = hirePrice(s);
-      return [{ id: 'hire', icon: 'robot', price: p, enabled: p !== null && s.money >= p, soldOut: p === null }];
+      return [{ id: 'hire', icon: 'robot', price: p, enabled: afford(s, p), soldOut: p === null }];
     }
     if (b.kind === 'stall') {   // a stall: what it could sell, and what a customer pays for each now; an empty place: a stall to buy
       const st = s.stalls[b.i];
-      if (!st.bought) { const p = stallPrice(s); return [{ id: 'buystall', icon: 'stall', price: p, enabled: p !== null && s.money >= p }]; }
+      if (!st.bought) { const p = stallPrice(s); return [{ id: 'buystall', icon: 'stall', price: p, enabled: afford(s, p) }]; }
       return SELLS.map(item => ({ id: 'sell:' + item, icon: 'sell', item, price: paid(s, item), on: st.want === item, enabled: true }));
     }
     if (b.kind === 'robot') {   // its jobs: the planer, each stall bought, slots 02 to 04; rest; its page
@@ -1961,6 +2044,7 @@ const FACTORY = (function () {
       stepMill(s, 'saw', h);
       stepMill(s, 'extract', h);
       stepShop(s, h);
+      stepGoal(s, h);
       dt -= h;
     }
     return s;
@@ -1977,6 +2061,14 @@ const FACTORY = (function () {
       const d = JSON.parse(text);
       if (!d || d.version !== CFG.version || !d.machine || !Array.isArray(d.robots)) return null;
       const s = Object.assign(newGame(), d, { events: [], force: {} });
+      // the goals (2026-10-20): a save from before them has every slot, so all three are met (it keeps
+      // every machine and whatever is in its bins); no version bump, nobody loses a factory
+      const G = CFG.goals.length, num = v => typeof v === 'number' && Number.isFinite(v);
+      s.goal = num(d.goal) ? Math.max(0, Math.min(G, Math.floor(d.goal))) : G;
+      const gNow = CFG.goals[s.goal];
+      s.goalN = num(d.goalN) && gNow && gNow.item ? Math.max(0, Math.min(gNow.n, Math.floor(d.goalN))) : 0;
+      s.goalT = num(d.goalT) && gNow && gNow.sec ? Math.max(0, Math.min(gNow.sec, d.goalT)) : fullT();
+      s.flat = flatOf(d.flat);
       const items = (v, ok) => (Array.isArray(v) ? v : []).filter(x => isItem(x) && (!ok || ok(x)));
       const belt = v => (Array.isArray(v) ? v : []).filter(it => it && isItem(it.item)).map(it => ({ item: it.item, t: Math.min(CFG.outSec + CFG.dropSec, +it.t || 0), by: it.by }));
       s.rack = items(d.rack, ACCEPTS.rack); s.bin = items(d.bin);
@@ -2012,7 +2104,7 @@ const FACTORY = (function () {
             stall: open.indexOf(c.stall) >= 0 ? c.stall : open[0], at: c.state !== 'out' && (c.at === 'stall' || c.at === 'line') ? c.at : null, item: isItem(c.item) ? c.item : null, by: c.by, wrong: !!c.wrong })),
         next: Number.isFinite(+sh.next) ? +sh.next : s.t + CFG.shop.first, n: Math.max(0, sh.n | 0), served: Math.max(0, sh.served | 0), wrong: Math.max(0, sh.wrong | 0)
       };
-      s.robots = s.robots.slice(0, CFG.hire.length);
+      s.robots = s.robots.slice(0, CFG.names.length);
       s.hired = s.robots.length;
       s.seen = startSeen();   // a save from before the delay gets it on the list too
       Object.keys(d.seen || {}).forEach(k => { if (d.seen[k] === true && RULE[k]) s.seen[k] = true; });
@@ -2072,7 +2164,7 @@ const FACTORY = (function () {
   }
 
   return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, SELLS, RULES, ONLY, BASE, SLOT_JOBS, GRADE, ACCEPTS, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, keepers,
-    jobKind, stallOfJob, srcOf, jobsOpen, homeOf,
+    jobKind, stallOfJob, srcOf, jobsOpen, homeOf, slotOf, unlocked, placeOpen, goalNow, setFlat,
     gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, stallPrice, openStalls, known, slotsOpen, slotPrice, buySlot, setRule, setWait, setCut, rename,
     resetEvals, ready, canMill, store, waitingNow, kindsIn, SAMPLE, path, free, nearestFree, grid, save, load, rects, CELL };
 })();
@@ -3795,13 +3887,14 @@ const MODE = (function () {
 
   /* ---------- the floor (live: cheap rects and lines) ---------- */
   // the four slots (the CD, 2026-10-15): a painted bay each, its number on the floor at the left,
-  // the middle and the right of the row
+  // the middle and the right of the row; numbered by where they are, so 02 is the sap extractor's,
+  // 03 the bench's and 04 the table saw's (2026-10-20)
   const DOCK_BAY = [0.2, SO.dockPanel[1] - 0.15, 5.1, 17.8];
   const SLOTS = [
     { n: '01', y0: 3.05, y1: 5.65 },
-    { n: '02', y0: ROWY.saw - 0.75, y1: ROWY.saw + 1.45 },
-    { n: '03', y0: ROWY.extract - 0.75, y1: ROWY.extract + 1.45 },
-    { n: '04', y0: 12.1, y1: 14.05 }
+    { n: '02', y0: ROWY.extract - 0.75, y1: ROWY.extract + 1.45 },
+    { n: '03', y0: ROWY.bench - 0.75, y1: ROWY.bench + 1.45 },
+    { n: '04', y0: ROWY.saw - 0.65, y1: ROWY.saw + 1.3 }
   ].map(b => Object.assign(b, { ny: b.y1 - 0.3, nx: [0.45, 3.0, 5.52] }));
   let floorC = null, floorKey = '';
   function drawFloor() {
@@ -4437,14 +4530,14 @@ const MODE = (function () {
     const bots = s.robots.length ? s.robots.map(r => {
       const n = r.tally.good + r.tally.soso + r.tally.bad;
       return '<tr><td>' + esc(r.name) + ' (' + JOB_NAME(r.job) + ')</td><td>' + r.tally.good + '</td><td>' + r.tally.soso + '</td><td>' + r.tally.bad + '</td><td>' + (n ? Math.round(r.tally.good / n * 100) + '%' : '-') + '</td></tr>';
-    }).join('') : '<tr><td colspan="5">No robots yet. The first one costs $' + C.hire[0] + '.</td></tr>';
+    }).join('') : '<tr><td colspan="5">No robots yet. The first one costs ' + usd(s.flat.robot) + '.</td></tr>';
     panelBody.innerHTML =
       '<h2>Robot factory</h2>' +
       '<p><b>The goal</b>: ' + esc(goalText()) + '. The planer (slot 01) is a task you can always do yourself, and you never get it wrong, but you can only be in one place. The robots are AI agents: they take the work off you, and they do not always do it well.</p>' +
       '<p><b>Customer satisfaction</b> (' + Math.round(s.satisfaction) + '% now) is how much our customers trust us and our products. It starts at 100%. As the robots take over the work, do not let it erode.</p>' +
       '<p><b>Wood</b> comes in three sizes, small, medium and large (2\', 4\' and 8\'), and three qualities: normal, gnarled and sappy. The planer\'s input bin starts with ' + C.startLogs + ' logs, and <b>when it runs out ' + C.restock.n + ' more arrive for ' + usd(C.restock.cost) + '</b>. Of the logs bought, ' + pct(Z.s) + ' are small, ' + pct(Z.m) + ' medium and ' + pct(Z.l) + ' large; ' + pct(Q.gnarled) + ' are gnarled and ' + pct(Q.sappy) + ' sappy. The planer makes a normal log a plank of its size and a gnarled one a gnarled plank (its holes kept); any sap log jams it. <b>Every machine costs ' + usd(C.logCost) + ' for each thing it processes</b> (electricity and wear), whoever presses the button and whatever the thing, and <b>fixing a jam costs ' + usd(C.fixCost) + '</b>, so money can go below zero. You press the normal medium logs, and any normal log you put in its bin yourself (yours roll in first), and toss the rest in the recycle bin.</p>' +
       '<p><b>Your arms</b>: tap an output bin to take everything in it, tap a stall on the counter to stock it with what you carry of what it sells (the rest stay with you), and tap the recycle bin or a machine\'s input bin to put things in or take them back out: what you carry that it takes is on top, what is in it below. No bin ever fills up.</p>' +
-      '<p><b>The sales counter</b> has room for ' + C.stalls.n + ' stalls. The first sells medium planks; tap an empty place on the counter to buy another (' + money$(C.stalls.prices) + ', in that order), and tap any stall to choose what it sells: anything with a price. Whatever was in it comes back into your arms. The stalls need nobody: customers come in at the door, each for one of the stalls that sells something (any of them as likely), wait across the counter from it (or in the line along the back wall while someone is there) and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything else in a stall still sells as the stall\'s thing and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: a stall\'s price times it, but never less than the thing cost to make (' + usd(C.floor.plank) + ' for a plank, a log and a press; each stall\'s label shows what they pay now). Prices: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length. Each fair sale wins a point back, and customers slowly forget.</p>' +
+      '<p><b>The sales counter</b> has room for ' + C.stalls.n + ' stalls. The first sells medium planks; tap an empty place on the counter to buy another (' + usd(s.flat.stall) + ' each), and tap any stall to choose what it sells: anything with a price. Whatever was in it comes back into your arms. The stalls need nobody: customers come in at the door, each for one of the stalls that sells something (any of them as likely), wait across the counter from it (or in the line along the back wall while someone is there) and buy what is in it. With nothing in it they wait, and <b>every second each one waits costs ' + C.satWait + '%</b> of customer satisfaction. Once ' + C.shop.max + ' are waiting nobody else comes in. Anything else in a stall still sells as the stall\'s thing and costs ' + C.satHit + ' points. <b>Satisfaction sets what customers pay</b>: a stall\'s price times it, but never less than the thing cost to make (' + usd(C.floor.plank) + ' for a plank, a log and a press; each stall\'s label shows what they pay now). Prices: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ' a unit, and cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + ', by length. Each fair sale wins a point back, and customers slowly forget.</p>' +
       '<p><b>Slots 02 to 04</b> are run by you or by a robot. The table saw cuts a plank into two 2"x4"s, four 2"x2"s or sixteen dowel rods of its length (' + usd(C.sawCost) + '); the sap extractor gets ' + C.sapUnits.s + ' / ' + C.sapUnits.m + ' / ' + C.sapUnits.l + ' units of sap out of a small / medium / large sap log and gives back a clean log for the planer\'s input bin (' + usd(C.extractCost) + '); at the bench you carve gnarled wood into something to keep.</p>' +
       '<p>Each robot\'s page ends in its <b>evals</b>: what it has done, counted, with a dot for how it went. Reset them to start counting again after you change its instructions.</p>' +
       '<ul>' +
@@ -4452,7 +4545,7 @@ const MODE = (function () {
       '<li><b>Yellow</b>: unexpected or wasteful: stopping to think; any other log cut into a plank; a reach that came up with something other than the stall\'s thing; anything done against the robot\'s own instructions.</li>' +
       '<li><b>Red</b>: a blocker or a hit to customer satisfaction: a sap log fed in, which jams the planer until you scrub it clean yourself; anything else put in a stall, which a customer will pay for as the stall\'s thing.</li>' +
       '<li><b>A stall\'s robot</b> waits at the output bin its stall\'s thing comes out of (planks the planer\'s, cut wood the saw\'s, sap the extractor\'s), takes one and walks it over; the first stall\'s, on planks, has the bin behind it and the stall in front. Told to stock only its stall\'s thing, it leaves everything else where it is and hunts for one: each reach finds one as often as that thing makes up the bin, and a reach that comes up with something else is a "looking for" it. Told to put a kind of thing in the recycle bin, it does that with whatever of it it turns up, but never its stall\'s own thing.</li>' +
-      '<li><b>Robots</b>: up to ' + C.hire.length + ', ' + money$(C.hire) + ', each to one job: the planer, a stall bought, or slots 02 to 04. The robots on slots 02 to 04 get nothing wrong yet: they press the saw or the extractor whenever there is something in its input bin and carve whatever is on the bench (the saw\'s robot makes the cut set on its page), and only one pair of hands fits at the bench.</li>' +
+      '<li><b>Robots</b>: up to ' + C.names.length + ', ' + usd(s.flat.robot) + ' each, each to one job: the planer, a stall bought, or slots 02 to 04. The robots on slots 02 to 04 get nothing wrong yet: they press the saw or the extractor whenever there is something in its input bin and carve whatever is on the bench (the saw\'s robot makes the cut set on its page), and only one pair of hands fits at the bench.</li>' +
       '<li><b>Instructions</b>: tap a robot, then its clipboard. Under its base prompt each robot keeps its own instructions, one to a slot; slots cost ' + money$(C.slots) + ' for each robot, once two robots are on staff. The list grows with what you see: each kind of mistake a robot makes adds the instructions about it, and not every one of them helps. A robot ignores an instruction ' + Math.round(C.slip * 100) + '% of the time, and an instruction about a different job (or another stall\'s thing) does nothing. One is on the list from the start and suits any robot: <b>Wait between tasks</b>. Under its slot you set how long, ' + C.wait.min + ' to ' + C.wait.max + ' seconds (' + C.wait.start + ' to begin with), and the robot waits that long after each log it handles, each thing it stocks or recycles, and each thing it makes on slots 02 to 04.</li>' +
       '</ul>' +
       // what the game has taught the CD so far (the CD, 2026-10-16: "add these to a list of tips in the
