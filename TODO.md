@@ -11,7 +11,14 @@ backlog entry here.
 
 ## Now
 
-- (none)
+- [taas] **Goals that unlock slots 02-04, bins and stalls you fill by hand, flat $1 prices** (the CD's
+  brief and four answers, 2026-10-20): one stall and the planer to start; "Sell 50 medium planks"
+  unlocks the sap extractor (slot 02), ">$50 & >90% for 10 minutes" the bench (slot 03), "Sell 25
+  sap" (draft) the table saw (slot 04); every bin and stall takes anything through the recycle bin's
+  put/take bubble, and a machine run on the wrong thing jams; a stall's Re-assign / Re-stock / Close
+  and its green dots; robot and stall prices in the menu. Seven steps on branch `taas-goals`.
+  **Plan ready (2026-10-20)** - run:
+  `/zmh-producer:oversee-implementation .claude/plans/taasgoals.goals-arc.md`
 
 ## Needs Zack
 
