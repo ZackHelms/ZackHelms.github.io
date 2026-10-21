@@ -236,6 +236,19 @@ written went red with no change to the page:
   layout row, check `document.fonts.check('15px <family>')`. To try one both
   ways, load a copy of the page with the fonts `<link>` removed.
 
+One from 2026-10-20, when a TAAS factory row was missed by a break it was
+written for:
+
+- **Clearing storage does not give a fresh page if the old page saves on
+  `pagehide`.** The factory suite's `fresh()` cleared `localStorage` and then
+  loaded the page. Navigating away fired the old page's `pagehide` save, which
+  wrote the previous row's factory back, so every row started from the row
+  before it. A row about a new game's floor passed with its rule broken. The
+  fix is to navigate to a blank page first (the suite's server answers
+  `/blank`), then clear, then load. Add a row that a new page loads no save:
+  on the old order only that row failed. Any game that saves on `pagehide`
+  or `beforeunload` needs the same order.
+
 And one older rule that keeps earning its place: **break it to believe it.**
 Every check above was verified by deliberately breaking the thing it guards and
 confirming that check — and only that check — went red. `.claude/scripts/negtest.sh`

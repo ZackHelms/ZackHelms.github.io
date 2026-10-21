@@ -23,6 +23,23 @@
   run must be resumable or leave nothing behind (`negtest-copies.py` works on
   copies for exactly this reason), and after any surprise, check the shipping
   files first: `bash .claude/scripts/negtest.sh scan <page>`.
+- **An oversee run outlives its worker** (2026-10-20/21, taasgoals: three
+  restarts, two of them at a usage limit). Each time:
+  - A subagent stopped by the limit keeps its work: its edits sit
+    uncommitted in the worktree and `SendMessage` to the same agent after
+    the reset resumes it with its context warm. Do not spawn a new agent.
+  - Background jobs are gone and the session's cwd is back at `/home/user`.
+    `EnterWorktree` with `path` then refuses ("not in a git repository") and
+    `ExitWorktree` is a no-op. Work on with absolute paths and `git -C`, and
+    at the end remove the worktree by hand from the primary checkout:
+    `git worktree remove .claude/worktrees/<name>`, then `git branch -D <branch>`
+    once the branch is pushed.
+  - Tell implementers to run long jobs (whole break lists) as foreground
+    chunks under ~9 minutes (`negtest-copies.py --only a,b,...`), so a
+    restart costs one chunk. Push each step's commit to the plan's branch as
+    the off-box copy.
+  - While a subagent is editing, the stop hook's "uncommitted changes" warning
+    is its work in flight; committing it from the overseer would race it.
 - **This session cannot delete anything on the remote.** `git push --delete`
   is hung up on by the agent proxy and `gh api -X DELETE` answers 403 ("Write
   access to this GitHub API path is not permitted through this proxy"). A
@@ -51,6 +68,14 @@
   plans use it)
 - Task-scoping skill: none
 - Metrics ledger: none
+- **An arc's steps each pass the whole gate, so plan the seams** (2026-10-20,
+  taasgoals). `gates.sh <page>` runs every drive suite of the game at the end of
+  every step. So an engine-only step that changes what the page shows or how a
+  player reaches something must carry the minimal UI and the page-suite
+  restatements that keep that suite green. Without them the step cannot commit.
+  Name those lines in the step itself, not in a later UI step. The pacing eval is
+  the exception: it runs only with `--eval`, so an arc may leave it to the step
+  that restates it. Say so in the plan.
 - **Note:** `.claude/last-refine-sha` is a **single repo-wide pointer**, but this
   repo routinely has two game sessions in flight at once (CLAUDE.md § Git
   workflow). Whichever refines first moves the pointer for both, so
@@ -70,6 +95,14 @@
   hidden by the 2026-09-18, 2026-09-19 and 2026-09-20 ones. The six
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
+
+  **2026-10-21, TAAS pass** (pointer moved `0e51881` -> `44d949d`, range
+  `0e51881..44d949d`, 9 commits, all TAAS). Refined this session's work:
+  `9d69a95` (the goals plan) and `44d949d` (the goals arc, an oversee run).
+  `7b1c983` is an earlier refine commit, skippable. Not re-mined here: six
+  earlier TAAS arcs, `5bcc0e7`, `3558cec`, `f11997e`, `66e14b9`, `f512e3f` and
+  `e823c35`. Each wrote its learnings into `.claude/taas.md` through its own
+  docs step, but no refine pass has read them.
 
   **2026-10-14, third TAAS pass** (pointer moved `6da9a05` -> `0e51881`, range
   `6da9a05..0e51881`). Clean: `f47b497` (the factory's fourth brief) and `0e51881` (the
@@ -358,6 +391,15 @@
 - Mode: direct-merge-push
 - Detail: CLAUDE.md § Git workflow ("It is fine to push directly to the
   `main` branch for this repository. No pull request is required.")
+- **But never a merge commit on `main`** (CLAUDE.md section Git workflow), so the
+  oversee wrap-up's `merge --no-ff` step does not apply here. Land the run's
+  branch as one commit by fast-forward with
+  `.claude/scripts/land-on-main.sh <branch> <message-file>` (dry-run first);
+  if it reports `behind`, merge `origin/main` into the branch, re-run the
+  gates, and land again. Push the branch itself too (as the plan's named
+  branch, e.g. `git push origin HEAD:taas-goals`) so the per-step commits
+  survive the worktree's removal. First used 2026-10-21 (taasgoals, landed
+  by hand as 44d949d before the script existed).
 
 ## Publish
 - Step: pushing to `main` **is** the publish — GitHub Pages auto-deploys.

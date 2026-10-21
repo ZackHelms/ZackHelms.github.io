@@ -496,6 +496,26 @@ Deterministic helpers for working on this repo.
   watch for is any helper whose success line is computed from *intent* rather
   than from re-reading the artifact.
 
+- **`land-on-main.sh`** - lands a branch on `main` as **one** commit by
+  fast-forward: a new commit whose tree is the branch's last and whose parent
+  is `origin/main`, pushed as `<sha>:refs/heads/main`. The branch keeps its
+  per-step commits; `main` never gets a merge commit (CLAUDE.md section Git
+  workflow). It moves no local branch and touches no working tree, so it runs
+  from an oversee worktree as well as the primary checkout. It refuses unless
+  `origin/main` is an ancestor of the branch (another session pushed: merge
+  `origin/main` into the branch, re-run the gates, land again), and fetches a
+  second time right before the push. Prints `LAND: GREEN|DRY|NOTHING|RED`.
+
+  ```
+  .claude/scripts/land-on-main.sh <branch> <message-file> --dry-run   # build and check, no push
+  .claude/scripts/land-on-main.sh <branch> <message-file>             # push
+  ```
+
+  Written 2026-10-21 after the taasgoals oversee run, whose wrap-up template
+  says `merge --no-ff` on `main` (the one thing CLAUDE.md forbids); that arc
+  landed by hand with `git commit-tree`, and this is the same sequence with
+  its checks made unskippable.
+
 - **`check-canvas-space.cjs`** — diagnostic: does a page lay out in the same
   coordinate space its taps arrive in? Simulates the iOS rotation quirk (the
   canvas box ends up shorter than `window.innerHeight`), then compares each
