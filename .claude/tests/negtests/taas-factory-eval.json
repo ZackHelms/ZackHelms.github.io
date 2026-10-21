@@ -38,8 +38,8 @@
  {
   "name": "ev-first-stall-only",
   "file": "games/taas/index.html",
-  "old": "const open = openStalls(s), stall = open.length > 1 ? roll(",
-  "new": "const open = openStalls(s), stall = open.length > 99 /* @negtest */ ? roll("
+  "old": "const open = openStalls(s), pick = () => open.length > 1 ? roll(",
+  "new": "const open = openStalls(s), pick = () => open.length > 99 /* @negtest */ ? roll("
  },
  {
   "name": "ev-customers-give-up",
@@ -52,5 +52,35 @@
   "file": "games/taas/index.html",
   "old": "        if ((b.item || b.in.length) && !yours) { r.state = 'carve'; r.t = 0; }",
   "new": "        if (false /* @negtest */ && (b.item || b.in.length) && !yours) { r.state = 'carve'; r.t = 0; }"
+ },
+ {
+  "name": "ev-goal2-frozen",
+  "file": "games/taas/index.html",
+  "old": "s.goalT = Math.max(0, s.goalT - dt);",
+  "new": "s.goalT = Math.max(0, s.goalT - 0 /* @negtest */);"
+ },
+ {
+  "name": "ev-goal2-never-resets",
+  "file": "games/taas/index.html",
+  "old": "      else s.goalT = g.sec;",
+  "new": "      else {} /* @negtest */"
+ },
+ {
+  "name": "ev-goal1-unlocks-saw",
+  "file": "games/taas/index.html",
+  "old": "{ id: 'planks', item: 'plank.m', n: 50, unlocks: 'extract' },",
+  "new": "{ id: 'planks', item: 'plank.m', n: 50, unlocks: 'saw' }, /* @negtest */"
+ },
+ {
+  "name": "ev-robots-twenty",
+  "file": "games/taas/index.html",
+  "old": "    flat: { robot: 1, stall: 1, min: 0, max: 200 },",
+  "new": "    flat: { robot: 20, stall: 1, min: 0, max: 200 }, /* @negtest */"
+ },
+ {
+  "name": "ev-empty-gives-nothing",
+  "file": "games/taas/index.html",
+  "old": "        const empty = m.result === 'empty', outs = empty ? [m.item] : millOut(key, m);",
+  "new": "        const empty = m.result === 'empty', outs = empty || key === 'extract' ? [m.item] : millOut(key, m); /* @negtest */"
  }
 ]

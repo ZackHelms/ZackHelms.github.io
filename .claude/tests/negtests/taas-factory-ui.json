@@ -50,7 +50,7 @@
  {
   "name": "goal-text-gone",
   "file": "games/taas/index.html",
-  "old": "    ctx.fillStyle = '#f5f7f9'; ctx.fillText(goalText(), r.x + 2 * pad + tw, gy + 0.5);",
+  "old": "    ctx.fillStyle = '#f5f7f9'; ctx.fillText(gt, r.x + 2 * pad + tw, gy + 0.5);",
   "new": "    /* @negtest */"
  },
  {
@@ -60,16 +60,16 @@
   "new": "    /* @negtest */"
  },
  {
-  "name": "goal-wrong-price",
+  "name": "goal-wrong-thing",
   "file": "games/taas/index.html",
-  "old": "  const goalText = () => 'Sell medium planks for $' + F.priceOf(WANT());",
-  "new": "  const goalText = () => 'Sell medium planks for $5'; /* @negtest */"
+  "old": "(F.kindOf(id) === 'sap' ? 'sap' :",
+  "new": "(false /* @negtest */ ? 'sap' :"
  },
  {
   "name": "goal-not-heard",
   "file": "games/taas/index.html",
-  "old": "'%. Goal: ' + goalText() + '.';",
-  "new": "'%.'; /* @negtest */"
+  "old": "Customer satisfaction ' + v + '%. Goal: ' + gt + '.';",
+  "new": "Customer satisfaction ' + v + '%.'; /* @negtest */"
  },
  {
   "name": "money-never-red",
@@ -128,8 +128,8 @@
  {
   "name": "plate-never-amber",
   "file": "games/taas/index.html",
-  "old": "ctx.textAlign = 'left'; ctx.fillStyle = now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';",
-  "new": "ctx.textAlign = 'left'; ctx.fillStyle = '#7ff09a'; /* @negtest */"
+  "old": "ctx.fillStyle = st.closed ? '#ff6b6b' : now < full ? SAT_COL(Math.round(s.satisfaction)) : '#7ff09a';",
+  "new": "ctx.fillStyle = st.closed ? '#ff6b6b' : '#7ff09a'; /* @negtest */"
  },
  {
   "name": "plate-label-gone",
@@ -506,8 +506,8 @@
  {
   "name": "stalls-ui-trays-always",
   "file": "games/taas/index.html",
-  "old": "const onFloor = q => !(q.crate !== undefined && s.hired > q.crate) && !(q.stall !== undefined && !s.stalls[q.stall].bought);",
-  "new": "const onFloor = q => !(q.crate !== undefined && s.hired > q.crate); /* @negtest */"
+  "old": " && !(q.stall !== undefined && !s.stalls[q.stall].bought)",
+  "new": " /* @negtest */"
  },
  {
   "name": "stalls-ui-tray-behind-counter",
@@ -524,14 +524,14 @@
  {
   "name": "stalls-ui-plate-first-only",
   "file": "games/taas/index.html",
-  "old": "const S = VW.S, r = boardRect('plate', i), pad = 0.07 * S, want = s.stalls[i].want;",
-  "new": "const S = VW.S, r = boardRect('plate', 0), pad = 0.07 * S, want = s.stalls[i].want; /* @negtest */"
+  "old": "const S = VW.S, r = boardRect('plate', i), pad = 0.07 * S, st = s.stalls[i], want = st.want;",
+  "new": "const S = VW.S, r = boardRect('plate', 0), pad = 0.07 * S, st = s.stalls[i], want = st.want; /* @negtest */"
  },
  {
   "name": "stalls-ui-plate-name-fixed",
   "file": "games/taas/index.html",
-  "old": "price = usd(now), name = PLATE_NAME(want);",
-  "new": "price = usd(now), name = 'MEDIUM PLANKS'; /* @negtest */"
+  "old": "usd(now), name = PLATE_NAME(want);",
+  "new": "usd(now), name = 'MEDIUM PLANKS'; /* @negtest */"
  },
  {
   "name": "stalls-ui-stock-first-only",
@@ -554,7 +554,7 @@
  {
   "name": "stalls-ui-sell-flat",
   "file": "games/taas/index.html",
-  "old": "else if (sells) bubbleEl.innerHTML = stallRows(opts);",
+  "old": "else if (sells) bubbleEl.innerHTML = backRow(opts) + stallRows(opts);",
   "new": "else if (sells) bubbleEl.innerHTML = opts.map(optButton).join(''); /* @negtest */"
  },
  {
@@ -646,5 +646,245 @@
   "file": "games/taas/index.html",
   "old": "if (robotBakeBytes <= ROBOT_BAKE_BYTES || k0 === key) break;",
   "new": "break; /* @negtest */"
+ },
+ {
+  "name": "s3-slot-sprites-drawn",
+  "file": "games/taas/index.html",
+  "old": " && !(q.slot && !F.unlocked(s, q.slot));",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "s3-spriterect-ignores-onfloor",
+  "file": "games/taas/index.html",
+  "old": "return sp && onFloor(sp) ? { x: sp.x",
+  "new": "return sp /* @negtest */ ? { x: sp.x"
+ },
+ {
+  "name": "s3-goal-no-countdown",
+  "file": "games/taas/index.html",
+  "old": "if (q.item) return 'Sell ' + sellN(q.item, g.left);",
+  "new": "if (q.item) return 'Sell ' + sellN(q.item, q.n); /* @negtest */"
+ },
+ {
+  "name": "s3-goal-no-singular",
+  "file": "games/taas/index.html",
+  "old": "(n === 1 ? ONE : PLURAL)",
+  "new": "(PLURAL /* @negtest */)"
+ },
+ {
+  "name": "s3-goal2-no-mss",
+  "file": "games/taas/index.html",
+  "old": "(g.counting ? mss(g.t) : q.sec / 60 + ' minutes')",
+  "new": "(q.sec / 60 + ' minutes' /* @negtest */)"
+ },
+ {
+  "name": "s3-hud-ignores-goal",
+  "file": "games/taas/index.html",
+  "old": "if (s.money === shownMoney && v === shownSat && gt === shownGoal) return;",
+  "new": "if (s.money === shownMoney && v === shownSat /* @negtest */) return;"
+ },
+ {
+  "name": "s3-no-goal-event",
+  "file": "games/taas/index.html",
+  "old": "          ARRIVE[job] = 0;\n          FLOAT.push(",
+  "new": "          ARRIVE[job] = 0; break; /* @negtest */\n          FLOAT.push("
+ },
+ {
+  "name": "s3-goal-no-level-sound",
+  "file": "games/taas/index.html",
+  "old": "          SND.sfx('level');\n          for (let i = 0; i < 5; i++) puff(",
+  "new": "          /* @negtest */\n          for (let i = 0; i < 5; i++) puff("
+ },
+ {
+  "name": "s3-goal-board-no-fit",
+  "file": "games/taas/index.html",
+  "old": "    fitText(gt, '700 #px ' + FONT.display, 0.27 * S, r.w - 3 * pad - tw);",
+  "new": "    ctx.font = '700 ' + (0.27 * S).toFixed(1) + 'px ' + FONT.display; /* @negtest */"
+ },
+ {
+  "name": "s3-startover-forgets-prices",
+  "file": "games/taas/index.html",
+  "old": "s = F.newGame((Date.now() >>> 0) || 1, s.flat);",
+  "new": "s = F.newGame((Date.now() >>> 0) || 1); /* @negtest */"
+ },
+ {
+  "name": "s3-prices-shown-in-formal",
+  "file": "games/taas/index.html",
+  "old": "document.getElementById('menu-prices').hidden = MODE.current !== 'robot-factory';",
+  "new": "document.getElementById('menu-prices').hidden = false; /* @negtest */"
+ },
+ {
+  "name": "s3-prices-no-bounds-shown",
+  "file": "games/taas/index.html",
+  "old": "b.disabled = +b.dataset.by < 0 ? s.flat[k] <= C.flat.min : s.flat[k] >= C.flat.max;",
+  "new": "b.disabled = false; /* @negtest */"
+ },
+ {
+  "name": "s3-prices-no-save",
+  "file": "games/taas/index.html",
+  "old": "{ SND.sfx('tick'); save(); bubbleSig = null; }",
+  "new": "{ SND.sfx('tick'); bubbleSig = null; /* @negtest */ }"
+ },
+ {
+  "name": "s3-prices-not-rendered-on-open",
+  "file": "games/taas/index.html",
+  "old": "MODE.on('robot-factory', { enter, leave, info: showInfo, menu: renderPrices });",
+  "new": "MODE.on('robot-factory', { enter, leave, info: showInfo }); /* @negtest */"
+ },
+ {
+  "name": "s4-dots-none",
+  "file": "games/taas/index.html",
+  "old": "const dotY = r.y + r.h * 0.2, dotR = clamp(r.h * 0.085, 1.6, 0.05 * S), n = Math.min(st.stock.length, C.stallCap);",
+  "new": "const dotY = r.y + r.h * 0.2, dotR = clamp(r.h * 0.085, 1.6, 0.05 * S), n = 0; /* @negtest */"
+ },
+ {
+  "name": "s4-dots-one",
+  "file": "games/taas/index.html",
+  "old": "const dotY = r.y + r.h * 0.2, dotR = clamp(r.h * 0.085, 1.6, 0.05 * S), n = Math.min(st.stock.length, C.stallCap);",
+  "new": "const dotY = r.y + r.h * 0.2, dotR = clamp(r.h * 0.085, 1.6, 0.05 * S), n = Math.min(st.stock.length, 1); /* @negtest */"
+ },
+ {
+  "name": "s4-dots-not-green",
+  "file": "games/taas/index.html",
+  "old": "const DOT_COL = '#4fe07f';",
+  "new": "const DOT_COL = '#e0e0e0'; /* @negtest */"
+ },
+ {
+  "name": "s4-dots-on-price",
+  "file": "games/taas/index.html",
+  "old": "const dotY = r.y + r.h * 0.2,",
+  "new": "const dotY = r.y + r.h * 0.62, /* @negtest */"
+ },
+ {
+  "name": "s4-closed-shows-price",
+  "file": "games/taas/index.html",
+  "old": "price = st.closed ? 'CLOSED' : usd(now)",
+  "new": "price = /* @negtest */ usd(now)"
+ },
+ {
+  "name": "s4-closed-not-red",
+  "file": "games/taas/index.html",
+  "old": "ctx.fillStyle = st.closed ? '#ff6b6b' :",
+  "new": "ctx.fillStyle = false /* @negtest */ ? '#ff6b6b' :"
+ },
+ {
+  "name": "s4-stall1-unequal",
+  "file": "games/taas/index.html",
+  "old": ".fx-bubble.stall1 .fx-opt { width: 84px; min-width: 84px; flex: 0 0 84px; }",
+  "new": "/* @negtest */"
+ },
+ {
+  "name": "s4-back-tall",
+  "file": "games/taas/index.html",
+  "old": ".fx-bubble .fx-opt.fx-back { width: 58px; min-width: 58px; height: 34px; flex: 0 0 58px; }",
+  "new": ".fx-bubble .fx-opt.fx-back { width: 58px; min-width: 58px; height: 58px; flex: 0 0 58px; } /* @negtest */"
+ },
+ {
+  "name": "s4-no-side",
+  "file": "games/taas/index.html",
+  "old": "if (x > left - 4 && x < left + w + 4 && y > top - 4 && y < top + h + 4) {",
+  "new": "if (false /* @negtest */ && x > left - 4 && x < left + w + 4 && y > top - 4 && y < top + h + 4) {"
+ },
+ {
+  "name": "s4-never-open-label",
+  "file": "games/taas/index.html",
+  "old": "label = o.id === 'close' ? 'Close' : 'Open';",
+  "new": "label = /* @negtest */ 'Close';"
+ },
+ {
+  "name": "s4-no-zzz",
+  "file": "games/taas/index.html",
+  "old": "else if (o.id === 'close' || o.id === 'open') { inner = ICON.rest;",
+  "new": "else if (o.id === 'close' || o.id === 'open') { inner = ICON.stock; /* @negtest */"
+ },
+ {
+  "name": "s4-jam-light-off",
+  "file": "games/taas/index.html",
+  "old": "const b = J.beacon, on = Math.sin(clock * 10) > 0,",
+  "new": "const b = J.beacon, on = false /* @negtest */,"
+ },
+ {
+  "name": "s4-jam-grime-fixed",
+  "file": "games/taas/index.html",
+  "old": "* (0.3 + 0.5 * Math.abs(Math.sin(i * 7.3 + clock * 0.8))) * m.dirt;\n      const wd",
+  "new": "* (0.3 + 0.5 * Math.abs(Math.sin(i * 7.3 + clock * 0.8))) /* @negtest */;\n      const wd"
+ },
+ {
+  "name": "s4-jam-not-drawn",
+  "file": "games/taas/index.html",
+  "old": "if (on && F.jammed(s, k)) D.push({ key: SO[k][3] + 0.03, f: () => slotJam(k) });",
+  "new": "if (false /* @negtest */ && on && F.jammed(s, k)) D.push({ key: SO[k][3] + 0.03, f: () => slotJam(k) });"
+ },
+ {
+  "name": "s4-cleaned-at-planer",
+  "file": "games/taas/index.html",
+  "old": "const at = AT[e.at] ? e.at : 'planer', p = SCRUB[at](), q = AT[at]();",
+  "new": "const at = /* @negtest */ 'planer', p = SCRUB[at](), q = AT[at]();"
+ },
+ {
+  "name": "s4-placeholder-same",
+  "file": "games/taas/index.html",
+  "old": "mini(F.SAMPLE[b.kind]) + ARROW[icon]",
+  "new": "mini('log.m' /* @negtest */) + ARROW[icon]"
+ },
+ {
+  "name": "s4-info-no-goals",
+  "file": "games/taas/index.html",
+  "old": "<ol class=\"fx-goals\">' + C.goals.map(",
+  "new": "<ol class=\"fx-goals\">' + [/* @negtest */].map("
+ },
+ {
+  "name": "s4-info-no-toss",
+  "file": "games/taas/index.html",
+  "old": "You never get it wrong: at a machine whose next thing is wrong for it, you toss that thing in the recycle bin instead, one a tap. A robot",
+  "new": "A robot' /* @negtest */ + ' "
+ },
+ {
+  "name": "s4-info-no-prices",
+  "file": "games/taas/index.html",
+  "old": "'<p><b>Prices</b> in the menu set",
+  "new": "/* @negtest */ '<p><b>Costs</b> in the menu set"
+ },
+ {
+  "name": "s4-info-no-closing",
+  "file": "games/taas/index.html",
+  "old": "'<p><b>Closing a stall</b>: its label says CLOSED in place of the price,",
+  "new": "/* @negtest */ '<p><b>Closing a stall</b>: its label says shut,"
+ },
+ {
+  "name": "s3-floor-key",
+  "file": "games/taas/index.html",
+  "old": "'|' + Math.min(s.hired, L.CRATES.length) + '|' + s.goal;",
+  "new": "'|' + Math.min(s.hired, L.CRATES.length); /* @negtest */"
+ },
+ {
+  "name": "s4-full-put-zero",
+  "file": "games/taas/index.html",
+  "old": "if (!o.enabled) aria = 'No room in this stall for ' + NAME(o.item); }",
+  "new": "if (!o.enabled) { label = '0'; aria = 'Nothing to put in'; } } /* @negtest */"
+ },
+ {
+  "name": "goals-ui-words-swapped",
+  "file": "games/taas/index.html",
+  "old": "label = 'Re-assign'; aria",
+  "new": "label = 'Re-stock'; /* @negtest */ aria"
+ },
+ {
+  "name": "goals-ui-no-back-row",
+  "file": "games/taas/index.html",
+  "old": "  const backRow = opts => opts.some(o => o.id === 'back') ?",
+  "new": "  const backRow = opts => false /* @negtest */ ?"
+ },
+ {
+  "name": "goals-ui-float-wrong-slot",
+  "file": "games/taas/index.html",
+  "old": "text: 'slot 0' + (F.SLOT_JOBS.indexOf(job) + 2) + ': '",
+  "new": "text: 'slot 0' + (F.SLOT_JOBS.indexOf(job) + 1 /* @negtest */) + ': '"
+ },
+ {
+  "name": "goals-ui-all-met-unsaid",
+  "file": "games/taas/index.html",
+  "old": "    if (g.done) return 'All goals met';",
+  "new": "    if (g.done) return 'Sell 25 sap'; /* @negtest */"
  }
 ]

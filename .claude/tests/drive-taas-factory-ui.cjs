@@ -1292,15 +1292,17 @@ const server = http.createServer((req, res) => {
       const before = { rect: !!T.spriteRect('extract'), cyan: cyan() };
       s.goalN = 50; T.tick(1 / 60);
       for (let i = 0; i < 45; i++) T.tick(1 / 60);
+      // the float's own words (taasgoals step 5: a float naming the wrong slot was drawn just as cyan)
+      const said = [], fill = g.fillText; g.fillText = function (txt) { said.push(String(txt)); return fill.apply(this, arguments); }; T.tick(0); g.fillText = fill;
       const c = T.spriteRect('extract'), hit = c ? T.hitTest(c.x + c.w / 2, c.y + c.h * 0.6) : null;
-      const after = { goal: s.goal, rect: !!c, all: ['extractInFront', 'extractConsole', 'extractOutFront'].every(id => T.spriteRect(id)), hit: hit && hit.kind, cyan: cyan(), level: heardSfx.indexOf('level') >= 0, heard: document.getElementById('fx-score').textContent.replace(/^.*Goal: /, '') };
+      const after = { goal: s.goal, rect: !!c, all: ['extractInFront', 'extractConsole', 'extractOutFront'].every(id => T.spriteRect(id)), hit: hit && hit.kind, cyan: cyan(), named: said.indexOf('slot 02: the sap extractor') >= 0, level: heardSfx.indexOf('level') >= 0, heard: document.getElementById('fx-score').textContent.replace(/^.*Goal: /, '') };
       for (let i = 0; i < 240; i++) T.tick(1 / 60);
       after.later = cyan();
       SND.sfx = was;
       return { before, after };
     });
-    ok(!arrival.before.rect && arrival.after.goal === 1 && arrival.after.rect && arrival.after.all && arrival.after.hit === 'extract' && arrival.after.level && arrival.after.cyan > 300 && arrival.before.cyan < 50 && arrival.after.later < 50,
-      'the 50th medium plank sold, the sap extractor arrives in slot 02 with the level sound and a float naming it (gone a few seconds later), and a tap on it reaches it', JSON.stringify(arrival));
+    ok(!arrival.before.rect && arrival.after.goal === 1 && arrival.after.rect && arrival.after.all && arrival.after.hit === 'extract' && arrival.after.level && arrival.after.named && arrival.after.cyan > 300 && arrival.before.cyan < 50 && arrival.after.later < 50,
+      'the 50th medium plank sold, the sap extractor arrives in slot 02 with the level sound and a float naming it, "slot 02: the sap extractor" (gone a few seconds later), and a tap on it reaches it', JSON.stringify(arrival));
     ok(arrival.after.heard === '>$50 & >90% customer satisfaction for 10 minutes.', 'then the wall reads goal 2: ">$50 & >90% customer satisfaction for 10 minutes"', arrival.after.heard);
     // goal 2's countdown in m:ss while both hold, and back to 10 minutes when either fails
     const rest = await goalBits();

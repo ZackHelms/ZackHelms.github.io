@@ -249,7 +249,7 @@ question is genuinely unclear.
 | 2 | Engine: bins and stalls take anything, the stall's menu, closing, wrong-input jams; rules rows | DONE 2026-10-20 |
 | 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | DONE 2026-10-20 |
 | 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | DONE 2026-10-20 |
-| 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | open |
+| 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | DONE 2026-10-20 |
 | 6 | Docs final and gates | open |
 | 7 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
 
@@ -808,6 +808,138 @@ whether the goals feel right in pace.
     (`DOT_COL`), `slotJam()` / `JAM_LOOK` / `GRIME`, the `SMOKE` / `SCRUB` / `AT` tables, the `shake` tags read through
     `F.jammed()`, `renderBubble()`'s side placement, the `stall1` and `fx-back` classes, and the suite's `fresh()` and `loaded`;
     `.claude/tests/README.md` the page suite at 159.
+- **Step 5 results (2026-10-20, the eval at $1, the goals persona, the three break lists, frame cost).**
+  - **No escalation trigger fired.** The goals persona (`goals`, from `newGame()`, seeds 1-12, an hour each) met
+    every goal on **12 of 12 seeds**, all inside the hour. Minutes from a new factory (goal 1 / goal 2 / goal 3),
+    goal 2's countdown started / started over, operator rested for lack of money:
+
+    | Seed | goal 1 | goal 2 | goal 3 | countdown started / reset | rested |
+    |---|---|---|---|---|---|
+    | 1 | 11.0 | 30.3 | 39.0 | 2 / 1 | 0 |
+    | 2 | 10.6 | 34.9 | 45.1 | 3 / 2 | 1 |
+    | 3 | 9.8 | 28.2 | 40.2 | 1 / 0 | 0 |
+    | 4 | 11.3 | 32.7 | 45.6 | 3 / 2 | 1 |
+    | 5 | 10.5 | 29.7 | 38.8 | 2 / 1 | 1 |
+    | 6 | 10.5 | 33.7 | 43.5 | 1 / 0 | 1 |
+    | 7 | 11.1 | 30.8 | 42.7 | 2 / 1 | 0 |
+    | 8 | 10.5 | 28.9 | 38.5 | 1 / 0 | 0 |
+    | 9 | 11.8 | 36.9 | 48.9 | 3 / 2 | 0 |
+    | 10 | 11.0 | 28.5 | 40.2 | 2 / 1 | 0 |
+    | 11 | 10.6 | 29.5 | 36.0 | 1 / 0 | 1 |
+    | 12 | 11.5 | 29.7 | 40.0 | 2 / 1 | 0 |
+
+    Goal 1 at 9.8-11.8 minutes, goal 2 at 28.2-36.9, goal 3 at 36.0-48.9; goal 2's countdown started over on 8 of
+    12 seeds (12 resets in all, at most 2 on a seed) and always completed. The goals persona (assumed sensible
+    player): the paced line for goals 1 and 2; when the extractor arrives it hires a robot for it and carries the
+    sap logs the operator recycles to it (and its clean logs back to the planer's input bin), so sap piles up in the
+    extractor's output bin while goal 2 counts; when the bench arrives it buys a second stall, hires its robot and
+    sets it to sap (sap sold before goal 3 does not count). Its way out of a line that has run out of money (money
+    below zero two minutes running and the operator short of an instruction it cannot pay for) is to rest the
+    operator and press the planer by hand until the next slot is paid for, then put it back: needed on 5 seeds
+    (without it seed 2 never reached goal 2 inside 90 minutes and seed 6 took 70.8 / 83.5 minutes to goals 2 / 3; traced: a supervisor stepping back at 30 s
+    with $2 in hand, an untold operator jamming, no money for slots ever). Traced on the way and fixed in the
+    persona, not the game: a hauling persona's block ended in `continue`, so one that had to work by hand stood idle.
+  - **The eval** (`eval-taas-factory.cjs`): **32 -> 35** (3 goals rows added: every goal inside the hour on most
+    seeds, measured 12/12 each; goal 2's countdown starts over in real play and still completes; nothing dead-ends,
+    in the data (each count goal's thing a stall can sell, made by a machine there before the goal begins, every
+    slot's machine some goal's reward) and in play (every seed past the last goal)). Every persona but `goals` starts
+    with `s.goal = 3` and plays at $1 through the new bubbles (an output bin emptied a kind a tap, Re-stock to put
+    in, Re-assign to set; haulers take only what they carry somewhere); whoever cleans the planer also scrubs a
+    jammed slot. Runs in about 1.6 minutes.
+  - **Persona restatements** (each traced, each named in the eval's header): `paced` now puts the delay in once a
+    stall's worth of medium planks has piled up behind a full stall, and buys no other instruction until it is in
+    (its old rule, "the moment the operator is hired", put a 5 s wait in 30 s into the game at $1 and starved the
+    line on 12 of 12 seeds, money -$93 to -$550 at the hour; that rule is kept as `paced early`); `stocker only`
+    hires only with the stocker's four slots ($50) in hand (hiring with $2 it never paid for them behind an operator
+    told nothing: money below zero from minute 6, plan never whole on seed 7); new `alone` (never hires, ten
+    minutes) measures working by hand, since every other persona's first robot comes 30 s in.
+  - **Restated claims** (old -> new; same claim unless marked SUBSTANCE CHANGED):
+    - the first $20 inside 2.5 min: 1.6 min on hands-on -> 1.6 min by hand (`alone`), plus the first robot, at $1,
+      inside a minute (0.5 min).
+    - both robots inside nine minutes: 7.8 min -> inside a minute (0.5 min).
+    - satisfaction above 80% working alone until the first robot: now over ten minutes of `alone` (100% throughout).
+    - uninstructed robots barely beat a person alone: -8.1 vs 11.2 $/min -> -3.0 vs 11.3 (`alone`'s minutes 1-2).
+    - **SUBSTANCE CHANGED: operator first.** Was: the operator hired first loses money until moved to stocking
+      (swapped at 5.0 min, robot 2 at 10.4). At $1 the stocker is the next $1, on staff within the minute; it never
+      swaps and ends healthy (100%, 6.1 $/min). The row now asserts that the trap is gone at this price.
+    - supervisor's bin: ten stalls' worth and climbing (78-134) -> seven stalls' worth, a minute may dip by 3 not 2
+      (45-143; seed 9's supervisor never pays for its plans at $1).
+    - paced bin within three stalls' worth: in the last 20 minutes (max 13) -> from ten minutes after the delay went
+      in (max 15), since the delay now goes in at 5.7-45.2 minutes.
+    - paced spends less on every seed: holds ($624-721 vs $761-990).
+    - pays on most seeds (10/12) -> on every seed (12/12).
+    - **SUBSTANCE CHANGED: the 5 s start.** Was: too long on some seeds (3 of 12 under 50%). Now: put in at the hire
+      (`paced early`) it starves 12 of 12 and the money ends below zero on all; put in once the pile shows, the lowest
+      satisfaction after it is 78-100% (open question 10 sharpened: the start is too long for a line not yet running).
+    - both plans whole inside the hour on most seeds: 10/12 -> 11/12 (row reworded "the delay as soon as planks pile up").
+    - grew on most seeds: 6/6 -> 5/6 (seed 8's stocker plan never whole).
+    - second stall never pays: -$97..-$197 -> -$5..-$199 (seed 7 within $5: fragile).
+    - saw line ahead on most: 5 of 6 -> 5 of 5 (+$194..+$411).
+    - **SUBSTANCE CHANGED: all medium.** Was: costs too much ($660) to pay back in two hours (-$178..-$488). At $1
+      ($7 in all, slots apart) it is ahead within two hours on every seed (+$365..+$703); the row now asserts that.
+    - cut stall: holds (10-11%, 5.7 waiting).
+    - large planks: 5.0-5.6 waiting, 10-13% -> 3.9-5.6 waiting, 10-25%; thresholds restated to >= 3.5 and <= 30%.
+    - **SUBSTANCE CHANGED: set first.** Was: a stall set before its robot locks the shop for good (none served, the
+      robot never affordable). At $1 the robot is hired at once (hired 3), the shop never locks, and it ends as a
+      second stall does (behind the line, -$2..-$185); the row now asserts that.
+    - **SUBSTANCE CHANGED: full house.** Was: buying everything ends two hours behind (-$519..-$732). At $1 it ends
+      ahead (+$164..+$435) but behind the four stalls of 2x4s on every seed, and a customer still pays less than with
+      the saw line alone ($4.09-4.42 vs $4.76-5.11); the row now asserts that.
+    - every other row held with its old threshold (instructions pay 3.3 vs -3.0; uninstructed 24% with 124 wrong vs
+      100%; crossed -6.3 vs -4.8; stock planks 189 junk, looking 2347; the plan clears the floor; evals 0.85 / 1.0
+      green; NO WAY OUT none; stocker only 0 left, jams $205 vs $25; the books balance over 107 runs).
+  - **Tips recheck** (not edited; for step 6 and the CD): Tip 1 (a first agent rarely pays) holds and is starker at
+    $1 (the hire is cheap, the cleanup is not: supervisors' money hovers at or below zero until the plans). Tip 2
+    (pace it, start the wait short) holds; the eval now says why: a 5 s wait put in before the line runs starves it
+    every time. **Tip 3 (give an agent the next best task) is no longer shown by the eval at $1**: the trap needs a
+    stretch with one robot, which a $1 second robot removes; it still holds whenever a robot costs more than the
+    first sales. Tip 4 (more agents do not make more demand) holds (second stall $4.00 a customer, behind on every
+    seed), but its "a new stall pays when it sells something worth more, like 2x4s from the table saw" now points at
+    the machine that arrives last (goal 3). **Tip 5 (only as good as what feeds it)**: large planks and the cut stall
+    still show it; its "set a stall to sell only once someone can keep it stocked" is not shown at $1 (set first no
+    longer locks the shop). Info's Tips text is unchanged; step 6 should decide wording with these in hand.
+  - **Break lists** (each suite first run on the unbroken page: 358 / 159 / 35 green; all lists whole on copies,
+    `negtest-copies.py --jobs 3`):
+    - engine `taas-factory-engine.json`: **144 -> 216, 214 caught.** Added 77: step 1's twelve recovered from the
+      `br/*.html` copies and re-anchored (`goals-*`), step 2's 22 (`s2-*`), and new ones for goal counts and met,
+      the countdown's money / satisfaction boundaries and reset, the unlock gate, the `goal` event, load clamps,
+      `setFlat` bounds and rounding, flat hire / stall prices, `flatOf`, each stall level (back, assign, close, open,
+      take, sell keeping or returning stock), the paying customer at a closed stall, walking out free, the re-pick,
+      the jam's timing / charge / dirt, the bench never jamming or jamming on rough planks, the extractor on normal
+      logs, the saw on logs, the empty run's sap / log / grade, `unjam()` freeing and its recycled thing, the toss
+      (two, uncounted, by hand at the bench), the planer on a plank, a logs-only rack. Repointed 6 stale anchors
+      (`fix-not-charged`, `line-no-cap`, `clean-instant`, `robot-cleans`, `stocker-ignores-full`, `load-keeps-junk`).
+      Retired 5 (`rack-takes-planks`, `saw-takes-gnarled`, `extract-takes-logs`, `bench-no-planks`,
+      `bins-rack-normal-only`): each broke "a bin takes only its machine's thing", a rule the CD withdrew; what
+      replaced it is broken by `planer-cuts-planks`, `saw-takes-logs`, `extract-runs-logs`, `bench-rough-jams`,
+      `rack-logs-only` and `s2-acc-filter`. **Misses (2):** `bubble-before-arrival`, the known equivalent; and
+      `s2-no-slot-toss`, step 2's traced equivalent (the press act's own guard tosses the wrong thing a moment
+      later). `unjam-wrong-thing` was first written as an equivalent (`m.log || m.item`) and missed; rewritten to
+      recycle the next log instead, caught.
+    - page `taas-factory-ui.json`: **108 -> 148, 147 caught.** Added step 3's 15 (less `s3-floor-key-no-goal`, the
+      same change as step 4's `s3-floor-key`), step 4's 22, and 4 new (`goals-ui-words-swapped`,
+      `goals-ui-no-back-row`, `goals-ui-float-wrong-slot`, `goals-ui-all-met-unsaid`). Repointed 8 stale anchors
+      (`goal-text-gone`, `goal-not-heard`, `plate-never-amber`, `stalls-ui-trays-always`, `stalls-ui-plate-first-only`,
+      `stalls-ui-plate-name-fixed`, `stalls-ui-sell-flat`, and `goal-wrong-price` renamed `goal-wrong-thing`: the goal
+      carries no price now, so it breaks the sap wording). **Miss (1):** `no-remeasure`, the known equivalent.
+      `goals-ui-float-wrong-slot` was first missed (the arrival row read only the float's cyan pixels); the row now
+      also reads its words, "slot 02: the sap extractor", and catches it (page suite still 159, that row restated).
+      No flaky row: the most-catching rows (taps at six sizes, 7; the CLOSED label, 7, all label breaks) catch
+      related breaks only. `fresh()`'s order is a suite-level change, outside a page list; step 4 proved it on a
+      suite copy.
+    - eval `taas-factory-eval.json`: **9 -> 14, 14 caught.** Repointed `ev-first-stall-only`; added
+      `ev-goal2-frozen`, `ev-goal2-never-resets`, `ev-goal1-unlocks-saw` (caught by the dead-end row),
+      `ev-robots-twenty` and `ev-empty-gives-nothing`.
+  - **Frame cost** (eight pose, nothing else running): median 16.7 ms, p95 16.7, max 16.8, **0 of 149 over**.
+  - **Gates:** `gates.sh --eval games/taas/index.html` GREEN: formal 43 / 39 / 9, factory rules 358, page 159,
+    eval 35. No page code changed in this step.
+  - **For step 6** (assumed rows and open questions to record): the goals persona's play (above) and its way out;
+    the restated personas (`paced` on the pile, `paced early`, `stocker only` with $50, `alone`); open question 10
+    answered in part (the 5 s start starves a line not yet running); the four SUBSTANCE CHANGED claims, each a
+    consequence of $1 prices, which the CD may want to see (cheap staffing removes the operator-first trap and the
+    set-first lock, and makes buying everything pay); Tips 3 and 5 not shown at $1, Tip 4's 2x4s now behind goal 3;
+    `.claude/tests/README.md` rows: eval 35 (about 1.6 minutes), lists 216 / 148 / 14 with 214 / 147 / 14 caught.
+
 
 ## Handoff
 
