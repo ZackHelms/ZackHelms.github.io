@@ -1018,7 +1018,7 @@ voice against a stand-in for OpenAI's speech service, and other phones as browse
 contexts joined over real WebRTC). Detailed context:
 `.claude/cyoa2.md`.
 
-### TAAS (`taas/index.html`, ~4,800 lines)
+### TAAS (`taas/index.html`, ~5,200 lines)
 The **Team AI Adoption Simulator**, designed with the CD on 2026-10-09 and shipped on
 2026-10-12 as the hub's 3rd card (after CYOA2 and CYOA). Not a scene but a **management
 sim rendered as a DOM page**: a roadmap tracker of eight quarters across the top, the
@@ -1059,13 +1059,24 @@ it did, red only for a blocker or a hit to customer satisfaction, resettable. On
 is on every robot's list from the start (2026-10-16): a **delay between tasks**, set with a
 slider from 0 to 60 s under its slot, which ends overproduction when it is tuned. Since the same
 day logs are bought ten for $10 into the planer's input bin, a machine run costs $0.10, nothing
-sells below what it cost to make, and every bin you put things in gives them back. Static scenery is baked per scale and blitted on
+sells below what it cost to make, and every bin you put things in gives them back. Since 2026-10-20
+(the CD's goals brief) a new game starts with **one stall and slot 01 only**: three goals on the
+wall unlock the sap extractor (slot 02: sell 50 medium planks), the hand crafting bench (03: over
+$50 and over 90% customer satisfaction for 10 minutes, a countdown that starts over whenever either
+fails) and the table saw (04: sell 25 sap, a draft), a locked slot an empty bay that is not drawn,
+tapped or walked round. Every input bin, output bin and stall is a put/take bubble like the recycle
+bin's, taking anything and doing nothing by itself on arrival; a stall's tap offers **Re-assign**,
+**Re-stock** and **Close**, its label wears a green dot per thing in it and reads CLOSED when
+closed; a machine run on the wrong thing jams ($5 to scrub, the thing to the recycle bin; the
+extractor on a log with no sap runs empty). Robots and stalls cost a flat $1, set under Prices in
+the menu (factory only). Static scenery is baked per scale and blitted on
 whole device pixels, robots are baked by pose, the canvas is capped at 2x, and the busy scene
 (four stalls, eight robots) holds 60 fps.
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`
 (rules, pure node), `drive-taas-ui.cjs` (the page in Chromium) and `eval-taas.cjs` (balance
 shape, opt-in) for the formal mode; `drive-taas-factory.cjs`, `drive-taas-factory-ui.cjs`
-and `eval-taas-factory.cjs` for the factory. Detailed context: `.claude/taas.md`.
+and `eval-taas-factory.cjs` for the factory (358, 159 and 35 checks since the goals brief). Detailed
+context: `.claude/taas.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

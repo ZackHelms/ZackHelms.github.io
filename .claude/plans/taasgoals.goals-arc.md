@@ -250,7 +250,7 @@ question is genuinely unclear.
 | 3 | UI: empty bays, the slots' new order, the goal board, a machine arriving, Prices in the menu; page rows | DONE 2026-10-20 |
 | 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | DONE 2026-10-20 |
 | 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | DONE 2026-10-20 |
-| 6 | Docs final and gates | open |
+| 6 | Docs final and gates | DONE 2026-10-21 |
 | 7 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
 
 ### Step 1 - engine: goals, unlocks, the slots' order, flat prices
@@ -939,6 +939,35 @@ whether the goals feel right in pace.
     consequence of $1 prices, which the CD may want to see (cheap staffing removes the operator-first trap and the
     set-first lock, and makes buying everything pay); Tips 3 and 5 not shown at $1, Tip 4's 2x4s now behind goal 3;
     `.claude/tests/README.md` rows: eval 35 (about 1.6 minutes), lists 216 / 148 / 14 with 214 / 147 / 14 caught.
+
+- **Step 6 results (2026-10-21, docs final and gates).** No code, suite or break list changed; every name and
+  count was read from the page, the suites and the lists.
+  - `.claude/taas.md`: header counts (358 / 159 / 35, break lists 216 / 148 / 14, ~5,200 lines, a new game's
+    start); section Tips gained a recheck at the flat $1 for each of the five Tips (3 and 5's line not shown, 4's
+    2x4s behind goal 3, 1 and 2 hold; none removed, Info's Tips untouched); a stated section "Goals that unlock
+    the slots, bins and stalls you fill by hand, flat prices (CD, 2026-10-20)" (the brief verbatim, the four
+    answers, what was built); 31 rows in Assumed, not decided dated 2026-10-20 (a "Superseded" row naming the
+    older rows the brief replaces, then Goals, Flat prices, Bins, Stall, Closing, Dots, Wrong inputs, Jams on
+    screen, Info's Tips, Eval); Open questions: 13 answered "later", notes on 1, 5, 10 and 12, new 16 (goal 3),
+    17 (an instruction for non-logs and each slot), 18 (a dot for a wrong thing) and 19 (is $1 the default the CD
+    wants); Architecture (the goals, bins and stalls, wrong inputs, saves and the UI names of steps 3 and 4,
+    and three stale lines corrected: `ACCEPTS`, hire price, events); How to change it (Another goal, A fifth slot,
+    and the stall price and bin lines corrected); a Measured (2026-10-20, the goals) section (the goals table,
+    the restated personas and claims old -> new, the frame cost); Negative tests (the new sizes with each miss
+    explained); History.
+  - `.claude/tests/README.md`: the three factory rows (358 checks, 159, 35; the goals sections; break lists
+    216 / 214 caught, 148 / 147, 14 / 14).
+  - `CLAUDE.md`: the `games/taas/` bullet and the TAAS context-file row (the goals brief, appended; one section
+    sign on the row's last line became the word "section" so the line is plain ASCII). `games/CLAUDE.md`: the TAAS entry
+    (heading ~5,200 lines, the goals paragraph, the suites' counts).
+  - **Gates:** `NODE_PATH=/opt/node-tools/node_modules .claude/scripts/gates.sh --eval games/taas/index.html` ->
+    `GATES: GREEN` (smoke, sync, negtest scan, formal drive / UI / eval, factory rules 358, page 159, eval 35 each
+    run alone and green). The added lines are plain ASCII.
+  - **Corrections to step 5's Results, found while documenting:** the goals persona's goal 2 resets sum to **11**
+    from its own table (the note said 12); the goals persona ends the hour at 20% and 39% satisfaction on seeds 12
+    and 8 (not mentioned before; a hypothesis in `.claude/taas.md`, not traced).
+  - **For step 7:** the docs name the plan at `.claude/plans/DONE/taasgoals.goals-arc.md`, which is where step 7
+    moves it.
 
 
 ## Handoff
