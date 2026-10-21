@@ -1,6 +1,6 @@
 # taasgoals - TAAS robot factory: goals that unlock the slots, bins and stalls filled by hand, flat prices (plan arc)
 
-**Status:** DRAFT (steps 1-7 open; build on branch `taas-goals`)
+**Status:** IMPLEMENTED 2026-10-21 (oversee run; steps 1-6 a44f339..0329fc8 on `taas-goals`, landed on `main` as one commit; follow-up `.claude/plans/DONE/taasgoals.goals-arc.follow-up.md`)
 **Requested:** 2026-10-20, the CD's brief (verbatim, quotes straightened):
 
 > - start with only one sales stall set to sell medium planks, and slot01 with the planer.
@@ -251,7 +251,7 @@ question is genuinely unclear.
 | 4 | UI: bin and stall bubbles, green dots, CLOSED, jams on slots 02-04, Info; page rows | DONE 2026-10-20 |
 | 5 | Eval (goals reachable, the economy at $1) and all three break lists; frame cost | DONE 2026-10-20 |
 | 6 | Docs final and gates | DONE 2026-10-21 |
-| 7 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | open |
+| 7 | Ship: badge, one commit, fast-forward `main`, push, Pages, report to the CD | DONE 2026-10-21 |
 
 ### Step 1 - engine: goals, unlocks, the slots' order, flat prices
 
@@ -969,6 +969,13 @@ whether the goals feel right in pace.
   - **For step 7:** the docs name the plan at `.claude/plans/DONE/taasgoals.goals-arc.md`, which is where step 7
     moves it.
 
+
+- **Step 7 results (2026-10-21, ship; run by the overseer).** Badge `build 2026-10-21 12:04 UTC`;
+  `check-inline-js` and `gates.sh --eval games/taas/index.html` GREEN on the stamped page (formal 43 / 39 / 9,
+  factory rules 358, page 159, eval 35). The tests README's older wall sentence that still quoted "Sell medium
+  planks for $4" now names the new goal. The plan and its follow-up moved to `.claude/plans/DONE/`; TODO.md's Now
+  entry became a Needs Zack playtest entry; DONE.md gained the arc. Landed on `main` as one commit whose tree is
+  this branch's last (fast-forward; no merge commit on `main`); the Pages run for that SHA is in the CD's report.
 
 ## Handoff
 

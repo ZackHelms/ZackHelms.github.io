@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-10-21 [taas] **Goals that unlock slots 02-04, bins and stalls filled by hand, flat $1
+  prices** (the CD, 2026-10-20, with four answers): a new factory starts with one stall and slot 01;
+  "Sell 50 medium planks" unlocks the sap extractor (02), over $50 and over 90% for 10 minutes on a
+  countdown that starts over unlocks the bench (03), "Sell 25 sap" (a draft) the table saw (04);
+  every bin and stall is a put/take bubble, a stall's Re-assign / Re-stock / Close with a green dot
+  per thing, a machine run on the wrong thing jams; robots and stalls a flat $1 set under Prices in
+  the menu. The goals persona meets all three on 12 of 12 seeds inside the hour; five eval claims
+  changed substance at $1 (open question 19). Suites 358 / 159 / 35, break lists 216/214, 148/147,
+  14/14; plan `.claude/plans/DONE/taasgoals.goals-arc.md`.
+
 - 2026-10-17 [taas] **Four stalls and eight robots in the robot factory** (the CD,
   2026-10-16): stalls 2-4 bought for $50 / $100 / $150 and set by tapping to one of
   13 things (unsold stock to your arms), customers picking a stall at random, one
