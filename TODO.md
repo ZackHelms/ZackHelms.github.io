@@ -11,16 +11,20 @@ backlog entry here.
 
 ## Now
 
-- [taas] **Goals that unlock slots 02-04, bins and stalls you fill by hand, flat $1 prices** (the CD's
-  brief and four answers, 2026-10-20): one stall and the planer to start; "Sell 50 medium planks"
-  unlocks the sap extractor (slot 02), ">$50 & >90% for 10 minutes" the bench (slot 03), "Sell 25
-  sap" (draft) the table saw (slot 04); every bin and stall takes anything through the recycle bin's
-  put/take bubble, and a machine run on the wrong thing jams; a stall's Re-assign / Re-stock / Close
-  and its green dots; robot and stall prices in the menu. Seven steps on branch `taas-goals`.
-  **Plan ready (2026-10-20)** - run:
-  `/zmh-producer:oversee-implementation .claude/plans/taasgoals.goals-arc.md`
+- (none)
 
 ## Needs Zack
+
+- [taas] **Play the goals arc** (shipped 2026-10-21, `build 2026-10-21 12:04 UTC`; start over or a new
+  save for a new factory, an old save counts as all goals met). Check: one stall and only slot 01 at
+  the start; "Sell 50 medium planks" counting down and the sap extractor arriving in slot 02; goal 2's
+  countdown, and starting over when satisfaction dips; the bench in 03; "Sell 25 sap" and the saw in
+  04; a stall's Re-assign / Re-stock / Close and the zzz; the green dots; putting things in output bins
+  for the robots; a plank in the planer's input bin jamming it under a robot; Prices in the menu. Then
+  answer open questions 16-19 in `.claude/taas.md` (most of all **19: is $1 the default you want**? At
+  $1 five of the eval's lessons change, operator-first is no longer a trap, and Tip 3 is no longer
+  shown), and overrule what is wrong among the 31 new assumed rows (the ones most worth a look are
+  listed in `.claude/plans/DONE/taasgoals.goals-arc.follow-up.md`).
 
 - [cyoa2] **Try step 4 on two phones.** Host: Menu > Players > Invite a player.
   Guest: point the camera at the code, open the link, type a name, and show the

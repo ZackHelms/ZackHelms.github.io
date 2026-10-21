@@ -1,10 +1,12 @@
 // TAAS robot factory with everything bought (taasstalls, 2026-10-17): four stalls set to sell four
 // things, eight robots at work (the planer's, one at each stall told to stock only its thing, the
 // saw's, the extractor's, the bench's), a full shop (one at each stall, two in the back line), every
-// slot's bins full and the avatar walking with its arms full. For frame-budget.cjs evalFile= (after
+// slot's bins full and the avatar walking with its arms full. Every goal is met, so slots 02-04 have
+// their machines. For frame-budget.cjs evalFile= (after
 // select=#mode-btn:robot-factory). It opens at the top of the floor, so the counter is on screen.
 (function () {
   const F = FACTORY, s = F.newGame(7), run = n => { for (let k = 0; k < n; k++) F.step(s, 0.05); };
+  s.goal = F.CFG.goals.length;   // every goal met (taasgoals, 2026-10-20): slots 02-04 and their jobs are there
   s.money = 2000;
   const wants = ['plank.m', 'plank.l', 'b2x4.m', 'sap'];
   for (let i = 1; i < 4; i++) { F.tap(s, { kind: 'stall', i }); run(300); F.choose(s, 'buystall'); F.choose(s, 'sell:' + wants[i]); s.bubble = null; }
