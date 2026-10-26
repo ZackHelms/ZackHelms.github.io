@@ -15,6 +15,19 @@ backlog entry here.
 
 ## Needs Zack
 
+- [taas] **Play Robot factory v2** (shipped 2026-10-26; the mode dropdown's third choice, or
+  `games/taas/factory-v2.html`; built with no Q&A, as asked). Check: the planer running by itself
+  from its hopper; the dump truck's tail tipping ten logs into the raw materials bin when it is empty;
+  buying a robot at the terminal and watching it ride the elevator up, and sending one down; a
+  robot's page: tap the main prompt, then a source and a destination on the floor; build lines in
+  the sentence builder and reorder them (try "Recycle any sap logs" above and below "Only take medium
+  logs"); a nonsense line and the slip figure. Then answer the eight open questions in `.claude/taas.md`
+  section Robot factory v2, most of all **1: the word lists** (your prompt stopped before them; the
+  four lists are a guess), **2: the long haul** from the raw materials bin to the planer's hopper
+  (one robot carrying one log a trip cannot keep a stall stocked; two carrying six can), and
+  **3: the truck only comes for an empty bin**, so an "Only take" robot that leaves logs behind stops
+  the deliveries. Overrule anything in its 27-row assumed table.
+
 - [taas] **Play the goals arc** (shipped 2026-10-21, `build 2026-10-21 12:04 UTC`; start over or a new
   save for a new factory, an old save counts as all goals met). Check: one stall and only slot 01 at
   the start; "Sell 50 medium planks" counting down and the sap extractor arriving in slot 02; goal 2's

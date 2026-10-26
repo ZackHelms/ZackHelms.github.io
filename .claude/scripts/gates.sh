@@ -21,6 +21,9 @@
 # Always runs check-games-sync.cjs — it is pure node, costs nothing, and the
 # three files it compares drift independently.
 #
+# A game's second page (`games/<slug>/<page>.html`, such as TAAS's factory-v2.html,
+# 2026-10-26) maps to the game's slug, so it runs every one of that game's suites.
+#
 # Suite discovery takes `drive-<slug>.cjs` AND `drive-<slug>-*.cjs` (same for
 # eval-), because a game may keep more than one suite of a class: music-mixer
 # splits a pure-node notation gate from a Chromium synth/input gate. It was
@@ -120,6 +123,7 @@ if [ "$DRIVE" = 1 ] && [ "$HAVE_PW" = 1 ]; then
   for p in ${PAGES[*]+"${PAGES[@]}"}; do
     case "$p" in
       games/*/index.html) slug=$(basename "$(dirname "$p")") ;;
+      games/*/*.html)     slug=$(basename "$(dirname "$p")") ;;   # a game's second page (taas/factory-v2.html)
       games/*.html)       slug=$(basename "$p" .html) ;;
       *) continue ;;
     esac
@@ -143,6 +147,7 @@ if [ "$HAVE_PW" = 1 ]; then
   for p in ${PAGES[*]+"${PAGES[@]}"}; do
     case "$p" in
       games/*/index.html) slug=$(basename "$(dirname "$p")") ;;
+      games/*/*.html)     slug=$(basename "$(dirname "$p")") ;;   # a game's second page (taas/factory-v2.html)
       games/*.html)       slug=$(basename "$p" .html) ;;
       *) continue ;;
     esac

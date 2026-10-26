@@ -1,0 +1,86 @@
+[
+ {
+  "name": "pick-machine-src",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (step !== 'dst') return null;\n",
+  "new": "     /* @negtest */\n"
+ },
+ {
+  "name": "pick-same-twice",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (!k || (pick.step === 'dst' && k === pick.src)) {",
+  "new": "if (!k) { /* @negtest */"
+ },
+ {
+  "name": "builder-no-advance",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (next >= 0) focusPos = next;\n",
+  "new": "    if (next >= 0) focusPos = focusPos; /* @negtest */\n"
+ },
+ {
+  "name": "slip-figure-fixed",
+  "file": "games/taas/factory-v2.html",
+  "old": "    h = '<div class=\"fx-sec\"><div class=\"fx-h\"><span>Instructions, in order</span><span>slips ' + pct(mi.slip) + ' of trips</span></div><ol class=\"fx-slots fx-lines\">';",
+  "new": "    h = '<div class=\"fx-sec\"><div class=\"fx-h\"><span>Instructions, in order</span><span>slips ' + pct(0.05) + ' of trips</span></div><ol class=\"fx-slots fx-lines\">'; /* @negtest */"
+ },
+ {
+  "name": "lift-no-clip",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (riding || lz < 0) {   // on the elevator",
+  "new": "    if (false) { /* @negtest */   // on the elevator"
+ },
+ {
+  "name": "truck-not-drawn",
+  "file": "games/taas/factory-v2.html",
+  "old": "    D.push({ key: L.TRUCK.y0 + 0.5, f: drawTruck });\n",
+  "new": "     /* @negtest */\n"
+ },
+ {
+  "name": "truck-no-tilt",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (k.phase === 'tip') tilt = ease(u(k.t / (T.tipSec * 0.45))) * 0.75;",
+  "new": "    if (false) tilt = 0; /* @negtest */"
+ },
+ {
+  "name": "hold-part-off",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (!el || partSig[name] === sig || holdPart === name) return;",
+  "new": "if (!el || partSig[name] === sig) return; /* @negtest */"
+ },
+ {
+  "name": "lift-tap-floor",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (!pick && w.x >= L.LIFT.x0 && w.x <= L.LIFT.x1 && w.y >= L.LIFT.y0 && w.y <= L.LIFT.y1) return { kind: 'terminal' };\n",
+  "new": "     /* @negtest */\n"
+ },
+ {
+  "name": "mode-no-nav",
+  "file": "games/taas/factory-v2.html",
+  "old": "    location.href = 'index.html?mode=' + encodeURIComponent(m);",
+  "new": "    return; /* @negtest */"
+ },
+ {
+  "name": "prices-dead",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (!b || !s) return;\n    SND.init();\n    const k = b.dataset.price;",
+  "new": "    if (!b || !s || true) return; /* @negtest */\n    SND.init();\n    const k = b.dataset.price;"
+ },
+ {
+  "name": "raw-taps-bin",
+  "file": "games/taas/factory-v2.html",
+  "old": "['rawBack', 'raw'], ['rawFront', 'raw']]",
+  "new": "['rawBack', 'bin'], ['rawFront', 'bin']] /* @negtest */"
+ },
+ {
+  "name": "mode-not-stored",
+  "file": "games/taas/factory-v2.html",
+  "old": "  try { localStorage.setItem('taas-mode', HERE); } catch (e) { /* optional */ }\n",
+  "new": "   /* @negtest */\n"
+ },
+ {
+  "name": "v2-save-shares-key",
+  "file": "games/taas/factory-v2.html",
+  "old": "const KEY = 'taas.factory2.v' + C.version;",
+  "new": "const KEY = 'taas.factory.v3'; /* @negtest */"
+ }
+]

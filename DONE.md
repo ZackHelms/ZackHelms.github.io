@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-10-26 [taas] **Robot factory v2** (the CD's brief, no Q&A by request), a page of its own on
+  the same mode dropdown in both pages: the planer and the sap extractor run by themselves from
+  hoppers into their output bins; a raw materials bin that a dump truck (its tail end in the yard)
+  fills ten for $10 whenever it is empty; a terminal and an elevator for buying robots, calling them
+  up from storage and sending them down; each robot's main prompt chosen by tapping a source then a
+  destination on the floor, and up to six instruction lines from a four-list sentence builder, read
+  first-match from the top, a nonsense line adding 5% to its slips. Measured: two haulers and a
+  stocker with good lines meet goal 1 in about 10 minutes at 93-98% satisfaction. Suites 112 / 45,
+  break lists 28/28 and 14/14; `gates.sh` now maps a game's second page to its slug.
+
 - 2026-10-21 [taas] **Goals that unlock slots 02-04, bins and stalls filled by hand, flat $1
   prices** (the CD, 2026-10-20, with four answers): a new factory starts with one stall and slot 01;
   "Sell 50 medium planks" unlocks the sap extractor (02), over $50 and over 90% for 10 minutes on a

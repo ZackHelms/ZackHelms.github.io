@@ -1075,8 +1075,16 @@ whole device pixels, robots are baked by pose, the canvas is capped at 2x, and t
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`
 (rules, pure node), `drive-taas-ui.cjs` (the page in Chromium) and `eval-taas.cjs` (balance
 shape, opt-in) for the formal mode; `drive-taas-factory.cjs`, `drive-taas-factory-ui.cjs`
-and `eval-taas-factory.cjs` for the factory (358, 159 and 35 checks since the goals brief). Detailed
-context: `.claude/taas.md`.
+and `eval-taas-factory.cjs` for the factory (358, 159 and 35 checks since the goals brief). Since
+2026-10-26 a third mode, **Robot factory v2**, is a second page, `taas/factory-v2.html`, on the same
+dropdown in both pages (the CD's brief, built with no Q&A at the CD's request): the planer and the sap
+extractor run by themselves from their hoppers, a dump truck backs up to a raw materials bin and tips
+ten logs in for $10 whenever it is empty, robots ride an elevator up from a terminal (bought, or called
+up from storage) and back down, and each robot has a **main prompt**, a source and a destination
+tapped on the floor, and up to six **instruction lines** built from four word lists, read in order
+(the first line about a thing decides it), a line that means nothing only making it slip 5% more
+often. Suites `drive-taas-factory2.cjs` (112, pure node) and `drive-taas-factory2-ui.cjs` (45,
+Chromium); `gates.sh` maps a game's second page to its slug. Detailed context: `.claude/taas.md`.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

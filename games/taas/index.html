@@ -354,7 +354,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-21 12:04 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-26 04:12 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -374,7 +374,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 })();
 </script>
 <button id="menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 7h16M1 12.5h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-<select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option></select>
+<select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option><option value="robot-factory-v2">Robot factory v2</option></select>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <div id="menu-scrim" hidden></div>
 <div id="menu" role="dialog" aria-label="Menu" hidden>
@@ -2585,8 +2585,11 @@ const SND = (function () {
 
 /* The mode switch: a native select beside the menu button. ?mode= wins, then the last choice. */
 const MODE = (function () {
-  const NAMES = { 'formal': 'Formal', 'robot-factory': 'Robot factory' };
-  const ALIAS = { factory: 'robot-factory', robot: 'robot-factory', robotfactory: 'robot-factory' };
+  const NAMES = { 'formal': 'Formal', 'robot-factory': 'Robot factory', 'robot-factory-v2': 'Robot factory v2' };
+  const ALIAS = { factory: 'robot-factory', robot: 'robot-factory', robotfactory: 'robot-factory', v2: 'robot-factory-v2', factory2: 'robot-factory-v2' };
+  // Robot factory v2 is a page of its own (the CD, 2026-10-26: "I want both of these to be available
+  // in the drop-down menu"): choosing it, or arriving here with it chosen last, goes there
+  const PAGES = { 'robot-factory-v2': 'factory-v2.html' };
   const sel = document.getElementById('mode-btn');
   const hooks = {};
   let cur = null;
@@ -2597,8 +2600,14 @@ const MODE = (function () {
     if (!m) { try { m = norm(localStorage.getItem('taas-mode')); } catch (e) { /* optional */ } }
     return m || 'formal';
   }
-  function set(m) {
+  function set(m, chosen) {
     m = norm(m) || 'formal';
+    if (PAGES[m]) {
+      try { localStorage.setItem('taas-mode', m); } catch (e) { /* optional */ }
+      if (cur && hooks[cur] && hooks[cur].leave) hooks[cur].leave();
+      if (chosen) location.href = PAGES[m]; else location.replace(PAGES[m]);
+      return;
+    }
     if (m === cur) return;
     const prev = cur;
     cur = m;
@@ -2618,7 +2627,7 @@ const MODE = (function () {
   function info() { if (hooks[cur] && hooks[cur].info) hooks[cur].info(); }
   // the menu has just opened: a mode with settings of its own fills them in (the factory's Prices)
   function menu() { if (hooks[cur] && hooks[cur].menu) hooks[cur].menu(); }
-  sel.addEventListener('change', () => { SND.init(); set(sel.value); sel.blur(); });
+  sel.addEventListener('change', () => { SND.init(); set(sel.value, true); sel.blur(); });
   set(pick());
   return { set, on, info, menu, get current() { return cur; }, NAMES };
 })();

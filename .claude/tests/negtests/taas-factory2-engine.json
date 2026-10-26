@@ -1,0 +1,170 @@
+[
+ {
+  "name": "auto-off",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (AUTO.indexOf(key) >= 0 && m.phase === 'idle' && m.in.length && placeOpen(s, key)) startMill(s, key, null, 'auto');",
+  "new": "if (false && AUTO.indexOf(key) >= 0 && m.phase === 'idle' && m.in.length && placeOpen(s, key)) startMill(s, key, null, 'auto'); /* @negtest */"
+ },
+ {
+  "name": "auto-ignores-lock",
+  "file": "games/taas/factory-v2.html",
+  "old": "m.in.length && placeOpen(s, key)) startMill(s, key, null, 'auto');",
+  "new": "m.in.length) startMill(s, key, null, 'auto'); /* @negtest */"
+ },
+ {
+  "name": "truck-free",
+  "file": "games/taas/factory-v2.html",
+  "old": "        spend(s, 'bought', T.cost);\n",
+  "new": "         /* @negtest */\n"
+ },
+ {
+  "name": "truck-no-calloff",
+  "file": "games/taas/factory-v2.html",
+  "old": "      if (s.raw.length) { k.phase = 'parked'; k.t = 0; return; }\n",
+  "new": "       /* @negtest */\n"
+ },
+ {
+  "name": "truck-nine",
+  "file": "games/taas/factory-v2.html",
+  "old": "truck: { n: 10,",
+  "new": "truck: { n: 9, /* @negtest */"
+ },
+ {
+  "name": "slip-no-nonsense",
+  "file": "games/taas/factory-v2.html",
+  "old": "CFG.slip + CFG.nonsense * nonsense",
+  "new": "CFG.slip /* @negtest */"
+ },
+ {
+  "name": "slip-without-lines",
+  "file": "games/taas/factory-v2.html",
+  "old": "slip: r.lines.length ? Math.min(CFG.slipMax, CFG.slip + CFG.nonsense * nonsense) : 0 };",
+  "new": "slip: Math.min(CFG.slipMax, CFG.slip + CFG.nonsense * nonsense) }; /* @negtest */"
+ },
+ {
+  "name": "slip-per-reach",
+  "file": "games/taas/factory-v2.html",
+  "old": "r.carry.push(takeAt(s, r.src, at)); r.from = r.src;\n          if (told",
+  "new": "r.carry.push(takeAt(s, r.src, at)); r.from = r.src; r.trip = null; /* @negtest */\n          if (told"
+ },
+ {
+  "name": "order-only-weak",
+  "file": "games/taas/factory-v2.html",
+  "old": "else return hit ? 'take' : 'skip';",
+  "new": "else if (hit) return 'take'; /* @negtest */"
+ },
+ {
+  "name": "recycle-as-skip",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (q.verb === 'recycle') { if (hit) return 'recycle'; }",
+  "new": "if (q.verb === 'recycle') { if (hit) return 'take'; } /* @negtest */"
+ },
+ {
+  "name": "carry-ignored",
+  "file": "games/taas/factory-v2.html",
+  "old": "carry: c ? Math.max(1, c.n) : 1,",
+  "new": "carry: 1, /* @negtest */"
+ },
+ {
+  "name": "carry-not-slower",
+  "file": "games/taas/factory-v2.html",
+  "old": "const speed = CFG.robotSpeed / (1 + CFG.carrySlow * Math.max(0, r.carry.length - 1));",
+  "new": "const speed = CFG.robotSpeed; /* @negtest */"
+ },
+ {
+  "name": "stop-ignored",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (stop && holding(s, dst, stop.noun) + r.carry.length >= stop.n)",
+  "new": "if (false && stop && holding(s, dst, stop.noun) + r.carry.length >= stop.n) /* @negtest */"
+ },
+ {
+  "name": "stop-counts-all",
+  "file": "games/taas/factory-v2.html",
+  "old": "return noun && noun !== 'things' ? list.filter(x => matchNoun(noun, x)).length : list.length;",
+  "new": "return list.length; /* @negtest */"
+ },
+ {
+  "name": "wait-ignored",
+  "file": "games/taas/factory-v2.html",
+  "old": "        if (mi.wait > 0) {\n",
+  "new": "        if (false) { /* @negtest */\n"
+ },
+ {
+  "name": "parse-sized-sap",
+  "file": "games/taas/factory-v2.html",
+  "old": "      if (w !== 'any' && (t === 'sap' || t === 'carvings')) return { kind: 'nonsense' };   // sap and carvings have no size\n",
+  "new": "       /* @negtest */\n"
+ },
+ {
+  "name": "parse-loose-tail",
+  "file": "games/taas/factory-v2.html",
+  "old": "noun && !isNum(w) && d === 'none') {",
+  "new": "noun && !isNum(w)) { /* @negtest */"
+ },
+ {
+  "name": "lift-up-first",
+  "file": "games/taas/factory-v2.html",
+  "old": "const r = down || up;",
+  "new": "const r = up || down; /* @negtest */"
+ },
+ {
+  "name": "down-keeps-carry",
+  "file": "games/taas/factory-v2.html",
+  "old": "    release(s, r);\n    r.toLift = true; r.state = 'toLift';",
+  "new": "     /* @negtest */\n    r.toLift = true; r.state = 'toLift';"
+ },
+ {
+  "name": "storage-works",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (r.where !== 'floor') return;\n    if (r.toLift) {",
+  "new": "     /* @negtest */\n    if (r.toLift) {"
+ },
+ {
+  "name": "machine-source",
+  "file": "games/taas/factory-v2.html",
+  "old": "const SOURCES = BINS.concat(STALL_KEYS);",
+  "new": "const SOURCES = BINS.concat(STALL_KEYS, ['saw']); /* @negtest */"
+ },
+ {
+  "name": "same-src-dst",
+  "file": "games/taas/factory-v2.html",
+  "old": "!placeOk(s, dst, DESTS) || src === dst) return false;",
+  "new": "!placeOk(s, dst, DESTS)) return false; /* @negtest */"
+ },
+ {
+  "name": "misstock-green",
+  "file": "games/taas/factory-v2.html",
+  "old": "credit(s, r.id, right ? 'stock:' + item : 'misstock:' + item + '@' + (st.want || 'none'), against);",
+  "new": "credit(s, r.id, 'stock:' + item, against); /* @negtest */"
+ },
+ {
+  "name": "feedjam-green",
+  "file": "games/taas/factory-v2.html",
+  "old": "(run === 'jam' ? 'feedjam:' :",
+  "new": "(run === 'jamx' ? 'feedjam:' : /* @negtest */"
+ },
+ {
+  "name": "robot-free",
+  "file": "games/taas/factory-v2.html",
+  "old": "    s.money = cents(s.money - p);\n    const r = newRobot(s);",
+  "new": "     /* @negtest */\n    const r = newRobot(s);"
+ },
+ {
+  "name": "truck-never-away",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (k.phase === 'lower' && k.t >= T.lowerSec) { k.phase = 'away';",
+  "new": "if (k.phase === 'lower' && k.t >= T.lowerSec) { k.phase = 'parked'; /* @negtest */"
+ },
+ {
+  "name": "stall-overfill",
+  "file": "games/taas/factory-v2.html",
+  "old": "if (room(s, i) <= 0) { r.waiting = 'full'; r.t = CFG.placeSec; return; }",
+  "new": "if (room(s, i) <= -9) { r.waiting = 'full'; r.t = CFG.placeSec; return; } /* @negtest */"
+ },
+ {
+  "name": "saw-ignores-cut",
+  "file": "games/taas/factory-v2.html",
+  "old": "        startMill(s, 'saw', r.cut, r.id);\n",
+  "new": "        startMill(s, 'saw', 'b2x4', r.id); /* @negtest */\n"
+ }
+]

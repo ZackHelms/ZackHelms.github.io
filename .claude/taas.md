@@ -4,7 +4,11 @@
 dropdown beside the menu button (2026-10-13; the menu replaced the back and mute buttons on
 2026-10-14): **Formal** (everything in this file down to §
 Robot factory mode; the default) and **Robot factory** (§ Robot factory mode, a playful
-cel-shaded take on the same story). The formal mode is a management sim: you run one team
+cel-shaded take on the same story). A third, **Robot factory v2** (the CD, 2026-10-26: machines
+that run themselves, a raw materials bin filled by a dump truck, robots by elevator, and robots told
+what to do by a main prompt and sentence-built lines), is a page of its own,
+`games/taas/factory-v2.html` (~4,300 lines), on the same dropdown in both pages (section Robot
+factory v2). The formal mode is a management sim: you run one team
 for **eight quarters** (Y1Q1 to Y2Q4), and each quarter you split **60 story points (SP)**
 between shipping work and building the team's AI skill, inside a **9,000 AI-credit (AIC)**
 budget. The team starts with no AI skill and owes **240 units of work a year**. The
@@ -1902,6 +1906,293 @@ top.
   `LAYOUT.SPOT`. The rules suite walks every spot to every other.
 
 
+## Robot factory v2 (2026-10-26)
+
+`games/taas/factory-v2.html`, a page of its own beside `index.html`, picked from the same mode
+dropdown as **Robot factory v2**. The first robot factory (everything in section Robot factory mode)
+stays exactly as it was, by the CD's ask that both be available. Built in one session with no Q&A,
+by the CD's instruction ("no q&a, just use your best judgement and i will playtest later"), so the
+standing rule to ask first was waived for this brief, and everything below that the brief did not
+say is in the assumed table.
+
+### The CD's brief (2026-10-26) - stated, do not relitigate
+
+Verbatim, quotes straightened; the CD said the prompt was not quite complete, and it ends where the
+CD stopped writing:
+
+> I started writing up the following prompt, but it is not quite complete. Take what i have and do
+> the best you can with it, no q&a, just use your best judgement and i will playtest later.
+>
+> Create robot factory v2, which has a different interface as defined below. Lots of similarities
+> with the first robot factory version. I want both of these to be available in the drop-down menu.
+> With this version V2, I want to try more open ended instruction and prompt definition. For
+> example, instead of the robot being assigned a particular prompt each robot has a list of
+> instructions that I define using a sentence builder for each. Order of these matters for example,
+> the first one might define its main objective at a high level and then subsequent instructions
+> help it refine how it handles the task.
+>
+> At the same time we can enable robots to transport items between bins and or stalls.
+>
+> First, some big design changes:
+> - planer & sap extractor machines automatically process their inputs from their "input hopper"
+>   and auto drop outputs into the output bin in the right.
+> - modify the new robot section so it is a computer terminal and an elevator that is used to
+>   deliver robots (from the robot store or from storage) to the work floor or return them to
+>   storage. I don't need to see this robot store or the storage area... This is basically
+>   shrinking down the screen real estate for the robot +/- functionality, which is on the left side
+>   of a slot.
+> - on the right side of the robot +/- slot, add a "raw materials" bin where I can see the tail end
+>   of a dump truck filling up this bin whenever it is empty. It is filled up with 10 items just like
+>   how the slot1 one input bin used to behave.
+>
+> When I open a robot's instructions panel, at the top i can tap the "main prompt" thing which:
+> - first it asks me to tap the "source" which can be any bin or stall.
+> - then it asks me to tap the "destination" which could be any bin, stall, machine / workbench.
+>
+> Also in the robot instruction panel if I tap one of the instruction slots, it opens up a sentence
+> builder that has the following basic words that I get to choose from a predefined list. It might
+> be possible to create nonsensical sentences that effectively don't do anything other than
+> increase random mistake chance by 5%
+>
+> ...
+
+### What was built
+
+- **The page and the dropdown.** `factory-v2.html` carries the same chrome (menu with Info, sound
+  and Prices, the mode dropdown, the reload button, the badge bottom right). Its dropdown lists all
+  three modes; choosing Formal or Robot factory goes to `index.html?mode=...`. `index.html`'s
+  dropdown gained the third option, and its `MODE` a `PAGES` map: choosing v2, or arriving with v2
+  as the last choice in `taas-mode` (the games list's link), goes to `factory-v2.html`
+  (`location.replace` on arrival, so Back does not bounce). A `?mode=` on `index.html` still wins.
+  Its save is `taas.factory2.v1`; the first factory's `taas.factory.v3` is untouched.
+- **The planer and the sap extractor run by themselves** from an input hopper on their left (a
+  deeper bin with a yellow lip and HOPPER on it), one thing at a time, into the output bin on their
+  right, $0.10 a run. No console, no button; the label says AUTO. On anything they are not made for
+  they jam exactly as in the first factory ($5 to scrub, by tapping the machine; the thing to the
+  recycle bin), and the extractor runs empty on a log with no sap. The table saw and the bench are
+  worked as before, by you or by a robot.
+- **The robot row** where the dock was: a terminal (a kiosk with "+ ROBOTS -" on its screen) and an
+  elevator (a hatch in the floor under a low striped frame) on its left, eight charging pads, and the
+  **raw materials bin** on its right, with the **dump truck's tail** backed up to it from the yard
+  outside the floor's front edge (the floor now scrolls 1.7 m past its edge to show it). Whenever the
+  bin is empty the truck tips its bed and ten logs land in the bin for $10, then it drives off for
+  the next load and backs up again. A new factory's bin holds ten logs, free, and the planer's
+  hopper six medium logs, so the planer is running when the game opens.
+- **Robots** are bought at the terminal ($1, the flat price under Prices, up to eight) and ride the
+  elevator up; the terminal's bubble has a **+** row (buy one, or call one up from storage) and a
+  **-** row (send one down). A robot's own bubble has its page and Storage. A robot sent down puts
+  back what it carries, walks onto the platform and rides down, keeping its prompt, its lines and its
+  evals. The elevator takes one robot at a time, 1.8 s a ride, one waiting on the platform to go down
+  before one waiting below to come up. Drawn rising out of the shaft (clipped at the opening).
+- **The main prompt**, at the top of a robot's page: tap it, and the page closes and a card at the
+  bottom of the screen asks for the **source** (any bin or stall: they glow, dashed and pulsing); a
+  machine is refused (the card shakes), then the **destination** (any bin, stall, machine or the
+  bench; the same place twice is refused). The page comes back with the prompt as the robot reads
+  it: "Take things from the raw materials bin to the planer's hopper." The planer or the extractor as
+  a destination is its hopper; the table saw is "and run them through the table saw" (the cut is on
+  the robot's page); the bench is "and carve them at the bench". Cancel keeps the old prompt.
+- **A robot's trip**: to its source, a reach (0.45 s) for a random thing there, what its lines say
+  about it (take it, leave it, or carry it to the recycle bin), more reaches up to how many it
+  carries, then to its destination: into a bin, a stall as there is room (it waits there with the
+  rest), the saw (each plank through it in turn, waiting stuck at a jam) or the bench (each piece
+  carved in turn). Then back to its source. A robot with nothing to take, or held by a Stop at line,
+  waits at its source with a "none" or "full" sign; one with no prompt goes to its pad.
+- **Instruction lines**, under the main prompt, up to six, free, each four words picked in a
+  **sentence builder**: four chips (Verb, Which, Thing, Ending) and the list for the chip in focus;
+  a new line is kept when its fourth word is chosen, a change to a kept line at once; lines move up
+  and down and are removed. The words (the CD's own list did not arrive; these are Claude's):
+
+  | Verb | Which | Thing | Ending |
+  |---|---|---|---|
+  | Only take, Never take, Recycle, Wait, Carry, Stop at | any, small, medium, large, 1, 2, 3, 4, 5, 6, 10, 20, 30, 60 | things, logs, normal logs, gnarled logs, sap logs, planks, gnarled planks, sap, 2x4s, 2x2s, dowel rods, carvings, seconds | (nothing), between trips, at a time, in the destination |
+
+  Six forms mean something: **Only take** / **Never take** / **Recycle** + a size or "any" + a
+  thing + nothing (a size on sap or carvings is nonsense); **Wait** n **seconds** (between trips);
+  **Carry** n + any thing (at a time), at most 10, each extra thing slowing the robot by a tenth;
+  **Stop at** n + a thing (in the destination), counting that thing at the destination (or anything,
+  for "things"; at the saw and the bench, their input bin and what is on them). Everything else is
+  nonsense. **Order matters** the way a firewall's rules do: for each thing reached, the first line
+  that speaks to it decides; Recycle and Never take speak only to what they name, and **Only take
+  speaks to everything** (takes what it names, leaves the rest), so nothing under an Only take line
+  gets a say. Wait, Carry and Stop at are read whatever their place (the first of each counts).
+- **Slips, and nonsense** (the CD: "nonsensical sentences that effectively don't do anything other
+  than increase random mistake chance by 5%"): a robot with any lines slips on 5% of trips, plus 5%
+  for each line that means nothing, at most 75%. **One die a trip** (the first-factory lesson, a
+  chance per job not per try), and on a slip it ignores every line for that whole trip: it takes
+  whatever it reaches, carries one, ignores Stop at, and does not wait after. A robot with no lines
+  never slips and rolls no die. The page shows the figure ("slips 10% of trips") in the lines
+  header, so a nonsense line's cost is visible without saying which line it is.
+- **Evals**, graded at the moment of delivery: moved into a bin, green; into a hopper, by what the
+  machine will do with it (green, yellow for an extractor's empty run, **red for a jam**); a stall's
+  own thing green, anything else **red**; recycled green; left where it was yellow; a slip yellow,
+  and anything done on a slipped trip against the lines marked "against its lines"; sawn, carved
+  and waited green; a saw or bench jam red.
+- **Everything else is the first factory as of the goals brief**: the shop and its customers,
+  customer satisfaction and its rules, wood in size by quality, prices and floors, the four stalls
+  and their Re-assign / Re-stock / Close, the three goals unlocking slots 02-04, flat $1 prices,
+  your arms and every bin's put/take bubble (the raw materials bin and both hoppers included).
+
+### Assumed, not decided (Claude's choices; the CD has not ruled on these)
+
+| # | Choice | Why / alternative |
+|---|---|---|
+| 1 | v2 is a **page of its own** (`factory-v2.html`), not a third mode inside `index.html` | Keeps the first factory byte for byte (its 361 KB page, three suites and ~380 break strings, which must each occur once in the page, would all have collided with a forked copy). The cost: switching between v2 and the others is a page load. |
+| 2 | The shop, wood, prices, goals, stalls and flat prices are the first factory's | "Lots of similarities with the first robot factory version." |
+| 3 | The auto machines run anything in their hopper, and the wrong thing jams as in the first factory | The goals brief's rule; it makes a robot's lines matter. |
+| 4 | The table saw and the bench are **not** automatic | The brief names only the planer and the extractor. |
+| 5 | The planer's hopper starts with six medium logs; the raw materials bin with ten random logs, free | So the planer is running when the game opens; ten free as the first factory's input bin. |
+| 6 | The truck: called 0.8 s after the bin empties (called off if something is put in first), a 2.4 s tip, logs paid for as they land, a 1.2 s lowering, then 3.6 s away and back | "Filling up this bin whenever it is empty"; the away trip is what makes it a truck and not a tap. |
+| 7 | The robot row: terminal and elevator left, eight pads in the middle, the raw materials bin right, 0.7 m further down than the dock's panel stood | Drawn first where the dock was, the terminal and the elevator's frame stood tall enough to cover slot 04's saw and input bin, and the truck hid the raw materials bin; the row moved down and both were made lower. |
+| 8 | Up to eight robots owned, on the floor or in storage; one elevator ride at a time, 1.8 s; down before up | The first factory's eight; a robot cannot be bought straight into storage (assumed). |
+| 9 | The main prompt is chosen on the floor through a card at the bottom of the screen, valid places glowing | At the top the card covered the stalls, which are sources and destinations. |
+| 10 | The planer or the extractor as a destination is its hopper; the saw means "run it through the saw"; the bench means "carve it" | "Destination ... machine / workbench." A source is never a machine (only "any bin or stall"). |
+| 11 | A robot carries one thing a trip unless a Carry line says more, and goes back to its source after every delivery | The simplest reading of "transport items between bins and or stalls". |
+| 12 | **The sentence builder's words** (the table above), four positions, any word in any position | The brief stopped before the CD's word list. |
+| 13 | Six forms mean something; anything else is nonsense; "Carry 3 logs at a time" means carry 3 of anything | Strict enough that nonsense exists, loose enough that a sensible sentence reads as one. |
+| 14 | Order is first match, top to bottom, and Only take decides every thing it reaches | One reading of "order of these matters"; it makes Recycle-above-Only the right order and the reverse a jam. |
+| 15 | Up to six lines a robot, free | The first factory's five slots cost $5-$25; v2 is about trying instructions. |
+| 16 | A slip ignores every line for one whole trip, 5% of trips plus 5% a nonsense line, at most 75%; no lines, no slips | The first factory's 1 in 20; "increase random mistake chance by 5%". |
+| 17 | Carry at most 10, each extra thing 10% slower | Without a cost, carrying more is always right and there is no decision. |
+| 18 | Stop at counts the destination (the saw and the bench: their input bin and the piece on them) | The robot stops taking from its source; it still delivers what it carries. |
+| 19 | A Recycle verdict with something already in its claws: it delivers first and leaves the thing | One trip, one destination. |
+| 20 | A thing a robot leaves costs a 0.8 s look and another random reach; with something in its claws it delivers instead | The first factory's "looking for"; a bin of only things it will not take keeps it looking for ever. |
+| 21 | All words are on the list from the start (no instruction joins after a mistake) | "Open ended"; the first factory's growing list was about discovering mistakes. |
+| 22 | The slip figure is shown on the robot's page; nothing says which line is nonsense | A consequence earns text (discovery over instruction); naming the line would delete the puzzle. |
+| 23 | The antenna bulb: red with no main prompt, then amber, yellow, green as lines grow | The first factory's bulb counted instructions. |
+| 24 | A tap on the elevator's platform is a tap on the terminal | Both are the robot +/- place. |
+| 25 | v2's Info has no Tips section; the first factory's Tips are about its own mechanics | See the measured lessons below for what v2 teaches. |
+| 26 | The truck is drawn as its back half (bed, tailgate, rear wheels, lights); the cab is never on screen | "The tail end of a dump truck". |
+| 27 | Robots stand at one of two or three spots at each place (robot i at spot i mod n) | Two robots at one bin were drawn one over the other in the first factory (2026-10-17). |
+
+### Open questions for the CD (v2)
+
+1. **The sentence builder's words.** The brief ends at "the following basic words that I get to
+   choose from a predefined list". Which words did you mean? The four lists above are a guess.
+2. **The long haul.** The raw materials bin is at the bottom right and the planer's hopper at the top
+   left, about 11 m apart: one robot carrying one log a trip moves about 3 logs a minute, which cannot
+   keep one stall of medium planks stocked (customers come about 5 a minute). Two robots told to carry
+   six each can (measured below). Keep the haul as the lesson, or move the bin nearer the planer?
+3. **The truck only comes for an empty bin.** A robot told "Only take medium logs" leaves the other
+   logs in the bin, so it never empties and the truck never comes (the first factory's "no way out"
+   shape). Intended, as written ("whenever it is empty"), or should the truck also come on a timer?
+4. **Should the table saw and the bench run by themselves too?**
+5. **Should lines cost money** (the first factory's slots were $5-$25), and should there be more
+   than six?
+6. **Should nonsense show** (a robot that says it is not sure what a line means), or stay hidden
+   behind the slip figure?
+7. **Mistakes beyond slips.** The first factory's robots made mistakes with causes (a small plank in
+   a medium stall). v2's robots do exactly what their lines say, but for slips. Add causes back?
+8. **Goals.** v2 keeps the first factory's three goals. Should v2 have its own?
+
+### Architecture (v2)
+
+`factory-v2.html` is one page assembled on 2026-10-26 from `index.html`'s shared parts (the
+palette and chrome CSS, the factory CSS, the badge script, `SND`, the menu) and two new blocks,
+forked from the first factory's and edited, not shared with it (assumed row 1):
+
+1. **`const FACTORY2 = (function () { ... })()`**, ending `if (typeof module !== 'undefined')
+   module.exports = FACTORY2;` (the suites lift exactly that span).
+   - **Places**: `BINS` (`raw`, `planerIn`, `bin`, `extractIn`, `extractOut`, `benchIn`,
+     `benchOut`, `sawIn`, `sawOut`, `recycle`), `STALL_KEYS` (`stall0`-`stall3`), `SOURCES` (bins and
+     stalls), `DESTS` (those, `saw` and `bench`); `store()` (a bin's array), `things()` (any source as
+     things), `takeAt()`, `holding()` (Stop at's count), `placeOk()` (in the list, the slot open, the
+     stall bought).
+   - **Machines**: the planer, the extractor and the saw are all `newMill()`s (`in`, `phase`,
+     `belt`, `out`; the planer's `out` is the place `bin`); `AUTO` (`planer`, `extract`) start
+     themselves in `stepMill()` by `'auto'`; `runOf()`, `unjam()` and the bench as in the first
+     factory.
+   - **The truck**: `s.truck` `{ phase: parked | wait | tip | lower | away, t, load }` in
+     `stepTruck()`; the ten logs are rolled (the `log` dice) as it tips and land at the end of the tip.
+   - **The elevator**: `s.lift` `{ by, dir, t }`, `stepLift()`; a robot's `where` is `queued`,
+     `up`, `floor`, `down` or `storage`; `buyRobot()`, `callUp()`, `sendDown()` (it walks onto the
+     platform first, `toLift` then state `onLift`).
+   - **The main prompt** is `r.src` and `r.dst`, set only through `setPrompt()` (null for both
+     clears it). **Lines** are `r.lines`, arrays of four word ids, set through `setLine()` /
+     `removeLine()` / `moveLine()`; `WORDS` (one list per position, `POS`), `WORD_TEXT`, `lineText()`,
+     `parse()` (a line's meaning), `verdict()` (what the lines say about one thing), `mind(r)` (all of
+     a robot's lines together: rules, carry, wait, stop, slip).
+   - **A robot's trip** is `carrier()`, states `toSrc`, `reach`, `look`, `toRecycle`, `toDst`, `drop`,
+     `feed` / `sawing` (the saw), `carve` (the bench), `cool`, `pause`; `r.trip = { slip }` is the
+     trip's one die; `r.waiting` (`empty` / `full`) and `r.against` (how many things in its claws were
+     taken against its lines) for the evals; `botSpot()` picks its spot at a place (`LAYOUT.BOT`).
+   - **Evals** are `r.record`, keyed `action:thing[@place][!]` (`moved`, `fed`, `empty`, `feedjam`,
+     `stock`, `misstock`, `recycle`, `skipped`, `sawn`, `jam`, `carved`, `waited`, `straight`,
+     `slipped`); `GRADE` and `gradeOf()` colour them.
+   - **Saves**: `save()` / `load()`, version 1, key `taas.factory2.v1`; a ride under way starts over
+     (`up` back to `queued`, `down` finished), bad lines and a machine as a source are dropped.
+2. **`MODE`** on this page always says `robot-factory-v2` and goes to `index.html?mode=...` for the
+   others; the menu is the first page's (its Prices always shown here).
+3. **The page** (an IIFE, the first factory's, edited): the same kit (primitives, shading, baked
+   sprites, `blitItem()`, people, robots baked by pose); new in the scene: `hopper()`, the terminal
+   and `decalTerminal()`, the elevator's frame and `decalLift()`, the raw materials bin; on the floor
+   the robot row's bay (`ROBOT_BAY`), its pads, the shaft's striped edge and the yard; live:
+   `drawLiftDoors()` (`liftOpen()`), `drawTruck()` (`truckPose()`, `TRUCK_LOGS`; the `truck` event
+   sends the logs flying with `FLY` entries that start late and are hidden until they do), `liftZ()`
+   and the shaft clip in `drawRobot()`, a robot's carried stack (`o.stack` in its pose), `waitSign()`.
+   The terminal's bubble is two `.fx-brow`s led by `.fx-sign` + and -. **The robot's page** is three
+   parts (`prompt`, `lines`, `evals`) built by the first factory's `part()` (never under a finger);
+   `builder()` is the sentence builder (`draft`, `focusPos`, `pickWord()`). **Choosing a prompt**:
+   `pick` `{ bot, step, src }`, `startPick()`, `pickTap()` (taps go there instead of `F.tap()` while
+   it is set), `placeOf()` (a tap to a place), `drawPickMarks()` and `placeRect()` over
+   `PLACE_SPRITES`, the `#fx-pick` card. Test hook `window.TAAS_FACTORY2` (the first factory's, plus
+   `placeRect`, `pick`, and `page` with the line being edited).
+4. **`gates.sh`** maps a game's second page (`games/<slug>/<page>.html`) to its slug, so a change to
+   `factory-v2.html` runs every TAAS suite.
+
+### Measured (2026-10-26, half an hour each, seeds 1-3)
+
+A scratch harness played lines through the engine with no customer ever served by hand (and, for
+the last three, a player who scrubs a jam ten seconds after it happens). Numbers are at 30 minutes.
+
+| Setup | Goal 1 | Money | Satisfaction | What happened |
+|---|---|---|---|---|
+| A robot raw -> hopper and one bin -> stall, no lines | never | -$50 to -$100 | 10% | the first sap log jams the planer; nobody scrubs it |
+| The same with Recycle sap logs / Stop at 2, and Recycle gnarled planks / Only take medium planks | 1 of 3 at 30 min | -$46 to +$3 | 10-11% | a slip feeds a sap log and the line stops; small and large planks pile up in the output bin |
+| Only take medium logs on the hauler | never | +$8 to +$23 | 10% | the other logs never leave the bin, so it never empties and the truck never comes |
+| One hauler (Recycle sap logs, Carry 6, Stop at 4) and a stocker that recycles every plank but medium, Carry 3 | 12.5-15.6 min | -$59 to -$67 | 29-34% average | it meets goal 1 but cannot keep the stall stocked |
+| **Two such haulers and the stocker** | **10.1-11.0 min** | **+$180 to +$197** | **93-98% average** | the valid path; a suite row holds it (inside 20 minutes, over 80%, money in hand) |
+| One hauler with two nonsense lines added (slips 15%) | 12.3-14.4 min | -$50 to -$78 | 30-38% average | about the same as one hauler; slips cost a few jams |
+
+What it suggests v2 teaches (inferred from these runs, not yet played by the CD):
+- **An agent told only what to take leaves the rest where it is.** "Only take medium logs" never
+  empties the raw materials bin, and the truck only comes for an empty bin: say what to do with the
+  rest (Recycle it, or give it to another robot).
+- **Order matters.** Recycle and Never take lines go above an Only take line, or they are never read.
+- **One agent far from its work cannot keep up.** The haul from the raw materials bin is long; carry
+  more, or put two robots on it.
+- **An agent faster than demand still makes waste.** The two-hauler line bought $340 of logs and
+  recycled about 140 things in half an hour; a Stop at line on the hopper does not stop the planer
+  filling its output bin.
+- **Nonsense in a prompt makes an agent ignore the rest of it more often.** Each nonsense line is
+  another 5% of trips with every line ignored.
+
+**Frame cost** (`frame-budget.cjs games/taas/factory-v2.html evalFile=.claude/scripts/poses/taas-factory2-eight.js`:
+every goal met, four stalls, eight robots carrying, a full shop, half way down the floor): median
+16.7 ms, 0 of 149 frames over budget (2026-10-26).
+
+### Negative tests (v2)
+
+`.claude/tests/negtests/taas-factory2-engine.json` (28 breaks, 28 caught, 2026-10-26) and
+`taas-factory2-ui.json` (14 breaks; result in the page suite's row of `.claude/tests/README.md`).
+The first engine pass caught 24 of 30: rows that read the truck's ten logs out of `CFG` (the CD's
+number is now asserted as a literal), a dice count checked as "at most one" (now exact: two dice for
+two trips), a Stop at row that could not tell a count of planks from a count of everything (now on a
+jammed hopper, where logs pile up), and an elevator row whose robot was already riding when the
+test asked (now made to wait for a busy elevator). Two breaks were dropped as equivalent: the
+starting hopper's six logs (a tuning number read from `CFG`) and a save that drops a robot's walk (a
+walk planned again from where it stands is the same walk; the change it guarded was a hypothesis
+for a save mismatch whose traced cause was an idle machine's owner, and was reverted).
+
+### How to change it (v2)
+
+- **A word**: add it to its `WORDS` list and `WORD_TEXT`; if it makes a new meaningful form, add the
+  form to `parse()` and what it does to `mind()` / `carrier()`; add a row to section 7 of
+  `drive-taas-factory2.cjs`. The builder and Info read the lists.
+- **A place**: a `SOLID` footprint, an entry in `BINS` (and `store()`), robot spots in `BOT`, its
+  sprites in `sceneObjects()`, `TAPS`, `PLACE_SPRITES` and a name in `PLACE()`.
+- **The truck or the elevator's timing**: `CFG.truck`, `CFG.elevSec`; the page reads them.
+- **Copy rule**: plain ASCII in the page, as in the first factory.
+
 ## How to change it (formal)
 
 - **Retune:** edit the tables only. Run `.claude/scripts/gates.sh games/taas/index.html`
@@ -1921,6 +2212,14 @@ top.
 - **Copy rule:** plain ASCII in the page (straight quotes, hyphens); the CD prefers it.
 
 ## History
+
+- 2026-10-26: **Robot factory v2** (the CD's brief, built with no Q&A at the CD's request), a page of
+  its own on the same dropdown: the planer and the extractor run by themselves from hoppers, a raw
+  materials bin a dump truck fills ten for $10 whenever it is empty, a terminal and an elevator for
+  robots (store and storage unseen), a main prompt chosen by tapping a source and a destination on the
+  floor, and up to six instruction lines built from four word lists, read in order, nonsense adding
+  5% to the slips. Suites `drive-taas-factory2.cjs` (112) and `drive-taas-factory2-ui.cjs` (45),
+  break lists 28/28 and 14/14; eight open questions (section Robot factory v2).
 
 - 2026-10-20: **goals that unlock the slots, bins and stalls you fill by hand, flat prices** (the CD's
   sixth factory brief and four answers; plan arc `.claude/plans/DONE/taasgoals.goals-arc.md`, built in
