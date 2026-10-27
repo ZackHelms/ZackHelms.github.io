@@ -92,7 +92,7 @@
  {
   "name": "parse-sized-sap",
   "file": "games/taas/factory-v2.html",
-  "old": "      if (w !== 'any' && (t === 'sap' || t === 'carvings')) return { kind: 'nonsense' };   // sap and carvings have no size\n",
+  "old": "      if (!any && (t === 'sap' || t === 'carvings')) return { kind: 'nonsense' };   // sap and carvings have no size\n",
   "new": "       /* @negtest */\n"
  },
  {
@@ -166,5 +166,227 @@
   "file": "games/taas/factory-v2.html",
   "old": "        startMill(s, 'saw', r.cut, r.id);\n",
   "new": "        startMill(s, 'saw', 'b2x4', r.id); /* @negtest */\n"
+ },
+ {
+  "name": "sizes-medium-heavy",
+  "file": "games/taas/factory-v2.html",
+  "old": "logs: { size: { s: 1 / 3, m: 1 / 3, l: 1 / 3 },",
+  "new": "logs: { size: { s: 0.2, m: 0.65, l: 0.15 }, /* @negtest */"
+ },
+ {
+  "name": "blank-size-nonsense",
+  "file": "games/taas/factory-v2.html",
+  "old": "      const any = w === 'any' || w === '_';\n",
+  "new": "      const any = w === 'any'; /* @negtest */\n"
+ },
+ {
+  "name": "blank-refused",
+  "file": "games/taas/factory-v2.html",
+  "old": "POS.every((p, i) => WORDS[p].indexOf(l[i]) >= 0 || l[i] === BLANK[i])",
+  "new": "POS.every((p, i) => WORDS[p].indexOf(l[i]) >= 0 /* @negtest */)"
+ },
+ {
+  "name": "all-blank-kept",
+  "file": "games/taas/factory-v2.html",
+  "old": " && l.some((w, i) => w !== BLANK[i]);",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "blank-shows",
+  "file": "games/taas/factory-v2.html",
+  "old": "dest: 'in the destination', _: '' };",
+  "new": "dest: 'in the destination', _: '_' }; /* @negtest */"
+ },
+ {
+  "name": "goal4-gone",
+  "file": "games/taas/factory-v2.html",
+  "old": "      { id: 'all4', sells: ['sap', 'plank.s', 'plank.m', 'plank.l'], sat: 90, sec: 600, unlocks: null }\n",
+  "new": "      /* @negtest */\n"
+ },
+ {
+  "name": "goal4-three-things",
+  "file": "games/taas/factory-v2.html",
+  "old": "sells: ['sap', 'plank.s', 'plank.m', 'plank.l'], sat: 90",
+  "new": "sells: ['sap', 'plank.s', 'plank.m'], sat: 90 /* @negtest */"
+ },
+ {
+  "name": "goal4-no-sells",
+  "file": "games/taas/factory-v2.html",
+  "old": " && (!g.sells || g.sells.every(x => onSale(s, x)));",
+  "new": "; /* @negtest */"
+ },
+ {
+  "name": "goal4-closed-counts",
+  "file": "games/taas/factory-v2.html",
+  "old": "const onSale = (s, item) => s.stalls.some(st => st.bought && !st.closed && st.want === item);",
+  "new": "const onSale = (s, item) => s.stalls.some(st => st.bought && st.want === item); /* @negtest */"
+ },
+ {
+  "name": "goal4-money",
+  "file": "games/taas/factory-v2.html",
+  "old": "(g.money === undefined || s.money > g.money)",
+  "new": "(s.money > (g.money || 0)) /* @negtest */"
+ },
+ {
+  "name": "goal4-sat-ignored",
+  "file": "games/taas/factory-v2.html",
+  "old": "&& Math.round(s.satisfaction) > g.sat && (!g.sells",
+  "new": "&& (g.sells || Math.round(s.satisfaction) > g.sat) && (!g.sells /* @negtest */"
+ },
+ {
+  "name": "goal-countdown-zero",
+  "file": "games/taas/factory-v2.html",
+  "old": "    s.goal++; s.goalN = 0; s.goalT = secOf(s.goal);",
+  "new": "    s.goal++; s.goalN = 0; s.goalT = 0; /* @negtest */"
+ },
+ {
+  "name": "load-goalT-zero",
+  "file": "games/taas/factory-v2.html",
+  "old": ": secOf(s.goal);\n      s.flat",
+  "new": ": 0; /* @negtest */\n      s.flat"
+ },
+ {
+  "name": "destroy-not-offered",
+  "file": "games/taas/factory-v2.html",
+  "old": "      if (b.kind === 'recycle') opts.push({ id: 'destroy',",
+  "new": "      if (false) opts.push({ id: 'destroy', /* @negtest */"
+ },
+ {
+  "name": "destroy-anywhere",
+  "file": "games/taas/factory-v2.html",
+  "old": "      if (b.kind === 'recycle') opts.push({ id: 'destroy',",
+  "new": "      if (true) opts.push({ id: 'destroy', /* @negtest */"
+ },
+ {
+  "name": "destroy-empty-on",
+  "file": "games/taas/factory-v2.html",
+  "old": "enabled: s.recycle.length > 0, group: 'destroy' }",
+  "new": "enabled: true, group: 'destroy' } /* @negtest */"
+ },
+ {
+  "name": "destroy-to-arms",
+  "file": "games/taas/factory-v2.html",
+  "old": "      const gone = s.recycle.splice(0);\n",
+  "new": "      const gone = s.recycle.splice(0); a.inv.push.apply(a.inv, gone); /* @negtest */\n"
+ },
+ {
+  "name": "destroy-keeps",
+  "file": "games/taas/factory-v2.html",
+  "old": "      const gone = s.recycle.splice(0);\n",
+  "new": "      const gone = s.recycle.slice(0); /* @negtest */\n"
+ },
+ {
+  "name": "configs-off",
+  "file": "games/taas/factory-v2.html",
+  "old": "      opts.push({ id: 'configs', icon: 'configs', enabled: true, group: 'cfg' });",
+  "new": "      /* @negtest */"
+ },
+ {
+  "name": "configs-keep-bubble",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (id === 'configs') { ev(s, 'configs', {}); s.bubble = null; return true; }",
+  "new": "    if (id === 'configs') { ev(s, 'configs', {}); return true; } /* @negtest */"
+ },
+ {
+  "name": "snap-going-down",
+  "file": "games/taas/factory-v2.html",
+  "old": "  const active = r => (r.where === 'floor' && !r.toLift) ||",
+  "new": "  const active = r => (r.where === 'floor') || /* @negtest */"
+ },
+ {
+  "name": "snap-no-lines",
+  "file": "games/taas/factory-v2.html",
+  "old": "src: r.src, dst: r.dst, lines: r.lines.map(l => l.slice()), cut: r.cut }));\n    return robots.length ? cleanConfig",
+  "new": "src: r.src, dst: r.dst, lines: [], cut: r.cut })); /* @negtest */\n    return robots.length ? cleanConfig"
+ },
+ {
+  "name": "snap-empty-ok",
+  "file": "games/taas/factory-v2.html",
+  "old": "    return robots.length ? cleanConfig({ name: cleanText(name, CFG.configName) || 'Setup', robots }) : null;",
+  "new": "    return cleanConfig({ name: cleanText(name, CFG.configName) || 'Setup', robots }) || { name: 'x', robots: [] }; /* @negtest */"
+ },
+ {
+  "name": "clean-machine-source",
+  "file": "games/taas/factory-v2.html",
+  "old": "      const ok = SOURCES.indexOf(r.src) >= 0 && DESTS.indexOf(r.dst) >= 0 && r.src !== r.dst;",
+  "new": "      const ok = !!r.src && !!r.dst; /* @negtest */"
+ },
+ {
+  "name": "clean-bad-lines",
+  "file": "games/taas/factory-v2.html",
+  "old": "        lines: (Array.isArray(r.lines) ? r.lines : []).filter(validLine).slice(0, CFG.lines).map(l => l.slice()), cut: CUTS.indexOf(r.cut) >= 0 ? r.cut : CUTS[0] };",
+  "new": "        lines: (Array.isArray(r.lines) ? r.lines : []).slice(0, CFG.lines).map(l => l.slice()), cut: CUTS.indexOf(r.cut) >= 0 ? r.cut : CUTS[0] }; /* @negtest */"
+ },
+ {
+  "name": "cast-no-names",
+  "file": "games/taas/factory-v2.html",
+  "old": "    c.robots.forEach((q, j) => { const k = free.findIndex(r => r.name === q.name); if (k >= 0) cast[j] = free.splice(k, 1)[0]; });",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "cast-storage-first",
+  "file": "games/taas/factory-v2.html",
+  "old": "    const rank = r => active(r) ? 0 : r.where === 'storage' ? 1 : 2;",
+  "new": "    const rank = r => r.where === 'storage' ? 0 : active(r) ? 1 : 2; /* @negtest */"
+ },
+ {
+  "name": "cast-always-buy",
+  "file": "games/taas/factory-v2.html",
+  "old": "    cast.forEach((r, j) => { if (!r && free.length) cast[j] = free.shift(); });",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "needs-free",
+  "file": "games/taas/factory-v2.html",
+  "old": "    return { buy, price, ok: !buy || afford(s, price),",
+  "new": "    return { buy, price, ok: true, /* @negtest */"
+ },
+ {
+  "name": "load-unpaid",
+  "file": "games/taas/factory-v2.html",
+  "old": "    for (let j = 0; j < cast.length; j++) if (!cast[j]) cast[j] = buyRobot(s);",
+  "new": "    for (let j = 0; j < cast.length; j++) if (!cast[j]) { const m = s.money; s.money = 1e9; cast[j] = buyRobot(s); s.money = m; } /* @negtest */"
+ },
+ {
+  "name": "load-no-rename",
+  "file": "games/taas/factory-v2.html",
+  "old": "      r.name = q.name; r.lines = q.lines.map(l => l.slice()); r.cut = q.cut;",
+  "new": "      r.lines = q.lines.map(l => l.slice()); r.cut = q.cut; /* @negtest */"
+ },
+ {
+  "name": "load-keeps-lines",
+  "file": "games/taas/factory-v2.html",
+  "old": "      r.name = q.name; r.lines = q.lines.map(l => l.slice()); r.cut = q.cut;",
+  "new": "      r.name = q.name; r.cut = q.cut; /* @negtest */"
+ },
+ {
+  "name": "load-locked-prompt",
+  "file": "games/taas/factory-v2.html",
+  "old": "  const promptOk = (s, q) => !!q.src && placeOk(s, q.src, SOURCES) && placeOk(s, q.dst, DESTS);",
+  "new": "  const promptOk = (s, q) => !!q.src; /* @negtest */"
+ },
+ {
+  "name": "load-leftovers-stay",
+  "file": "games/taas/factory-v2.html",
+  "old": "    s.robots.forEach(r => { if (cast.indexOf(r) < 0) putAway(s, r); });",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "load-no-callup",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (r.where === 'storage') return callUp(s, r.id);",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "lift-no-turn",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (r.where === 'down') return turnLift(s, r);",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "lift-turn-jumps",
+  "file": "games/taas/factory-v2.html",
+  "old": "L.t = Math.max(0, CFG.elevSec - L.t);",
+  "new": "L.t = 0; /* @negtest */"
  }
 ]

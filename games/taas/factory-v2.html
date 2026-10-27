@@ -218,12 +218,36 @@ html, body { overflow: hidden; overscroll-behavior: none; }
   box-shadow: 0 6px 18px rgba(15,20,28,.35); font: 500 14px/1.35 var(--body); }
 #fx-pick p { flex: 1; margin: 0; }
 #fx-pick.nope { animation: fx-nope 0.32s; }
+/* the configurations at the terminal (the CD, 2026-10-27), and the dialog that asks "I am sure" before one is deleted */
+.fx-cfsave { display: flex; gap: 8px; }
+.fx-cfsave input { flex: 1; min-width: 0; font: 600 15px var(--body); color: #1d2430; border: 2px solid #e1e6ea; border-radius: 10px; padding: 7px 10px; background: #f4f7f9;
+  user-select: text; -webkit-user-select: text; }
+.fx-cfsave input:focus { outline: none; border-color: #16b3a5; background: #fff; }
+.fx-cfsave .fx-ghost:disabled, .fx-cfs .fx-ghost:disabled { opacity: .45; }
+#fx-panel-body .fx-cfs { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.fx-cfs li { display: flex; gap: 6px; align-items: center; border: 2px solid #e1e6ea; border-radius: 10px; padding: 6px 6px 6px 10px; background: #f4f7f9; }
+.fx-cfi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fx-cfi b { font: 700 14px/1.25 var(--body); overflow-wrap: anywhere; }
+.fx-cfi span { font: 500 12px/1.3 var(--mono); color: #3c4652; overflow-wrap: anywhere; }
+.fx-ghost.fx-del { color: #b0382c; border-color: #b0382c; }
+#fx-confirm { position: absolute; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(15,20,28,.6); }
+#fx-confirm[hidden] { display: none; }
+.fx-dlg { width: min(360px, 100%); background: #fff; color: #1d2430; border: 2.5px solid #1d2430; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  font: 500 14px/1.45 var(--body); user-select: text; -webkit-user-select: text; }
+.fx-dlg h3 { font: 800 18px var(--display); overflow-wrap: anywhere; }
+.fx-dlg input { font: 600 16px var(--body); color: #1d2430; border: 2px solid #e1e6ea; border-radius: 10px; padding: 8px 10px; background: #f4f7f9; }
+.fx-dlg input:focus { outline: none; border-color: #b0382c; background: #fff; }
+.fx-ghost.fx-danger { background: #b0382c; border-color: #b0382c; color: #fff; }
+.fx-ghost.fx-danger:disabled { opacity: .4; }
+/* the recycle bin's Destroy all, under its two halves */
+.fx-bubble.bin .fx-drow .fx-opt { width: auto; min-width: 0; flex: 1 1 auto; height: 40px; flex-direction: row; gap: 8px; color: #b0382c; }
+.fx-bubble.bin .fx-drow .fx-opt.off .fx-lbl { color: #7b8794; }
 @keyframes fx-nope { 0%, 100% { transform: translateX(-50%); } 25% { transform: translateX(calc(-50% - 7px)); } 75% { transform: translateX(calc(-50% + 7px)); } }
 </style>
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-27 11:56 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-27 21:47 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -268,6 +292,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
   <div id="fx-bubble" class="fx-bubble" hidden></div>
   <div id="fx-pick" hidden role="status" aria-live="polite"></div>
   <div id="fx-panel" hidden><div id="fx-panel-body"></div></div>
+  <div id="fx-confirm" hidden role="dialog" aria-modal="true" aria-labelledby="fx-confirm-h"><div class="fx-dlg"><h3 id="fx-confirm-h">Delete?</h3><p>Type <b>I am sure</b> to delete it.</p><input id="fx-confirm-in" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" aria-label="Type I am sure"><div class="fx-row"><button class="fx-ghost" data-dlg="cancel">Cancel</button><button class="fx-ghost fx-danger" data-dlg="proceed" disabled>Proceed</button></div></div></div>
 </div>
 
 <script>
@@ -595,7 +620,8 @@ const FACTORY2 = (function () {
     names: ['Bolt', 'Sprocket', 'Widget', 'Gizmo', 'Rivet', 'Piston', 'Ratchet', 'Dynamo'],
     nameMax: 16,
     lines: 6,               // instruction lines under a robot's main prompt, free (assumed)
-    logs: { size: { s: 0.2, m: 0.65, l: 0.15 }, quality: { log: 0.75, gnarled: 0.15, sappy: 0.1 } },
+    // sizes uniformly at random (the CD, 2026-10-27: "i see way more medium planks overall")
+    logs: { size: { s: 1 / 3, m: 1 / 3, l: 1 / 3 }, quality: { log: 0.75, gnarled: 0.15, sappy: 0.1 } },
     runCost: 0.1,           // every machine run, $0.10 a thing, whoever or whatever starts it
     startLogs: 10,          // a new factory's raw materials bin: ten logs, free
     startHopper: 6,         // and six medium logs already in the planer's hopper, so it runs from the start (assumed)
@@ -613,8 +639,13 @@ const FACTORY2 = (function () {
     goals: [
       { id: 'planks', item: 'plank.m', n: 50, unlocks: 'extract' },
       { id: 'steady', money: 50, sat: 90, sec: 600, unlocks: 'carve' },
-      { id: 'sap', item: 'sap', n: 25, unlocks: 'saw' }
+      { id: 'sap', item: 'sap', n: 25, unlocks: 'saw' },
+      // the CD, 2026-10-27: sap and small, medium and large planks, each in an open stall at the same
+      // time, for 10 minutes over 90% customer satisfaction; no reward yet, "mainly is just for guidance"
+      { id: 'all4', sells: ['sap', 'plank.s', 'plank.m', 'plank.l'], sat: 90, sec: 600, unlocks: null }
     ],
+    configs: 20,            // configurations kept at the terminal (assumed)
+    configName: 24,
     stallCap: 6,
     sapUnits: { s: 1, m: 2, l: 4 },
     shop: { first: 12, every: [8, 10, 12, 14, 16], max: 6, gap: 0.62, speed: 1.1, paySec: 2.5 },
@@ -754,6 +785,7 @@ const FACTORY2 = (function () {
     return o;
   }
   const fullT = () => (CFG.goals.find(g => g.sec) || { sec: 0 }).sec;
+  const secOf = i => (CFG.goals[i] && CFG.goals[i].sec) || fullT();   // a goal's countdown when it comes up
   function newGame(seed, flat) {
     const s = {
       version: CFG.version, t: 0, seed: (seed === undefined ? 20261026 : seed) >>> 0,
@@ -819,25 +851,30 @@ const FACTORY2 = (function () {
     tail: ['none', 'trips', 'atime', 'dest']
   };
   const POS = ['verb', 'which', 'thing', 'tail'];
+  // a word left unchosen when the builder's Done is tapped (the CD, 2026-10-27: "save it as is with
+  // nothing/blank for the unspecified fields"): '_' in the first three places, 'none' at the end. A
+  // blank size reads as "any" ("Only take logs"); any other blank leaves the line meaning nothing
+  const BLANK = ['_', '_', '_', 'none'];
   const WORD_TEXT = { only: 'Only take', never: 'Never take', recycle: 'Recycle', wait: 'Wait', carry: 'Carry', stop: 'Stop at',
     any: 'any', small: 'small', medium: 'medium', large: 'large',
     things: 'things', logs: 'logs', nlogs: 'normal logs', glogs: 'gnarled logs', slogs: 'sap logs', planks: 'planks', gplanks: 'gnarled planks',
     sap: 'sap', b2x4: '2x4s', b2x2: '2x2s', dowels: 'dowel rods', carvings: 'carvings', seconds: 'seconds',
-    none: '', trips: 'between trips', atime: 'at a time', dest: 'in the destination' };
+    none: '', trips: 'between trips', atime: 'at a time', dest: 'in the destination', _: '' };
   const wordText = w => WORD_TEXT[w] !== undefined ? WORD_TEXT[w] : String(w);
   const NOUN = { things: null, logs: ['log', 'gnarled', 'sappy'], nlogs: ['log'], glogs: ['gnarled'], slogs: ['sappy'], planks: ['plank'], gplanks: ['rough'],
     sap: ['sap'], b2x4: ['b2x4'], b2x2: ['b2x2'], dowels: ['dowels'], carvings: ['carving'] };
   const SZ = { small: 's', medium: 'm', large: 'l' };
   const isNum = w => /^\d+$/.test(w);
-  const validLine = l => Array.isArray(l) && l.length === 4 && POS.every((p, i) => WORDS[p].indexOf(l[i]) >= 0);
+  const validLine = l => Array.isArray(l) && l.length === 4 && POS.every((p, i) => WORDS[p].indexOf(l[i]) >= 0 || l[i] === BLANK[i]) && l.some((w, i) => w !== BLANK[i]);
   const lineText = l => l.map(wordText).filter(Boolean).join(' ');
   // what a line means: { kind: 'filter', verb, size, noun } / 'wait' / 'carry' / 'stop' / 'nonsense'
   function parse(l) {
     if (!validLine(l)) return { kind: 'nonsense' };
     const [v, w, t, d] = l, noun = t !== 'seconds' && NOUN.hasOwnProperty(t);
     if ((v === 'only' || v === 'never' || v === 'recycle') && noun && !isNum(w) && d === 'none') {
-      if (w !== 'any' && (t === 'sap' || t === 'carvings')) return { kind: 'nonsense' };   // sap and carvings have no size
-      return { kind: 'filter', verb: v, size: w === 'any' ? null : SZ[w], noun: t };
+      const any = w === 'any' || w === '_';
+      if (!any && (t === 'sap' || t === 'carvings')) return { kind: 'nonsense' };   // sap and carvings have no size
+      return { kind: 'filter', verb: v, size: any ? null : SZ[w], noun: t };
     }
     if (v === 'wait' && isNum(w) && t === 'seconds' && (d === 'none' || d === 'trips')) return { kind: 'wait', sec: +w };
     if (v === 'carry' && isNum(w) && noun && (d === 'none' || d === 'atime')) return { kind: 'carry', n: Math.min(CFG.carryMax, +w) };
@@ -883,19 +920,24 @@ const FACTORY2 = (function () {
   /* ---------- the goals (as in the first factory) ---------- */
   function unlocked(s, job) { const i = CFG.goals.findIndex(g => g.unlocks === job); return i < 0 || s.goal > i; }
   const placeOpen = (s, k) => { const j = slotOf(k); return !j || unlocked(s, j); };
+  // a thing is on sale while an open stall is set to it (goal 4 asks it of four things at once)
+  const onSale = (s, item) => s.stalls.some(st => st.bought && !st.closed && st.want === item);
   function goalNow(s) {
     const g = CFG.goals[s.goal] || null;
-    return { i: s.goal, goal: g, done: !g, left: g && g.item ? Math.max(0, g.n - s.goalN) : null, t: g && g.sec ? s.goalT : null, counting: !!(g && g.sec && s.goalT < g.sec) };
+    return { i: s.goal, goal: g, done: !g, left: g && g.item ? Math.max(0, g.n - s.goalN) : null, t: g && g.sec ? s.goalT : null, counting: !!(g && g.sec && s.goalT < g.sec),
+      missing: g && g.sells ? g.sells.filter(x => !onSale(s, x)) : null };
   }
+  // a goal held for a time: every part of it at once, or the countdown starts over
+  const holds = (s, g) => (g.money === undefined || s.money > g.money) && Math.round(s.satisfaction) > g.sat && (!g.sells || g.sells.every(x => onSale(s, x)));
   function stepGoal(s, dt) {
     const g = CFG.goals[s.goal];
     if (!g) return;
     if (g.sec) {
-      if (s.money > g.money && Math.round(s.satisfaction) > g.sat) s.goalT = Math.max(0, s.goalT - dt);
+      if (holds(s, g)) s.goalT = Math.max(0, s.goalT - dt);
       else s.goalT = g.sec;
       if (s.goalT > 0) return;
     } else if (s.goalN < g.n) return;
-    s.goal++; s.goalN = 0; s.goalT = fullT();
+    s.goal++; s.goalN = 0; s.goalT = secOf(s.goal);
     clearWay(s);
     ev(s, 'goal', { n: s.goal, id: g.id, unlocks: g.unlocks });
   }
@@ -1496,6 +1538,86 @@ const FACTORY2 = (function () {
     r.name = n || CFG.names[r.id];
     return true;
   }
+
+  /* ---------- configurations: the robots on the floor, kept and put back (the CD, 2026-10-27) ---------- */
+  // A configuration is { name, robots: [{ name, src, dst, lines, cut }] }: every robot on the floor
+  // or on its way up, with its name, main prompt, lines and cut. The page keeps them apart from the
+  // game's save, so one made in one game loads in the next (assumed). Loading one makes the robots on
+  // the floor exactly its robots: a robot of the same name takes each part, then any other robot (one
+  // on the floor before one in storage), and only then is one bought, at the flat price; every robot
+  // left over goes down to storage. A prompt to a place not open in this game is dropped
+  const active = r => (r.where === 'floor' && !r.toLift) || r.where === 'queued' || r.where === 'up';
+  const cleanText = (v, max) => String(v === undefined || v === null ? '' : v).replace(/\s+/g, ' ').trim().slice(0, max);
+  function snapshot(s, name) {
+    const robots = s.robots.filter(active).map(r => ({ name: r.name, src: r.src, dst: r.dst, lines: r.lines.map(l => l.slice()), cut: r.cut }));
+    return robots.length ? cleanConfig({ name: cleanText(name, CFG.configName) || 'Setup', robots }) : null;
+  }
+  function cleanConfig(c) {
+    if (!c || typeof c !== 'object' || !Array.isArray(c.robots)) return null;
+    const robots = c.robots.filter(r => r && typeof r === 'object').slice(0, CFG.names.length).map((r, j) => {
+      const ok = SOURCES.indexOf(r.src) >= 0 && DESTS.indexOf(r.dst) >= 0 && r.src !== r.dst;
+      return { name: cleanText(r.name, CFG.nameMax) || CFG.names[j], src: ok ? r.src : null, dst: ok ? r.dst : null,
+        lines: (Array.isArray(r.lines) ? r.lines : []).filter(validLine).slice(0, CFG.lines).map(l => l.slice()), cut: CUTS.indexOf(r.cut) >= 0 ? r.cut : CUTS[0] };
+    });
+    const name = cleanText(c.name, CFG.configName);
+    return robots.length && name ? { name, robots } : null;
+  }
+  // which robot takes each part (null: one to buy)
+  function castOf(s, c) {
+    const free = s.robots.slice(), cast = c.robots.map(() => null);
+    c.robots.forEach((q, j) => { const k = free.findIndex(r => r.name === q.name); if (k >= 0) cast[j] = free.splice(k, 1)[0]; });
+    const rank = r => active(r) ? 0 : r.where === 'storage' ? 1 : 2;
+    free.sort((a, b) => rank(a) - rank(b) || a.id - b.id);
+    cast.forEach((r, j) => { if (!r && free.length) cast[j] = free.shift(); });
+    return cast;
+  }
+  const promptOk = (s, q) => !!q.src && placeOk(s, q.src, SOURCES) && placeOk(s, q.dst, DESTS);
+  // what loading it would take: robots to buy and their price, whether you can pay, prompts dropped
+  function configNeeds(s, c) {
+    const cfg = cleanConfig(c);
+    if (!cfg) return null;
+    const buy = castOf(s, cfg).filter(r => !r).length, price = cents(buy * s.flat.robot);
+    return { buy, price, ok: !buy || afford(s, price), dropped: cfg.robots.filter(q => q.src && !promptOk(s, q)).length };
+  }
+  // the elevator turns round with a robot on it, from where it is
+  function turnLift(s, r) {
+    const L = s.lift;
+    if (L.by !== r.id) return false;
+    L.dir = L.dir === 'up' ? 'down' : 'up'; L.t = Math.max(0, CFG.elevSec - L.t);
+    r.where = L.dir; r.toLift = false;
+    ev(s, 'lift', { id: r.id, dir: L.dir, back: true });
+    return true;
+  }
+  function bringUp(s, r) {
+    if (r.where === 'storage') return callUp(s, r.id);
+    if (r.where === 'down') return turnLift(s, r);
+    if (r.where === 'floor' && r.toLift) { r.toLift = false; r.state = 'idle'; r.t = 0; r.path = []; }
+    return true;
+  }
+  function putAway(s, r) {
+    if (r.where === 'floor' && !r.toLift) return sendDown(s, r.id);
+    if (r.where === 'queued') { r.where = 'storage'; ev(s, 'stored', { id: r.id }); return true; }
+    if (r.where === 'up') return turnLift(s, r);
+    return false;
+  }
+  function loadConfig(s, c) {
+    const cfg = cleanConfig(c), need = cfg && configNeeds(s, cfg);
+    if (!cfg || !need.ok) return false;
+    const cast = castOf(s, cfg);
+    for (let j = 0; j < cast.length; j++) if (!cast[j]) cast[j] = buyRobot(s);
+    let dropped = 0;
+    cast.forEach((r, j) => {
+      const q = cfg.robots[j], ok = promptOk(s, q);
+      r.name = q.name; r.lines = q.lines.map(l => l.slice()); r.cut = q.cut;
+      if (q.src && !ok) dropped++;
+      if (!ok) { if (r.src || r.dst) setPrompt(s, r.id, null, null); }
+      else if (r.src !== q.src || r.dst !== q.dst) setPrompt(s, r.id, q.src, q.dst);
+      bringUp(s, r);
+    });
+    s.robots.forEach(r => { if (cast.indexOf(r) < 0) putAway(s, r); });
+    ev(s, 'configLoaded', { name: cfg.name, n: cast.length, bought: need.buy, dropped });
+    return true;
+  }
   // where a robot stands at a place: its own spot of the few there
   function botSpot(r, place) {
     const list = BOT[place] || [SPOT[place] || SPOT.start];
@@ -1677,6 +1799,8 @@ const FACTORY2 = (function () {
     if (BINS.indexOf(b.kind) >= 0) {
       const opts = kindsIn(a.inv).map(q => ({ id: 'put:' + q.item, icon: 'put', item: q.item, count: q.n, enabled: true, group: 'put' }));
       kindsIn(store(s, b.kind)).forEach(q => opts.push({ id: 'take:' + q.item, icon: 'take', item: q.item, count: q.n, enabled: true, group: 'take' }));
+      // the recycle bin can also be emptied for good (the CD, 2026-10-27)
+      if (b.kind === 'recycle') opts.push({ id: 'destroy', icon: 'destroy', count: s.recycle.length, enabled: s.recycle.length > 0, group: 'destroy' });
       return opts;
     }
     if (b.kind === 'saw') {
@@ -1687,6 +1811,7 @@ const FACTORY2 = (function () {
       const p = hirePrice(s), opts = [{ id: 'buy', icon: 'robot', price: p, enabled: afford(s, p), soldOut: p === null, group: 'up' }];
       s.robots.forEach(r => { if (r.where === 'storage') opts.push({ id: 'up:' + r.id, icon: 'up', bot: r.id, enabled: true, group: 'up' }); });
       s.robots.forEach(r => { if (r.where === 'floor') opts.push({ id: 'down:' + r.id, icon: 'down', bot: r.id, enabled: !r.toLift, on: r.toLift, group: 'down' }); });
+      opts.push({ id: 'configs', icon: 'configs', enabled: true, group: 'cfg' });   // saved configurations (the CD, 2026-10-27; the page keeps them)
       return opts;
     }
     if (b.kind === 'stall') {
@@ -1732,6 +1857,12 @@ const FACTORY2 = (function () {
       return true;
     }
     if (id.indexOf('cut:') === 0) { pressSaw(s, id.slice(4)); return true; }
+    if (id === 'destroy') {
+      const gone = s.recycle.splice(0);
+      ev(s, 'destroyed', { n: gone.length, items: gone });
+      a.act = { kind: 'put', t: 0, dur: CFG.putSec, item: gone[gone.length - 1] };
+      return true;
+    }
     if (id === 'buystall') {
       const st = s.stalls[b.i];
       s.money = cents(s.money - o.price); st.bought = true;
@@ -1744,6 +1875,7 @@ const FACTORY2 = (function () {
     if (id.indexOf('down:') === 0) return sendDown(s, +id.slice(5));
     if (id === 'down') { const ok = sendDown(s, b.id); s.bubble = null; return ok; }
     if (id === 'notes') { ev(s, 'notes', { id: b.id }); s.bubble = null; return true; }
+    if (id === 'configs') { ev(s, 'configs', {}); s.bubble = null; return true; }
     return false;
   }
   function chooseStall(s, b, id) {
@@ -1818,7 +1950,7 @@ const FACTORY2 = (function () {
       s.goal = num(d.goal) ? Math.max(0, Math.min(G, Math.floor(d.goal))) : 0;
       const gNow = CFG.goals[s.goal];
       s.goalN = num(d.goalN) && gNow && gNow.item ? Math.max(0, Math.min(gNow.n, Math.floor(d.goalN))) : 0;
-      s.goalT = num(d.goalT) && gNow && gNow.sec ? Math.max(0, Math.min(gNow.sec, d.goalT)) : fullT();
+      s.goalT = num(d.goalT) && gNow && gNow.sec ? Math.max(0, Math.min(gNow.sec, d.goalT)) : secOf(s.goal);
       s.flat = flatOf(d.flat);
       s.raw = items(d.raw); s.recycle = items(d.recycle);
       const tk = d.truck && typeof d.truck === 'object' ? d.truck : {};
@@ -1907,7 +2039,8 @@ const FACTORY2 = (function () {
   }
 
   return { CFG, LAYOUT, ITEMS, LOGS, PRODUCTS, SIZES, CUTS, DESIGNS, SELLS, SLOT_JOBS, GRADE, RIGHT, MACHINES, AUTO, BINS, STALL_KEYS, SOURCES, DESTS,
-    WORDS, POS, WORD_TEXT, wordText, lineText, parse, verdict, mind, validLine, NOUN,
+    WORDS, POS, WORD_TEXT, BLANK, wordText, lineText, parse, verdict, mind, validLine, NOUN, onSale,
+    snapshot, cleanConfig, configNeeds, loadConfig,
     runOf, jammed, kindOf, sizeOf, isItem, makes, priceOf, floorOf, cents, slotOf, unlocked, placeOpen, placeOk, goalNow, setFlat,
     gradeOf, newGame, step, tap, choose, options, bubbleOpen, priceNow, hirePrice, stallPrice, openStalls,
     buyRobot, callUp, sendDown, setPrompt, setLine, removeLine, moveLine, setCut, rename, resetEvals, botSpot,
@@ -3311,6 +3444,7 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     if (g.done) return 'All goals met';
     const q = g.goal;
     if (q.item) return 'Sell ' + sellN(q.item, g.left);
+    if (q.sells) return 'Sell sap + S, M & L planks at once, >' + q.sat + '% for ' + (g.counting ? mss(g.t) : q.sec / 60 + ' minutes');
     return '>$' + q.money + ' & >' + q.sat + '% customer satisfaction for ' + (g.counting ? mss(g.t) : q.sec / 60 + ' minutes');
   }
   function boardRect(k, i) {
@@ -3597,6 +3731,12 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
         }
         case 'goal': {
           const job = e.unlocks, q = SO[job === 'carve' ? 'bench' : job];
+          if (!job) {   // a goal with no reward (goal 4): sparks along the board
+            SND.sfx('level');
+            for (let i = 0; i < 6; i++) puff(0.6 + i, BOARD.y + 0.1, (BOARD.g0 + BOARD.g1) / 2, 'spark', 8);
+            FLOAT.push({ x: 3, y: BOARD.y + 0.2, z: BOARD.g1 + 0.3, text: 'Goal met', color: '#7ff0ff', age: 0, life: 3, fit: true });
+            break;
+          }
           if (!q) break;
           const cy = (q[1] + q[3]) / 2;
           SND.sfx('level');
@@ -3607,6 +3747,20 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
         }
         case 'prompt': case 'line': SND.sfx('beep'); break;
         case 'notes': SND.sfx('pop'); openRobot(e.id); break;
+        case 'configs': SND.sfx('pop'); openConfigs(); break;
+        case 'configLoaded': {
+          const tq = SO.terminal;
+          SND.sfx('beep');
+          FLOAT.push({ x: (tq[0] + tq[2]) / 2, y: tq[1], z: 1.7, text: 'Loaded', color: '#7ff0ff', sub: e.name + (e.dropped ? ', ' + e.dropped + (e.dropped > 1 ? ' prompts' : ' prompt') + ' not open here' : ''), age: 0, life: 3 });
+          break;
+        }
+        case 'destroyed': {
+          const R = L.RECYCLE;
+          SND.sfx('drop');
+          for (let i = 0; i < 3; i++) puff(R.x - 0.2 + 0.2 * i, R.y, R.z, 'smoke', 5);
+          FLOAT.push({ x: R.x, y: R.y, z: 1.2, text: 'Destroyed', color: '#ffb4a8', sub: e.n + (e.n > 1 ? ' things' : ' thing'), age: 0 });
+          break;
+        }
         case 'outcome': SND.sfx(e.grade === 'good' ? 'good' : e.grade === 'soso' ? 'meh' : 'bad'); break;
         case 'arrive': if (s.bubble) SND.sfx('pop'); break;
       }
@@ -3631,6 +3785,9 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     carve: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><g stroke-linecap="round"><path d="M10 26L21 15" stroke="#1d2430" stroke-width="7.5"/><path d="M10 26L21 15" stroke="#d5dde5" stroke-width="4"/><path d="M21 15L30 6" stroke="#1d2430" stroke-width="9"/><path d="M21 15L30 6" stroke="#b07a45" stroke-width="5.5"/></g><path d="M5 31c3-1 5-4 9-3" fill="none" stroke="#e0b072" stroke-width="2.4" stroke-linecap="round"/></svg>',
     up: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><path d="M20 4l10 11h-6v14h-8V15h-6z" fill="#16b3a5" stroke="#1d2430" stroke-width="2.2" stroke-linejoin="round"/></svg>',
     down: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><rect x="5" y="25" width="30" height="6" rx="1.5" fill="#f2c230" stroke="#1d2430" stroke-width="2"/><path d="M20 24L10 13h6V3h8v10h6z" fill="#f2862e" stroke="#1d2430" stroke-width="2.2" stroke-linejoin="round"/></svg>',
+    // the terminal's saved configurations (a disk), and the recycle bin's Destroy all (a bin struck through)
+    configs: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><path d="M8 2h21l5 5v23a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 30V3.5A1.5 1.5 0 0 1 8 2z" fill="#16b3a5" stroke="#1d2430" stroke-width="2.5" stroke-linejoin="round"/><rect x="12" y="2" width="15" height="9" fill="#eef2f5" stroke="#1d2430" stroke-width="2"/><rect x="21" y="4" width="3.5" height="5" fill="#1d2430"/><rect x="11" y="17" width="18" height="12.5" rx="1" fill="#fff" stroke="#1d2430" stroke-width="2"/><path d="M14 21.5h12M14 25.5h8" stroke="#9aa5b1" stroke-width="2" stroke-linecap="round"/></svg>',
+    destroy: '<svg viewBox="0 0 40 34" width="26" height="22" aria-hidden="true"><rect x="9" y="9" width="22" height="22" rx="2.5" fill="#ffd9d6" stroke="#1d2430" stroke-width="2.5"/><rect x="6" y="4.5" width="28" height="5.5" rx="2" fill="#e5484d" stroke="#1d2430" stroke-width="2.2"/><path d="M15 15l10 11M25 15L15 26" stroke="#b0241c" stroke-width="3" stroke-linecap="round"/></svg>',
     // an empty place on the counter, to buy a stall in
     stall: '<svg viewBox="0 0 40 34" width="34" height="29" aria-hidden="true"><rect x="3" y="19" width="34" height="10" rx="2.5" fill="#d9dee3" stroke="#1d2430" stroke-width="2.5"/><rect x="3" y="15" width="34" height="5" rx="2" fill="#16b3a5" stroke="#1d2430" stroke-width="2"/><circle cx="20" cy="8" r="6.5" fill="#fff" stroke="#1d2430" stroke-width="2"/><path d="M16.5 8h7M20 4.5v7" stroke="#16b3a5" stroke-width="2.4" stroke-linecap="round"/></svg>'
   };
@@ -3716,6 +3873,8 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     else if (o.id === 'back') { inner = BACK_ICON; aria = 'Back'; }
     // the terminal (v2): a robot up from the store or from storage, or one down to storage
     else if (o.id === 'down') { inner = ICON.down; label = 'Storage'; aria = 'Send this robot down to storage'; }
+    else if (o.id === 'configs') { inner = ICON.configs; label = 'Configs'; aria = 'Configurations: save, load or delete the robots on the floor'; }
+    else if (o.id === 'destroy') { inner = ICON.destroy; label = 'Destroy all'; aria = o.count ? 'Destroy everything in the recycle bin, ' + o.count + (o.count > 1 ? ' things' : ' thing') : 'The recycle bin is empty'; }
     else if (o.icon === 'up' || o.icon === 'down') {
       const r = s.robots[o.bot];
       inner = ICON.robot + (o.icon === 'up' ? ARROW.take : ARROW.put); label = esc(r ? r.name : '');
@@ -3765,6 +3924,7 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
   // a stall's second levels open under a short back button: Re-assign's thirteen rows, Re-stock's two halves
   const BACK_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M15 4l-8 8 8 8" fill="none" stroke="#1d2430" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   const backRow = opts => opts.some(o => o.id === 'back') ? '<div class="fx-brow">' + optButton(opts.find(o => o.id === 'back')) + '</div>' : '';
+  const destroyRow = opts => { const o = opts.find(x => x.id === 'destroy'); return o ? '<div class="fx-brow fx-drow">' + optButton(o) + '</div>' : ''; };
   function renderBubble() {
     const b = F.bubbleOpen(s), opts = b ? F.options(s) : [];
     const bot = b && b.kind === 'robot' ? s.robots[b.id] : null;
@@ -3781,12 +3941,12 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
         const sells = b.kind === 'stall' && opts.some(o => o.icon === 'sell');
         bubbleEl.classList.toggle('stall', sells);
         bubbleEl.classList.toggle('stall1', b.kind === 'stall' && opts.some(o => o.id === 'restock'));   // Re-assign, Re-stock, Close
-        if (bin) bubbleEl.innerHTML = backRow(opts) + binHalves(b, opts);
+        if (bin) bubbleEl.innerHTML = backRow(opts) + binHalves(b, opts) + destroyRow(opts);
         else if (sells) bubbleEl.innerHTML = backRow(opts) + stallRows(opts);
         else if (bot) { bubbleEl.innerHTML = '<div class="fx-bname"></div><div class="fx-bopts">' + opts.map(optButton).join('') + '</div>'; bubbleEl.firstChild.textContent = bot.name; }
         else if (b.kind === 'terminal') {   // two rows: up (+) and down (-)
           const row = (g, sign) => { const list = opts.filter(o => o.group === g); return list.length ? '<div class="fx-brow"><span class="fx-sign" aria-hidden="true">' + sign + '</span>' + list.map(optButton).join('') + '</div>' : ''; };
-          bubbleEl.innerHTML = row('up', '+') + row('down', '-');
+          bubbleEl.innerHTML = row('up', '+') + row('down', '-') + row('cfg', '');
         }
         else bubbleEl.innerHTML = opts.map(optButton).join('');
       }
@@ -3848,18 +4008,22 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     panelBody.innerHTML =
       '<h2>Robot factory v2</h2>' +
       '<p><b>The goal</b>: ' + esc(goalText()) + '. This is the second robot factory: the same shop, the same wood and the same goals, but the machines that can run themselves do, and every robot is told what to do in its own words.</p>' +
-      '<p><b>Goals</b>: the wall shows one at a time, and each one met brings a machine.</p><ol class="fx-goals">' + C.goals.map(q => '<li>' + (q.item ? 'Sell ' + sellN(q.item, q.n) : 'More than $' + q.money + ' and more than ' + q.sat + '% customer satisfaction, both for ' + q.sec / 60 + ' minutes without a break (the countdown starts over whenever either fails)') + '. Then <b>' + ARRIVED[q.unlocks] + '</b> arrives in slot 0' + (F.SLOT_JOBS.indexOf(q.unlocks) + 2) + '.</li>').join('') + '</ol>' +
+      '<p><b>Goals</b>: the wall shows one at a time, and each of the first three brings a machine.</p><ol class="fx-goals">' + C.goals.map(q => '<li>' + (q.item ? 'Sell ' + sellN(q.item, q.n)
+        : q.sells ? 'Sell sap and small, medium and large planks at the same time, each in an open stall, with more than ' + q.sat + '% customer satisfaction, for ' + q.sec / 60 + ' minutes without a break (the countdown starts over whenever one of them is off sale or satisfaction falls)'
+        : 'More than $' + q.money + ' and more than ' + q.sat + '% customer satisfaction, both for ' + q.sec / 60 + ' minutes without a break (the countdown starts over whenever either fails)') +
+        (q.unlocks ? '. Then <b>' + ARRIVED[q.unlocks] + '</b> arrives in slot 0' + (F.SLOT_JOBS.indexOf(q.unlocks) + 2) + '.' : '. No reward yet: it shows the way to a full shop.') + '</li>').join('') + '</ol>' +
       '<p><b>Raw materials</b>: logs come in the dump truck backed up to the raw materials bin, bottom right. Whenever the bin is empty the truck tips ' + C.truck.n + ' more logs into it for ' + usd(C.truck.cost) + ' (the first ' + C.startLogs + ' are free). Of the logs, ' + pc(Z.s) + ' are small, ' + pc(Z.m) + ' medium and ' + pc(Z.l) + ' large; ' + pc(Q.gnarled) + ' are gnarled and ' + pc(Q.sappy) + ' sappy.</p>' +
       '<p><b>The planer and the sap extractor run by themselves</b>: whatever is in a machine\'s input hopper (on its left) goes through, one at a time, and what it makes drops into the output bin on its right, ' + usd(C.runCost) + ' a run. The planer makes a normal log a plank of its size and a gnarled log a gnarled plank; on anything else (a sap log, a plank) it jams. The extractor takes the sap out of a sap log and gives back a clean log; it runs empty on a log with no sap and jams on anything else. <b>A jam costs ' + usd(C.fixCost) + '</b> and stops the machine until you tap it and scrub it. The table saw (' + usd(C.runCost) + ' a cut) and the bench are still worked by hand, yours or a robot\'s.</p>' +
-      '<p><b>Your arms</b>: tap any bin or stall and its bubble shows what you carry on top and what is in it below: tap a thing on top to put every one of that kind in, below to take them all out. Nothing happens by itself when you get there.</p>' +
-      '<p><b>Robots</b>: tap the terminal (or the elevator beside it) to buy one (' + usd(s.flat.robot) + ', up to ' + C.names.length + ') or to call one up from storage; it rides the elevator up. Tap a robot for its page, or to send it down to storage, where it keeps its prompt and its lines.</p>' +
+      '<p><b>Your arms</b>: tap any bin or stall and its bubble shows what you carry on top and what is in it below: tap a thing on top to put every one of that kind in, below to take them all out. Nothing happens by itself when you get there. The recycle bin\'s bubble can also <b>destroy</b> everything in it, for good.</p>' +
+      '<p><b>Robots</b>: tap the terminal (or the elevator beside it) to buy one (' + usd(s.flat.robot) + ', up to ' + C.names.length + ') or to call one up from storage; it rides the elevator up. Tap a robot for its page, or to send it down to storage, where it keeps its prompt and its lines. The terminal also keeps <b>configurations</b>: save the robots on the floor (their names, main prompts and lines) and load them again later, in this game or a new one. Loading one sends the robots it does not name down to storage and buys any it is short of; deleting one asks you to type I am sure.</p>' +
       '<p><b>The main prompt</b>: at the top of a robot\'s page. Tap it, then tap the robot\'s <b>source</b> on the floor (any bin or stall) and then its <b>destination</b> (any bin, stall, machine or the bench). It walks to its source, takes a thing, walks it to its destination and puts it in, and goes back for the next, for as long as there is something to take. Bringing the planer or the extractor something puts it in its hopper; bringing the table saw a plank runs it through the saw (the cut is on the robot\'s page); bringing the bench something carves it.</p>' +
       '<p><b>Instruction lines</b>, under the main prompt, up to ' + C.lines + ', each four words from four lists:</p><ul>' +
       '<li>' + esc(list('verb')) + '</li><li>' + esc(list('which')) + '</li><li>' + esc(list('thing')) + '</li><li>' + esc(list('tail')) + '</li></ul>' +
+      '<p><b>Done</b> keeps a line as it is: a word not chosen is left blank. A blank size means any size ("Only take logs"); any other blank leaves the line meaning nothing.</p>' +
       '<p><b>Order matters</b>: a robot reads its lines from the top for each thing it reaches for, and the first line about that thing decides. "Recycle" carries it to the recycle bin; "Never take" leaves it; "Only take" takes what it names and leaves everything else, so nothing under an "Only take" line gets a say. "Wait", "Carry" and "Stop at" set how it works: a rest between trips, how many it takes on a trip (it walks a little slower for each), and how full its destination may get before it stops taking. <b>Some sentences mean nothing</b>: those do nothing, except that a robot ignores all of its lines for a whole trip ' + pc(C.slip) + ' of the time and ' + pc(C.nonsense) + ' more for each line that means nothing. Its page shows how often.</p>' +
       '<p><b>The sales counter</b>: four places for stalls; the first sells medium planks and the others are ' + usd(s.flat.stall) + ' each. Tap a stall to <b>Re-assign</b> what it sells, <b>Re-stock</b> it by hand, or <b>Close</b> it. Customers come in at the door, each for an open stall, and pay its price times customer satisfaction (never less than the thing cost to make). Every second each one waits costs ' + C.satWait + '% of customer satisfaction, and anything but the stall\'s own thing costs ' + C.satHit + ' points. Prices: planks $' + P.plank.s + ' / $' + P.plank.m + ' / $' + P.plank.l + ', sap $' + P.sap + ', cut wood $' + P.cut.s + ' / $' + P.cut.m + ' / $' + P.cut.l + '.</p>' +
       '<p><b>Evals</b>, at the bottom of a robot\'s page: green for what was asked, yellow for something wasteful or done against its lines (and a trip it ignored them), red for a jam or the wrong thing put in a stall.</p>' +
-      '<p><b>Prices</b> in the menu set what a robot and a stall cost, $' + C.flat.min + ' to $' + C.flat.max + '. The first robot factory is still in the mode menu, as it was.</p>' +
+      '<p><b>Prices</b> in the menu set what a robot and a stall cost, $' + C.flat.min + ' to $' + C.flat.max + '. The first robot factory is under Version in the menu.</p>' +
       '<h3>Measured since each robot\'s evals were last reset</h3><div class="fx-scroll"><table><thead><tr><th></th><th>Green</th><th>Yellow</th><th>Red</th><th>Green %</th></tr></thead><tbody>' + bots + '</tbody></table></div>' +
       '<p class="fx-small">You: ' + T.stocked + ' stocked, ' + T.tossed + ' tossed, ' + T.fixed + ' jams fixed, ' + T.sawn + ' sawn, ' + T.carved + ' carved. Customers served: ' + s.shop.served + (s.shop.wrong ? ' (' + s.shop.wrong + ' sold something else)' : '') + '. Earned in all: ' + cash(s.earned) + '; spent: ' + cash(s.spent) + ' (logs ' + cash(s.costs.bought) + ', machine runs ' + cash(s.costs.runs) + ', jams ' + cash(s.costs.fixes) + ').</p>' +
       '<div class="fx-row"><button class="fx-ghost" data-panel="restart">' + (confirmReset ? 'Tap again to start over' : 'Start over') + '</button><button class="fx-ghost" data-panel="close">Close</button></div>';
@@ -3953,7 +4117,7 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     h = '<div class="fx-sec"><div class="fx-h"><span>Instructions, in order</span><span>slips ' + pct(mi.slip) + ' of trips</span></div><ol class="fx-slots fx-lines">';
     r.lines.forEach((l, k) => {
       const on = editLine === k;
-      h += '<li><b>' + (k + 1) + '</b><button class="fx-slot filled' + (on ? ' picking' : '') + '" data-panel="edit:' + k + '">' + esc(F.lineText(on && draft ? draft : l)) + '</button>' +
+      h += '<li><b>' + (k + 1) + '</b><button class="fx-slot filled' + (on ? ' picking' : '') + '" data-panel="edit:' + k + '">' + esc(on && draft ? draftText() : F.lineText(l)) + '</button>' +
         '<button class="fx-x fx-mv" data-panel="up:' + k + '" aria-label="Move this line up"' + (k ? '' : ' disabled') + '>' + CARET(-1) + '</button>' +
         '<button class="fx-x fx-mv" data-panel="dn:' + k + '" aria-label="Move this line down"' + (k < r.lines.length - 1 ? '' : ' disabled') + '>' + CARET(1) + '</button>' +
         '<button class="fx-x" data-panel="del:' + k + '" aria-label="Remove this line">' + CROSS + '</button></li>';
@@ -3988,16 +4152,25 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
       '<div class="fx-row"><button class="fx-ghost" data-panel="sb-done">Done</button></div></div>';
     return h;
   }
+  // the draft as a line: a word not chosen left blank (the CD, 2026-10-27: Done "should save it as is
+  // with nothing/blank for the unspecified fields"); in the draft a blank is null, as unchosen
+  const asLine = d => d.map((w, i) => w === null ? F.BLANK[i] : w);
+  function finishEdit() {
+    const r = s && s.robots[pageBot];
+    if (r && draft && editLine === r.lines.length && draft.some(x => x !== null) && F.setLine(s, r.id, editLine, asLine(draft))) save();
+    editLine = -1; draft = null;
+  }
   function startEdit(r, k) {
-    if (editLine === k) { editLine = -1; draft = null; return; }
-    editLine = k; focusPos = 0;
-    draft = k < r.lines.length ? r.lines[k].slice() : [null, null, null, null];
+    if (editLine === k) { finishEdit(); return; }
+    finishEdit();   // a line half built elsewhere is kept as it is
+    editLine = k;
+    draft = k < r.lines.length ? r.lines[k].map((w, i) => i < 3 && w === F.BLANK[i] ? null : w) : [null, null, null, null];
+    focusPos = Math.max(0, draft.indexOf(null));   // a kept line opens on its first blank word, to fill in
   }
   function pickWord(r, w) {
     if (!draft) return;
     draft[focusPos] = w;
-    const done = draft.every(x => x !== null);
-    if (done) { if (F.setLine(s, r.id, editLine, draft)) save(); }
+    if (editLine < r.lines.length || draft.every(x => x !== null)) { if (F.setLine(s, r.id, editLine, asLine(draft))) save(); }
     const next = draft.findIndex(x => x === null);
     if (next >= 0) focusPos = next;
     else if (focusPos < 3) focusPos++;
@@ -4012,6 +4185,8 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
   function closePanel() {
     const inp = document.getElementById('fx-rp-name');
     if (inp && document.activeElement === inp) inp.blur();
+    if (panelMode === 'robot') finishEdit();
+    if (!dlgEl.hidden) closeDialog();
     panelEl.hidden = true; panelMode = 'info'; pageBot = -1; editLine = -1; draft = null; holdPart = null;
   }
   panelEl.addEventListener('click', ev => {
@@ -4025,6 +4200,13 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
       shownMoney = null; shownSat = -1; save(); closePanel(); VW.camY = VW.minY;
       return;
     }
+    if (panelMode === 'configs') {
+      SND.init();
+      if (act === 'cf-save') saveConfig();
+      else if (act.indexOf('cf-load:') === 0) loadConfigAt(+act.slice(8));
+      else if (act.indexOf('cf-del:') === 0) askDelete(+act.slice(7));
+      return;
+    }
     if (panelMode !== 'robot' || !s.robots[pageBot]) return;
     const id = pageBot, r = s.robots[id];
     SND.init();
@@ -4033,7 +4215,7 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     else if (act.indexOf('edit:') === 0) { startEdit(r, +act.slice(5)); SND.sfx('tick'); }
     else if (act.indexOf('pos:') === 0) { focusPos = +act.slice(4); SND.sfx('tick'); }
     else if (act.indexOf('word:') === 0) { pickWord(r, act.slice(5)); SND.sfx('tick'); }
-    else if (act === 'sb-done') { editLine = -1; draft = null; }
+    else if (act === 'sb-done') finishEdit();
     else if (act.indexOf('up:') === 0 || act.indexOf('dn:') === 0) {
       const k = +act.slice(3), d = act[0] === 'u' ? -1 : 1;
       if (F.moveLine(s, id, k, d)) { if (editLine === k) editLine = k + d; else if (editLine === k + d) editLine = k; save(); }
@@ -4047,6 +4229,107 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     renderRobot();
     const sb = act.indexOf('edit:') === 0 ? panelBody.querySelector('.fx-sb') : null;
     if (sb && sb.scrollIntoView) sb.scrollIntoView({ block: 'nearest' });
+  });
+
+  /* ---------- configurations at the terminal (the CD, 2026-10-27: "save/load/delete a configuration
+     for the current set of active robots, their names, their prompts and instructions. Deleting a
+     config requires an extra dialog where i have to type in I am sure then click a proceed btn"). Kept
+     in this browser apart from the game's save, so one made in one game loads in the next (assumed);
+     newest first ---------- */
+  const CFG_KEY = 'taas.factory2.configs';
+  let configs = readConfigs();
+  function readConfigs() {
+    try { const v = JSON.parse(localStorage.getItem(CFG_KEY) || '[]'); return (Array.isArray(v) ? v : []).map(F.cleanConfig).filter(Boolean).slice(0, C.configs); } catch (e) { return []; }
+  }
+  function writeConfigs() { try { localStorage.setItem(CFG_KEY, JSON.stringify(configs)); } catch (e) { /* storage is optional */ } }
+  // a name nobody has: the one typed, or "Setup 3", with (2), (3)... after it if taken
+  function freeName(n) {
+    const used = new Set(configs.map(c => c.name));
+    if (!used.has(n)) return n;
+    for (let k = 2; ; k++) { const m = n.slice(0, C.configName - 4 - String(k).length).trim() + ' (' + k + ')'; if (!used.has(m)) return m; }
+  }
+  const nextName = () => freeName('Setup ' + (configs.length + 1));
+  const plural = (n, one) => n + ' ' + one + (n === 1 ? '' : 's');
+  function openConfigs() {
+    if (pick) endPick(false);
+    panelMode = 'configs'; pageBot = -1; editLine = -1; draft = null;
+    Object.keys(partSig).forEach(k => delete partSig[k]);
+    panelBody.innerHTML = '<h2>Configurations</h2>' +
+      '<div class="fx-sec"><div class="fx-h"><span>Save the robots on the floor</span><span data-cf="count"></span></div>' +
+      '<div class="fx-cfsave"><input id="fx-cf-name" maxlength="' + C.configName + '" autocomplete="off" spellcheck="false" enterkeyhint="done" aria-label="Name of the configuration"><button class="fx-ghost" data-panel="cf-save">Save</button></div></div>' +
+      '<div data-part="cflist"></div><div class="fx-row"><button class="fx-ghost" data-panel="close">Close</button></div>';
+    const inp = document.getElementById('fx-cf-name');
+    inp.value = nextName();
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); saveConfig(); } });
+    renderConfigs();
+    panelEl.hidden = false;
+  }
+  function renderConfigs() {
+    const listEl = panelBody.querySelector('[data-part="cflist"]');
+    if (panelMode !== 'configs' || !listEl) return;
+    const snap = F.snapshot(s, 'x'), full = configs.length >= C.configs;
+    const cnt = panelBody.querySelector('[data-cf="count"]'), t = snap ? plural(snap.robots.length, 'robot') : 'no robots';
+    if (cnt.textContent !== t) cnt.textContent = t;
+    panelBody.querySelector('[data-panel="cf-save"]').disabled = !snap || full;
+    let h = '<div class="fx-sec"><div class="fx-h"><span>Saved</span><span>' + configs.length + ' of ' + C.configs + '</span></div>';
+    if (!configs.length) h += '<p class="fx-small">None yet.</p>';
+    else h += '<ul class="fx-cfs">' + configs.map((c, i) => {
+      const need = F.configNeeds(s, c), notes = [];
+      if (need.buy) notes.push('buys ' + plural(need.buy, 'robot') + ', ' + usd(need.price) + (need.ok ? '' : ': not enough money'));
+      if (need.dropped) notes.push(plural(need.dropped, 'prompt') + ' to a place not open here');
+      return '<li><div class="fx-cfi"><b>' + esc(c.name) + '</b><span>' + esc(plural(c.robots.length, 'robot') + ': ' + c.robots.map(r => r.name).join(', ')) + '</span>' +
+        (notes.length ? '<span class="fx-small">' + esc(notes.join('; ')) + '</span>' : '') + '</div>' +
+        '<button class="fx-ghost" data-panel="cf-load:' + i + '"' + (need.ok ? '' : ' disabled') + '>Load</button><button class="fx-ghost fx-del" data-panel="cf-del:' + i + '">Delete</button></li>';
+    }).join('') + '</ul>';
+    if (full) h += '<p class="fx-small">That is as many as it keeps: delete one to save another.</p>';
+    part('cflist', h, h + '</div>');
+  }
+  function saveConfig() {
+    const inp = document.getElementById('fx-cf-name');
+    if (configs.length >= C.configs) return;
+    const typed = inp ? inp.value.replace(/\s+/g, ' ').trim().slice(0, C.configName) : '';
+    const snap = F.snapshot(s, freeName(typed || nextName()));
+    if (!snap) { SND.sfx('flop'); return; }
+    configs.unshift(snap); writeConfigs();
+    if (inp) inp.value = nextName();
+    SND.sfx('done');
+    renderConfigs();
+  }
+  function loadConfigAt(i) {
+    const c = configs[i];
+    if (!c || !F.loadConfig(s, c)) { SND.sfx('flop'); return; }
+    save(); closePanel();
+  }
+  // deleting asks first: type I am sure, then Proceed
+  const dlgEl = document.getElementById('fx-confirm'), dlgIn = document.getElementById('fx-confirm-in'), dlgGo = dlgEl.querySelector('[data-dlg="proceed"]');
+  let dlgFor = null;
+  const sure = () => dlgIn.value.replace(/\s+/g, ' ').trim().toLowerCase() === 'i am sure';
+  function askDelete(i) {
+    const c = configs[i];
+    if (!c) return;
+    dlgFor = c;
+    document.getElementById('fx-confirm-h').textContent = 'Delete "' + c.name + '"?';
+    dlgIn.value = ''; dlgGo.disabled = true; dlgEl.hidden = false;
+    SND.sfx('tick');
+    dlgIn.focus();
+  }
+  function closeDialog() { dlgEl.hidden = true; dlgFor = null; if (document.activeElement === dlgIn) dlgIn.blur(); }
+  function proceedDelete() {
+    const i = configs.indexOf(dlgFor);
+    if (i < 0 || !sure()) return;
+    configs.splice(i, 1); writeConfigs();
+    SND.sfx('toss');
+    closeDialog();
+    const inp = document.getElementById('fx-cf-name');
+    if (inp && document.activeElement !== inp) inp.value = nextName();
+    renderConfigs();
+  }
+  dlgIn.addEventListener('input', () => { dlgGo.disabled = !sure(); });
+  dlgIn.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); proceedDelete(); } else if (e.key === 'Escape') closeDialog(); });
+  dlgEl.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-dlg]');
+    if (!b) { if (ev.target === dlgEl) closeDialog(); return; }
+    if (b.dataset.dlg === 'cancel') closeDialog(); else proceedDelete();
   });
 
   /* ---------- choosing a main prompt: tap the source, then the destination, on the floor ---------- */
@@ -4239,6 +4522,7 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
     if (pick) { s.bubble = null; if (!s.robots[pick.bot]) endPick(false); }
     renderBubble();
     if (!panelEl.hidden && panelMode === 'robot') renderRobot();
+    if (!panelEl.hidden && panelMode === 'configs') renderConfigs();
     saveT += dt;
     if (saveT > 2) save();
   }
@@ -4270,6 +4554,7 @@ if (typeof module !== 'undefined') module.exports = FACTORY2;
   window.TAAS_FACTORY2 = {
     get s() { return s; }, set s(v) { s = v; bubbleSig = null; shownMoney = null; shownSat = -1; },   // (null: '' is a closed bubble's own signature)
     view: VW, layout, tick, save, hitTest, spriteRect, openRobot, closePanel, placeRect, truck: () => truckPose(),
+    openConfigs, get configs() { return configs; }, set configs(v) { configs = v; writeConfigs(); }, readConfigs, CFG_KEY,
     get page() { return { mode: panelMode, bot: pageBot, line: editLine, draft: draft && draft.slice(), pos: focusPos, open: !panelEl.hidden }; },
     get pick() { return pick && Object.assign({}, pick); },
     screen: (x, y, z) => [PX(x), PY(y, z || 0)],

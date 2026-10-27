@@ -1093,7 +1093,12 @@ TAAS's two factories as a game of their own, the hub's first card since 2026-10-
 The card opens **v2**, and a **Version** selector, the first row of the factory's menu, goes to v1
 and back; each version keeps its own save. The pages stay in `games/taas/`, so they keep TAAS's
 proprietary licence, suites and context file: everything about them is in `.claude/taas.md`
-(sections Robot factory mode, Robot factory v2, and Robot Factory, a card of its own).
+(sections Robot factory mode, Robot factory v2, Robot Factory, a card of its own, and Robot factory
+v2: configurations, a fourth goal, uniform log sizes). Since 2026-10-27 v2's terminal also keeps
+**configurations** of the robots on the floor (save, load, and delete behind a typed "I am sure"; kept
+in the browser apart from the save, so they carry into a new game), and v2 has a fourth goal (sap and
+small, medium and large planks on sale at once, over 90%, for 10 minutes; no reward yet), logs of
+every size alike, a Destroy all in the recycle bin, and Done keeping a half-built line with blanks.
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

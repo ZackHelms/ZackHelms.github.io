@@ -2084,7 +2084,7 @@ CD stopped writing:
    behind the slip figure?
 7. **Mistakes beyond slips.** The first factory's robots made mistakes with causes (a small plank in
    a medium stall). v2's robots do exactly what their lines say, but for slips. Add causes back?
-8. **Goals.** v2 keeps the first factory's three goals. Should v2 have its own?
+8. **Goals.** v2 keeps the first factory's three goals. Should v2 have its own? (Partly answered 2026-10-27: the CD added a fourth goal of v2's own, with no reward yet; questions 9-12 are in section Robot factory v2: configurations, a fourth goal, uniform log sizes.)
 
 ### Architecture (v2)
 
@@ -2142,6 +2142,9 @@ forked from the first factory's and edited, not shared with it (assumed row 1):
    `factory-v2.html` runs every TAAS suite.
 
 ### Measured (2026-10-26, half an hour each, seeds 1-3)
+
+With the sizes of 2026-10-26 (20/65/15); uniform sizes since 2026-10-27 change these, see section Robot factory
+v2: configurations, a fourth goal, uniform log sizes.
 
 A scratch harness played lines through the engine with no customer ever served by hand (and, for
 the last three, a player who scrubs a jam ten seconds after it happens). Numbers are at 30 minutes.
@@ -2256,6 +2259,138 @@ median but 7-21 of 149 over in four runs, against 0 on 2026-10-26; the page with
 gave 6-14 of 149 over in the same container the same hour. So the slower frames are from the
 container, not this change (traced by A/B, not by profile).
 
+## Robot factory v2: configurations, a fourth goal, uniform log sizes (2026-10-27)
+
+The CD, verbatim (quotes straightened):
+
+> Robot Factory v2 updates:
+> - at computer (where i add/remove robots) give me an option to save/load/delete a "configuration"
+>   for the current set of active robots, their names, their prompts and instructions. Deleting a
+>   config requires an extra dialog where i have to type in "I am sure" then click a proceed btn. I
+>   have this feature as soon as robots become available (i think from the start).
+> - NOTE: Currently I can max out the robot factory by assigning robots as follows: 3 for raw
+>   materials to planer, extractor, workbench; 1 to deliver lumber from extractor output to planer
+>   input. Then 4 to stock sales stalls with s/m/l planks and sap. This gives me a nice stable state
+>   where i can give a few instructions to each robot and add pacing (wait 10s) to the raw materials
+>   robots. I like this.
+> - add another goal to sell all 4 items (sap, small, med, large planks) at same time in open stalls
+>   for 10 minutes while maintaining >90% customer satisfaction. No reward (yet) for this goal,
+>   mainly is just for guidance.
+> - i see way more medium planks overall. Make the raw materials truck deliveries uniformly random
+>   sizes.
+> - add option in recycle bin to destroy/delete contents of the recycle bin
+> - in the sentence builder if i click done btn and some fields are unspecified then it should save
+>   it as is with "nothing"/blank for the unspecified fields (currently it discards the instruction
+>   and i have to start it over).
+
+Built without Q&A, the brief being clear enough to build; what it did not say is in the assumed table.
+
+**What was built.**
+- **Configurations at the terminal.** Its bubble has a third row, **Configs** (a disk), from the
+  start. It opens a page: a name box (offering "Setup N") and **Save**, for the robots on the floor
+  now and any on their way up (one on its way down is not counted), then the saved list, newest
+  first, up to 20, each naming its robots, with **Load** and **Delete**. A configuration is
+  `{ name, robots: [{ name, src, dst, lines, cut }] }` (`F.snapshot()`, cleaned by
+  `F.cleanConfig()`), kept in `localStorage['taas.factory2.configs']` apart from the game's save, so
+  it outlives Start over and loads into a new game.
+  - **Load** (`F.loadConfig()`) makes the floor exactly the configuration. Each part goes to a robot
+    of the same name, then to any other robot (one on the floor before one in storage, so nobody
+    rides for nothing), then to a robot bought at the flat price. Robots in storage are called up; one
+    riding down turns round where it is (`turnLift()`, the ride's clock mirrored); robots it does not
+    name go down to storage, keeping their own prompts. A prompt to a place not open in this game (a
+    locked slot, a stall not bought) is dropped and the rest of that robot loads. The list says what a
+    load would buy and cost (`F.configNeeds()`), and offers Load only when you can pay. Loading closes
+    the page so you see the robots move, and "Loaded" floats over the terminal.
+  - **Delete** opens a dialog naming it, with a box to type **I am sure** and **Proceed**, which comes
+    on only when the box says that (case and surrounding spaces ignored). Cancel, a tap outside or
+    Escape deletes nothing; it asks again from an empty box.
+- **Goal 4** (`CFG.goals[3]`, id `all4`): sap and small, medium and large planks each on sale in an
+  open stall at the same time (`onSale()`: a stall bought, open, set to it), with customer
+  satisfaction over 90%, for 10 minutes. Any of the four off sale, or satisfaction at 90% or less,
+  starts the countdown over (`holds()`); money plays no part. **No reward**: it unlocks nothing; met,
+  the wall sparks and says "Goal met", then "All goals met". The board reads "Sell sap + S, M & L
+  planks at once, >90% for 10 minutes" (m:ss while it counts). `goalNow()` also returns `missing`,
+  not shown anywhere yet. A save from before it with the three goals met comes back working on it. A
+  goal's countdown now starts at its own `sec` (`secOf()`).
+- **Log sizes are uniform**: `CFG.logs.size` is a third each (it was 20% small, 65% medium, 15%
+  large), for the truck's loads and the first free ten alike; quality is unchanged (75% normal, 15%
+  gnarled, 10% sappy). The planer's starting hopper is still six medium logs.
+- **Destroy all** across the foot of the recycle bin's bubble: everything in it gone for good (not
+  into your arms, free), with smoke and "Destroyed"; off when the bin is empty; no other bin has it.
+- **Done keeps a half-built line.** A word not chosen is kept blank (`BLANK`: `_` in the first three
+  places, `none` for the ending). A blank size reads as any size ("Only take logs", "Recycle sap");
+  any other blank (the verb, a number, the thing) leaves the line nonsense, which adds 5% to the slips
+  like any nonsense. A line with no word chosen is not kept. Leaving a half-built line for another
+  line, or closing the page, keeps it the same way. A kept line with a blank opens on that word.
+- **Info** lists the four goals and says how configurations, Destroy all and a blank word work, and
+  that v1 is under Version (the stale "mode menu" line is gone).
+
+**The CD's layout, measured.** The eight robots the CD described (three out of the raw materials bin,
+to the planer, the extractor and the bench; one from the extractor's output to the planer; a stocker
+for each of four stalls) were played through the engine from all three goals met, with lines guessed
+(assumed): Only take normal / sap / gnarled logs, Carry 6, Stop at 4 (the two hoppers) and Wait 10
+seconds between trips on the haulers; Only take logs from the extractor, Carry 3; Only take its size
+of planks, or sap, Carry 3 on the stockers. Goal 4 was met inside an hour on 6 of 6 seeds (10-55
+min; 55-98% satisfaction on average; $133-$674 in hand at the hour). Carrying one log a trip, the same
+eight could not keep up (18-24% satisfaction); without the Wait lines, 5 of 6 seeds. A rules row
+holds the Carry version on three seeds.
+
+**Uniform sizes, measured: goal 1 is about three times slower.** Goal 1 is 50 medium planks, and
+medium logs went from 65% to 33%. The 2026-10-26 path (two haulers, one medium plank stall whose
+stocker recycles the other sizes) still meets goal 1 in 12-19 min, but now recycles two planks in three
+and leaves customers waiting (20-25% satisfaction, about -$330 at 45 min, six seeds). What works now
+is to buy stalls 2 and 3 ($1 each) for small and large planks: two haulers and three stockers meet
+goal 1 in 29-34 min at 94-98% satisfaction with $376-$464 in hand (six seeds, 45 min), where the old
+path took 10-11 min. Rules row 15 now holds that path (inside 40 minutes, over 80%, money in hand) and
+that the old path no longer keeps customers. (Open question 9.)
+
+**Assumed, not decided** (Claude's choices; the CD has not ruled on these):
+
+| # | Choice | Why / alternative |
+|---|---|---|
+| 1 | Configurations live in the browser apart from the game's save, so they carry into a new game | Their point is putting a setup back; one list per game would be lost on Start over. |
+| 2 | A configuration is the robots on the floor and on their way up (not in storage, not on the way down), each with its name, main prompt, lines and cut | "the current set of active robots, their names, their prompts and instructions"; the saw's cut is part of what a robot is told. |
+| 3 | Load makes the floor exactly the configuration: same names first, then any robot (floor before storage), then buying at the flat price; the rest go down to storage | Nothing is sold or lost, and robots it does not use keep their own prompts. |
+| 4 | Load needs the money for any robot it must buy, and is offered only then | Otherwise a load would be a free hire. |
+| 5 | A prompt to a place not open in this game is dropped (that robot loads without one), and the list says so | A locked slot or an unbought stall is not a valid prompt (`placeOk()`). |
+| 6 | Load is immediate and closes the page; Save never overwrites (a taken name gets " (2)") | Only Delete was asked to confirm; with no overwrite, only Delete loses a configuration. |
+| 7 | "I am sure" ignores case and surrounding spaces | A phone keyboard may capitalise "I", or not. |
+| 8 | Up to 20 configurations, names up to 24 characters, newest first, the box offering "Setup N" | Room enough; one tap saves. |
+| 9 | Goal 4 counts a thing as sold while an open stall is set to it, stocked or not | An empty stall leaves customers waiting, which takes satisfaction under 90% soon enough. |
+| 10 | Goal 4 has no money condition, and its countdown starts over as goal 2's does | The CD named the four things and satisfaction; goal 2 is the precedent. |
+| 11 | Uniform sizes apply to every log, the first free ten too; the starting hopper stays six medium logs | They come from the same truck; the hopper is what makes the planer run at once. |
+| 12 | Destroy all is free, one tap, no confirm | Asked for as an option; the recycle bin holds only what was thrown away. |
+| 13 | A blank size means any size; any other blank makes the line nonsense | "Only take logs" reads as any logs; a missing verb, number or thing leaves nothing to follow. |
+| 14 | Leaving a half-built line (for another line, or closing the page) keeps it as Done does; with no word chosen, nothing is kept | The complaint was losing work; Done was the case named. |
+| 15 | Goal 4 met: sparks along the board and "Goal met", nothing else | There is no machine to bring. |
+
+**Open questions for the CD** (continuing the v2 list above):
+9. **Goal 1 now takes about 30 minutes** with a healthy shop (about 10 before), since uniform sizes
+   made medium planks a third of the output. Keep it, lower it (say 25), or make it 50 planks of any
+   size?
+10. **Should a configuration also keep the stalls** (what each sells)? It holds robots only, as asked.
+11. **Should Save be able to overwrite** a configuration of the same name (behind its own confirm)?
+12. **Goal 4's reward**, when there is one; and should the wall say which of the four is off sale
+    (`goalNow().missing` has it)?
+
+**Suites.** `drive-taas-factory2.cjs` 112 -> 158 checks: section 4 the sizes (the CD's third as a
+literal; 150 truckloads within 29-38% each), 7 blank words, 12 goal 4 (its countdown; a closed stall,
+a stall set to something else and satisfaction at 90 each starting it over; money not counted; met
+with no reward; goal 3 handing over a full countdown; an old save), 13 Destroy all and the terminal's
+Configs, 15 restated (the old path, the three-stall path, the CD's eight meeting goal 4), 16
+configurations (snapshot, cleaning, loading into a new game with and without the money, a locked
+prompt dropped, same names over working robots, storage called up, a robot riding down turned round,
+floor before storage). `drive-taas-factory2-ui.cjs` 46 -> 74: sections 10 (configurations by real
+taps: save, newest first, stored, the next name, load, a new game, cost, the I am sure dialog, a 320 px
+phone), 11 (Destroy all), 12 (Done with blanks), 13 (goal 4 on the wall and in Info). Break lists:
+engine 28 -> 65 (37 new; 65 of 65 caught), page 15 -> 39 (24 new; 39 of 39 caught). The engine pass first
+missed two (a goal coming up with a zero countdown, storage robots taken before floor ones) and crashed
+on a third; each now has a named row. The page pass missed one (a kept line with two blanks waiting
+for both before it is kept), now a row of its own.
+
+**Frame cost** (the eight pose, every goal met): median 16.7 ms, 0 of 149 frames over budget
+(2026-10-27).
+
 ## How to change it (formal)
 
 - **Retune:** edit the tables only. Run `.claude/scripts/gates.sh games/taas/index.html`
@@ -2275,6 +2410,11 @@ container, not this change (traced by A/B, not by profile).
 - **Copy rule:** plain ASCII in the page (straight quotes, hyphens); the CD prefers it.
 
 ## History
+
+- 2026-10-27: **Robot factory v2 updates** (the CD): configurations at the terminal (save, load,
+  delete behind "I am sure"), a fourth goal (sap and three sizes of plank on sale at once, over 90%,
+  10 minutes, no reward yet), log sizes uniform, Destroy all in the recycle bin, and Done keeping a
+  half-built line with blanks. Goal 1 measured about three times slower (open question 9).
 
 - 2026-10-27: **Robot Factory, a card of its own** (the CD): first on the games list, opening v2, with
   a Version selector first in the factory's menu (v2 / v1); TAAS's card is formal only and the mode

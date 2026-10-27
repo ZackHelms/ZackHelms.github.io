@@ -148,6 +148,13 @@ const strip = s => { const o = JSON.parse(F.save(s)); return JSON.stringify(o); 
   ok(c.truck.phase === 'parked' && c.raw.length === 1 && c.costs.bought === 0, 'something put in the bin before it tips calls it off');
   const n = shut(F.newGame(9)); run(n, 30);
   ok(n.truck.phase === 'parked' && !take(n, 'truck').length, 'a bin with logs in it brings no truck');
+  // the truck's logs come in every size alike (the CD, 2026-10-27: "Make the raw materials truck
+  // deliveries uniformly random sizes"), the CD's number asserted as a literal
+  ok(C.logs.size.s === 1 / 3 && C.logs.size.m === 1 / 3 && C.logs.size.l === 1 / 3, 'the truck\'s logs are small, medium and large, a third each');
+  const u = shut(F.newGame(17)); u.planer.in = []; const sz = { s: 0, m: 0, l: 0 };
+  for (let k = 0; k < 150; k++) { u.raw = []; until(u, x => x.raw.length > 0, 20); u.raw.forEach(id => sz[F.sizeOf(id)]++); }
+  const tot = sz.s + sz.m + sz.l;
+  ok(tot === 1500 && ['s', 'm', 'l'].every(z => sz[z] / tot > 0.29 && sz[z] / tot < 0.38), 'and 150 truckloads come out about a third of each size', JSON.stringify(sz));
 }
 
 /* ---------- 5. robots: the terminal and the elevator ---------- */
@@ -225,6 +232,17 @@ const strip = s => { const o = JSON.parse(F.save(s)); return JSON.stringify(o); 
   ok(F.moveLine(s, 0, 0, 1) && s.robots[0].lines[0][1] === '2' && s.robots[0].lines[1][1] === '1' && !F.moveLine(s, 0, 0, -1) && !F.moveLine(s, 0, C.lines - 1, 1), 'a line moves up or down, not off the ends');
   ok(F.removeLine(s, 0, 0) && s.robots[0].lines.length === C.lines - 1 && s.robots[0].lines[0][1] === '1', 'and is removed');
   ok(F.mind(s.robots[0]).wait === 1, 'with several Wait lines, the first one counts');
+  // a word left blank (the CD, 2026-10-27: Done "should save it as is with nothing/blank for the
+  // unspecified fields"): a blank size reads as "any"; any other blank leaves the line nonsense
+  const B_ = F.BLANK;
+  ok(B_.join() === '_,_,_,none' && P(['only', '_', 'logs', 'none']).kind === 'filter' && P(['only', '_', 'logs', 'none']).size === null && P(['recycle', '_', 'sap', 'none']).kind === 'filter', 'a blank size is any size: "Only take logs", "Recycle sap"');
+  ok([['_', 'medium', 'logs', 'none'], ['only', 'medium', '_', 'none'], ['wait', '_', 'seconds', 'none'], ['carry', '_', 'things', 'atime'], ['stop', '_', 'planks', 'dest'], ['_', '_', 'seconds', 'trips']].every(l => P(l).kind === 'nonsense'), 'a blank verb, thing or number means nothing');
+  ok(F.lineText(['only', '_', 'logs', 'none']) === 'Only take logs' && F.lineText(['_', 'medium', '_', 'none']) === 'medium', 'a blank word is left out of the sentence');
+  const bl = staffed(32, 1);
+  ok(F.setLine(bl, 0, 0, ['only', '_', 'planks', 'none']) && F.setLine(bl, 0, 1, ['_', 'large', '_', 'none']) && !F.setLine(bl, 0, 2, ['_', '_', '_', 'none']) && !F.setLine(bl, 0, 2, ['only', 'any', 'logs', '_']), 'a line with blanks is kept; an all-blank line, or a blank where the ending goes, is not');
+  ok(F.mind(bl.robots[0]).nonsense === 1 && F.mind(bl.robots[0]).slip === C.slip + C.nonsense, 'the line that means nothing makes the robot slip 5% more, as any nonsense does');
+  const blb = F.load(F.save(bl));
+  ok(blb && JSON.stringify(blb.robots[0].lines) === JSON.stringify(bl.robots[0].lines), 'and a save keeps the blanks');
 }
 
 /* ---------- 8. order matters ---------- */
@@ -346,6 +364,31 @@ const strip = s => { const o = JSON.parse(F.save(s)); return JSON.stringify(o); 
   s.shop.next = s.t; until(s, x => x.goal === 1, 60);
   ok(s.goal === 1 && F.unlocked(s, 'extract') && take(s, 'goal').length === 1, 'the fiftieth medium plank sold brings the sap extractor (slot 02)');
   ok(F.setPrompt((s.money = 2, F.buyRobot(s), until(s, x => x.robots[0].where === 'floor', 10), s), 0, 'raw', 'extractIn'), 'and its hopper is then a destination');
+  // goal 4 (the CD, 2026-10-27): "sell all 4 items (sap, small, med, large planks) at same time in
+  // open stalls for 10 minutes while maintaining >90% customer satisfaction. No reward (yet)"
+  const g4 = C.goals[3];
+  ok(C.goals.length === 4 && g4.sells.slice().sort().join() === 'plank.l,plank.m,plank.s,sap' && g4.sat === 90 && g4.sec === 600 && !g4.unlocks && g4.money === undefined, 'a fourth goal: sap and small, medium and large planks on sale at once, over 90%, for 10 minutes, unlocking nothing');
+  const q = shut(F.newGame(72)); q.goal = 3; q.goalT = g4.sec;
+  const sellAll = x => x.stalls.forEach((st, i) => { st.bought = true; st.closed = false; st.want = ['sap', 'plank.s', 'plank.m', 'plank.l'][i]; });
+  sellAll(q); run(q, 60);
+  ok(q.goal === 3 && F.goalNow(q).counting && Math.abs(q.goalT - (g4.sec - 60)) < 0.2 && F.goalNow(q).missing.length === 0, 'with all four on sale and customers happy, its countdown runs', q.goalT.toFixed(1));
+  q.stalls[2].closed = true; F.step(q, 0.05);
+  ok(q.goalT === g4.sec && F.goalNow(q).missing.join() === 'plank.m', 'a stall closed starts it over (and the goal says what is missing)');
+  sellAll(q); q.stalls[1].want = 'plank.m'; run(q, 5);
+  ok(q.goalT === g4.sec, 'so does a stall set to something else, leaving one of the four off sale');
+  sellAll(q); run(q, 5); q.satisfaction = 90; F.step(q, 0.05);
+  ok(q.goalT === g4.sec, 'and customer satisfaction at 90% or less');
+  sellAll(q); q.satisfaction = 100; q.money = -500; run(q, 5);
+  ok(q.goalT < g4.sec, 'money does not come into it');
+  run(q, g4.sec);
+  ok(q.goal === 4 && F.goalNow(q).done && take(q, 'goal').some(e => e.id === 'all4' && !e.unlocks), 'held for 10 minutes, it is met; every goal is then met');
+  ok(F.unlocked(q, 'extract') && F.unlocked(q, 'carve') && F.unlocked(q, 'saw'), 'and it unlocks nothing new: slots 02-04 are the first three goals\' rewards');
+  // goal 3 met in play: goal 4 comes up with its whole 10 minutes, not met at once
+  const g3 = shut(F.newGame(74)); g3.goal = 2; g3.goalN = C.goals[2].n; sellAll(g3); F.step(g3, 0.05);
+  ok(g3.goal === 3 && g3.goalT > g4.sec - 0.2, 'goal 3 met: goal 4 comes up with its whole 10 minutes to run', g3.goal + ' ' + g3.goalT);
+  const old = JSON.parse(F.save(shut(F.newGame(73)))); old.goal = 3; old.goalT = 600;
+  const ob = F.load(JSON.stringify(old));
+  ok(ob && ob.goal === 3 && F.goalNow(ob).goal.id === 'all4' && ob.goalT === g4.sec, 'a save from before it, with the three goals met, comes back working on the fourth');
 }
 
 /* ---------- 13. you: bubbles at the bins, the terminal, a robot ---------- */
@@ -360,11 +403,13 @@ const strip = s => { const o = JSON.parse(F.save(s)); return JSON.stringify(o); 
   F.options(s).filter(x => x.group === 'put').forEach(x => F.choose(s, x.id));
   ok(s.avatar.inv.length === 0 && s.planer.in.length >= n - 1, 'and go into the planer\'s hopper');
   F.tap(s, { kind: 'terminal' }); until(s, x => F.bubbleOpen(x) && F.bubbleOpen(x).kind === 'terminal', 40);
-  ok(F.options(s).map(x => x.id).join() === 'buy', 'at the terminal: buy a robot');
+  ok(F.options(s).map(x => x.id).join() === 'buy,configs', 'at the terminal: buy a robot, or open the configurations');
   s.money = 20; F.choose(s, 'buy'); until(s, x => x.robots[0].where === 'floor', 10);
   ok(F.options(s).some(x => x.id === 'down:0'), 'then send it down');
   F.choose(s, 'down:0'); until(s, x => x.robots[0].where === 'storage', 30);
   ok(F.options(s).some(x => x.id === 'up:0') && F.options(s).some(x => x.id === 'buy'), 'or call it back up, or buy another');
+  ok(F.choose(s, 'configs') && take(s, 'configs').length === 1 && !s.bubble, 'the configurations close the bubble for their page');
+  F.tap(s, { kind: 'terminal' }); until(s, x => F.bubbleOpen(x) && F.bubbleOpen(x).kind === 'terminal', 40);
   F.choose(s, 'up:0'); until(s, x => x.robots[0].where === 'floor', 10);
   F.tap(s, { kind: 'robot', id: 0 }); until(s, x => F.bubbleOpen(x) && F.bubbleOpen(x).kind === 'robot', 30);
   ok(F.options(s).map(x => x.id).join() === 'notes,down', 'a robot\'s bubble: its page, or down to storage');
@@ -373,6 +418,15 @@ const strip = s => { const o = JSON.parse(F.save(s)); return JSON.stringify(o); 
   ok(j.planer.phase !== 'jam' && j.tally.player.fixed === 1, 'at the planer you only ever scrub a jam');
   const k = shut(F.newGame(83)); F.tap(k, { kind: 'machine' }); until(k, x => x.avatar.task && x.avatar.task.arrived, 30);
   ok(!k.avatar.act && !F.bubbleOpen(k), 'and at a planer that is running fine, nothing');
+  // the recycle bin's contents can be destroyed (the CD, 2026-10-27)
+  const d = shut(F.newGame(84)); d.recycle = ['log.m', 'plank.s', 'plank.s', 'sap'];
+  F.tap(d, { kind: 'recycle' }); until(d, x => F.bubbleOpen(x), 30);
+  const des = F.options(d).find(x => x.id === 'destroy');
+  ok(des && des.enabled && des.count === 4 && F.options(d).filter(x => x.group === 'take').length === 3, 'the recycle bin\'s bubble can destroy everything in it (4 things), beside taking them out');
+  ok(F.choose(d, 'destroy') && d.recycle.length === 0 && take(d, 'destroyed').length === 1 && take(d, 'destroyed')[0].n === 4 && d.avatar.inv.length === 0 && d.money === 0, 'destroyed: gone, not into your arms, and free');
+  ok(!F.options(d).find(x => x.id === 'destroy').enabled && !F.choose(d, 'destroy'), 'an empty recycle bin has nothing to destroy');
+  F.tap(d, { kind: 'raw' }); until(d, x => F.bubbleOpen(x) && F.bubbleOpen(x).kind === 'raw', 40);
+  ok(!F.options(d).some(x => x.id === 'destroy'), 'and no other bin can destroy');
 }
 
 /* ---------- 14. saving ---------- */
@@ -392,30 +446,127 @@ const strip = s => { const o = JSON.parse(F.save(s)); return JSON.stringify(o); 
   ok(F.load('{"version":0}') === null && F.load('nope') === null, 'and one from another version, or not a save, is refused');
 }
 
-/* ---------- 15. measured: a good set of lines reaches the first goal ---------- */
+/* ---------- 15. measured: good sets of lines reach the first goal, and the fourth ---------- */
+// robots hired and told their lines, then played with a player who scrubs any jam ten seconds after
+// it happens; returns when goal 1 and goal 4 were met (minutes), satisfaction on average, money
+function played(seed, setup, prep, mins) {
+  const s = F.newGame(seed);
+  if (prep) prep(s);
+  s.money = setup.length * s.flat.robot;
+  setup.forEach(([src, dst, lines]) => { const r = F.buyRobot(s); F.setPrompt(s, r.id, src, dst); lines.forEach((l, k) => F.setLine(s, r.id, k, l)); });
+  let t1 = null, t4 = null, sat = 0, n = 0;
+  const jam = {};
+  for (let k = 0; k < mins * 60 * 20; k++) {
+    F.step(s, 0.05);
+    F.MACHINES.forEach(key => {
+      jam[key] = F.jammed(s, key) ? (jam[key] || 0) + 0.05 : 0;
+      if (jam[key] > 10 && !s.avatar.act) { s[key].dirt = 0.001; s.avatar.act = { kind: 'clean', t: 0, on: key }; jam[key] = 0; }
+    });
+    if (t1 === null && s.goal >= 1) t1 = s.t / 60;
+    if (t4 === null && s.goal >= 4) t4 = s.t / 60;
+    sat += s.satisfaction; n++;
+    s.events.length = 0;
+  }
+  return { t1, t4, sat: sat / n, money: s.money };
+}
+const say = (r, t) => (r[t] === null ? 'never' : r[t].toFixed(1)) + ' min ' + Math.round(r.sat) + '% $' + Math.round(r.money);
 {
-  // two robots hauling logs and one stocking the stall, with a player who scrubs any jam ten
-  // seconds after it happens; three seeds, half an hour each (2026-10-26)
+  // the 2026-10-26 path (two haulers, one medium plank stall whose stocker recycles every other
+  // plank) with the truck's sizes uniform (the CD, 2026-10-27): it still meets goal 1, but two planks
+  // in three are recycled and the stall cannot be kept stocked
   const A = [['recycle', 'any', 'slogs', 'none'], ['carry', '6', 'things', 'atime'], ['stop', '4', 'things', 'dest']];
   const B = [['recycle', 'any', 'gplanks', 'none'], ['recycle', 'small', 'planks', 'none'], ['recycle', 'large', 'planks', 'none'], ['carry', '3', 'things', 'atime']];
-  const res = [1, 2, 3].map(seed => {
-    const s = F.newGame(seed); s.money = 3;
-    [['raw', 'planerIn', A], ['raw', 'planerIn', A], ['bin', 'stall0', B]].forEach(([src, dst, lines]) => { const r = F.buyRobot(s); F.setPrompt(s, r.id, src, dst); lines.forEach((l, k) => F.setLine(s, r.id, k, l)); });
-    let t1 = null, sat = 0, n = 0, jam = 0;
-    for (let k = 0; k < 30 * 60 * 20; k++) {
-      F.step(s, 0.05);
-      jam = F.jammed(s, 'planer') ? jam + 0.05 : 0;
-      if (jam > 10) { s.planer.dirt = 0.001; s.avatar.act = { kind: 'clean', t: 0, on: 'planer' }; jam = 0; }
-      if (t1 === null && s.goal >= 1) t1 = s.t / 60;
-      sat += s.satisfaction; n++;
-      s.events.length = 0;
-    }
-    return { t1, sat: sat / n, money: s.money };
-  });
-  ok(res.every(r => r.t1 !== null && r.t1 < 20), 'three robots with good lines meet the first goal inside 20 minutes on three seeds', res.map(r => r.t1 && r.t1.toFixed(1)).join(' / '));
+  const old = [1, 2, 3].map(seed => played(seed, [['raw', 'planerIn', A], ['raw', 'planerIn', A], ['bin', 'stall0', B]], null, 30));
+  ok(old.every(r => r.t1 !== null && r.sat < 50), 'one medium plank stall that recycles the other sizes meets goal 1 but leaves customers waiting', old.map(r => say(r, 't1')).join(' / '));
+  // the valid path now: a stall for each size of plank ($1 each), two haulers and a stocker per stall
+  const C3 = ['carry', '3', 'things', 'atime'];
+  const three = [['raw', 'planerIn', A], ['raw', 'planerIn', A],
+    ['bin', 'stall0', [['recycle', 'any', 'gplanks', 'none'], ['only', 'medium', 'planks', 'none'], C3]],
+    ['bin', 'stall1', [['only', 'small', 'planks', 'none'], C3]], ['bin', 'stall2', [['only', 'large', 'planks', 'none'], C3]]];
+  const stalls3 = s => { [1, 2].forEach(i => { s.stalls[i].bought = true; s.stalls[i].want = i === 1 ? 'plank.s' : 'plank.l'; }); };
+  const res = [1, 2, 3].map(seed => played(seed, three, stalls3, 40));
+  ok(res.every(r => r.t1 !== null && r.t1 < 40), 'three plank stalls, two haulers and three stockers meet the first goal inside 40 minutes on three seeds', res.map(r => say(r, 't1')).join(' / '));
   ok(res.every(r => r.sat > 80 && r.money > 0), 'with customer satisfaction over 80% on average and money in hand', res.map(r => Math.round(r.sat) + '% $' + Math.round(r.money)).join(' / '));
   const one = (() => { const s = F.newGame(1); s.money = 1; const r = F.buyRobot(s); F.setPrompt(s, r.id, 'raw', 'planerIn'); run(s, 600, 0.05); return s; })();
   ok(one.satisfaction < 50, 'one robot hauling logs with nobody stocking the stall leaves customers waiting (satisfaction ' + Math.round(one.satisfaction) + '%)');
+  // the CD's layout (2026-10-27): three robots out of the raw materials bin (normal logs to the
+  // planer, sap logs to the extractor, gnarled logs to the bench), one from the extractor's output
+  // to the planer, a stocker for each of four stalls; the lines are guessed (assumed)
+  const W = ['wait', '10', 'seconds', 'trips'], C6 = ['carry', '6', 'things', 'atime'], S4 = ['stop', '4', 'things', 'dest'];
+  const cd = [['raw', 'planerIn', [['only', 'any', 'nlogs', 'none'], C6, S4, W]], ['raw', 'extractIn', [['only', 'any', 'slogs', 'none'], C6, S4, W]],
+    ['raw', 'bench', [['only', 'any', 'glogs', 'none'], C6, W]], ['extractOut', 'planerIn', [['only', 'any', 'logs', 'none'], C3]],
+    ['bin', 'stall0', [['only', 'medium', 'planks', 'none'], C3]], ['bin', 'stall1', [['only', 'small', 'planks', 'none'], C3]],
+    ['bin', 'stall2', [['only', 'large', 'planks', 'none'], C3]], ['extractOut', 'stall3', [['only', 'any', 'sap', 'none'], C3]]];
+  const all3 = s => { s.goal = 3; s.goalT = C.goals[3].sec; s.stalls.forEach((st, i) => { st.bought = true; st.want = ['plank.m', 'plank.s', 'plank.l', 'sap'][i]; }); };
+  const four = [1, 2, 4].map(seed => played(seed, cd, all3, 60));
+  ok(four.every(r => r.t4 !== null), 'the CD\'s eight robots meet goal 4 (all four things on sale, over 90%, for 10 minutes) inside an hour on three seeds', four.map(r => say(r, 't4')).join(' / '));
+}
+
+/* ---------- 16. configurations: the robots on the floor, saved and loaded at the terminal ---------- */
+// (the CD, 2026-10-27: "save/load/delete a configuration for the current set of active robots,
+// their names, their prompts and instructions"; delete and its "I am sure" are the page's)
+{
+  const s = staffed(101, 3, open3);
+  F.rename(s, 0, 'Hauler'); F.setPrompt(s, 0, 'raw', 'planerIn'); F.setLine(s, 0, 0, ['recycle', 'any', 'slogs', 'none']); F.setLine(s, 0, 1, ['wait', '10', 'seconds', 'trips']);
+  F.rename(s, 1, 'Seller'); F.setPrompt(s, 1, 'bin', 'stall0'); F.setLine(s, 1, 0, ['only', '_', 'planks', 'none']);
+  F.setPrompt(s, 2, 'bin', 'saw'); F.setCut(s, 2, 'dowels');
+  const all = F.snapshot(s, '  Morning   shift ');
+  ok(all && all.name === 'Morning shift' && all.robots.length === 3 && all.robots[0].name === 'Hauler' && all.robots[0].src === 'raw' && all.robots[0].lines.length === 2 && all.robots[1].lines[0][1] === '_' && all.robots[2].cut === 'dowels',
+    'a configuration keeps every robot on the floor: its name, its main prompt, its lines (blanks too) and its cut');
+  F.sendDown(s, 2);
+  const two = F.snapshot(s, 'Two');
+  ok(two.robots.length === 2 && two.robots.every(r => r.name !== 'Widget'), 'a robot on its way down to storage is not on the floor, so not in it');
+  ok(JSON.stringify(F.cleanConfig(JSON.parse(JSON.stringify(two)))) === JSON.stringify(two), 'and it comes back from JSON unchanged');
+  ok(F.snapshot(F.newGame(1), 'Empty') === null, 'with no robots there is nothing to save');
+  const bad = F.cleanConfig({ name: 'x', robots: [{ name: '', src: 'saw', dst: 'bin', lines: [['bogus', 'a', 'b', 'c'], ['wait', '5', 'seconds', 'none']], cut: 'nope' }, null, 5] });
+  ok(bad && bad.robots.length === 1 && bad.robots[0].name === C.names[0] && bad.robots[0].src === null && bad.robots[0].lines.length === 1 && bad.robots[0].cut === F.CUTS[0], 'a bad one is cleaned: a name, no machine as a source, no bad line, a cut');
+  ok(F.cleanConfig({ name: '', robots: [{ name: 'a' }] }) === null && F.cleanConfig({ name: 'n', robots: [] }) === null && F.cleanConfig('nope') === null, 'one with no name or no robots is not a configuration');
+
+  // loaded into a new game: robots are bought for it, at the flat price, and ride up
+  const n = shut(F.newGame(102)); n.goal = C.goals.length;
+  const need = F.configNeeds(n, all);
+  ok(need.buy === 3 && need.price === 3 * n.flat.robot && !need.ok && !F.loadConfig(n, all) && n.robots.length === 0, 'into a new game it needs 3 robots, $' + 3 * n.flat.robot + ': with no money it does not load, and nothing changes');
+  n.money = 3 * n.flat.robot;
+  ok(F.configNeeds(n, all).ok && F.loadConfig(n, all) && n.robots.length === 3 && n.money === 0 && n.robots.every(r => r.where === 'queued' || r.where === 'up'), 'with the money it buys them, and they wait for the elevator');
+  until(n, x => x.robots.every(r => r.where === 'floor'), 30);
+  ok(n.robots.map(r => r.name).join() === 'Hauler,Seller,Widget' && n.robots[0].src === 'raw' && n.robots[0].dst === 'planerIn' && (n.robots[1].lines[0] || []).join() === 'only,_,planks,none' && n.robots[2].dst === 'saw' && n.robots[2].cut === 'dowels', 'up on the floor, each has its name, prompt, lines and cut');
+  ok(take(n, 'configLoaded').length === 1 && take(n, 'configLoaded')[0].bought === 3, 'and the load is told');
+  // a prompt to a place not open in this game is dropped, the rest of the robot kept
+  const lk = shut(F.newGame(103)); lk.money = 5;
+  const nl = F.configNeeds(lk, all);
+  ok(nl.dropped === 1 && F.loadConfig(lk, all) && lk.robots[2].src === null && lk.robots[2].cut === 'dowels' && lk.robots[0].src === 'raw' && take(lk, 'configLoaded')[0].dropped === 1, 'a prompt to the table saw, before its slot is open, is dropped; the rest loads');
+
+  // loaded over robots already working: the same names take their parts, the rest go down
+  const w = staffed(104, 4, open3);
+  ['Seller', 'Hauler', 'Spare', 'Other'].forEach((nm, i) => F.rename(w, i, nm));
+  F.setPrompt(w, 0, 'raw', 'stall0'); F.setLine(w, 0, 0, ['wait', '1', 'seconds', 'none']);
+  F.setPrompt(w, 2, 'raw', 'planerIn'); F.setPrompt(w, 3, 'raw', 'planerIn');
+  until(w, x => x.robots[2].carry.length > 0, 30);
+  const m0 = w.money;
+  ok(F.configNeeds(w, two).buy === 0 && F.loadConfig(w, two) && w.money === m0, 'over four robots, a configuration of two buys nothing');
+  ok(w.robots[0].name === 'Seller' && w.robots[0].src === 'bin' && w.robots[0].dst === 'stall0' && w.robots[0].lines.length === 1 && (w.robots[0].lines[0] || [])[0] === 'only', 'the robot named Seller takes the Seller\'s part: its prompt and lines replaced');
+  ok(w.robots[1].name === 'Hauler' && w.robots[1].src === 'raw' && w.robots[1].lines.length === 2, 'and Hauler the Hauler\'s');
+  ok(w.robots[2].toLift && w.robots[3].toLift && w.robots[2].carry.length === 0, 'the two left over go down to storage, putting back what they carried');
+  until(w, x => x.robots[2].where === 'storage' && x.robots[3].where === 'storage', 40);
+  ok(w.robots[2].src === 'raw' && w.robots[2].where === 'storage', 'keeping their own prompts in storage');
+  // and a robot in storage is called up before one is bought; one on its way down turns round
+  const t = staffed(105, 3, open3);
+  F.rename(t, 0, 'Hauler'); F.rename(t, 1, 'Seller'); F.rename(t, 2, 'Third');
+  F.sendDown(t, 1); until(t, x => x.robots[1].where === 'storage', 40);
+  F.sendDown(t, 0); until(t, x => x.robots[0].where === 'down', 40);
+  const lt = t.lift.t, m1 = t.money;
+  ok(F.loadConfig(t, two) && t.money === m1 && t.robots[0].where === 'up' && t.lift.dir === 'up' && Math.abs(t.lift.t - (C.elevSec - lt)) < 1e-9, 'Hauler, riding down, rides back up from where it was');
+  ok(t.robots[1].where === 'queued' && t.robots[2].toLift, 'Seller is called up from storage; Third, not in it, goes down');
+  until(t, x => x.robots[0].where === 'floor' && x.robots[1].where === 'floor' && x.robots[2].where === 'storage', 40);
+  ok(t.robots[0].where === 'floor' && t.robots[1].where === 'floor' && t.robots[2].where === 'storage', 'and the floor ends up exactly the configuration');
+  // the names in it beat the order of the robots: a configuration whose names match nobody takes robots in order
+  const o = staffed(106, 2, open3);
+  ok(F.loadConfig(o, two) && o.robots[0].name === 'Hauler' && o.robots[1].name === 'Seller', 'with no names in common it takes the robots on the floor in order, and renames them');
+  // a robot on the floor takes a part before one in storage (no ride for nothing)
+  const f = staffed(107, 2, open3);
+  F.sendDown(f, 0); until(f, x => x.robots[0].where === 'storage', 40);
+  ok(F.loadConfig(f, { name: 'One', robots: [{ name: 'Nobody', src: 'raw', dst: 'planerIn', lines: [] }] }) && f.robots[1].name === 'Nobody' && f.robots[1].where === 'floor' && !f.robots[1].toLift && f.robots[0].where === 'storage',
+    'a part no robot is named for goes to a robot on the floor before one in storage', JSON.stringify(f.robots.map(r => r.name + ':' + r.where)));
 }
 
 console.log('CHECKS=' + checks + ' PASSED=' + (checks - failed) + ' FAILED=' + failed);

@@ -193,7 +193,7 @@ const server = http.createServer((req, res) => {
     await stepUntil("s => FACTORY2.bubbleOpen(s) && FACTORY2.bubbleOpen(s).kind === 'terminal'", 30);
     await step(0.1);
     const b = await H(() => ({ opts: [...document.querySelectorAll('#fx-bubble [data-opt]')].map(x => x.dataset.opt + ':' + (x.querySelector('.fx-lbl') || {}).textContent), signs: [...document.querySelectorAll('#fx-bubble .fx-sign')].map(x => x.textContent).join('') }));
-    ok(b.opts.join() === 'buy:$1' && b.signs === '+', 'the terminal\'s bubble: a robot for $1, on the + row', JSON.stringify(b));
+    ok(b.opts.join() === 'buy:$1,configs:Configs' && b.signs === '+', 'the terminal\'s bubble: a robot for $1 on the + row, and the configurations under it', JSON.stringify(b));
     const m0 = await H(() => window.TAAS_FACTORY2.s.money);
     await page.tap('#fx-bubble [data-opt="buy"]'); await step(0.05);
     const ride = await H(() => { const s = window.TAAS_FACTORY2.s; return { where: s.robots[0] && s.robots[0].where, lift: s.lift.by, money: s.money }; });
@@ -327,14 +327,14 @@ const server = http.createServer((req, res) => {
       if (r.menu && r.reload && !(r.menu.r <= r.reload.l)) bad.push(w + 'x' + h + ' chrome order');
       ['menu', 'reload'].forEach(k => { const q = r[k], u = r.bubble; if (q && u && u.t < q.b && u.b > q.t && u.l < q.r && u.r > q.l) bad.push(w + 'x' + h + ' bubble over the ' + k + ' button'); });
       const n = await H(() => document.querySelectorAll('#fx-bubble [data-opt]').length);
-      if (n !== 5) bad.push(w + 'x' + h + ' terminal options ' + n);
+      if (n !== 6) bad.push(w + 'x' + h + ' terminal options ' + n);
       await H(() => { window.TAAS_FACTORY2.openRobot(0); document.querySelector('[data-panel="prompt"]').click(); });
       await step(0.05);
       const pk = await H(() => { const q = document.getElementById('fx-pick').getBoundingClientRect(); return { l: q.left, r: q.right, t: q.top, b: q.bottom, vw: innerWidth, vh: innerHeight }; });
       if (pk.l < 0 || pk.r > pk.vw || pk.b > pk.vh || pk.t < 40) bad.push(w + 'x' + h + ' pick card off screen ' + JSON.stringify(pk));
       await H(() => document.querySelector('#fx-pick [data-pick="cancel"]').click());
     }
-    ok(!bad.length, 'menu and reload in order, the terminal\'s bubble (buy, a stored robot to call up, three to send down) and the pick card on screen at 320, 390, landscape and desktop', bad.join('; '));
+    ok(!bad.length, 'menu and reload in order, the terminal\'s bubble (buy, a stored robot to call up, three to send down, the configurations) and the pick card on screen at 320, 390, landscape and desktop', bad.join('; '));
     await page.setViewportSize({ width: 390, height: 844 });
   });
 
@@ -355,6 +355,145 @@ const server = http.createServer((req, res) => {
     await page.tap('[data-price="robot"][data-by="1"]');
     const after = await H(() => ({ txt: document.getElementById('price-robot').textContent, flat: window.TAAS_FACTORY2.s.flat.robot }));
     ok(shown === '$1' && after.txt === '$2' && after.flat === 2, 'the menu\'s Prices set what a robot costs here', JSON.stringify([shown, after]));
+  });
+
+  /* ---------- 10. configurations at the terminal (the CD, 2026-10-27: "save/load/delete a configuration
+     for the current set of active robots ... Deleting a config requires an extra dialog where i have to
+     type in I am sure then click a proceed btn") ---------- */
+  const atTerminal = () => H(() => { const T = window.TAAS_FACTORY2, s = T.s; s.avatar.x = 0.61; s.avatar.y = 16.15; s.avatar.path = []; s.avatar.task = { kind: 'terminal', arrived: true, spot: FACTORY2.LAYOUT.SPOT.terminal }; s.bubble = { kind: 'terminal' }; T.view.camY = T.view.maxY; T.tick(0); });
+  const cfgList = () => H(() => [...document.querySelectorAll('.fx-cfs li')].map(li => ({ name: li.querySelector('b').textContent, text: li.textContent, load: !li.querySelector('[data-panel^="cf-load"]').disabled })));
+  await section('10. configurations', async () => {
+    await fresh(10, 'open');
+    await H(() => { const T = window.TAAS_FACTORY2, s = T.s; s.money = 2; FACTORY2.buyRobot(s); FACTORY2.buyRobot(s); for (let i = 0; i < 300; i++) T.tick(1 / 60);
+      FACTORY2.rename(s, 0, 'Hauler'); FACTORY2.setPrompt(s, 0, 'raw', 'planerIn'); FACTORY2.setLine(s, 0, 0, ['recycle', 'any', 'slogs', 'none']); FACTORY2.setLine(s, 0, 1, ['wait', '10', 'seconds', 'trips']);
+      FACTORY2.rename(s, 1, 'Seller'); FACTORY2.setPrompt(s, 1, 'bin', 'stall0'); });
+    await atTerminal(); await step(0.1);
+    await page.tap('#fx-bubble [data-opt="configs"]'); await step(0.05);
+    const p0 = await H(() => ({ open: !document.getElementById('fx-panel').hidden, h: (document.querySelector('#fx-panel-body h2') || {}).textContent, count: (document.querySelector('[data-cf="count"]') || {}).textContent, name: (document.getElementById('fx-cf-name') || {}).value, save: !(document.querySelector('[data-panel="cf-save"]') || { disabled: true }).disabled, bubble: document.getElementById('fx-bubble').hidden }));
+    ok(p0.open && p0.h === 'Configurations' && p0.count === '2 robots' && p0.name === 'Setup 1' && p0.save && p0.bubble, 'Configs at the terminal opens its page: the robots on the floor to save, under a name to change', JSON.stringify(p0));
+    await page.tap('[data-panel="cf-save"]'); await step(0.05);
+    await page.fill('#fx-cf-name', 'Haul crew'); await page.tap('[data-panel="cf-save"]'); await step(0.05);
+    const l1 = await cfgList(), st1 = await H(() => JSON.parse(localStorage.getItem(window.TAAS_FACTORY2.CFG_KEY) || '[]'));
+    ok(l1.length === 2 && l1[0].name === 'Haul crew' && l1[1].name === 'Setup 1' && /2 robots: Hauler, Seller/.test(l1[0].text) && st1.length === 2 && st1[0].robots[0].lines.length === 2, 'Save keeps them, newest first, in this browser: each with its robots by name', JSON.stringify(l1.map(x => x.name)));
+    ok(await H(() => document.getElementById('fx-cf-name').value) === 'Setup 3', 'and the name box offers the next name');
+    // the robots changed, then the configuration loaded back
+    await H(() => { const s = window.TAAS_FACTORY2.s; FACTORY2.removeLine(s, 0, 0); FACTORY2.removeLine(s, 0, 0); FACTORY2.setPrompt(s, 0, null, null); FACTORY2.rename(s, 1, 'Renamed'); });
+    await step(0.05);
+    await page.tap('[data-panel="cf-load:0"]'); await step(0.05);
+    const ld = await H(() => { const s = window.TAAS_FACTORY2.s; return { open: !document.getElementById('fx-panel').hidden, a: s.robots[0].name + ':' + s.robots[0].src + ':' + s.robots[0].lines.length, b: s.robots[1].name + ':' + s.robots[1].dst }; });
+    ok(!ld.open && ld.a === 'Hauler:raw:2' && ld.b === 'Seller:stall0', 'Load puts them back (names, prompts, lines) and closes the page to show the floor', JSON.stringify(ld));
+    // a new game: the configurations are still there; one that needs robots says what it costs
+    await H(() => { const T = window.TAAS_FACTORY2; T.s = FACTORY2.newGame(11); T.s.shop.next = 1e9; T.s.goal = FACTORY2.CFG.goals.length; T.tick(0); });
+    await atTerminal(); await step(0.1);
+    await page.tap('#fx-bubble [data-opt="configs"]'); await step(0.05);
+    const l2 = await cfgList();
+    ok(l2.length === 2 && !l2[0].load && /buys 2 robots, \$2: not enough money/.test(l2[0].text), 'in a new game they are still there; one that needs robots says it buys 2 for $2, and with no money it cannot load', JSON.stringify(l2[0]));
+    await H(() => { window.TAAS_FACTORY2.s.money = 2; }); await step(0.05);
+    const l3 = await cfgList();
+    ok(l3[0].load && !/not enough/.test(l3[0].text), 'with the money, Load is offered', JSON.stringify(l3[0]));
+    await page.tap('[data-panel="cf-load:0"]'); await step(0.05);
+    const nb = await H(() => window.TAAS_FACTORY2.s.robots.map(r => r.name + ':' + r.where).join());
+    ok(nb === 'Hauler:up,Seller:queued', 'and loading buys them, and up they come', nb);
+    // deleting asks for "I am sure", then Proceed
+    await H(() => window.TAAS_FACTORY2.openConfigs()); await step(0.05);
+    await page.tap('[data-panel="cf-del:1"]'); await step(0.05);
+    const d0 = await H(() => ({ dlg: !document.getElementById('fx-confirm').hidden, h: document.getElementById('fx-confirm-h').textContent, go: document.querySelector('[data-dlg="proceed"]').disabled, focus: document.activeElement && document.activeElement.id }));
+    ok(d0.dlg && d0.h === 'Delete "Setup 1"?' && d0.go && d0.focus === 'fx-confirm-in', 'Delete opens a dialog naming it, Proceed off and the typing box ready', JSON.stringify(d0));
+    await page.type('#fx-confirm-in', 'I am');
+    const d1 = await H(() => document.querySelector('[data-dlg="proceed"]').disabled);
+    await page.type('#fx-confirm-in', ' sure');
+    const d2 = await H(() => document.querySelector('[data-dlg="proceed"]').disabled);
+    ok(d1 && !d2, 'Proceed comes on only once "I am sure" is typed in full', JSON.stringify([d1, d2]));
+    await page.tap('[data-dlg="cancel"]'); await step(0.05);
+    const d3 = await H(() => ({ dlg: document.getElementById('fx-confirm').hidden, n: window.TAAS_FACTORY2.configs.length }));
+    ok(d3.dlg && d3.n === 2, 'Cancel deletes nothing', JSON.stringify(d3));
+    await page.tap('[data-panel="cf-del:1"]'); await step(0.05);
+    ok(await H(() => document.getElementById('fx-confirm-in').value) === '', 'and asks again from an empty box');
+    await page.type('#fx-confirm-in', 'i am sure ');
+    await page.tap('[data-dlg="proceed"]'); await step(0.05);
+    const d4 = await H(() => ({ dlg: document.getElementById('fx-confirm').hidden, names: [...document.querySelectorAll('.fx-cfs li b')].map(b => b.textContent).join(), stored: JSON.parse(localStorage.getItem(window.TAAS_FACTORY2.CFG_KEY)).map(c => c.name).join() }));
+    ok(d4.dlg && d4.names === 'Haul crew' && d4.stored === 'Haul crew', 'Proceed deletes it, from the page and from storage', JSON.stringify(d4));
+    // the dialog and the page fit a small phone
+    await page.setViewportSize({ width: 320, height: 640 }); await step(0.05);
+    await page.tap('[data-panel="cf-del:0"]'); await step(0.05);
+    const fit = await H(() => { const g = sel => { const q = document.querySelector(sel).getBoundingClientRect(); return q.left >= 0 && q.right <= innerWidth && q.top >= 0 && q.bottom <= innerHeight; }; return { dlg: g('.fx-dlg'), go: g('[data-dlg="proceed"]'), save: g('[data-panel="cf-save"]') }; });
+    ok(fit.dlg && fit.go && fit.save, 'the page and the dialog fit a 320 px phone', JSON.stringify(fit));
+    await page.tap('[data-dlg="cancel"]'); await page.tap('[data-panel="close"]');
+    await page.setViewportSize({ width: 390, height: 844 });
+  });
+
+  /* ---------- 11. the recycle bin's Destroy all (the CD, 2026-10-27) ---------- */
+  await section('11. destroy', async () => {
+    await fresh(11);
+    await H(() => { window.TAAS_FACTORY2.s.recycle = ['log.m', 'plank.s', 'plank.s']; });
+    await look(5.2);
+    const c = centre(await rectOf('recycle'));
+    await tap(c[0], c[1]);
+    await stepUntil("s => FACTORY2.bubbleOpen(s) && FACTORY2.bubbleOpen(s).kind === 'recycle'", 30);
+    await step(0.1);
+    const b = await H(() => { const d = document.querySelector('#fx-bubble [data-opt="destroy"]'), q = d && d.getBoundingClientRect(), bb = document.getElementById('fx-bubble').getBoundingClientRect(); return d && { label: d.textContent, aria: d.getAttribute('aria-label'), off: d.disabled, wide: q.width > bb.width * 0.6, last: d.closest('.fx-brow') === document.querySelector('#fx-bubble').lastElementChild }; });
+    ok(b && b.label === 'Destroy all' && !b.off && b.wide && b.last && /3 things/.test(b.aria), 'the recycle bin\'s bubble has Destroy all across its foot', JSON.stringify(b));
+    await page.tap('#fx-bubble [data-opt="destroy"]'); await step(0.05);
+    const a = await H(() => ({ n: window.TAAS_FACTORY2.s.recycle.length, off: document.querySelector('#fx-bubble [data-opt="destroy"]').disabled, inv: window.TAAS_FACTORY2.s.avatar.inv.length }));
+    ok(a.n === 0 && a.off && a.inv === 0, 'one tap destroys everything in it; then there is nothing to destroy', JSON.stringify(a));
+  });
+
+  /* ---------- 12. Done keeps a half-built line, a word not chosen left blank (the CD, 2026-10-27) ---------- */
+  await section('12. blanks', async () => {
+    await fresh(12);
+    await H(() => { const T = window.TAAS_FACTORY2, s = T.s; s.money = 1; FACTORY2.buyRobot(s); for (let i = 0; i < 300; i++) T.tick(1 / 60); T.openRobot(0); });
+    await step(0.05);
+    await page.tap('[data-panel="edit:0"]'); await step(0.02);
+    await page.tap('[data-panel="word:only"]'); await step(0.02);
+    await page.tap('[data-panel="pos:2"]'); await step(0.02);
+    await page.tap('[data-panel="word:planks"]'); await step(0.02);
+    ok((await H(() => window.TAAS_FACTORY2.s.robots[0].lines.length)) === 0, 'two words of four: nothing kept yet');
+    await page.tap('[data-panel="sb-done"]'); await step(0.05);
+    const a = await H(() => ({ lines: window.TAAS_FACTORY2.s.robots[0].lines, text: (document.querySelector('[data-panel="edit:0"]') || {}).textContent, slip: document.querySelector('[data-part="lines"] .fx-h span:last-child').textContent, page: window.TAAS_FACTORY2.page }));
+    ok(JSON.stringify(a.lines) === '[["only","_","planks","none"]]' && a.text === 'Only take planks' && /5%/.test(a.slip) && a.page.line === -1, 'Done keeps it as it is: "Only take planks", the size left blank (any size, so it means something)', JSON.stringify(a));
+    await page.tap('[data-panel="edit:1"]'); await step(0.02);
+    await page.tap('[data-panel="word:carry"]'); await step(0.02);
+    await page.tap('[data-panel="edit:0"]'); await step(0.02);   // to another line: the half-built one is kept too
+    const b = await H(() => ({ lines: window.TAAS_FACTORY2.s.robots[0].lines.map(l => l.join(' ')), chips: [...document.querySelectorAll('.fx-sb-words .fx-chip')].map(c => c.textContent + (c.classList.contains('blank') ? '(blank)' : '')).join('|'), slip: document.querySelector('[data-part="lines"] .fx-h span:last-child').textContent }));
+    ok(b.lines.join() === 'only _ planks none,carry _ _ none' && /10%/.test(b.slip), 'a line left for another is kept as it is too ("Carry", which means nothing: slips 10%)', JSON.stringify(b));
+    const list = await H(() => [...document.querySelectorAll('.fx-sb-list [data-panel]')].map(x => x.textContent).slice(0, 4).join());
+    ok(b.chips === 'Only take|Which(blank)|planks|(none)' && list === 'any,small,medium,large', 'and a kept line opens on its blank word, shown blank, to fill in', b.chips + ' / ' + list);
+    await page.tap('[data-panel="word:medium"]'); await step(0.02);
+    ok((await H(() => window.TAAS_FACTORY2.s.robots[0].lines[0].join(' '))) === 'only medium planks none', 'filling it in is kept at once');
+    await page.tap('[data-panel="sb-done"]'); await step(0.02);
+    await page.tap('[data-panel="edit:1"]'); await step(0.02);
+    await page.tap('[data-panel="word:3"]'); await step(0.02);
+    ok((await H(() => window.TAAS_FACTORY2.s.robots[0].lines[1].join(' '))) === 'carry 3 _ none', 'and so is one word of two blanks, the other still blank');
+    await page.tap('[data-panel="sb-done"]'); await step(0.02);
+    await page.tap('[data-panel="edit:2"]'); await step(0.02);
+    await page.tap('[data-panel="sb-done"]'); await step(0.02);
+    ok((await H(() => window.TAAS_FACTORY2.s.robots[0].lines.length)) === 2, 'Done with no word chosen adds nothing');
+    await page.tap('[data-panel="edit:2"]'); await step(0.02);
+    await page.tap('[data-panel="word:wait"]'); await step(0.02);
+    await page.tap('[data-panel="close"]'); await step(0.02);
+    ok((await H(() => window.TAAS_FACTORY2.s.robots[0].lines.length)) === 3, 'and closing the page keeps a half-built line as well');
+  });
+
+  /* ---------- 13. goal 4 on the wall (the CD, 2026-10-27) ---------- */
+  await section('13. goal 4', async () => {
+    await fresh(13);
+    await H(() => { const T = window.TAAS_FACTORY2, s = T.s; s.goal = 3; s.goalT = 600; T.tick(1 / 60); });
+    const g0 = await H(() => document.getElementById('fx-score').textContent);
+    ok(/Goal: Sell sap \+ S, M & L planks at once, >90% for 10 minutes\./.test(g0), 'the wall shows goal 4 once the first three are met', g0);
+    await H(() => { const T = window.TAAS_FACTORY2, s = T.s; s.stalls.forEach((st, i) => { st.bought = true; st.want = ['sap', 'plank.s', 'plank.m', 'plank.l'][i]; }); });
+    await step(2);
+    const g1 = await H(() => document.getElementById('fx-score').textContent);
+    ok(/at once, >90% for 9:5\d\./.test(g1), 'with all four on sale it counts down', g1);
+    await H(() => { const s = window.TAAS_FACTORY2.s; s.goalT = 0.05; });
+    await step(0.2);
+    const g2 = await H(() => ({ text: document.getElementById('fx-score').textContent, goal: window.TAAS_FACTORY2.s.goal }));
+    ok(g2.goal === 4 && /All goals met/.test(g2.text), 'met: every goal is met', JSON.stringify(g2));
+    await H(() => window.TAAS_FACTORY2.showInfo()); await step(0.02);
+    const info = await H(() => [...document.querySelectorAll('.fx-goals li')].map(li => li.textContent));
+    ok(info.length === 4 && /at the same time/.test(info[3]) && /No reward yet/.test(info[3]) && /arrives in slot 04/.test(info[2]), 'Info lists the four goals, the fourth with no reward yet', info[3]);
+    const txt = await H(() => document.getElementById('fx-panel-body').textContent);
+    ok(/configurations/.test(txt) && /destroy/.test(txt) && /Done keeps a line as it is/.test(txt) && /33% are small, 33% medium and 33% large/.test(txt) && /under Version in the menu/.test(txt), 'and says how the configurations, Destroy all and a blank word work, and that logs come in every size alike');
+    await page.tap('[data-panel="close"]');
   });
 
   ok(!errors.length, 'no errors on the page', errors.slice(0, 3).join(' | '));

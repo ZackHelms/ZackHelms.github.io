@@ -88,5 +88,149 @@
   "file": "games/taas/factory-v2.html",
   "old": "  <label class=\"mrow mver\" id=\"menu-version\"><span>Version</span><select id=\"version-sel\"><option value=\"v2\">v2</option><option value=\"v1\">v1</option></select></label>\n  <button class=\"mi\" type=\"button\" data-menu=\"info\">Info <small id=\"menu-info-sub\">How this mode works</small></button>\n",
   "new": "  <button class=\"mi\" type=\"button\" data-menu=\"info\">Info <small id=\"menu-info-sub\">How this mode works</small></button>\n  <label class=\"mrow mver\" id=\"menu-version\"><span>Version</span><select id=\"version-sel\"><option value=\"v2\">v2</option><option value=\"v1\">v1</option></select></label><!-- @negtest -->\n"
+ },
+ {
+  "name": "cfg-row-missing",
+  "file": "games/taas/factory-v2.html",
+  "old": "row('down', '-') + row('cfg', '');",
+  "new": "row('down', '-'); /* @negtest */"
+ },
+ {
+  "name": "cfg-event-ignored",
+  "file": "games/taas/factory-v2.html",
+  "old": "        case 'configs': SND.sfx('pop'); openConfigs(); break;",
+  "new": "        case 'configs': SND.sfx('pop'); break; /* @negtest */"
+ },
+ {
+  "name": "cfg-save-noop",
+  "file": "games/taas/factory-v2.html",
+  "old": "    configs.unshift(snap); writeConfigs();",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "cfg-oldest-first",
+  "file": "games/taas/factory-v2.html",
+  "old": "    configs.unshift(snap); writeConfigs();",
+  "new": "    configs.push(snap); writeConfigs(); /* @negtest */"
+ },
+ {
+  "name": "cfg-not-stored",
+  "file": "games/taas/factory-v2.html",
+  "old": "  function writeConfigs() { try { localStorage.setItem(CFG_KEY, JSON.stringify(configs)); } catch (e) { /* storage is optional */ } }",
+  "new": "  function writeConfigs() { } /* @negtest */"
+ },
+ {
+  "name": "cfg-name-stale",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (inp) inp.value = nextName();\n    SND.sfx('done');",
+  "new": "    /* @negtest */\n    SND.sfx('done');"
+ },
+ {
+  "name": "cfg-load-stays",
+  "file": "games/taas/factory-v2.html",
+  "old": "    save(); closePanel();\n  }\n  // deleting asks first",
+  "new": "    save(); /* @negtest */\n  }\n  // deleting asks first"
+ },
+ {
+  "name": "cfg-load-always",
+  "file": "games/taas/factory-v2.html",
+  "old": "(need.ok ? '' : ' disabled') + '>Load</button>",
+  "new": "'' /* @negtest */ + '>Load</button>"
+ },
+ {
+  "name": "cfg-no-cost",
+  "file": "games/taas/factory-v2.html",
+  "old": "      if (need.buy) notes.push(",
+  "new": "      if (false) notes.push( /* @negtest */"
+ },
+ {
+  "name": "dlg-skipped",
+  "file": "games/taas/factory-v2.html",
+  "old": "    dlgFor = c;\n",
+  "new": "    dlgFor = c; configs.splice(i, 1); writeConfigs(); renderConfigs(); return; /* @negtest */\n"
+ },
+ {
+  "name": "dlg-proceed-on",
+  "file": "games/taas/factory-v2.html",
+  "old": "  dlgIn.addEventListener('input', () => { dlgGo.disabled = !sure(); });",
+  "new": "  dlgIn.addEventListener('input', () => { dlgGo.disabled = false; }); /* @negtest */"
+ },
+ {
+  "name": "dlg-partial",
+  "file": "games/taas/factory-v2.html",
+  "old": "=== 'i am sure';",
+  "new": "=== 'i am sure' || /^i am/.test(dlgIn.value.trim().toLowerCase()); /* @negtest */"
+ },
+ {
+  "name": "dlg-cancel-deletes",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (b.dataset.dlg === 'cancel') closeDialog(); else proceedDelete();",
+  "new": "    if (b.dataset.dlg === 'cancel') { dlgIn.value = 'I am sure'; proceedDelete(); } else proceedDelete(); /* @negtest */"
+ },
+ {
+  "name": "dlg-not-cleared",
+  "file": "games/taas/factory-v2.html",
+  "old": "    dlgIn.value = ''; dlgGo.disabled = true; dlgEl.hidden = false;",
+  "new": "    dlgEl.hidden = false; /* @negtest */"
+ },
+ {
+  "name": "dlg-no-focus",
+  "file": "games/taas/factory-v2.html",
+  "old": "    SND.sfx('tick');\n    dlgIn.focus();\n",
+  "new": "    SND.sfx('tick'); /* @negtest */\n"
+ },
+ {
+  "name": "destroy-row-gone",
+  "file": "games/taas/factory-v2.html",
+  "old": "return o ? '<div class=\"fx-brow fx-drow\">' + optButton(o) + '</div>' : ''; };",
+  "new": "return ''; }; /* @negtest */"
+ },
+ {
+  "name": "done-discards",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (r && draft && editLine === r.lines.length && draft.some(x => x !== null) && F.setLine(s, r.id, editLine, asLine(draft))) save();",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "switch-discards",
+  "file": "games/taas/factory-v2.html",
+  "old": "    finishEdit();   // a line half built elsewhere is kept as it is",
+  "new": "    editLine = -1; draft = null; /* @negtest */"
+ },
+ {
+  "name": "close-discards",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (panelMode === 'robot') finishEdit();",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "blank-focus-first",
+  "file": "games/taas/factory-v2.html",
+  "old": "    focusPos = Math.max(0, draft.indexOf(null));",
+  "new": "    focusPos = 0; /* @negtest */"
+ },
+ {
+  "name": "kept-blank-waits",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (editLine < r.lines.length || draft.every(x => x !== null)) { if (F.setLine(s, r.id, editLine, asLine(draft))) save(); }",
+  "new": "    if (draft.every(x => x !== null)) { if (F.setLine(s, r.id, editLine, asLine(draft))) save(); } /* @negtest */"
+ },
+ {
+  "name": "goal4-board",
+  "file": "games/taas/factory-v2.html",
+  "old": "    if (q.sells) return 'Sell sap + S, M & L planks at once, >'",
+  "new": "    if (false) return 'Sell sap + S, M & L planks at once, >' /* @negtest */"
+ },
+ {
+  "name": "goal4-info",
+  "file": "games/taas/factory-v2.html",
+  "old": "'. No reward yet: it shows the way to a full shop.'",
+  "new": "'.' /* @negtest */"
+ },
+ {
+  "name": "info-configs",
+  "file": "games/taas/factory-v2.html",
+  "old": "The terminal also keeps <b>configurations</b>: save",
+  "new": "The terminal also keeps <b>setups</b>: ' /* @negtest */ + ' save"
  }
 ]

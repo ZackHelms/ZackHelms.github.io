@@ -1,5 +1,14 @@
 # DONE — done log
 
+- 2026-10-27 [taas] **Robot factory v2 updates** (the CD): configurations at the terminal (save,
+  load and delete the robots on the floor with their names, prompts, lines and cuts; kept in the
+  browser apart from the save; loading casts parts by name, buys what it is short of at the flat
+  price and sends the rest to storage; delete behind a typed "I am sure" and Proceed); a fourth goal
+  (sap and small, medium and large planks on sale at once, over 90%, for 10 minutes, no reward);
+  log sizes uniform; Destroy all in the recycle bin; Done keeping a half-built line with blanks (a
+  blank size means any). Measured: the CD's eight robots meet goal 4 inside an hour on 6 of 6 seeds;
+  goal 1 now takes about 30 minutes with three plank stalls (open question 9). Suites 158 / 74, break lists 65/65 and 39/39.
+
 - 2026-10-27 [taas] **Robot Factory, a card of its own** (the CD): first on the games list (🤖),
   opening v2, with a Version selector (v2 / v1) first in the factory's menu on both pages; TAAS's
   card is formal only and the mode dropdown is gone from both pages (no `?mode=` is always formal,

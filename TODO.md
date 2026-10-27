@@ -15,6 +15,15 @@ backlog entry here.
 
 ## Needs Zack
 
+- [taas] **Play the v2 updates** (2026-10-27): Configs at the terminal (save the robots on the floor,
+  load them back in a new game, delete behind "I am sure"), goal 4 on the wall once the first three
+  are met, logs of every size alike, Destroy all in the recycle bin, and Done keeping a half-built
+  line. Then answer open questions 9-12 in `.claude/taas.md` section Robot factory v2:
+  configurations, a fourth goal, uniform log sizes, most of all **9: goal 1 now takes about 30
+  minutes** with a healthy shop (about 10 before), since medium planks fell from 65% to a third of
+  the output: keep it, lower it, or make it 50 planks of any size? Overrule anything in its 15-row
+  assumed table.
+
 - [taas] **Play Robot factory v2** (shipped 2026-10-26; since 2026-10-27 the games list's first card,
   Robot Factory, which opens v2, with v1 under Version in its menu; built with no Q&A, as asked). Check: the planer running by itself
   from its hopper; the dump truck's tail tipping ten logs into the raw materials bin when it is empty;
