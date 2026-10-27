@@ -54,12 +54,6 @@
   "new": "     /* @negtest */\n"
  },
  {
-  "name": "mode-no-nav",
-  "file": "games/taas/factory-v2.html",
-  "old": "    location.href = 'index.html?mode=' + encodeURIComponent(m);",
-  "new": "    return; /* @negtest */"
- },
- {
   "name": "prices-dead",
   "file": "games/taas/factory-v2.html",
   "old": "    if (!b || !s) return;\n    SND.init();\n    const k = b.dataset.price;",
@@ -72,15 +66,27 @@
   "new": "['rawBack', 'bin'], ['rawFront', 'bin']] /* @negtest */"
  },
  {
-  "name": "mode-not-stored",
-  "file": "games/taas/factory-v2.html",
-  "old": "  try { localStorage.setItem('taas-mode', HERE); } catch (e) { /* optional */ }\n",
-  "new": "   /* @negtest */\n"
- },
- {
   "name": "v2-save-shares-key",
   "file": "games/taas/factory-v2.html",
   "old": "const KEY = 'taas.factory2.v' + C.version;",
   "new": "const KEY = 'taas.factory.v3'; /* @negtest */"
+ },
+ {
+  "name": "version-no-nav",
+  "file": "games/taas/factory-v2.html",
+  "old": "  ver.addEventListener('change', () => { if (ver.value === 'v1') { close(); location.href = 'index.html?mode=robot-factory'; } });",
+  "new": "  ver.addEventListener('change', () => { if (ver.value === 'v1') close(); }); /* @negtest */"
+ },
+ {
+  "name": "version-reads-v1",
+  "file": "games/taas/factory-v2.html",
+  "old": "    ver.value = 'v2';\n",
+  "new": "    ver.value = 'v1'; /* @negtest */\n"
+ },
+ {
+  "name": "version-not-first",
+  "file": "games/taas/factory-v2.html",
+  "old": "  <label class=\"mrow mver\" id=\"menu-version\"><span>Version</span><select id=\"version-sel\"><option value=\"v2\">v2</option><option value=\"v1\">v1</option></select></label>\n  <button class=\"mi\" type=\"button\" data-menu=\"info\">Info <small id=\"menu-info-sub\">How this mode works</small></button>\n",
+  "new": "  <button class=\"mi\" type=\"button\" data-menu=\"info\">Info <small id=\"menu-info-sub\">How this mode works</small></button>\n  <label class=\"mrow mver\" id=\"menu-version\"><span>Version</span><select id=\"version-sel\"><option value=\"v2\">v2</option><option value=\"v1\">v1</option></select></label><!-- @negtest -->\n"
  }
 ]

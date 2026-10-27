@@ -309,19 +309,19 @@ const click = (p, sel) => p.locator(sel).first().click();
         const r = await page.evaluate(() => {
           const vw = document.documentElement.clientWidth;
           const box = id => document.getElementById(id).getBoundingClientRect();
-          const b = box('menu-btn'), m = box('mode-btn'), rl = box('reload-btn'), h = document.querySelector('.mast h1').getBoundingClientRect();
+          const b = box('menu-btn'), rl = box('reload-btn'), h = document.querySelector('.mast h1').getBoundingClientRect();
           const svg = document.querySelector('#chart svg').getBoundingClientRect();
           return { vw, iw: innerWidth, rows: document.querySelectorAll('#log tbody tr').length, sw: document.scrollingElement.scrollWidth,
-            chrome: b.left >= 0 && b.right <= m.left && m.right <= rl.left && rl.right <= vw && vw - rl.right < 24,
-            overH1: !(h.top >= Math.max(b.bottom, m.bottom, rl.bottom)), chart: svg.right <= vw + 0.5 };
+            chrome: b.left >= 0 && b.right <= rl.left && rl.right <= vw && vw - rl.right < 24 && !document.getElementById('mode-btn') && !document.querySelector('body > select'),
+            overH1: !(h.top >= Math.max(b.bottom, rl.bottom)), chart: svg.right <= vw + 0.5 };
         });
         if (r.rows !== 2) bad.push(w + ': the log has ' + r.rows + ' rows, not 2');
         if (r.sw > r.vw || r.iw !== w) bad.push(w + ': page is ' + Math.max(r.sw, r.iw) + ' px wide');
-        if (!r.chrome) bad.push(w + ': menu/mode/reload off screen, overlapping or out of order');
+        if (!r.chrome) bad.push(w + ': menu/reload off screen, overlapping or out of order, or a mode dropdown back in the top bar');
         if (r.overH1) bad.push(w + ': the chrome sits on the title');
         if (!r.chart) bad.push(w + ': chart wider than the screen');
       }
-      ok(!bad.length, 'at 390 and 320 px nothing scrolls sideways, the chart fits, and the menu, mode and reload buttons clear the title with reload in the top right corner', bad.join('; '));
+      ok(!bad.length, 'at 390 and 320 px nothing scrolls sideways, the chart fits, and the menu and reload buttons clear the title with reload in the top right corner (no mode dropdown: TAAS is formal only, the CD 2026-10-27)', bad.join('; '));
     });
 
     /* ---------- 9. the menu (the CD, 2026-10-14): Info, sound, Exit game ---------- */
@@ -331,10 +331,10 @@ const click = (p, sel) => p.locator(sel).first().click();
       const gone = await page.evaluate(() => ['back-btn', 'mute-btn'].filter(id => document.getElementById(id)));
       ok(!gone.length, 'the back button and the mute button have gone from the top bar', gone.join());
       await page.tap('#menu-btn');
-      const m = await page.evaluate(() => ({ open: !document.getElementById('menu').hidden, exp: document.getElementById('menu-btn').getAttribute('aria-expanded'), sub: document.getElementById('menu-info-sub').textContent,
+      const m = await page.evaluate(() => ({ open: !document.getElementById('menu').hidden, exp: document.getElementById('menu-btn').getAttribute('aria-expanded'), sub: document.getElementById('menu-info-sub').textContent, ver: document.getElementById('menu-version').getBoundingClientRect().height,
         items: [...document.querySelectorAll('#menu .mi')].map(e => e.firstChild.textContent.trim()), exit: document.getElementById('menu-exit').getAttribute('href'), sliders: [...document.querySelectorAll('#menu input[type=range]')].map(e => e.closest('label').firstElementChild.textContent) }));
-      ok(m.open && m.exp === 'true' && m.sub === 'How the model works' && m.items.join() === 'Info,Exit game' && m.exit === '../index.html' && m.sliders.join() === 'Music,Ambient sounds,Sound effects',
-        'the menu opens with Info (how the model works), a volume for music, ambient sounds and sound effects, and Exit game back to the games list', JSON.stringify(m));
+      ok(m.open && m.exp === 'true' && m.sub === 'How the model works' && m.items.join() === 'Info,Exit game' && m.exit === '../index.html' && m.sliders.join() === 'Music,Ambient sounds,Sound effects' && m.ver === 0,
+        'the menu opens with Info (how the model works), a volume for music, ambient sounds and sound effects, and Exit game back to the games list (and no Version: that is the factory\'s)', JSON.stringify(m));
       // the ambience is really playing, and sits under the music (measured on the buses, 1.5 s)
       const lv = await page.evaluate(async () => {
         const A = { music: SND.probe('music'), amb: SND.probe('amb') }, sum = { music: 0, amb: 0 }, buf = new Float32Array(2048);
@@ -374,12 +374,16 @@ const click = (p, sel) => p.locator(sel).first().click();
       await page.tap('#menu-btn');
       const kept = await page.evaluate(() => ({ vol: SND.vol, out: ['music', 'amb', 'sfx'].map(k => document.getElementById('vol-' + k + '-out').textContent) }));
       ok(kept.out.join() === '40%,0%,70%' && near(kept.vol.music, 0.4), 'after a reload the menu shows the same volumes', JSON.stringify(kept));
-      await page.selectOption('#mode-btn', 'robot-factory');
+      // the factory (Robot Factory v1, the CD 2026-10-27) is this page with ?mode=robot-factory
+      await page.goto(URL + '?mode=robot-factory', { waitUntil: 'load' });
+      await page.tap('#menu-btn');   // the first gesture: the sound starts here
       await page.waitForTimeout(1600);   // the fade's time constant is 0.4 s
-      const fac = await page.evaluate(() => ({ g: SND.gains, sub: (TAAS_MENU.sync(), document.getElementById('menu-info-sub').textContent) }));
-      ok(fac.g && fac.g.bed === 'factory' && fac.g.beds.factory > 0.9 && fac.g.beds.formal < 0.1 && fac.sub === 'How the factory works', 'switching to the factory fades its own ambience in and the office out, and Info speaks for the factory', JSON.stringify(fac));
-      await page.selectOption('#mode-btn', 'formal');
+      const fac = await page.evaluate(() => ({ g: SND.gains, sub: document.getElementById('menu-info-sub').textContent, ver: document.getElementById('version-sel').value, verH: document.getElementById('menu-version').getBoundingClientRect().height }));
+      await page.evaluate(() => TAAS_MENU.close());
+      ok(fac.g && fac.g.bed === 'factory' && fac.g.beds.factory > 0.9 && fac.g.beds.formal < 0.1 && fac.sub === 'How the factory works' && fac.ver === 'v1' && fac.verH > 0,
+        'in the factory its own ambience plays and not the office\'s, Info speaks for the factory, and the menu has a Version reading v1', JSON.stringify(fac));
       await page.evaluate(() => { localStorage.removeItem('taas-vol'); localStorage.removeItem('taas-mute'); });
+      await load();
     });
 
     /* ---------- 10. reload: the latest version, past any cache, in the same mode ---------- */
@@ -387,7 +391,7 @@ const click = (p, sel) => p.locator(sel).first().click();
       await fresh();
       await page.evaluate(() => document.querySelector('button.fund').click());
       const before = await saved(page);
-      await page.selectOption('#mode-btn', 'robot-factory');
+      await page.goto(URL + '?mode=robot-factory', { waitUntil: 'load' });
       const nav = page.waitForNavigation({ waitUntil: 'load' });
       await page.tap('#reload-btn');
       await nav;
@@ -397,6 +401,22 @@ const click = (p, sel) => p.locator(sel).first().click();
       ok(/[?&]_r=[0-9a-z]+/.test(r.url) && /mode=robot-factory/.test(r.url) && r.mode === 'robot-factory' && after && after.plan.opp === before.plan.opp && before.plan.opp === true,
         'the reload button comes back on a fresh address, in the same mode, with the run as it was', JSON.stringify(r));
       await page.goto(URL + '?mode=formal', { waitUntil: 'load' });
+      // TAAS is formal only (the CD, 2026-10-27): the games list's card opens it with no ?mode=, and
+      // a factory chosen last under the old dropdown ('taas-mode') no longer takes it anywhere else
+      const seen = [];
+      for (const last of ['robot-factory', 'robot-factory-v2']) {
+        // (no waitForSelector: a page that went to the factory, or on to v2's page, must fail this row by name)
+        try {
+          await page.goto(URL, { waitUntil: 'load' });
+          await page.evaluate(m => localStorage.setItem('taas-mode', m), last);
+          await page.goto(URL, { waitUntil: 'load' });
+          await page.waitForTimeout(300);
+          seen.push(await page.evaluate(() => ({ mode: document.documentElement.dataset.mode, path: location.pathname, q: location.search, title: document.title, fac: !!(window.TAAS_FACTORY && window.TAAS_FACTORY.on) })));
+        } catch (e) { seen.push({ last, err: e.message.split('\n')[0] }); }
+      }
+      await page.goto(URL, { waitUntil: 'load' }).catch(() => {});
+      await page.evaluate(() => localStorage.removeItem('taas-mode')).catch(() => {});
+      ok(seen.every(v => v.mode === 'formal' && v.path === '/taas.html' && v.q === '' && v.title === 'TAAS' && !v.fac), 'with no ?mode= the page is always TAAS\'s formal mode, whatever factory was played last', JSON.stringify(seen));
     });
 
     /* ---------- 11. the badge in the device's own time zone ---------- */

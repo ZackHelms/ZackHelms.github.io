@@ -886,5 +886,29 @@
   "file": "games/taas/index.html",
   "old": "    if (g.done) return 'All goals met';",
   "new": "    if (g.done) return 'Sell 25 sap'; /* @negtest */"
+ },
+ {
+  "name": "v1-version-no-nav",
+  "file": "games/taas/index.html",
+  "old": "  ver.addEventListener('change', () => { if (ver.value === 'v2') { close(); location.href = 'factory-v2.html'; } });",
+  "new": "  ver.addEventListener('change', () => { if (ver.value === 'v2') close(); }); /* @negtest */"
+ },
+ {
+  "name": "v1-version-hidden",
+  "file": "games/taas/index.html",
+  "old": "    document.getElementById('menu-version').hidden = MODE.current !== 'robot-factory';\n",
+  "new": "    document.getElementById('menu-version').hidden = true; /* @negtest */\n"
+ },
+ {
+  "name": "v1-reads-v2",
+  "file": "games/taas/index.html",
+  "old": "    ver.value = 'v1';\n",
+  "new": "    ver.value = 'v2'; /* @negtest */\n"
+ },
+ {
+  "name": "v1-no-title",
+  "file": "games/taas/index.html",
+  "old": "    document.title = TITLES[m];\n",
+  "new": "    /* @negtest */\n"
  }
 ]

@@ -141,12 +141,20 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-13 06:19 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-27 11:56 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
 
   <div class="grid">
+    <a class="game-card" href="taas/factory-v2.html">
+      <div class="game-icon">🤖</div>
+      <div class="game-info">
+        <div class="game-name">ROBOT FACTORY</div>
+        <div class="game-desc">Staff a wood shop with AI robots. Give each one a prompt and instructions, then catch the mistakes they still make.</div>
+      </div>
+    </a>
+
     <a class="game-card" href="cyoa2/">
       <div class="game-icon">🎲</div>
       <div class="game-info">
@@ -167,7 +175,7 @@ h1 {
       <div class="game-icon">📈</div>
       <div class="game-info">
         <div class="game-name">TAAS</div>
-        <div class="game-desc">Lead a team through two years of AI adoption, or run a robot factory whose agents need watching. Either way, beat the traditional run.</div>
+        <div class="game-desc">Lead a team through two years of AI adoption, splitting story points between shipping and skills. Beat the traditional run.</div>
       </div>
     </a>
 
@@ -621,6 +629,7 @@ h1 {
 // Facet catalog — mirrors .claude/games-index.md. MAINTENANCE: every new game
 // adds its entry here in the same commit as its hub card (and index row).
 const GAMES = [
+  { n: 'ROBOT FACTORY', i: '🤖', h: 'taas/factory-v2.html', genre: ['management-sim'], input: ['tap-to-move', 'tap'], session: ['save-campaign'], mech: ['simulated-agents', 'agent-programming', 'resource-economy', 'skill-teaching'], players: ['solo'] },
   { n: 'CYOA2', i: '🎲', h: 'cyoa2/', genre: ['tabletop-rpg'], input: ['tap-to-move', 'pinch-zoom', 'drag-pan', 'text-entry', 'voice'], session: ['open-sandbox', 'save-campaign'], mech: ['tile-board', 'asset-library', 'procedural-generation', 'seeded-determinism', 'line-of-sight', 'fog-of-war', 'initiative-order', 'grid-combat', 'llm-game-master', 'scripted-game-master', 'dialogue-choices', 'speech-narration'], players: ['solo', 'local-coop'] },
   { n: 'CYOA', i: '🧙', h: 'cyoa/', genre: ['tabletop-rpg'], input: ['voice', 'text-entry', 'tap'], session: ['save-campaign'], mech: ['llm-game-master', 'speech-narration', 'procedural-generation', 'seeded-determinism'], players: ['solo', 'local-coop'] },
   { n: 'TAAS', i: '📈', h: 'taas/', genre: ['management-sim'], input: ['tap'], session: ['run-based'], mech: ['resource-allocation', 'systems-simulation', 'scale-ladder', 'skill-teaching'], players: ['solo'] },

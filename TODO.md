@@ -15,8 +15,8 @@ backlog entry here.
 
 ## Needs Zack
 
-- [taas] **Play Robot factory v2** (shipped 2026-10-26; the mode dropdown's third choice, or
-  `games/taas/factory-v2.html`; built with no Q&A, as asked). Check: the planer running by itself
+- [taas] **Play Robot factory v2** (shipped 2026-10-26; since 2026-10-27 the games list's first card,
+  Robot Factory, which opens v2, with v1 under Version in its menu; built with no Q&A, as asked). Check: the planer running by itself
   from its hopper; the dump truck's tail tipping ten logs into the raw materials bin when it is empty;
   buying a robot at the terminal and watching it ride the elevator up, and sending one down; a
   robot's page: tap the main prompt, then a source and a destination on the floor; build lines in
@@ -53,7 +53,7 @@ backlog entry here.
   ratings but cannot change them; a model's words reach a guest when the telling
   is done, not as they stream).
 
-- [taas] **Play the robot factory** (TAAS's mode dropdown, or `games/taas/?mode=robot-factory`)
+- [taas] **Play the robot factory** (Robot Factory's card, Version v1 in its menu, or `games/taas/?mode=robot-factory`)
   and overrule anything in its "assumed, not decided" table (`.claude/taas.md` § Robot factory
   mode); then say what comes after prompt engineering (its four open questions suggest the
   next rungs: context binders, an in-feed filter, a maintenance robot) and what the bays hold.

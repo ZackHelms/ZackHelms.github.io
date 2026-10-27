@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>TAAS: Robot factory v2</title>
+<title>Robot Factory v2</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
 /* Layout: a planning board. Roadmap strip across the top, this quarter's decision sheet on the left, live instruments on the right. */
@@ -83,13 +83,13 @@ button { font: inherit; color: inherit; cursor: pointer; touch-action: manipulat
 #snd-on { min-width: 52px; height: 28px; padding: 0 10px; border-radius: 14px; border: 1px solid var(--line); background: none; color: var(--muted); font: 600 12px var(--body); }
 #snd-on[aria-checked="true"] { background: var(--sp); border-color: var(--sp); color: var(--panel); }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
-/* the mode switch: a native select dressed as the second chrome button */
-#mode-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: calc(52px + env(safe-area-inset-left)); z-index: 80;
-  height: 30px; padding: 0 26px 0 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); font: 600 13px var(--body);
-  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237b8794' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center / 10px 6px;
+/* Robot Factory's Version (the CD, 2026-10-27), first in the menu: a native select */
+.mver { padding: 6px 10px 8px; border-bottom: 1px solid var(--line); font: 600 15px var(--body); }
+#version-sel { height: 32px; padding: 0 28px 0 12px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); font: 600 14px var(--body);
+  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237b8794' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center / 10px 6px;
   -webkit-appearance: none; appearance: none; cursor: pointer; }
-#mode-btn:hover { border-color: var(--ink); }
-#mode-btn:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
+#version-sel:hover { border-color: var(--ink); }
+#version-sel:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
 
 /* ---------- robot factory ---------- */
 #factory { position: fixed; inset: 0; z-index: 10; display: block; background: #26303c; overflow: hidden;
@@ -223,7 +223,7 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-26 04:12 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-27 11:56 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -243,10 +243,10 @@ html, body { overflow: hidden; overscroll-behavior: none; }
 })();
 </script>
 <button id="menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 7h16M1 12.5h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-<select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option><option value="robot-factory-v2">Robot factory v2</option></select>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <div id="menu-scrim" hidden></div>
 <div id="menu" role="dialog" aria-label="Menu" hidden>
+  <label class="mrow mver" id="menu-version"><span>Version</span><select id="version-sel"><option value="v2">v2</option><option value="v1">v1</option></select></label>
   <button class="mi" type="button" data-menu="info">Info <small id="menu-info-sub">How this mode works</small></button>
   <div class="msnd" id="menu-sound">
     <div class="mrow mhead"><span id="snd-lbl">Sound</span><button id="snd-on" type="button" role="switch" aria-checked="true" aria-labelledby="snd-lbl">On</button></div>
@@ -503,38 +503,25 @@ const SND = (function () {
 })();
 
 
-/* The mode switch on this page (the CD, 2026-10-26: "I want both of these to be available in the
-   drop-down menu"): Formal and the first Robot factory live in index.html, so choosing one goes
-   there; this page is always Robot factory v2. Both pages keep the last choice in 'taas-mode', so
-   the games list's link to TAAS opens whichever was played last. */
+/* This page is Robot Factory v2, the version the games list's Robot Factory card opens (the CD,
+   2026-10-27). The menu's Version selector goes to v1, which is the factory mode of TAAS's page. */
 const MODE = (function () {
-  const NAMES = { 'formal': 'Formal', 'robot-factory': 'Robot factory', 'robot-factory-v2': 'Robot factory v2' };
   const HERE = 'robot-factory-v2';
-  const sel = document.getElementById('mode-btn');
   const hooks = {};
   document.documentElement.dataset.mode = HERE;
-  sel.value = HERE;
-  try { localStorage.setItem('taas-mode', HERE); } catch (e) { /* optional */ }
-  function set(m) {
-    if (m === HERE || !NAMES[m]) { sel.value = HERE; return; }
-    try { localStorage.setItem('taas-mode', m); } catch (e) { /* optional */ }
-    if (hooks[HERE] && hooks[HERE].leave) hooks[HERE].leave();
-    location.href = 'index.html?mode=' + encodeURIComponent(m);
-  }
   function on(m, h) { hooks[m] = h; if (m === HERE && h.enter) h.enter(); }
   function info() { if (hooks[HERE] && hooks[HERE].info) hooks[HERE].info(); }
   function menu() { if (hooks[HERE] && hooks[HERE].menu) hooks[HERE].menu(); }
-  sel.addEventListener('change', () => { SND.init(); set(sel.value); sel.blur(); });
   SND.setTrack('factory');
-  return { set, on, info, menu, get current() { return HERE; }, NAMES };
+  return { on, info, menu, get current() { return HERE; } };
 })();
 
-/* The menu (the CD, 2026-10-14), in place of the hub's back button and the mute button: Info
-   on the mode in front of you, the sound switch and three volumes, and Exit game. Beside it the
-   mode switch, and top right a reload that fetches the latest version past any cache. */
+/* The menu (the CD, 2026-10-14), in place of the hub's back button and the mute button: the
+   Version, Info, the sound switch and three volumes, Prices and Exit game. Top right, a reload that
+   fetches the latest version past any cache. */
 (function () {
   const btn = document.getElementById('menu-btn'), menu = document.getElementById('menu'), scrim = document.getElementById('menu-scrim');
-  const sw = document.getElementById('snd-on'), box = document.getElementById('menu-sound');
+  const sw = document.getElementById('snd-on'), box = document.getElementById('menu-sound'), ver = document.getElementById('version-sel');
   const SUB = { 'robot-factory-v2': 'How the factory works' };
   const out = inp => document.getElementById(inp.id + '-out');
   function sync() {
@@ -544,6 +531,7 @@ const MODE = (function () {
     const v = SND.vol;
     menu.querySelectorAll('input[data-vol]').forEach(inp => { inp.value = Math.round(v[inp.dataset.vol] * 100); out(inp).textContent = inp.value + '%'; });
     document.getElementById('menu-info-sub').textContent = SUB[MODE.current] || '';
+    ver.value = 'v2';
     MODE.menu();
   }
   function open() { SND.init(); sync(); menu.hidden = false; scrim.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
@@ -560,12 +548,14 @@ const MODE = (function () {
   });
   menu.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.vol === 'sfx') SND.sfx('tick'); });   // a sample of the new level
   menu.querySelector('[data-menu="info"]').addEventListener('click', () => { close(); MODE.info(); });
+  // the Version: v1 is the factory mode of TAAS's page (this factory saves on the way out)
+  ver.addEventListener('change', () => { if (ver.value === 'v1') { close(); location.href = 'index.html?mode=robot-factory'; } });
   document.getElementById('reload-btn').addEventListener('click', async () => {
     try {
       if ('caches' in window) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }
       if ('serviceWorker' in navigator) { const regs = await navigator.serviceWorker.getRegistrations(); await Promise.all(regs.map(r => r.unregister())); }
     } catch (e) { /* best effort */ }
-    // a new address is a cache miss for the page itself; ?mode= rides along, so the mode stays
+    // a new address is a cache miss for the page itself
     const u = new URL(location.href); u.searchParams.set('_r', Date.now().toString(36)); location.replace(u.toString());
   });
   sync();

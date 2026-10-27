@@ -1,5 +1,11 @@
 # DONE — done log
 
+- 2026-10-27 [taas] **Robot Factory, a card of its own** (the CD): first on the games list (🤖),
+  opening v2, with a Version selector (v2 / v1) first in the factory's menu on both pages; TAAS's
+  card is formal only and the mode dropdown is gone from both pages (no `?mode=` is always formal,
+  nothing remembered; an old `?mode=robot-factory-v2` link still lands on v2). The files stay in
+  `games/taas/` under its licence. Suites 40 / 161 / 46, nine new breaks all caught.
+
 - 2026-10-26 [taas] **Robot factory v2** (the CD's brief, no Q&A by request), a page of its own on
   the same mode dropdown in both pages: the planer and the sap extractor run by themselves from
   hoppers into their output bins; a raw materials bin that a dump truck (its tail end in the yard)

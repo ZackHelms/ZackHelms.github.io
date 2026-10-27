@@ -85,25 +85,44 @@ const server = http.createServer((req, res) => {
   const tap = async (x, y) => { await page.touchscreen.tap(x, y); await step(0.05); };
   async function section(name, fn) { try { await fn(); } catch (e) { ok(false, name + ' played through', e.message.split('\n')[0]); } }
 
-  /* ---------- 1. the page and the mode dropdown on both pages ---------- */
-  await section('1. mode', async () => {
+  /* ---------- 1. the page and the Version in both factories' menus (the CD, 2026-10-27: Robot
+     Factory has its own card on the games list, opening here at v2; v1 is TAAS's page in its factory) ---------- */
+  await section('1. version', async () => {
     await page.goto(ORIGIN + '/blank'); await H(() => localStorage.clear());
     await page.goto(BASE, { waitUntil: 'load' });
     await page.waitForFunction(() => window.TAAS_FACTORY2 && window.TAAS_FACTORY2.on);
-    const a = await H(() => ({ label: document.getElementById('mode-btn').selectedOptions[0].textContent, opts: [...document.getElementById('mode-btn').options].map(o => o.value).join(), stored: localStorage.getItem('taas-mode'), mode: document.documentElement.dataset.mode }));
-    ok(a.label === 'Robot factory v2' && a.opts === 'formal,robot-factory,robot-factory-v2' && a.stored === 'robot-factory-v2' && a.mode === 'robot-factory-v2', 'the v2 page: its dropdown names it and lists all three modes, and keeps it as the last choice', JSON.stringify(a));
-    await page.selectOption('#mode-btn', 'robot-factory');
+    await page.tap('#menu-btn');
+    const a = await H(() => { const rows = [...document.getElementById('menu').children].filter(e => e.getBoundingClientRect().height > 0), sel = document.getElementById('version-sel');
+      return { first: rows[0] && rows[0].id, v: sel.value, opts: [...sel.options].map(o => o.value + ':' + o.textContent).join(), dropdown: !!document.getElementById('mode-btn'), title: document.title, mode: document.documentElement.dataset.mode }; });
+    ok(a.first === 'menu-version' && a.v === 'v2' && a.opts === 'v2:v2,v1:v1' && !a.dropdown && a.title === 'Robot Factory v2' && a.mode === 'robot-factory-v2',
+      'the v2 page: no mode dropdown, and its menu opens with the Version first, reading v2, with v2 and v1 to choose from', JSON.stringify(a));
+    await H(() => { window.TAAS_FACTORY2.s.money = 41; });
+    await page.selectOption('#version-sel', 'v1');
     await page.waitForFunction(() => location.pathname === '/taas/index.html' && window.TAAS_FACTORY && window.TAAS_FACTORY.on, null, { timeout: 4000 }).catch(() => {});
-    const b = await H(() => ({ path: location.pathname, mode: document.documentElement.dataset.mode, stored: localStorage.getItem('taas-mode') }));
-    ok(b.path === '/taas/index.html' && b.mode === 'robot-factory' && b.stored === 'robot-factory', 'choosing Robot factory goes to the first page, in its factory', JSON.stringify(b));
-    await page.selectOption('#mode-btn', 'robot-factory-v2').catch(() => {});
+    const b = await H(() => ({ path: location.pathname, q: location.search, mode: document.documentElement.dataset.mode, title: document.title, saved: (JSON.parse(localStorage.getItem(Object.keys(localStorage).find(k => k.indexOf('taas.factory2.v') === 0)) || '{}')).money }));
+    ok(b.path === '/taas/index.html' && b.q === '?mode=robot-factory' && b.mode === 'robot-factory' && b.title === 'Robot Factory v1' && b.saved === 41,
+      'choosing v1 goes to TAAS\'s page in its factory (Robot Factory v1), and v2 saved itself on the way out', JSON.stringify(b));
+    await page.tap('#menu-btn');
+    const v1 = await H(() => document.getElementById('version-sel').value);
+    await page.selectOption('#version-sel', 'v2').catch(() => {});
     await page.waitForFunction(() => location.pathname === '/taas/factory-v2.html' && window.TAAS_FACTORY2 && window.TAAS_FACTORY2.on, null, { timeout: 4000 }).catch(() => {});
-    ok(await H(() => location.pathname) === '/taas/factory-v2.html', 'and choosing Robot factory v2 there comes back here');
+    const c = await H(() => ({ path: location.pathname, money: window.TAAS_FACTORY2 && window.TAAS_FACTORY2.s.money }));
+    ok(v1 === 'v1' && c.path === '/taas/factory-v2.html' && c.money === 41, 'v1\'s menu reads v1, and choosing v2 there comes back here to the same factory', JSON.stringify({ v1, c }));
+    // the browser's Back from v2 to v1: the page comes back running, its menu shut
+    await page.goBack({ waitUntil: 'load' }).catch(() => {});
+    await page.waitForFunction(() => location.pathname === '/taas/index.html' && window.TAAS_FACTORY && window.TAAS_FACTORY.on, null, { timeout: 4000 }).catch(() => {});
+    const t0 = await H(() => window.TAAS_FACTORY && window.TAAS_FACTORY.s.t);
+    await page.waitForTimeout(400);
+    const d = await H(() => ({ path: location.pathname, t: window.TAAS_FACTORY && window.TAAS_FACTORY.s.t, menu: document.getElementById('menu').hidden }));
+    ok(d.path === '/taas/index.html' && d.t > t0 && d.menu, 'Back from v2 to v1 finds v1 running, its menu shut', JSON.stringify({ t0, d }));
+    // TAAS's own card opens the page with no ?mode=: always formal now, whatever was played last
+    await H(() => localStorage.setItem('taas-mode', 'robot-factory-v2'));
     await page.goto(V1URL, { waitUntil: 'load' });
-    await page.waitForFunction(() => location.pathname === '/taas/factory-v2.html' && window.TAAS_FACTORY2 && window.TAAS_FACTORY2.on);
-    ok(true, 'the first page opened with v2 the last choice goes straight to v2 (the games list\'s link opens what was played last)');
-    await page.goto(V1URL + '?mode=formal', { waitUntil: 'load' });
-    ok(await H(() => document.documentElement.dataset.mode) === 'formal' && await H(() => location.pathname) === '/taas/index.html', 'a ?mode= on the first page still wins');
+    const e = await H(() => ({ path: location.pathname, mode: document.documentElement.dataset.mode }));
+    ok(e.path === '/taas/index.html' && e.mode === 'formal', 'TAAS with no ?mode= stays formal, even with v2 chosen last under the old dropdown', JSON.stringify(e));
+    await page.goto(V1URL + '?mode=robot-factory-v2', { waitUntil: 'load' });
+    await page.waitForFunction(() => location.pathname === '/taas/factory-v2.html' && window.TAAS_FACTORY2 && window.TAAS_FACTORY2.on, null, { timeout: 4000 }).catch(() => {});
+    ok(await H(() => location.pathname) === '/taas/factory-v2.html', 'an old link to v2 on TAAS\'s page (?mode=robot-factory-v2) still lands here');
     const badge = await (async () => { await page.goto(BASE, { waitUntil: 'load' }); return H(() => { const r = document.getElementById('build-badge').getBoundingClientRect(); return { b: innerHeight - r.bottom, r: innerWidth - r.right, t: document.getElementById('build-badge').dataset.utc }; }); })();
     ok(badge.b < 12 && badge.r < 12 && /^build \d{4}-\d\d-\d\d \d\d:\d\d UTC$/.test(badge.t || ''), 'the build badge sits in the bottom right corner, stamped in UTC', JSON.stringify(badge));
   });
@@ -303,10 +322,10 @@ const server = http.createServer((req, res) => {
       await fresh(8);
       await H(() => { const T = window.TAAS_FACTORY2, s = T.s; s.money = 9; for (let i = 0; i < 4; i++) FACTORY2.buyRobot(s); for (let i = 0; i < 400; i++) T.tick(1 / 60); FACTORY2.sendDown(s, 1); for (let i = 0; i < 600; i++) T.tick(1 / 60); s.avatar.task = { kind: 'terminal', arrived: true, spot: FACTORY2.LAYOUT.SPOT.terminal }; s.avatar.x = 0.61; s.avatar.y = 16.15; s.bubble = { kind: 'terminal' }; T.view.camY = T.view.maxY; T.tick(0); });
       await step(0.1);
-      const r = await H(() => { const g = id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const q = e.getBoundingClientRect(); return { l: q.left, r: q.right, t: q.top, b: q.bottom }; }; return { vw: innerWidth, vh: innerHeight, menu: g('menu-btn'), mode: g('mode-btn'), reload: g('reload-btn'), bubble: g('fx-bubble') }; });
-      ['menu', 'mode', 'reload', 'bubble'].forEach(k => { const q = r[k]; if (!q) bad.push(w + 'x' + h + ' ' + k + ' missing'); else if (q.l < 0 || q.t < 0 || q.r > r.vw || q.b > r.vh) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
-      if (r.menu && r.mode && r.reload && !(r.menu.r <= r.mode.l && r.mode.r <= r.reload.l)) bad.push(w + 'x' + h + ' chrome order');
-      if (r.bubble && r.mode && r.bubble.t < r.mode.b && r.bubble.l < r.mode.r && r.bubble.r > r.mode.l) bad.push(w + 'x' + h + ' bubble over the mode button');
+      const r = await H(() => { const g = id => { const e = document.getElementById(id); if (!e || e.hidden) return null; const q = e.getBoundingClientRect(); return { l: q.left, r: q.right, t: q.top, b: q.bottom }; }; return { vw: innerWidth, vh: innerHeight, menu: g('menu-btn'), reload: g('reload-btn'), bubble: g('fx-bubble') }; });
+      ['menu', 'reload', 'bubble'].forEach(k => { const q = r[k]; if (!q) bad.push(w + 'x' + h + ' ' + k + ' missing'); else if (q.l < 0 || q.t < 0 || q.r > r.vw || q.b > r.vh) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
+      if (r.menu && r.reload && !(r.menu.r <= r.reload.l)) bad.push(w + 'x' + h + ' chrome order');
+      ['menu', 'reload'].forEach(k => { const q = r[k], u = r.bubble; if (q && u && u.t < q.b && u.b > q.t && u.l < q.r && u.r > q.l) bad.push(w + 'x' + h + ' bubble over the ' + k + ' button'); });
       const n = await H(() => document.querySelectorAll('#fx-bubble [data-opt]').length);
       if (n !== 5) bad.push(w + 'x' + h + ' terminal options ' + n);
       await H(() => { window.TAAS_FACTORY2.openRobot(0); document.querySelector('[data-panel="prompt"]').click(); });
@@ -315,7 +334,7 @@ const server = http.createServer((req, res) => {
       if (pk.l < 0 || pk.r > pk.vw || pk.b > pk.vh || pk.t < 40) bad.push(w + 'x' + h + ' pick card off screen ' + JSON.stringify(pk));
       await H(() => document.querySelector('#fx-pick [data-pick="cancel"]').click());
     }
-    ok(!bad.length, 'menu, mode and reload in order, the terminal\'s bubble (buy, a stored robot to call up, three to send down) and the pick card on screen at 320, 390, landscape and desktop', bad.join('; '));
+    ok(!bad.length, 'menu and reload in order, the terminal\'s bubble (buy, a stored robot to call up, three to send down) and the pick card on screen at 320, 390, landscape and desktop', bad.join('; '));
     await page.setViewportSize({ width: 390, height: 844 });
   });
 

@@ -1030,13 +1030,13 @@ model's formulas and sources behind a details panel. That makes it the **third
 rendering exception** after wayfinder and music-mixer: forms, tables and one SVG, no
 canvas and no draw loop. It is also built in its **own planning-board look** (light and
 dark themes, Bricolage Grotesque + IBM Plex), not neon, which was assumed rather than
-asked. Its chrome (a menu with Info, sound and Exit game in place of ← and 🔊, the mode
-dropdown, a reload button top right) is positioned `absolute`, because the page scrolls and
+asked. Its chrome (a menu with Info, sound and Exit game in place of ← and 🔊, a reload
+button top right) is positioned `absolute`, because the page scrolls and
 fixed buttons would cover the text. The whole simulation is one DOM-free
 engine block whose `forecast()` is the only place an outcome is computed, so the
 preview on screen is exactly what running the quarter does. Every number is a first
-draft the CD is still tuning. Since 2026-10-13 that is the **Formal** mode, and a dropdown
-beside the menu button switches to **Robot factory**: the same story played by hand, a
+draft the CD is still tuning. Since 2026-10-13 that is the **Formal** mode, and the same page
+with `?mode=robot-factory` is **Robot factory**: the same story played by hand, a
 **Canvas 2D** scene of hand-written low-poly meshes in toon bands and ink outlines, seen
 Zelda-style from 50 degrees up. A chibi in a hard hat walks where you tap (an A* over the
 floor, a walk cycle driven by distance), presses the planer's glowing red button, carries
@@ -1075,16 +1075,25 @@ whole device pixels, robots are baked by pose, the canvas is capped at 2x, and t
 **Proprietary** (one of the nine protected games). Suites: `.claude/tests/drive-taas.cjs`
 (rules, pure node), `drive-taas-ui.cjs` (the page in Chromium) and `eval-taas.cjs` (balance
 shape, opt-in) for the formal mode; `drive-taas-factory.cjs`, `drive-taas-factory-ui.cjs`
-and `eval-taas-factory.cjs` for the factory (358, 159 and 35 checks since the goals brief). Since
-2026-10-26 a third mode, **Robot factory v2**, is a second page, `taas/factory-v2.html`, on the same
-dropdown in both pages (the CD's brief, built with no Q&A at the CD's request): the planer and the sap
+and `eval-taas-factory.cjs` for the factory (358, 161 and 35 checks). Since
+2026-10-26 a second factory, **Robot factory v2**, is a second page, `taas/factory-v2.html` (the CD's
+brief, built with no Q&A at the CD's request): the planer and the sap
 extractor run by themselves from their hoppers, a dump truck backs up to a raw materials bin and tips
 ten logs in for $10 whenever it is empty, robots ride an elevator up from a terminal (bought, or called
 up from storage) and back down, and each robot has a **main prompt**, a source and a destination
 tapped on the floor, and up to six **instruction lines** built from four word lists, read in order
 (the first line about a thing decides it), a line that means nothing only making it slip 5% more
-often. Suites `drive-taas-factory2.cjs` (112, pure node) and `drive-taas-factory2-ui.cjs` (45,
-Chromium); `gates.sh` maps a game's second page to its slug. Detailed context: `.claude/taas.md`.
+often. Suites `drive-taas-factory2.cjs` (112, pure node) and `drive-taas-factory2-ui.cjs` (46,
+Chromium); `gates.sh` maps a game's second page to its slug. **Since 2026-10-27 the two factories
+are their own game on the hub** (see ROBOT FACTORY below), and TAAS's card is formal only, with no
+mode dropdown on either page. Detailed context: `.claude/taas.md`.
+
+### ROBOT FACTORY (`taas/factory-v2.html`, and v1 at `taas/index.html?mode=robot-factory`)
+TAAS's two factories as a game of their own, the hub's first card since 2026-10-27 (the CD's call).
+The card opens **v2**, and a **Version** selector, the first row of the factory's menu, goes to v1
+and back; each version keeps its own save. The pages stay in `games/taas/`, so they keep TAAS's
+proprietary licence, suites and context file: everything about them is in `.claude/taas.md`
+(sections Robot factory mode, Robot factory v2, and Robot Factory, a card of its own).
 
 ### ANIMATION RIGS (`animation-rigs/index.html`, ~2,000 lines)
 A grey-box diorama of eight 21-joint stick-figure rigs (CD commission 2026-10-04,

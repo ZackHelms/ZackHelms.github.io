@@ -24,6 +24,7 @@ local-2p.
 
 | Game | Path | Genre | Input | Session | Key mechanics | Players | Context |
 |---|---|---|---|---|---|---|---|
+| Robot Factory | `taas/factory-v2.html` | management-sim | tap-to-move, tap | save-campaign | simulated-agents, agent-programming, resource-economy, skill-teaching | solo | `.claude/taas.md` |
 | CYOA2 | `cyoa2/` | tabletop-rpg | tap-to-move, pinch-zoom, drag-pan, text-entry, voice | open-sandbox, save-campaign | tile-board, asset-library, procedural-generation, seeded-determinism, line-of-sight, fog-of-war, initiative-order, grid-combat, llm-game-master, scripted-game-master, dialogue-choices, speech-narration | solo, local-coop | `.claude/cyoa2.md` |
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | TAAS | `taas/` | management-sim | tap | run-based | resource-allocation, systems-simulation, scale-ladder, skill-teaching | solo | `.claude/taas.md` |
@@ -83,7 +84,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-57 games (55 in-repo + 2 external builds).
+58 games (56 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -152,6 +153,18 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-10-27 split
+- **`agent-programming`** mechanic (robot factory, TAAS's factory given its own hub card at the
+  CD's request; its pages still live in `taas/`, which keeps them under TAAS's proprietary
+  licence). The first game whose decision is **writing instructions for agents**: each robot
+  gets a prompt (a source and a destination tapped on the floor) and ordered instruction lines
+  built from word lists, then does what it was told, slips and all. `management-sim` and
+  `skill-teaching` are shared with TAAS on purpose (the same lessons about AI agents, played by
+  hand); `simulated-agents` (animation-rigs) for the robots and customers, `resource-economy`
+  for logs, prices and money. A second agent-programming game should program something other
+  than a production line (a heist crew, a garden, a fleet), or make the instructions a real
+  language rather than word lists.
 
 ### Newly opened by the 2026-10-12 build
 - **`management-sim`** genre + **`resource-allocation`** mechanic (taas, built with the

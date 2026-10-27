@@ -235,13 +235,14 @@ details.sheet > summary { cursor: pointer; font-family: var(--display); font-siz
   .rung { font-size: 11px; }
   .outcome .big { font-size: 38px; }
 }
-/* the mode switch: a native select dressed as the second chrome button */
-#mode-btn { position: absolute; top: calc(8px + env(safe-area-inset-top)); left: calc(52px + env(safe-area-inset-left)); z-index: 80;
-  height: 30px; padding: 0 26px 0 10px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); font: 600 13px var(--body);
-  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237b8794' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 9px center / 10px 6px;
+/* Robot Factory's Version (the CD, 2026-10-27), first in the factory's menu: a native select */
+.mver { padding: 6px 10px 8px; border-bottom: 1px solid var(--line); font: 600 15px var(--body); }
+#menu-version[hidden], html:not([data-mode="robot-factory"]) #menu-version { display: none; }
+#version-sel { height: 32px; padding: 0 28px 0 12px; border-radius: 8px; border: 1px solid var(--line); color: var(--ink); font: 600 14px var(--body);
+  background: var(--panel) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%237b8794' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center / 10px 6px;
   -webkit-appearance: none; appearance: none; cursor: pointer; }
-#mode-btn:hover { border-color: var(--ink); }
-#mode-btn:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
+#version-sel:hover { border-color: var(--ink); }
+#version-sel:focus-visible { outline: 2px solid var(--sp); outline-offset: 2px; }
 
 /* ---------- robot factory ---------- */
 #factory { position: fixed; inset: 0; z-index: 10; display: none; background: #26303c; overflow: hidden;
@@ -354,7 +355,7 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 
 </head>
 <body>
-<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-26 04:12 UTC</div>
+<div id="build-badge" style="position:fixed;bottom:calc(2px + env(safe-area-inset-bottom));right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-10-27 11:56 UTC</div>
 <script>
 /* The badge is stamped in UTC; show it in the device's own time zone (the CD, 2026-10-14),
    US Eastern if the device will not say, and UTC as it was stamped if neither works. */
@@ -374,10 +375,10 @@ html[data-mode="robot-factory"], html[data-mode="robot-factory"] body { overflow
 })();
 </script>
 <button id="menu-btn" type="button" aria-label="Menu" aria-haspopup="true" aria-expanded="false" aria-controls="menu"><svg viewBox="0 0 18 14" aria-hidden="true"><path d="M1 1.5h16M1 7h16M1 12.5h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button>
-<select id="mode-btn" aria-label="Mode"><option value="formal">Formal</option><option value="robot-factory">Robot factory</option><option value="robot-factory-v2">Robot factory v2</option></select>
 <button id="reload-btn" type="button" aria-label="Reload the latest version" title="Reload the latest version">&#8635;</button>
 <div id="menu-scrim" hidden></div>
 <div id="menu" role="dialog" aria-label="Menu" hidden>
+  <label class="mrow mver" id="menu-version"><span>Version</span><select id="version-sel"><option value="v2">v2</option><option value="v1">v1</option></select></label>
   <button class="mi" type="button" data-menu="info">Info <small id="menu-info-sub">How this mode works</small></button>
   <div class="msnd" id="menu-sound">
     <div class="mrow mhead"><span id="snd-lbl">Sound</span><button id="snd-on" type="button" role="switch" aria-checked="true" aria-labelledby="snd-lbl">On</button></div>
@@ -2583,27 +2584,24 @@ const SND = (function () {
   };
 })();
 
-/* The mode switch: a native select beside the menu button. ?mode= wins, then the last choice. */
+/* The mode, from the address alone (the CD, 2026-10-27: Robot Factory has its own card on the games
+   list, opening at v2, and TAAS is "formal only" with no dropdown). The TAAS card opens this page with
+   no ?mode=, which is always Formal; Robot Factory's Version selector opens ?mode=robot-factory for v1.
+   v2 is a page of its own, so an old link here to it goes on there. */
 const MODE = (function () {
   const NAMES = { 'formal': 'Formal', 'robot-factory': 'Robot factory', 'robot-factory-v2': 'Robot factory v2' };
-  const ALIAS = { factory: 'robot-factory', robot: 'robot-factory', robotfactory: 'robot-factory', v2: 'robot-factory-v2', factory2: 'robot-factory-v2' };
-  // Robot factory v2 is a page of its own (the CD, 2026-10-26: "I want both of these to be available
-  // in the drop-down menu"): choosing it, or arriving here with it chosen last, goes there
+  const ALIAS = { factory: 'robot-factory', robot: 'robot-factory', robotfactory: 'robot-factory', v1: 'robot-factory', v2: 'robot-factory-v2', factory2: 'robot-factory-v2' };
   const PAGES = { 'robot-factory-v2': 'factory-v2.html' };
-  const sel = document.getElementById('mode-btn');
+  const TITLES = { 'formal': 'TAAS', 'robot-factory': 'Robot Factory v1' };
   const hooks = {};
   let cur = null;
   function norm(m) { m = String(m || '').toLowerCase(); m = ALIAS[m] || m; return NAMES[m] ? m : null; }
   function pick() {
-    let m = null;
-    try { m = norm(new URLSearchParams(location.search).get('mode')); } catch (e) { /* no URL API */ }
-    if (!m) { try { m = norm(localStorage.getItem('taas-mode')); } catch (e) { /* optional */ } }
-    return m || 'formal';
+    try { return norm(new URLSearchParams(location.search).get('mode')) || 'formal'; } catch (e) { return 'formal'; }
   }
   function set(m, chosen) {
     m = norm(m) || 'formal';
     if (PAGES[m]) {
-      try { localStorage.setItem('taas-mode', m); } catch (e) { /* optional */ }
       if (cur && hooks[cur] && hooks[cur].leave) hooks[cur].leave();
       if (chosen) location.href = PAGES[m]; else location.replace(PAGES[m]);
       return;
@@ -2612,11 +2610,11 @@ const MODE = (function () {
     const prev = cur;
     cur = m;
     document.documentElement.dataset.mode = m;
-    sel.value = m;
-    try { localStorage.setItem('taas-mode', m); } catch (e) { /* optional */ }
+    document.title = TITLES[m];
     try {
       const u = new URL(location.href);
-      if (u.searchParams.get('mode') !== m) { u.searchParams.set('mode', m); history.replaceState(null, '', u.toString()); }
+      if (m === 'formal') { if (u.searchParams.has('mode')) { u.searchParams.delete('mode'); history.replaceState(null, '', u.toString()); } }
+      else if (u.searchParams.get('mode') !== m) { u.searchParams.set('mode', m); history.replaceState(null, '', u.toString()); }
     } catch (e) { /* file:// or no history */ }
     if (prev && hooks[prev] && hooks[prev].leave) hooks[prev].leave();
     if (hooks[m] && hooks[m].enter) hooks[m].enter();
@@ -2627,17 +2625,16 @@ const MODE = (function () {
   function info() { if (hooks[cur] && hooks[cur].info) hooks[cur].info(); }
   // the menu has just opened: a mode with settings of its own fills them in (the factory's Prices)
   function menu() { if (hooks[cur] && hooks[cur].menu) hooks[cur].menu(); }
-  sel.addEventListener('change', () => { SND.init(); set(sel.value, true); sel.blur(); });
   set(pick());
   return { set, on, info, menu, get current() { return cur; }, NAMES };
 })();
 
 /* The menu (the CD, 2026-10-14), in place of the hub's back button and the mute button: Info
-   on the mode in front of you, the sound switch and three volumes, and Exit game. Beside it the
-   mode switch, and top right a reload that fetches the latest version past any cache. */
+   on the mode in front of you, the sound switch and three volumes, and Exit game; in the factory,
+   its Version first and its Prices. Top right, a reload that fetches the latest version past any cache. */
 (function () {
   const btn = document.getElementById('menu-btn'), menu = document.getElementById('menu'), scrim = document.getElementById('menu-scrim');
-  const sw = document.getElementById('snd-on'), box = document.getElementById('menu-sound');
+  const sw = document.getElementById('snd-on'), box = document.getElementById('menu-sound'), ver = document.getElementById('version-sel');
   const SUB = { 'formal': 'How the model works', 'robot-factory': 'How the factory works' };
   const out = inp => document.getElementById(inp.id + '-out');
   function sync() {
@@ -2648,6 +2645,8 @@ const MODE = (function () {
     menu.querySelectorAll('input[data-vol]').forEach(inp => { inp.value = Math.round(v[inp.dataset.vol] * 100); out(inp).textContent = inp.value + '%'; });
     document.getElementById('menu-info-sub').textContent = SUB[MODE.current] || '';
     document.getElementById('menu-prices').hidden = MODE.current !== 'robot-factory';
+    document.getElementById('menu-version').hidden = MODE.current !== 'robot-factory';
+    ver.value = 'v1';
     MODE.menu();
   }
   function open() { SND.init(); sync(); menu.hidden = false; scrim.hidden = false; btn.setAttribute('aria-expanded', 'true'); }
@@ -2664,6 +2663,8 @@ const MODE = (function () {
   });
   menu.addEventListener('change', e => { if (e.target.dataset && e.target.dataset.vol === 'sfx') SND.sfx('tick'); });   // a sample of the new level
   menu.querySelector('[data-menu="info"]').addEventListener('click', () => { close(); MODE.info(); });
+  // Robot Factory's Version: this page is v1, and v2 is a page of its own (the factory saves on the way out)
+  ver.addEventListener('change', () => { if (ver.value === 'v2') { close(); location.href = 'factory-v2.html'; } });
   document.getElementById('reload-btn').addEventListener('click', async () => {
     try {
       if ('caches' in window) { const keys = await caches.keys(); await Promise.all(keys.map(k => caches.delete(k))); }

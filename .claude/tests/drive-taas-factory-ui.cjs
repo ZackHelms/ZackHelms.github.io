@@ -121,27 +121,43 @@ const server = http.createServer((req, res) => {
   // the counter label's bright pixels, as a mask: what the figure says
   const plateBits = () => H(() => { const T = window.TAAS_FACTORY, r = T.board('plate'), d = T.view.dpr; const im = document.getElementById('fx-canvas').getContext('2d').getImageData(Math.round(r.x * d), Math.round(r.y * d), Math.round(r.w * d), Math.round(r.h * d)).data; let bits = ''; for (let i = 0; i < im.length; i += 4) bits += im[i] + im[i + 1] + im[i + 2] > 360 ? '1' : '0'; return bits; });
 
-  /* ---------- 1. the mode dropdown ---------- */
+  /* ---------- 1. the mode, from the address (the CD, 2026-10-27: Robot Factory has its own card on
+     the games list and this factory is its v1; TAAS is formal only, with no dropdown) ---------- */
   await section('1. mode', async () => {
     await go(); await H(() => localStorage.clear()); await go();
-    const f = await H(() => ({ mode: document.documentElement.dataset.mode, wrap: getComputedStyle(document.querySelector('.wrap')).display !== 'none', fac: getComputedStyle(document.getElementById('factory')).display, on: !!(window.TAAS_FACTORY && window.TAAS_FACTORY.on), label: document.getElementById('mode-btn').selectedOptions[0].textContent }));
-    ok(f.mode === 'formal' && f.wrap && f.fac === 'none' && !f.on && f.label === 'Formal', 'a first visit opens in formal mode, the dropdown reading "Formal", the factory asleep', JSON.stringify(f));
-    await page.selectOption('#mode-btn', 'robot-factory');
+    const f = await H(() => ({ mode: document.documentElement.dataset.mode, wrap: getComputedStyle(document.querySelector('.wrap')).display !== 'none', fac: getComputedStyle(document.getElementById('factory')).display, on: !!(window.TAAS_FACTORY && window.TAAS_FACTORY.on), dropdown: !!document.getElementById('mode-btn'), title: document.title }));
+    ok(f.mode === 'formal' && f.wrap && f.fac === 'none' && !f.on && !f.dropdown && f.title === 'TAAS', 'with no ?mode= the page is TAAS in formal mode, with no mode dropdown, the factory asleep', JSON.stringify(f));
+    await go('?mode=robot-factory');
     await page.waitForFunction(() => window.TAAS_FACTORY.on);
-    const g = await H(() => ({ mode: document.documentElement.dataset.mode, wrap: getComputedStyle(document.querySelector('.wrap')).display, url: location.search, stored: localStorage.getItem('taas-mode'), label: document.getElementById('mode-btn').selectedOptions[0].textContent, cw: document.getElementById('fx-canvas').width, iw: innerWidth }));
-    ok(g.mode === 'robot-factory' && g.wrap === 'none' && /mode=robot-factory/.test(g.url) && g.stored === 'robot-factory' && g.label === 'Robot factory' && g.cw >= g.iw,
-      'choosing Robot factory shows the factory, names it on the button, and puts ?mode=robot-factory in the address', JSON.stringify(g));
+    const g = await H(() => ({ mode: document.documentElement.dataset.mode, wrap: getComputedStyle(document.querySelector('.wrap')).display, url: location.search, title: document.title, cw: document.getElementById('fx-canvas').width, iw: innerWidth }));
+    ok(g.mode === 'robot-factory' && g.wrap === 'none' && /mode=robot-factory/.test(g.url) && g.title === 'Robot Factory v1' && g.cw >= g.iw,
+      '?mode=robot-factory is Robot Factory v1: the factory, under its own title, the address kept for a reload', JSON.stringify(g));
     await go();
-    ok(await H(() => document.documentElement.dataset.mode) === 'robot-factory', 'a reload with no ?mode= keeps the last choice');
+    ok(await H(() => document.documentElement.dataset.mode) === 'formal', 'and a visit with no ?mode= after it is formal again: nothing is remembered');
     await go('?mode=formal');
     const h = await H(() => ({ mode: document.documentElement.dataset.mode, on: window.TAAS_FACTORY.on, big: !!document.querySelector('.outcome .big') }));
-    ok(h.mode === 'formal' && !h.on && h.big, '?mode=formal wins over the remembered choice, and the formal page is all there', JSON.stringify(h));
-    await page.selectOption('#mode-btn', 'robot-factory');
+    ok(h.mode === 'formal' && !h.on && h.big, '?mode=formal is the formal page, all there', JSON.stringify(h));
+    // no button switches modes in the page any more; MODE.set is the path one would take, and the suites'
+    await H(() => MODE.set('robot-factory'));
     await page.waitForFunction(() => window.TAAS_FACTORY.on);
-    await page.selectOption('#mode-btn', 'formal');
+    await H(() => MODE.set('formal'));
     const t0 = await H(() => window.TAAS_FACTORY.s.t);
     await page.waitForTimeout(300);
     ok(!(await H(() => window.TAAS_FACTORY.on)) && (await H(() => window.TAAS_FACTORY.s.t)) === t0, 'leaving the factory stops its clock (nothing runs behind the formal page)');
+  });
+
+  /* ---------- 1b. the Version in the factory's menu (the CD, 2026-10-27) ---------- */
+  await section('1b. version', async () => {
+    await fresh(2);
+    await page.tap('#menu-btn');
+    const m = await H(() => { const rows = [...document.getElementById('menu').children].filter(e => e.getBoundingClientRect().height > 0), sel = document.getElementById('version-sel');
+      return { first: rows[0] && rows[0].id, v: sel.value, opts: [...sel.options].map(o => o.value + ':' + o.textContent).join() }; });
+    ok(m.first === 'menu-version' && m.v === 'v1' && m.opts === 'v2:v2,v1:v1', 'the factory\'s menu opens with its Version first, reading v1, with v2 and v1 to choose from', JSON.stringify(m));
+    // (this suite serves only this page, so v2's page is a 404 here: the request is what is checked)
+    const nav = page.waitForRequest(r => r.isNavigationRequest() && /factory-v2\.html/.test(r.url()), { timeout: 3000 });
+    await page.selectOption('#version-sel', 'v2');
+    const req = await nav.catch(() => null);
+    ok(!!req && new URL(req.url()).pathname === '/factory-v2.html', 'and choosing v2 goes to v2\'s own page, beside this one', req ? req.url() : 'no navigation');
   });
 
   /* ---------- 2. the first loop, with real touches on drawn pixels ---------- */
@@ -334,7 +350,7 @@ const server = http.createServer((req, res) => {
       await step(4);
       const r = await H(() => {
         const box = id => { const e = document.getElementById(id); const b = e.getBoundingClientRect(); return { l: b.left, r: b.right, t: b.top, b: b.bottom, hidden: e.hidden }; };
-        const ids = ['menu-btn', 'mode-btn', 'reload-btn', 'fx-bubble'];
+        const ids = ['menu-btn', 'reload-btn', 'fx-bubble'];
         const o = {}; ids.forEach(i => { o[i] = box(i); });
         o.vw = innerWidth; o.vh = innerHeight; o.sw = document.scrollingElement.scrollWidth;
         o.opts = [...document.querySelectorAll('#fx-bubble [data-opt]')].map(b => { const q = b.getBoundingClientRect(); return [q.left, q.right, q.top, q.bottom]; });
@@ -342,16 +358,16 @@ const server = http.createServer((req, res) => {
       });
       const inside = k => r[k].l >= 0 && r[k].r <= r.vw + 0.5 && r[k].t >= 0 && r[k].b <= r.vh + 0.5;
       const overlap = (a, b) => !(r[a].r <= r[b].l || r[b].r <= r[a].l || r[a].b <= r[b].t || r[b].b <= r[a].t);
-      ['menu-btn', 'mode-btn', 'reload-btn', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
+      ['menu-btn', 'reload-btn', 'fx-bubble'].forEach(k => { if (!inside(k)) bad.push(w + 'x' + h + ' ' + k + ' off screen'); });
       if (r['fx-bubble'].hidden) bad.push(w + 'x' + h + ' bubble did not open');
       if (r.opts.length !== 10) bad.push(w + 'x' + h + ' ' + r.opts.length + ' choices in the bubble');
       if (r.opts.some(o => o[0] < 0 || o[1] > r.vw || o[2] < 0 || o[3] > r.vh)) bad.push(w + 'x' + h + ' a choice off screen');
-      [['menu-btn', 'mode-btn'], ['mode-btn', 'reload-btn'], ['fx-bubble', 'menu-btn'], ['fx-bubble', 'mode-btn'], ['fx-bubble', 'reload-btn']].forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
-      if (!(r['menu-btn'].r <= r['mode-btn'].l && r['mode-btn'].r <= r['reload-btn'].l && r.vw - r['reload-btn'].r < 24)) bad.push(w + 'x' + h + ' chrome order (menu, mode, then reload in the top right corner)');
+      [['menu-btn', 'reload-btn'], ['fx-bubble', 'menu-btn'], ['fx-bubble', 'reload-btn']].forEach(([a, b]) => { if (overlap(a, b)) bad.push(w + 'x' + h + ' ' + a + ' over ' + b); });
+      if (!(r['menu-btn'].r <= r['reload-btn'].l && r.vw - r['reload-btn'].r < 24)) bad.push(w + 'x' + h + ' chrome order (menu, then reload in the top right corner)');
       if (r.sw > r.vw) bad.push(w + 'x' + h + ' sideways scroll');
     }
     await page.setViewportSize({ width: 390, height: 844 });
-    ok(!bad.length, 'at four sizes: menu and mode on the left, reload in the top right corner, the recycle bin\'s ten choices all on screen, nothing on top of anything', bad.join('; '));
+    ok(!bad.length, 'at four sizes: the menu on the left, reload in the top right corner, the recycle bin\'s ten choices all on screen, nothing on top of anything', bad.join('; '));
   });
 
   /* ---------- 7. the info panel ---------- */
@@ -420,9 +436,9 @@ const server = http.createServer((req, res) => {
   /* ---------- 9. back in after a resize while hidden ---------- */
   await section('9. re-measure', async () => {
     await fresh(8);
-    await page.selectOption('#mode-btn', 'formal');
+    await H(() => MODE.set('formal'));
     await page.setViewportSize({ width: 600, height: 700 });
-    await page.selectOption('#mode-btn', 'robot-factory');
+    await H(() => MODE.set('robot-factory'));
     await page.waitForFunction(() => window.TAAS_FACTORY.on);
     await H(() => { window.TAAS_FACTORY.paused = true; window.TAAS_FACTORY.tick(0); });
     const r = await H(() => { const T = window.TAAS_FACTORY, c = document.getElementById('fx-canvas'), m = T.spriteRect('machine'); const t = T.hitTest(m.x + m.w / 2, m.y + m.h * 0.6); return { cw: c.width / T.view.dpr, vw: T.view.w, hit: t && t.kind }; });

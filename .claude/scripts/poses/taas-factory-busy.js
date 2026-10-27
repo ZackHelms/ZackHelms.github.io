@@ -3,7 +3,7 @@
 // a full shop of customers waiting at the counter (hourglasses), one leaving with a plank, every
 // slot's bins full, the table saw cutting and the sap extractor running, the avatar walking with
 // its arms full, the recycle bin with things in it and a sap log rolling in next. For
-// frame-budget.cjs evalFile= (after select=#mode-btn:robot-factory). It opens at the top of the
+// frame-budget.cjs evalFile= (after eval=MODE.set('robot-factory')). It opens at the top of the
 // floor, so the wall's boards and the shop are on screen.
 (function () {
   const F = FACTORY, s = F.newGame(7), run = n => { for (let k = 0; k < n; k++) F.step(s, 0.05); };

@@ -1,14 +1,15 @@
 # TAAS (Team AI Adoption Simulator) - context
 
-`games/taas/index.html` (single file, ~5,200 lines) holds **two modes**, picked from a
-dropdown beside the menu button (2026-10-13; the menu replaced the back and mute buttons on
-2026-10-14): **Formal** (everything in this file down to §
-Robot factory mode; the default) and **Robot factory** (§ Robot factory mode, a playful
-cel-shaded take on the same story). A third, **Robot factory v2** (the CD, 2026-10-26: machines
-that run themselves, a raw materials bin filled by a dump truck, robots by elevator, and robots told
-what to do by a main prompt and sentence-built lines), is a page of its own,
-`games/taas/factory-v2.html` (~4,300 lines), on the same dropdown in both pages (section Robot
-factory v2). The formal mode is a management sim: you run one team
+`games/taas/index.html` (single file, ~5,200 lines) holds **two modes**: **Formal** (everything in
+this file down to § Robot factory mode) and **Robot factory** (§ Robot factory mode, a playful
+cel-shaded take on the same story). A second factory, **Robot factory v2** (the CD, 2026-10-26:
+machines that run themselves, a raw materials bin filled by a dump truck, robots by elevator, and
+robots told what to do by a main prompt and sentence-built lines), is a page of its own,
+`games/taas/factory-v2.html` (~4,300 lines; section Robot factory v2). **Since 2026-10-27 the two
+factories are one game on the games list, Robot Factory**, at the top of the list: its card opens v2,
+and a **Version** selector first in the menu goes between v2 and v1 (v1 is `index.html?mode=robot-factory`).
+TAAS's own card opens `index.html` with no `?mode=`, which is always Formal, and the mode dropdown
+is gone from both pages (section Robot Factory, a card of its own). The formal mode is a management sim: you run one team
 for **eight quarters** (Y1Q1 to Y2Q4), and each quarter you split **60 story points (SP)**
 between shipping work and building the team's AI skill, inside a **9,000 AI-credit (AIC)**
 budget. The team starts with no AI skill and owes **240 units of work a year**. The
@@ -1488,7 +1489,7 @@ person can carry planks round, satisfaction at the floor, prices near $0 and the
 affordable, so they now come every 8-16 s (12 s on average). Hiring the operator first is the
 remaining trap (open question 1), **kept as a lesson** by the CD's call (2026-10-16).
 
-Frame cost (`.claude/scripts/frame-budget.cjs games/taas/index.html select=#mode-btn:robot-factory
+Frame cost (`.claude/scripts/frame-budget.cjs games/taas/index.html eval=MODE.set('robot-factory')
 evalFile=.claude/scripts/poses/taas-factory-busy.js`, 390x844; the busy pose: both robots at work,
 the stocker hunting a bin of junk, a full shop with one leaving, every slot's bins full, the saw
 cutting, the extractor running, the avatar walking with its arms full): first measured at **33.3 ms
@@ -1958,7 +1959,8 @@ CD stopped writing:
 
 ### What was built
 
-- **The page and the dropdown.** `factory-v2.html` carries the same chrome (menu with Info, sound
+- **The page and the dropdown** (the dropdown is gone since 2026-10-27; section Robot Factory, a
+  card of its own). `factory-v2.html` carries the same chrome (menu with Info, sound
   and Prices, the mode dropdown, the reload button, the badge bottom right). Its dropdown lists all
   three modes; choosing Formal or Robot factory goes to `index.html?mode=...`. `index.html`'s
   dropdown gained the third option, and its `MODE` a `PAGES` map: choosing v2, or arriving with v2
@@ -2193,6 +2195,67 @@ for a save mismatch whose traced cause was an idle machine's owner, and was reve
 - **The truck or the elevator's timing**: `CFG.truck`, `CFG.elevSec`; the page reads them.
 - **Copy rule**: plain ASCII in the page, as in the first factory.
 
+## Robot Factory, a card of its own (2026-10-27)
+
+The CD, verbatim (quotes straightened):
+
+> move "robot factory" to its own separate game entry in the arcade listing, at the top of the list.
+> When I open it, it should open up to the V2 version (current default), and there should be a
+> selector in the menu that lets me change version. TAAS remains in the arcade list and no longer
+> has dropdown to select version (formal only).
+
+**What changed.**
+- **The games list** (`games/index.html`) has a **ROBOT FACTORY** card first (🤖, `taas/factory-v2.html`),
+  with its own `GAMES[]` entry and `.claude/games-index.md` row (facets: `management-sim`;
+  `tap-to-move, tap`; `save-campaign`; `simulated-agents, agent-programming, resource-economy,
+  skill-teaching`; the new `agent-programming` is noted in that file's coverage). TAAS's card stays
+  where it was, its line now about the formal game alone.
+- **No mode dropdown on either page.** `#mode-btn` and its CSS are gone; the top bar is the menu
+  button and the reload button.
+- **The Version selector** is the first row of the factory's menu (`#menu-version`, a native
+  `<select id="version-sel">` with **v2** and **v1**), on both factory pages: on v2 it reads v2 and
+  choosing v1 goes to `index.html?mode=robot-factory`; on v1 it reads v1 and choosing v2 goes to
+  `factory-v2.html`. Each closes the menu first and lets the page's own `pagehide` save run; the
+  factory is not stopped by hand, so the browser's Back finds the other version still running (out
+  of the back-forward cache) with its menu shut. In the formal page the row is hidden (the `hidden`
+  attribute plus a `html:not([data-mode="robot-factory"])` rule, as Prices does).
+- **`index.html`'s `MODE` reads `?mode=` only.** No `?mode=` (TAAS's card) is always Formal, and
+  `?mode=formal` is taken back out of the address; `?mode=robot-factory` (or `factory`, `robot`,
+  `v1`) is v1, kept in the address so a reload stays there; `?mode=robot-factory-v2` (or `v2`,
+  `factory2`) still goes on to `factory-v2.html` with `location.replace`, for old links.
+  `localStorage['taas-mode']` is no longer read or written (a stale value is harmless). `MODE.set()`
+  still switches in the page, with the factory's enter/leave hooks, but nothing on the page calls it
+  any more: it is the suites' path (re-measure after a resize while hidden, the clock stopping).
+- **Titles:** `TAAS` for formal, `Robot Factory v1` for v1 (set by `MODE`), `Robot Factory v2` for
+  v2's page.
+
+**Assumed, not decided** (Claude's choices; the CD has not ruled on these):
+
+| Question | Assumed |
+|---|---|
+| Does the card remember the version last played? | **No**: the card always opens v2 ("When I open it, it should open up to the V2 version"). |
+| A directory of its own (`games/robot-factory/`)? | **No**: both factories stay in `games/taas/`, so they keep TAAS's proprietary licence, its save keys and its suites; the card points at `taas/factory-v2.html`. Moving them is a later, mechanical change if the CD wants a cleaner address. |
+| Where v1 lives | Still the factory mode of `index.html`, reached only through `?mode=robot-factory` (splitting it out of TAAS's page would rewrite about 3,000 lines and its 150 breaks for no change on screen). |
+| The selector's place and words | First in the menu, labelled **Version**, options **v2** and **v1** (newest first). |
+| The card | 🤖, "Staff a wood shop with AI robots. Give each one a prompt and instructions, then catch the mistakes they still make." |
+
+**Suites.** `drive-taas-ui.cjs` (formal: no dropdown in the top bar, no Version in its menu, the
+factory's ambience and Version v1 behind `?mode=robot-factory`, and no `?mode=` always formal even
+with `taas-mode` set to either factory), `drive-taas-factory-ui.cjs` (section 1 the mode from the
+address and the titles, 1b the Version first in the menu reading v1 and going to v2's page; sections 6
+and 9 without the dropdown), `drive-taas-factory2-ui.cjs` (section 1: the Version first reading v2, v1
+and back with v2's save intact, Back from v2 finding v1 running, TAAS formal with v2 chosen last, the
+old `?mode=robot-factory-v2` link). New breaks: `version-no-nav`, `version-reads-v1`,
+`version-not-first` (v2 list, replacing `mode-no-nav` and `mode-not-stored`), `v1-version-no-nav`,
+`v1-version-hidden`, `v1-reads-v2`, `v1-no-title` (factory list) and `formal-only-remembers`,
+`formal-keeps-mode-param` (formal list). The frame-budget poses now start the factory with
+`eval=MODE.set('robot-factory')` in place of `select=#mode-btn:robot-factory`.
+
+**Frame cost**, re-measured: v1's eight pose 16.7 ms median, 0 of 149 over. v2's eight pose 16.7 ms
+median but 7-21 of 149 over in four runs, against 0 on 2026-10-26; the page with this change stashed
+gave 6-14 of 149 over in the same container the same hour. So the slower frames are from the
+container, not this change (traced by A/B, not by profile).
+
 ## How to change it (formal)
 
 - **Retune:** edit the tables only. Run `.claude/scripts/gates.sh games/taas/index.html`
@@ -2212,6 +2275,10 @@ for a save mismatch whose traced cause was an idle machine's owner, and was reve
 - **Copy rule:** plain ASCII in the page (straight quotes, hyphens); the CD prefers it.
 
 ## History
+
+- 2026-10-27: **Robot Factory, a card of its own** (the CD): first on the games list, opening v2, with
+  a Version selector first in the factory's menu (v2 / v1); TAAS's card is formal only and the mode
+  dropdown is gone from both pages (section Robot Factory, a card of its own).
 
 - 2026-10-26: **Robot factory v2** (the CD's brief, built with no Q&A at the CD's request), a page of
   its own on the same dropdown: the planer and the extractor run by themselves from hoppers, a raw

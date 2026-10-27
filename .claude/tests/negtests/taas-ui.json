@@ -238,5 +238,17 @@
   "file": "games/taas/index.html",
   "old": "<a class=\"mi\" id=\"menu-exit\" href=\"../index.html\">",
   "new": "<a class=\"mi\" id=\"menu-exit\" href=\"index.html\"><!-- @negtest -->"
+ },
+ {
+  "name": "formal-only-remembers",
+  "file": "games/taas/index.html",
+  "old": "    try { return norm(new URLSearchParams(location.search).get('mode')) || 'formal'; } catch (e) { return 'formal'; }",
+  "new": "    let m = null; try { m = norm(new URLSearchParams(location.search).get('mode')); } catch (e) { /* no URL API */ } if (!m) { try { m = norm(localStorage.getItem('taas-mode')); } catch (e) { /* optional */ } } return m || 'formal'; /* @negtest */"
+ },
+ {
+  "name": "formal-keeps-mode-param",
+  "file": "games/taas/index.html",
+  "old": "      if (m === 'formal') { if (u.searchParams.has('mode')) { u.searchParams.delete('mode'); history.replaceState(null, '', u.toString()); } }\n      else if",
+  "new": "      if (m === 'formal') { /* @negtest */ if (!u.searchParams.has('mode')) { u.searchParams.set('mode', m); history.replaceState(null, '', u.toString()); } }\n      else if"
  }
 ]
