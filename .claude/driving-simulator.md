@@ -28,7 +28,7 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 
 | Thing | What was built | Why |
 |---|---|---|
-| Rendering | Hand-written **WebGL2** (the repo's second WebGL page after Wayfinder) | "Realistic" 3D with shadows, headlights and a mirror is not reachable in Canvas 2D; no library, per the no-dependencies rule |
+| Rendering | Hand-written **WebGL2** (the second hand-written WebGL game after Wayfinder; Interlock uses Three.js) | "Realistic" 3D with shadows, headlights and a mirror is not reachable in Canvas 2D; no library, per the no-dependencies rule |
 | Look | Realism inside the scene; the site's neon only on the chrome, HUD fonts and the settings panel | Same split as `experiments/` dioramas |
 | Four road classes | rural 2-lane 55 mph, town 2-lane 35 mph (kerbs, sidewalks, streetlights), arterial 4-lane 45 mph, highway 6-lane 65 mph (undivided, double yellow) | The kit's `standard.roadClasses`; a 6-lane road with a grass median was offered but not chosen |
 | Lane changes between classes | At most one lane per direction at a time, over the kit's MUTCD merge taper (L = W x S, ~165-238 m) | Real practice; a 2 -> 6 jump in one taper would be a 7 m lateral shift |
@@ -46,6 +46,14 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 2. Should the player be able to pick their car (the kit has six) or its colour?
 3. Weather, junctions with signals, or a destination next?
 4. Is the 6-lane class right undivided, or should it get a median?
+
+## Follow-ups not yet done
+
+- **Trees have not had a tree-expert review.** zmhstudio's `tree-expert` agent
+  is meant to see any tree render a human should find realistic; the trees here
+  are the town kit's species drawn as low-poly blobs and cones (conifers by id:
+  `fir-1`, `pine-1`), with a ragged treeline sheet for distant forest. Run it on
+  a forest shot (`teleport(400)`, chase view) before tuning the foliage.
 
 ## Architecture (one file, banner-commented sections)
 
@@ -154,9 +162,11 @@ cycle, settings, a seven-size layout sweep, day vs night pixels and the audio
 levels. Negative-tested 2026-11-01: removing lane-ends signs, the merge, the
 player-as-leader rule or halving the clock each turns rows red.
 
-Screenshots for review: `node` + Playwright with
-`--use-angle=swiftshader --enable-unsafe-swiftshader`; `__DS.teleport(s)`,
-`__DS.SKY.hour`, `__DS.CAM.mode` set the shot. Software rendering is slow
+Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for example
+`node .claude/scripts/shot-page.cjs games/driving-simulator/index.html /tmp/x.png w=844 h=390 wait=4000 eval="__DS.SETTINGS.cycle=0;__DS.SKY.hour=20.5;__DS.teleport(10600);__DS.CAM.mode=0"`
+(sections at the default seed: forest 2-lane from the start, 4-lane from ~1.1 km,
+6-lane ~2.5-4 km, suburb 4-lane ~6.8 km, town ~10.2 km). Lessons that transfer:
+`.claude/notes/20261101-a-realistic-webgl2-scene-in-one-file.md`. Software rendering is slow
 (300-800 ms a frame), so it says nothing about phone frame rate.
 
 ## Measured (2026-11-01)

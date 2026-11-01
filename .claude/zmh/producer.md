@@ -96,6 +96,14 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-11-01, Driving Simulator pass** (pointer moved `44d949d` -> `15ad39d`,
+  range `44d949d..15ad39d`, 5 commits). Refined this session's work: `15ad39d`
+  (the game; its zmh-3d road kit landed in zmhstudio as `15bf09a`). `8471f5b` is
+  the TAAS session's own refine commit, skippable. **Left behind, the TAAS
+  session's:** `e2dd432` (Robot factory v2), `6051cbe` (Robot Factory's own hub
+  card) and `f5a0c34` (v2 configurations, goal 4, uniform logs). Each wrote its
+  learnings into `.claude/taas.md`, but no refine pass has read them.
+
   **2026-10-21, TAAS pass** (pointer moved `0e51881` -> `44d949d`, range
   `0e51881..44d949d`, 9 commits, all TAAS). Refined this session's work:
   `9d69a95` (the goals plan) and `44d949d` (the goals arc, an oversee run).
