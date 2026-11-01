@@ -29,6 +29,7 @@ local-2p.
 | CYOA | `cyoa/` | tabletop-rpg | voice, text-entry, tap | save-campaign | llm-game-master, speech-narration, procedural-generation, seeded-determinism | solo, local-coop | `.claude/cyoa.md` |
 | TAAS | `taas/` | management-sim | tap | run-based | resource-allocation, systems-simulation, scale-ladder, skill-teaching | solo | `.claude/taas.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
+| Driving Simulator | `driving-simulator/` | driving-sim | steering-wheel, pedal-hold, multi-touch-chord, orbit-drag | open-sandbox | vehicle-physics, simulated-agents, procedural-generation, real-time-3d, day-night-cycle | solo | `.claude/driving-simulator.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -84,7 +85,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-58 games (56 in-repo + 2 external builds).
+59 games (57 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -231,6 +232,24 @@ local-2p.
   and `voice` are CYOA's, reused. What is new is that the narrator reads a **script**:
   the device's own voice over tables, so a game with no model, no key and no network
   still tells its tale aloud.
+
+### Newly opened by the 2026-11-01 build
+- **`driving-sim`** genre + **`steering-wheel`** / **`pedal-hold`** input +
+  **`vehicle-physics`** mechanic (driving-simulator, a direct CD commission). The
+  first game you drive rather than race: an endless two-way US road in WebGL2,
+  seen from the driver's seat (dash gauges, a working rear-view mirror) or from
+  behind or around the car, with no lap, score or finish. It sits apart from
+  `driver-racing` (neon-drift, a top-down time trial on two thumbs): here the
+  input is an on-screen **steering wheel** you grab by the rim and turn, with
+  separate accelerator and brake **pedals** under the other thumb, and the car is
+  a dynamic bicycle model with tyre slip, grip limits, weight transfer and an
+  automatic gearbox. `simulated-agents` is reused for the traffic (an intelligent
+  driver model, merges before a lane tapers away, passing on the left),
+  `procedural-generation` for the road (2-, 4- and 6-lane classes with MUTCD
+  tapers and signs), `day-night-cycle` for the 2.4-minute day. It is also the
+  first page built on zmh-3d's **road kit** (`road-spec/v1`: vehicle proportions,
+  paint mix, US road standard) and its town kit. Next on this axis: weather
+  (rain on the glass, wet roads), junctions with signals, or a destination.
 
 ### Newly opened by the 2026-10-04 build
 - **`animation-sandbox`** genre + **`procedural-animation`** /

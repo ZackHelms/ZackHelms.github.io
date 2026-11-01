@@ -68,7 +68,7 @@ one touch away, not buried.
 |-----------|--------|
 | Fonts | `'Black Ops One'` (headings) + `'Share Tech Mono'` (body/mono) via Google Fonts |
 | Palette | `--bg:#06060e` `--panel:#0b0b16` `--border:#1a1a30` `--green:#39ff14` `--gold:#ffc300` `--blue:#4488ff` `--red:#ff2244` `--white:#dde3ff` `--dim:#8899bb` `--purple:#b44fff` |
-| Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time **clamped to [0, ~100 ms]**: a frame's timestamp can precede the moment the script started, so the first `dt` can come out negative, and one negative step through Animation Rigs A004's physics made every figure NaN for good (2026-10-05). **Documented exception:** `wayfinder/` renders with hand-written **WebGL2 + GLSL** — real 3D terrain is not achievable in Canvas 2D and Three.js would break the no-external-libraries rule. All its assets are still generated procedurally in-file, it keeps a 2D canvas over the top for the HUD, and it degrades gracefully (simulation, map and compass all still run) when WebGL2 is unavailable. Reach for WebGL only when a game genuinely cannot exist without it. **Second documented exception:** `music-mixer/` renders its play surface in **DOM/CSS** — fifteen buttons whose coloured cap, lamp layer, filament core and specular streak are stacked gradients, with `box-shadow` supplying the bezel, the body depth and the coloured light bleed onto neighbouring pads for free. It is a control surface rather than a rendered scene: a canvas would have to re-implement all of that and would still lose crisp text labels. JS only ever writes two custom properties (`--glow`, `--pulse`); there is no draw loop |
+| Rendering | Canvas 2D, `requestAnimationFrame` loop, delta-time **clamped to [0, ~100 ms]**: a frame's timestamp can precede the moment the script started, so the first `dt` can come out negative, and one negative step through Animation Rigs A004's physics made every figure NaN for good (2026-10-05). **Documented exception:** `wayfinder/` renders with hand-written **WebGL2 + GLSL** — real 3D terrain is not achievable in Canvas 2D and Three.js would break the no-external-libraries rule. All its assets are still generated procedurally in-file, it keeps a 2D canvas over the top for the HUD, and it degrades gracefully (simulation, map and compass all still run) when WebGL2 is unavailable. `driving-simulator/` is the second WebGL2 page (2026-11-01): realistic driving with shadows, headlights, a working rear-view mirror and a cockpit is not reachable in Canvas 2D; it renders camera-relative (every mesh drawn at `anchor - eye`) so precision holds 100 km down the road, keeps a 2D canvas over the top for the wheel, pedals and speed, and shows a plain message where WebGL2 is missing. Reach for WebGL only when a game genuinely cannot exist without it. **Second documented exception:** `music-mixer/` renders its play surface in **DOM/CSS** — fifteen buttons whose coloured cap, lamp layer, filament core and specular streak are stacked gradients, with `box-shadow` supplying the bezel, the body depth and the coloured light bleed onto neighbouring pads for free. It is a control surface rather than a rendered scene: a canvas would have to re-implement all of that and would still lose crisp text labels. JS only ever writes two custom properties (`--glow`, `--pulse`); there is no draw loop |
 | Input | Touch + mouse events, `user-select:none`, `touch-action:manipulation` |
 | No dependencies | Zero external JS libs; Google Fonts is the only external resource. **Documented exception:** `cyoa/` calls the Anthropic Messages API at runtime with the player's own key (raw `fetch`, no SDK), and optionally OpenAI / ElevenLabs — `.claude/cyoa.md`; `cyoa2/` calls the Anthropic Messages API the same way, only where the player has given Claude a part of the table, and optionally OpenAI's speech for the narrator's voice (the player's own key again): its default Game Master is a script and its default narrator the device's own voice, and with those the page calls nothing at all; its other phones at the table connect phone to phone over WebRTC with no server and no STUN, so that calls nothing either — `.claude/cyoa2.md` |
 | Responsive | Portrait/landscape via `@media (orientation:landscape)` or `100dvh` layout; a canvas inside a flex column needs `min-height:0` or its intrinsic 300:150 ratio overflows landscape |
@@ -1131,6 +1131,24 @@ projection onto Canvas 2D (tiled faces, painter's sort) rather than WebGL. Hub
 icon is `animation-rigs/icon.svg` via the same CSS override Phasic uses (the card
 keeps 🩻 for the sync check). Suite: `.claude/tests/drive-animation-rigs.cjs`.
 Detailed context: `.claude/animation-rigs.md`.
+
+### DRIVING SIMULATOR (`driving-simulator/index.html`, ~2,700 lines)
+An endless two-way US road driven in **WebGL2** (CD commission 2026-11-01, placed after
+Animation Rigs on the hub; open MIT). Free drive: no score, no fail state. Three views
+from the car button top right: **cockpit** (dashboard, an instrument cluster drawn to a
+canvas texture, a turning steering wheel and a rear-view mirror that is a second camera),
+**chase** and **orbit**. The road runs through four classes from zmh-3d's road kit
+(rural 2-lane 55 mph, town 2-lane 35 mph with kerbs and streetlights, arterial 4-lane 45,
+highway 6-lane 65), one lane per direction at a time over MUTCD-length tapers, with
+speed-limit and lane-ends signs. Traffic both ways on an intelligent driver model, merging
+before a lane ends and passing on the left. A 24-hour day takes **2.4 minutes** by
+default, set in the cog's settings (24 s to real time, or stopped). Steer by grabbing the
+on-screen wheel's rim; accelerator and brake pedals under the other thumb; tap the hub
+for the horn. The car's proportions, the traffic's, the paint mix and every road
+dimension come from zmh-3d's `road-spec/v1` kit; houses, shops, offices and trees from
+its town kit, spliced in by `build-kits.mjs` (never hand-edit the `KITS` block). Suite:
+`.claude/tests/drive-driving-simulator.cjs` (55 checks). Detailed context:
+`.claude/driving-simulator.md`.
 ---
 
 ## Adding a New Game
