@@ -50,7 +50,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-01 15:21 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-01 15:55 UTC</div>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
@@ -72,6 +72,8 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
       <option value="86400">24 hours (real time)</option>
       <option value="0">stopped</option>
     </select></div>
+  <div class="row"><label for="season-sel">Season</label>
+    <select id="season-sel"><option value="spring">spring</option><option value="summer" disabled>summer</option><option value="autumn" disabled>autumn</option><option value="winter" disabled>winter</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
   <h3>ROAD</h3>
   <div class="row"><label for="traffic-sel">Traffic</label>
@@ -220,7 +222,9 @@ const SET_KEY = 'drivingSimulator.settings.v1';
 // One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
 const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'];
 // perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
-const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2,
+// season: only spring is selectable so far (the sun's declination of 15 deg is a Raleigh spring); the others are listed, greyed out
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring'];
+const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2, season: 'spring',
   vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])) };
 try {
   const saved = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {};
@@ -229,6 +233,7 @@ try {
   if (saved.radio === 0 && !saved.vols) SETTINGS.vols.music = 0;   // the old radio on/off switch becomes the radio's volume
 } catch (e) { /* private mode */ }
 delete SETTINGS.radio;
+if (!SEASONS_OPEN.includes(SETTINGS.season)) SETTINGS.season = 'spring';
 function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } }
 
 // ---------------------------------------------------------------- the road
@@ -2789,7 +2794,7 @@ const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)
 $('chan-rows').innerHTML = VOL_KEYS.map(k => `<div class="row"><label for="vol-${k}">${VOL_LABELS[k]}</label><input id="vol-${k}" data-k="${k}" class="chan" type="range" min="0" max="100" step="1"></div>`).join('');
 $('station-sel').innerHTML = STATIONS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('');
 function syncSettingsUI() {
-  $('cycle-sel').value = String(SETTINGS.cycle); $('traffic-sel').value = String(SETTINGS.traffic);
+  $('cycle-sel').value = String(SETTINGS.cycle); $('traffic-sel').value = String(SETTINGS.traffic); $('season-sel').value = SETTINGS.season;
   $('units-sel').value = SETTINGS.units; $('gfx-sel').value = String(SETTINGS.gfx); $('mirror-sel').value = String(SETTINGS.mirror);
   $('perf-sel').value = String(SETTINGS.perf); $('station-sel').value = String(SETTINGS.station); $('vol').value = String(SETTINGS.vol);
   for (const k of VOL_KEYS) $('vol-' + k).value = String(SETTINGS.vols[k]);
@@ -2803,6 +2808,7 @@ $('set-btn').addEventListener('click', openSettings);
 $('set-close').addEventListener('click', closeSettings);
 setPanel.addEventListener('click', e => { if (e.target === setPanel) closeSettings(); });
 $('cycle-sel').addEventListener('change', e => { SETTINGS.cycle = +e.target.value; saveSettings(); });
+$('season-sel').addEventListener('change', e => { if (SEASONS_OPEN.includes(e.target.value)) { SETTINGS.season = e.target.value; saveSettings(); } else e.target.value = SETTINGS.season; });
 $('traffic-sel').addEventListener('change', e => { SETTINGS.traffic = +e.target.value; saveSettings(); });
 $('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); if (booted) drawGauges(); });
 $('gfx-sel').addEventListener('change', e => { SETTINGS.gfx = +e.target.value; saveSettings(); resize(); makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
@@ -2920,7 +2926,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { SEASONS, SEASONS_OPEN, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

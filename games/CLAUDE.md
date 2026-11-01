@@ -1145,12 +1145,12 @@ before a lane ends and passing on the left. A 24-hour day takes **2.4 minutes** 
 default, set in the cog's settings (24 s to real time, or stopped). Steer by grabbing the
 on-screen wheel's rim; accelerator and brake pedals under the other thumb; tap the hub
 for the horn; hold the brake a second at 0 mph to back up; a cruise control button above
-the accelerator. The settings pause the game and hold a radio station selector (four
-stations), a volume slider per sound, and performance stats (pure green FPS at the top and
+the accelerator. The settings pause the game and hold a season (spring; the others greyed out until
+backlog DS-3), a radio station selector (four stations), a volume slider per sound, and performance stats (pure green FPS at the top and
 a block of frame, CPU, GPU, draw-call and triangle numbers, on by default). The car's proportions, the traffic's, the paint mix and every road
 dimension come from zmh-3d's `road-spec/v1` kit; houses, shops, offices and trees from
 its town kit, spliced in by `build-kits.mjs` (never hand-edit the `KITS` block). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (77 checks). Detailed context:
+`.claude/tests/drive-driving-simulator.cjs` (78 checks). Detailed context:
 `.claude/driving-simulator.md`.
 ---
 

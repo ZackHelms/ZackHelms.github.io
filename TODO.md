@@ -1,9 +1,10 @@
 # TODO — ZackHelms.github.io backlog
 
 Buckets in order: In progress · Now · Needs Zack · Next · Later · Icebox.
-Done log: `DONE.md`. Created 2026-07-31 scoped to **Phasic** — other work
-in this repo is tracked per-game in `.claude/<game>.md` until it earns a
-backlog entry here.
+Done log: `DONE.md`. Created 2026-07-31 scoped to **Phasic**; since then other
+games' entries have joined, each tagged with its game (`[taas]`, `[cyoa2]`,
+`[driving-sim]`...). Work that has not earned an entry here is tracked per game
+in `.claude/<game>.md`.
 
 ## In progress
 
@@ -11,7 +12,34 @@ backlog entry here.
 
 ## Now
 
-- (none)
+- [driving-sim] **A real star field: the sky from Raleigh, NC, in spring** (the CD,
+  2026-11-01: "fix the star field rotation. It looks like i am at the earths rotational
+  north pole and star field spins around like a spinning top"). Cause traced:
+  `skyCol()` turns hash-grid stars about the zenith (`uStarRot = hour/24*TAU`). Build
+  real catalogue stars (BSC5 to about mag 5) turned about the celestial pole at
+  latitude 35.78 N by the spring date's sidereal time, drawn in one `gl.POINTS` pass,
+  with the sun's clock taken from the same date (May 5: sunrise 06:18, sunset 20:03
+  EDT). Plan-shaped. Spec, the worked star positions the checks use, and the files:
+  `.claude/driving-simulator.md` § Backlog, DS-1.
+
+- [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
+  2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly
+  (a little in left too is realistic), also doppler effect should be realistically
+  simulated"). A pool of 6 voices for the nearest cars (engine and tyre roar),
+  distance and air absorption, an equal-power pan clamped to plus or minus 0.8 (right
+  about 0.99, left about 0.16 abeam), a Doppler factor computed every frame
+  (c = 343 m/s), and an "Other cars" volume slider. Plan-shaped. Spec and checks:
+  `.claude/driving-simulator.md` § Backlog, DS-2.
+
+- [driving-sim] **Summer, autumn and winter become selectable** in the Season
+  dropdown. The dropdown shipped 2026-11-01 with spring selected and the other three
+  greyed out, as asked ("other seasons are visible but not selectable (yet)"). Each
+  season becomes Raleigh at its date: the sun and stars (from DS-1's table), the
+  broadleaf trees (deeper green, autumn colours, bare in winter; conifers unchanged),
+  grass from fresh green to dormant straw, insects and birds; switching rebuilds the
+  chunks in place. **After DS-1.** Plan-shaped; its defaults were chosen and can be
+  overruled at plan review. Spec and checks: `.claude/driving-simulator.md` § Backlog,
+  DS-3.
 
 ## Needs Zack
 

@@ -57,10 +57,11 @@
 - Icebox bucket: Icebox
 - In-progress SOP: no
 - Done log: DONE.md
-- **Note:** `TODO.md`/`DONE.md` exist but are scoped to **Phasic** only
-  (created 2026-07-31/08-01) — other games' work is tracked per-game in
-  `.claude/<game>.md` until it earns a CD-facing backlog entry here (see
-  `TODO.md`'s own header note).
+- **Note:** `TODO.md`/`DONE.md` were created 2026-07-31/08-01 for **Phasic**
+  and are now shared: every entry carries its game's tag (`[phasic]`,
+  `[taas]`, `[cyoa2]`, `[driving-sim]`...), and an entry's detail lives in that
+  game's `.claude/<game>.md` (the entry points at the section). Work that has
+  not earned a CD-facing entry stays in the game's file only.
 
 ## Plans
 - Plans dir: `.claude/plans/` (archive: `.claude/plans/DONE/`)

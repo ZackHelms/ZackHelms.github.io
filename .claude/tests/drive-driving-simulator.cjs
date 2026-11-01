@@ -397,6 +397,11 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   await page.click('#set-close');
   ok('settings open on the cog and offer the day length (2.4 min selected)', panel.open && panel.cyc === '144', panel);
   ok('changing the day length in settings takes effect', cyc600 === 600, cyc600);
+  const season = await page.evaluate(() => { const el = document.getElementById('season-sel');
+    return { v: el.value, saved: window.__DS.SETTINGS.season, opts: [...el.options].map(o => [o.value, o.disabled]), section: el.closest('.row').previousElementSibling.querySelector('select')?.id };
+  });
+  ok('a season dropdown in TIME: spring selected, summer, autumn and winter listed but not selectable', season.v === 'spring' && season.saved === 'spring' && season.section === 'cycle-sel'
+    && JSON.stringify(season.opts) === JSON.stringify([['spring', false], ['summer', true], ['autumn', true], ['winter', true]]), season);
 
   // ---- 8. pixels: a real picture, and night is darker than day ----
   const lum = async () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => {

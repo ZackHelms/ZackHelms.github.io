@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (77 checks).
+`.claude/tests/drive-driving-simulator.cjs` (78 checks).
 
 ## The CD's brief (verbatim)
 
@@ -105,8 +105,255 @@ What was built, and the one cause that was traced:
 2. Should the player be able to pick their car (the kit has six) or its colour?
 3. Weather, junctions with signals, or a destination next?
 4. Is the 6-lane class right undivided, or should it get a median?
-5. Cruise control has no +/- buttons (set, then tap again to change). Wanted?
-6. Should traffic make sound? Other cars are silent today.
+5. ~~Cruise control +/- buttons?~~ The CD, 2026-11-01: "Cruise control as is for now."
+6. ~~Should traffic make sound?~~ The CD, 2026-11-01: yes, in stereo with Doppler: backlog DS-2.
+7. The moon is placed by a rule of thumb (`celestial(H + 12.8, -DECL * 0.6)`), not by the
+   date. Should it follow the season's real date, phase included? (Not asked; noticed
+   while specifying DS-1.)
+
+## Backlog (the CD's third message, 2026-11-01), specified for plan-gen
+
+The CD, verbatim:
+
+> Cruise control as is for now.
+>
+> Other cars should make sound yes; stereo so that if i pass a car and it is on my right i hear it in right speaker mostly (a little in left too is realistic), also doppler effect should be realistically simulated. Add this to backlog for driving simulator.
+>
+> Oh yeah, fix the star field rotation. It looks like i am at the earths rotational north pole and star field spins around like a spinning top. Should look like star field looks to me in the sky from perspective of raleigh north Carolina in the spring. Add this to driving sim backlog.
+>
+> Add to settings a season dropdown menu defaults to spring and other seasons are visible but not selectable (yet; add this to the backlog for "driving sim").
+
+The season dropdown itself shipped the same day (`build 2026-11-01 15:55 UTC`): a
+**Season** row in TIME, spring selected, summer / autumn / winter listed but
+disabled, `SETTINGS.season` saved, `SEASONS` and `SEASONS_OPEN` in the page, a
+suite row. The three items below are `TODO.md` § Now. Each is one plan. DS-3
+needs DS-1's date model, so it goes after it. Every step runs `gates.sh`, so a
+step that moves the sun must restate the suite's sun row in that step (producer
+config § Plans, "plan the seams"). The defaults marked *chosen* were set when
+the item was written; the CD may overrule them at plan review, but they need no
+answer to start.
+
+### DS-1. A real star field: the sky from Raleigh, NC, in spring
+
+**The cause, traced 2026-11-01.** `skyCol()` in `GLSL_COMMON` turns the star
+lookup direction about the world's vertical axis (`sd.xz` rotated by
+`uStarRot`), and `setFrameUniforms()` sets `uStarRot = SKY.hour / 24 * TAU`.
+A sky turning about the zenith is the sky at the North Pole. The stars are
+also not real: a hash over (azimuth, elevation) cells (`step(0.985, h21(cell))`),
+so there are no constellations, and the grid's cells crowd together at the
+zenith.
+
+**Build.**
+
+1. **Observer.** Raleigh, NC: latitude 35.7796 N, longitude 78.6382 W. This
+   replaces `LAT = 36 deg`.
+2. **One date per season** in a table that replaces `DECL` and `SOLAR_NOON`.
+   - Spring is **May 5, at UTC-4 (EDT)**, the middle of spring (*chosen*).
+   - The rows DS-3 will use: summer Aug 6 (UTC-4), autumn Nov 6 (UTC-5),
+     winter Feb 4 (UTC-5).
+   - The sun's declination, the equation of time and solar noon come from the
+     date, by NOAA's general solar position equations. For the spring date,
+     computed here 2026-11-01: declination +16.0 deg, equation of time
+     +3.5 min, solar noon 13:11, sunrise 06:18, sunset 20:03 EDT.
+   - The suite recomputes these with its own copy of the formula; it never
+     copies these numbers.
+   - The suite's existing row ("the sun sets about 7:45 pm and rises about
+     6:15 am") must be restated in the same step, to within 10 min of the
+     computed times.
+3. **A real catalogue** of the stars the eye sees, to about magnitude 5.0
+   (about 1,600 stars). Each star has RA and Dec (J2000), V magnitude and B-V
+   colour. *Chosen* source: the Yale Bright Star Catalogue, 5th ed. (BSC5,
+   VizieR V/50).
+   - Check its terms before using it, and record the source (and any
+     attribution it asks for) here and in the settings' notes.
+   - A committed, dependency-free script packs it into a marked block in the
+     page (the `build-kits.mjs` pattern); nobody types star data by hand.
+   - This container's proxy may refuse the download. If it does, the plan stops
+     and asks the CD for the file; it does not invent star data.
+   - Precession from J2000 to 2026 (about 0.36 deg) may be ignored; say so in
+     the code.
+4. **One rotation from catalogue to sky.** Local sidereal time is
+   `LST(hour) = LST0(season) + 15 deg x hour`.
+   - It uses the solar rate on purpose. The game's date never advances, and the
+     true sidereal rate would jump the sky about 1 deg at every midnight.
+   - Spring LST0 (local midnight, May 5) is 204.4 deg; at 22:00, LST is
+     11.69 h.
+   - Axes are those of `celestial()`: x east, y up, z north. The celestial
+     pole sits due north at an altitude equal to the latitude.
+   - Stars rise in the east and set in the west. Stars north of
+     dec +54.2 deg never set.
+5. **Drawing.** One `gl.POINTS` draw right after the sky in `renderScene()`,
+   so the mirror gets it too.
+   - Depth test off, like the sky; the world and the ridge cover it.
+   - Each vertex is a unit vector in equatorial coordinates; one matrix
+     uniform turns it into the sky.
+   - Size and brightness come from magnitude, and colour from B-V.
+   - Faded by `SKY.night`, and dimmed toward the horizon by airmass (about
+     0.2 mag per airmass).
+   - Delete the hash stars and `uStarRot`.
+   - Cost: one draw call and about 1,600 vertices; check it on the perf block.
+6. **Out of scope:** the moon (open question 7) and the Milky Way.
+
+**Checks.** Each is its own row and each is negative-tested.
+
+- **Polaris** (RA 2h31m49s, Dec +89 15' 51'') sits at altitude 35.0-35.6 deg
+  and azimuth 359.0-0.5 deg at every hour of the game day. Computed for 22:00:
+  35.2 deg, 359.4 deg.
+- **Each star circles the pole, not the zenith.** Its angle to the pole stays
+  constant within 0.05 deg over 24 game hours. Dubhe (dec +61.75 deg) never
+  sets; Arcturus (dec +19.2 deg) rises and sets.
+- **The spring sky at 22:00 on May 5.** Each star is checked against the
+  suite's own alt/az formula, never the page's, to within 0.5 deg:
+
+  | Star | Altitude | Azimuth | Where |
+  |---|---|---|---|
+  | Regulus | 58.3 | 227 | high, south-west |
+  | Arcturus | 52.3 | 106 | east |
+  | Spica | 37.0 | 147 | south-east |
+  | Dubhe | 63.4 | 350 | high, north |
+  | Vega | 12.4 | 51 | rising, north-east |
+  | Betelgeuse | 7.1 | 274 | setting, west |
+  | Sirius | 2.6 | 247 | on the south-west horizon |
+
+- **Stars move west.** A star in the east climbs over one game hour.
+- **Pixels.** At midnight the sky above the ridge holds star pixels whichever
+  way the camera looks; at noon it holds none.
+
+**Files:** `index.html` (the constants, `celestial()`, `updateSky()`,
+`setFrameUniforms()`, `skyCol()`, `renderScene()` and a star data block), a
+star build script beside `build-kits.mjs`, the suite, and this file.
+
+### DS-2. Other cars make sound, in stereo, with real Doppler
+
+**Build.**
+
+1. **Voices.** The 6 traffic cars nearest the listener within 150 m each get a
+   voice from a fixed pool built once in `SND.unlock()`.
+   - No AudioNodes are created per frame.
+   - When a voice moves to another car it fades over about 80 ms, so nothing
+     clicks.
+   - The 7th-nearest car, and any car beyond 150 m, is silent.
+2. **A voice's sound.**
+   - An engine like the player's: two saws and a square through a lowpass.
+     Its pitch comes from the car's speed (`c.v`) through the same gearbox
+     shape, scaled by `c.kind`: lower for `boxTruck` and `pickup`, higher for
+     `hatchback`.
+   - Tyre roar: band-passed noise from the shared buffer on the voice's own
+     BufferSource, so that source's `playbackRate` can carry the Doppler.
+     Its level follows speed.
+   - Then air absorption: a lowpass falling with distance, from about 16 kHz
+     at 5 m to about 3 kHz at 150 m.
+   - Then distance: inverse-distance gain, reference 5 m, clamped near 1 m.
+   - Then the stereo pan.
+   - Then a new **`traffic` channel** into `sfx`. Add `traffic` to `VOL_KEYS`
+     and its label "Other cars" to `VOL_LABELS`; the settings rows are built
+     from `VOL_KEYS`. It defaults to 100, and the existing merge gives old
+     saves 100.
+   - In the cockpit, the glass muffles it the way it muffles the ambient bed
+     (lowpass at about 1.5 kHz, x0.5).
+3. **The listener is the camera.** It stands at `CAM.eye` and faces `CAM.fwd`,
+   so the cockpit, chase and orbit views each hear from where they look. Its
+   velocity is the player's car velocity in every view.
+4. **Stereo.** θ is the source's bearing from the listener's facing (0 ahead,
+   +90 deg to the right), and `p = 0.8 x sin θ`.
+   - Equal-power pan: `L = cos((p + 1) π / 4)`, `R = sin((p + 1) π / 4)`.
+   - A car abeam on the right then plays R ≈ 0.99 and L ≈ 0.16: mostly the
+     right, a little in the left, as the CD asked.
+   - Use explicit L/R gains (a ChannelMerger) so the law can be tested.
+5. **Doppler, computed by hand.** Web Audio's PannerNode no longer applies
+   Doppler.
+   - `f' = f x (c + v_L·û) / (c + v_S·û)`, where c = 343 m/s, û is the unit
+     vector from the listener to the car, v_L the listener's velocity and v_S
+     the car's (`c.dir x c.v` along its heading).
+   - Apply it every frame to the engine oscillators' frequencies and the tyre
+     source's `playbackRate`, with a time constant of about 30 ms, so a
+     pass-by sweeps rather than steps.
+   - Worked case, an oncoming car with both at 25 m/s: x1.157 approaching,
+     x0.864 receding, a drop of about five semitones.
+   - Worked case, overtaking at 5 m/s relative: under 1.5%.
+6. **Level.** Measure it with `SND.rms('traffic')`; never set it by ear. A car
+   passing 4 m away at 25 m/s, heard from outside the car, sits at 0.5-1.0x the
+   player's engine at a cruise; in the cockpit, about half that.
+7. **The paused menu** holds traffic sound as it was, like every other sound.
+
+**Checks.**
+
+- **Stereo.** A car parked 6 m to the listener's right gives a right/left RMS
+  ratio of 4-12, measured on a channel splitter with an analyser per side
+  (probes `trafficL` and `trafficR`). Mirror it for the left. A car dead ahead
+  gives L and R within 10% of each other.
+- **Doppler.** For an oncoming car, a receding car and a car at the same speed,
+  the voice's applied factor equals the formula within 0.5%. An FFT of the
+  traffic channel shows the engine peak moving by the same ratio within 3%.
+- **The slider.** "Other cars" at 0 silences the traffic channel and nothing
+  else.
+- **The pool.** At most 6 voices play, and they belong to the 6 nearest cars.
+  No AudioNode is created after unlock over 60 s of heavy traffic (count them
+  by wrapping `ac.create*`).
+- **Range.** A car beyond 150 m is silent.
+
+**Files:** `index.html` (`SND`, `VOL_KEYS`, `VOL_LABELS`), the suite, and this
+file.
+
+### DS-3. Summer, autumn and winter become selectable
+
+Comes after DS-1, which supplies the date per season and the sun and stars from
+that date.
+
+**Build.** Remove the `disabled` flags and grow `SEASONS_OPEN`; spring stays
+the default. Each season is Raleigh as it looks at that season's date, and
+every part below is *chosen*.
+
+- **Sun and stars come from DS-1's table.**
+
+  | Season | Declination | Sunrise | Sunset | Clock | LST0 |
+  |---|---|---|---|---|---|
+  | Summer | +16.9 deg | 06:25 | 20:15 | EDT | 296.1 deg |
+  | Autumn | -15.8 deg | 06:40 | 17:15 | EST | 41.8 deg |
+  | Winter | -16.5 deg | 07:13 | 17:43 | EST | 130.5 deg |
+
+  These are NOAA computations made 2026-11-01; recompute them, don't copy
+  them. A winter evening should then show Orion high in the south.
+- **Trees.** The broadleaf species (`oak-1`, `maple-1`, `birch-1`, `sapling-1`
+  and the street trees `tree-1`..`tree-3`) change with the season. Conifers
+  (`fir-1`, `pine-1`) do not change.
+  - Summer: a deeper green.
+  - Autumn: maple red-orange, oak russet-brown, birch and street trees yellow,
+    varied per tree by a hash so a forest is never one colour.
+  - Winter: bare. A trunk and a few branch limbs replace the canopy blobs; this
+    is new geometry, and the colliders keep the trunk.
+  - Bushes: green in spring and summer, browner in autumn, thin in winter.
+- **Grass and verges** (`grassColor()`).
+  - Spring: fresh green.
+  - Summer: deeper green, a little dry.
+  - Autumn: tan-green.
+  - Winter: dormant straw-brown. Raleigh's warm-season lawns go dormant.
+  - No snow. Raleigh sees only a few snow days a year, and snow would be a
+    weather item.
+- **Ambient** (`bird()`, `cricket()`).
+  - Summer: cicadas by day, katydids at night, louder.
+  - Autumn: crickets, and fewer birds.
+  - Winter: a few birds and no insects.
+- **Switching season** rebuilds the loaded chunks, because their meshes bake
+  colour in. Do it the way `teleport()` rebuilds, keeping the player's `s` and
+  `u` and the traffic.
+
+**Checks.**
+
+- Each season is selectable and is saved.
+- Each season's sunrise and sunset are within 10 min of the NOAA computation.
+- Each season shows its own sky, for example winter at 22:00 against the
+  suite's own alt/az for Betelgeuse and Rigel.
+- A sampled broadleaf canopy's colour falls in that season's hue band; a winter
+  broadleaf tree has no canopy vertices; conifers are identical in every season.
+- Grass hue falls in each season's band.
+- No insect sound in winter.
+- The player's `s` and `u` are unchanged across a switch.
+- Spring stays exactly as shipped: the same vertex hash for the same chunks.
+
+**Files:** `index.html` (the season table, the settings handler,
+`buildChunk()` and the tree builders, `grassColor()`, the ambient functions),
+the suite, and this file.
 
 ## Follow-ups not yet done
 
@@ -209,6 +456,7 @@ What was built, and the one cause that was traced:
 - **Settings** (cog): day length (24 s / 1 min / **2.4 min** / 10 min / 24 min /
   1 h / real time / stopped), time of day, traffic, units, graphics
   (resolution scale, shadows, props distance), mirror, performance stats, the
+  season (spring only so far; the rest listed, greyed out: backlog DS-3), the
   radio station, all sound and a slider per sound, and the how-to and road
   notes. Opening it pauses the game. Persisted in `drivingSimulator.settings.v1`.
 - **Performance stats** (`PERF`): see the second brief. The draw-call counter
