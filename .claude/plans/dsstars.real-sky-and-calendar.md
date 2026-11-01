@@ -1,6 +1,9 @@
 # dsstars - Driving Simulator: the real sky over Raleigh, NC, and a calendar that runs a day per game day (DS-1)
 
-**Status:** DRAFT
+**Status:** PARTIALLY IMPLEMENTED 2026-11-01 - step 1 of 5 done, on branch `claude/brave-sagan-odwmrd`
+(not on `main`). Stopped at step 2: the agent proxy still refuses `cdsarc.cds.unistra.fr` (CONNECT
+403 at 19:05 and 20:17 UTC, in a container started after the CD's answer). Details and what to do:
+`dsstars.real-sky-and-calendar.follow-up.md`.
 **Requested:** 2026-11-01, the CD (third message of the day, verbatim):
 
 > Oh yeah, fix the star field rotation. It looks like i am at the earths rotational north pole and
@@ -320,7 +323,12 @@ Profile: **balanced** (assumed: this repo has no task-scoping skill, `.claude/zm
    immediately before any push to `main`.
 2. Read this file in full, including every step's Results. Then read `.claude/driving-simulator.md`:
    § Backlog DS-1, § Architecture, § Testing, and the "Assumed, not decided" table.
-3. Check out `ds-stars` (create it from `main` at step 1). Run the first step in the table below that
+3. **Step 1 is on `origin/claude/brave-sagan-odwmrd`, not `ds-stars`** (the session that ran it could
+   push only to its own designated branch, and `main` must not get the game's half before step 5).
+   Start from that branch: a worktree cut from `main` (as an oversee run cuts one) merges
+   `origin/claude/brave-sagan-odwmrd` in before anything else, then re-runs the gates (86 checks).
+   Read "ds-stars" below as the branch the arc lives on, and push to whatever branch your own
+   session may push to. Run the first step in the table below that
    is not DONE, and only that one. Then tick it, append a Results section (append, never rewrite),
    commit, push the branch (`git push -u origin ds-stars`), stop and report. **Never push to `main`
    before step 5.**
@@ -348,7 +356,7 @@ The CD's standing preferences:
 |---|---|---|
 | 0 | The CD's words, the catalogue answer and the spec corrections recorded (this file) | DONE 2026-11-01 |
 | 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | DONE 2026-11-01 |
-| 2 | Catalogue: V/50 downloaded and its terms read, `build-stars.mjs`, the STARS block; catalogue rows | |
+| 2 | Catalogue: V/50 downloaded and its terms read, `build-stars.mjs`, the STARS block; catalogue rows | BLOCKED 2026-11-01: host refused |
 | 3 | Sidereal time, sky matrix, star pass, `ridgeY()`, hash stars deleted; star and pixel rows | |
 | 4 | Break list run whole, frame cost, docs | |
 | 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
