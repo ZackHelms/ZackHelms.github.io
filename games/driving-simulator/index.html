@@ -41,7 +41,9 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 .row select,.row input[type=range]{background:var(--bg);border:1px solid var(--border);border-radius:8px;
   color:var(--green);font-family:'Share Tech Mono',monospace;font-size:13px;padding:5px 6px;min-width:150px}
 .row input[type=range]{accent-color:var(--green);padding:0;height:26px}
-#tod-val{color:var(--gold);min-width:46px;text-align:right}
+#tod-val,#date-val{color:var(--gold);min-width:46px;text-align:right}
+#date-val{white-space:nowrap}
+.row .lbl{color:var(--white)}
 #set-close{display:block;margin:18px auto 8px;background:var(--panel);border:1px solid var(--border);
   border-radius:10px;color:var(--dim);font-family:'Share Tech Mono',monospace;font-size:13px;
   letter-spacing:1px;padding:10px 26px;cursor:pointer}
@@ -75,6 +77,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
   <div class="row"><label for="season-sel">Season</label>
     <select id="season-sel"><option value="spring">spring</option><option value="summer" disabled>summer</option><option value="autumn" disabled>autumn</option><option value="winter" disabled>winter</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
+  <div class="row" id="date-row"><span class="lbl">Date</span><span id="date-val">---</span></div>
   <h3>ROAD</h3>
   <div class="row"><label for="traffic-sel">Traffic</label>
     <select id="traffic-sel"><option value="0.5">light</option><option value="1">normal</option><option value="1.8">heavy</option></select></div>
@@ -222,10 +225,57 @@ const SET_KEY = 'drivingSimulator.settings.v1';
 // One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
 const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'];
 // perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
-// season: only spring is selectable so far (the sun's declination of 15 deg is a Raleigh spring); the others are listed, greyed out
+// season: only spring is selectable so far (the calendar runs Raleigh's spring, Mar 20 - Jun 20, 2026); the others are listed, greyed out
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring'];
+
+// ---------------------------------------------------------------- the calendar
+// The game keeps a date: an integer MJD (Modified Julian Date at 0h UT; May 5, 2026 is 61165).
+// Civil dates come from pure day arithmetic (Hinnant's days_from_civil / civil_from_days on
+// days since 1970-01-01, MJD 40587), never from Date objects: the player's device clock is
+// not in Raleigh's time zone.
+function mjdOf(y, m, d) {
+  y -= m <= 2 ? 1 : 0;
+  const era = Math.floor(y / 400), yoe = y - era * 400;
+  const doy = Math.floor((153 * (m + (m > 2 ? -3 : 9)) + 2) / 5) + d - 1;
+  const doe = yoe * 365 + Math.floor(yoe / 4) - Math.floor(yoe / 100) + doy;
+  return era * 146097 + doe - 719468 + 40587;
+}
+function civilOf(mjd) {
+  const z = mjd - 40587 + 719468, era = Math.floor(z / 146097), doe = z - era * 146097;
+  const yoe = Math.floor((doe - Math.floor(doe / 1460) + Math.floor(doe / 36524) - Math.floor(doe / 146096)) / 365);
+  const doy = doe - (365 * yoe + Math.floor(yoe / 4) - Math.floor(yoe / 100)), mp = Math.floor((5 * doy + 2) / 153);
+  const d = doy - Math.floor((153 * mp + 2) / 5) + 1, m = mp < 10 ? mp + 3 : mp - 9;
+  return { y: yoe + era * 400 + (m <= 2 ? 1 : 0), m, d };
+}
+function weekday(mjd) { return ((mjd + 3) % 7 + 7) % 7; }   // 0 = Sunday
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function dateText(mjd) { const c = civilOf(mjd); return WEEKDAYS[weekday(mjd)] + ' ' + MONTHS[c.m - 1] + ' ' + c.d; }
+// Each season is a run of dates, the astronomical seasons: [first, last, middle] as MJDs. A first
+// visit starts on the middle date; past the last day the date wraps to the first.
+const SEASON_DATES = {
+  spring: [mjdOf(2026, 3, 20), mjdOf(2026, 6, 20), mjdOf(2026, 5, 5)],
+  summer: [mjdOf(2026, 6, 21), mjdOf(2026, 9, 22), mjdOf(2026, 8, 6)],
+  autumn: [mjdOf(2026, 9, 23), mjdOf(2026, 12, 20), mjdOf(2026, 11, 6)],
+  winter: [mjdOf(2026, 12, 21), mjdOf(2027, 3, 19), mjdOf(2027, 2, 4)],
+};
+// The US daylight-saving rule: EDT (UTC-4) from 02:00 on the second Sunday of March to 02:00 on the
+// first Sunday of November, EST (UTC-5) otherwise. The hour is the local clock's. The repeated hour
+// on the fall-back day reads as EDT (the first one); the clock itself carries SKY.dst as state.
+function dstDays(y) {
+  const mar1 = mjdOf(y, 3, 1), nov1 = mjdOf(y, 11, 1);
+  return [mar1 + (7 - weekday(mar1)) % 7 + 7, nov1 + (7 - weekday(nov1)) % 7];
+}
+function utcOffset(mjd, hour) {
+  const [on, off] = dstDays(civilOf(mjd).y);
+  if (mjd > on && mjd < off) return -4;
+  if (mjd === on) return hour >= 2 ? -4 : -5;
+  if (mjd === off) return hour < 2 ? -4 : -5;
+  return -5;
+}
+
 const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2, season: 'spring',
-  vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])) };
+  date: null, vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])) };
 try {
   const saved = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {};
   const vols = Object.assign({}, SETTINGS.vols, saved.vols || {});
@@ -234,6 +284,9 @@ try {
 } catch (e) { /* private mode */ }
 delete SETTINGS.radio;
 if (!SEASONS_OPEN.includes(SETTINGS.season)) SETTINGS.season = 'spring';
+// the saved date (an MJD) carries the moon's phase between visits; one outside the season starts on its middle date
+{ const sd = SEASON_DATES[SETTINGS.season];
+  if (!(Number.isInteger(SETTINGS.date) && SETTINGS.date >= sd[0] && SETTINGS.date <= sd[1])) SETTINGS.date = sd[2]; }
 function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } }
 
 // ---------------------------------------------------------------- the road
@@ -1917,21 +1970,50 @@ function updateChunks(budget) {
 }
 
 // ---------------------------------------------------------------- sun, moon, sky
-const SKY = { hour: 13, sun: [0, 1, 0], moon: [0, -1, 0], sunCol: [0, 0, 0], moonCol: [0, 0, 0], day: 1, night: 0, ambSky: [0, 0, 0], ambGnd: [0, 0, 0], exposure: 1, lights: false };
-// A US summer: latitude 36 N, the sun 15 degrees north, and the clock on daylight time (solar noon at 1 pm),
-// so the sun rises about 6:15 am and sets about 7:45 pm.
-const LAT = 36 * Math.PI / 180, DECL = 15 * Math.PI / 180, SOLAR_NOON = 13;
+// SKY.day is the daylight factor (0-1), not the date: the date is SKY.mjd (the calendar, above).
+// SKY.hour is the local clock; SKY.dst says whether that clock is on daylight time (EDT, UTC-4) or
+// not (EST, UTC-5). dst is state: advanceClock() flips it at 02:00 on the transition days, and it is
+// re-derived by the rule (utcOffset) only at boot, a date step and the time-of-day slider.
+const SKY = { hour: 13, mjd: SETTINGS.date, dst: true, decl: 0, eot: 0, solarNoon: 13,
+  sun: [0, 1, 0], moon: [0, -1, 0], sunCol: [0, 0, 0], moonCol: [0, 0, 0], day: 1, night: 0, ambSky: [0, 0, 0], ambGnd: [0, 0, 0], exposure: 1, lights: false };
+// The observer: Raleigh, NC, in degrees (east positive). The sun's declination, the equation of time and
+// so solar noon come from the date and clock (solar(), NOAA's calculator); no refraction yet, so the
+// sun rises and sets when its centre is at -0.833 deg (May 5: about 6:18 am and 8:05 pm EDT).
+const OBS = { lat: 35.7796, lon: -78.6382 };
+const RAD = Math.PI / 180;
+// NOAA solar calculator (Meeus-based). jd: Julian date (UT). Returns degrees and minutes.
+// Verified while drafting: 0.011 deg from an independent low-precision sun over 5 dates x 48 times.
+function solar(jd) {
+  const T = (jd - 2451545) / 36525, R = Math.PI / 180;
+  const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
+  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
+  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
+  const C = Math.sin(M * R) * (1.914602 - T * (0.004817 + 0.000014 * T)) + Math.sin(2 * M * R) * (0.019993 - 0.000101 * T) + Math.sin(3 * M * R) * 0.000289;
+  const om = 125.04 - 1934.136 * T;
+  const lam = L0 + C - 0.00569 - 0.00478 * Math.sin(om * R);
+  const eps = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60 + 0.00256 * Math.cos(om * R);
+  const decl = Math.asin(Math.sin(eps * R) * Math.sin(lam * R)) / R;
+  const y = Math.tan(eps / 2 * R) ** 2, l = L0 * R, m = M * R;
+  const eot = 4 / R * (y * Math.sin(2 * l) - 2 * e * Math.sin(m) + 4 * e * y * Math.sin(m) * Math.cos(2 * l) - 0.5 * y * y * Math.sin(4 * l) - 1.25 * e * e * Math.sin(2 * m));
+  return { decl, eot };
+}
+// The Julian date (UT) of the game's date and clock. Doubles carry it to well under a second; never pass it to GLSL.
+function julianDate() { return 2400000.5 + SKY.mjd + (SKY.hour - (SKY.dst ? -4 : -5)) / 24; }
+// A body at declination decl (degrees) at local clock hour, as a unit vector: x east, y up, z north.
 function celestial(hour, decl) {
-  const h = (hour - SOLAR_NOON) / 24 * TAU;
-  const up = Math.sin(LAT) * Math.sin(decl) + Math.cos(LAT) * Math.cos(decl) * Math.cos(h);
-  const east = -Math.cos(decl) * Math.sin(h);
-  const north = Math.sin(decl) * Math.cos(LAT) - Math.cos(decl) * Math.sin(LAT) * Math.cos(h);
+  const h = (hour - SKY.solarNoon) / 24 * TAU, lat = OBS.lat * RAD, d = decl * RAD;
+  const up = Math.sin(lat) * Math.sin(d) + Math.cos(lat) * Math.cos(d) * Math.cos(h);
+  const east = -Math.cos(d) * Math.sin(h);
+  const north = Math.sin(d) * Math.cos(lat) - Math.cos(d) * Math.sin(lat) * Math.cos(h);
   return norm3([east, up, north]);
 }
 function updateSky() {
-  const H = SKY.hour;
-  SKY.sun = celestial(H, DECL);
-  SKY.moon = celestial(H + 12.8, -DECL * 0.6);
+  const H = SKY.hour, off = SKY.dst ? -4 : -5;
+  const sol = solar(julianDate());
+  SKY.decl = sol.decl; SKY.eot = sol.eot;
+  SKY.solarNoon = (720 - 4 * OBS.lon - sol.eot) / 60 + off;     // local clock hours
+  SKY.sun = celestial(H, SKY.decl);
+  SKY.moon = celestial(H + 12.8, -SKY.decl * 0.6);                // a placeholder moon until DS-4
   const e = SKY.sun[1];
   SKY.day = smooth(-0.16, 0.28, e);
   SKY.night = 1 - smooth(-0.2, 0.03, e);
@@ -2798,7 +2880,7 @@ function syncSettingsUI() {
   $('units-sel').value = SETTINGS.units; $('gfx-sel').value = String(SETTINGS.gfx); $('mirror-sel').value = String(SETTINGS.mirror);
   $('perf-sel').value = String(SETTINGS.perf); $('station-sel').value = String(SETTINGS.station); $('vol').value = String(SETTINGS.vol);
   for (const k of VOL_KEYS) $('vol-' + k).value = String(SETTINGS.vols[k]);
-  $('tod').value = String(Math.floor(((SKY.hour % 24) + 24) % 24 * 60)); $('tod-val').textContent = clockText();
+  $('tod').value = String(Math.floor(((SKY.hour % 24) + 24) % 24 * 60)); $('tod-val').textContent = clockText(); $('date-val').textContent = dateText(SKY.mjd);
 }
 // the menu pauses the game: the loop stops ticking while it is open (the sound keeps
 // playing as it was, so every slider can be heard as it moves)
@@ -2808,7 +2890,9 @@ $('set-btn').addEventListener('click', openSettings);
 $('set-close').addEventListener('click', closeSettings);
 setPanel.addEventListener('click', e => { if (e.target === setPanel) closeSettings(); });
 $('cycle-sel').addEventListener('change', e => { SETTINGS.cycle = +e.target.value; saveSettings(); });
-$('season-sel').addEventListener('change', e => { if (SEASONS_OPEN.includes(e.target.value)) { SETTINGS.season = e.target.value; saveSettings(); } else e.target.value = SETTINGS.season; });
+$('season-sel').addEventListener('change', e => { const v = e.target.value;
+  if (!SEASONS_OPEN.includes(v)) { e.target.value = SETTINGS.season; return; }
+  if (v !== SETTINGS.season) { SETTINGS.season = v; setDate(SEASON_DATES[v][2]); } else saveSettings(); });
 $('traffic-sel').addEventListener('change', e => { SETTINGS.traffic = +e.target.value; saveSettings(); });
 $('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); if (booted) drawGauges(); });
 $('gfx-sel').addEventListener('change', e => { SETTINGS.gfx = +e.target.value; saveSettings(); resize(); makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
@@ -2820,7 +2904,7 @@ for (const el of document.querySelectorAll('input.chan')) {
   el.addEventListener('input', e => { SETTINGS.vols[e.target.dataset.k] = +e.target.value; saveSettings(); SND.apply(); });
   el.addEventListener('change', e => SND.preview(e.target.dataset.k));
 }
-$('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; $('tod-val').textContent = clockText(); updateSky(); if (booted) drawGauges(); });
+$('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4; $('tod-val').textContent = clockText(); updateSky(); if (booted) drawGauges(); });
 
 // ---------------------------------------------------------------- boot + loop
 function resize() {
@@ -2837,9 +2921,33 @@ addEventListener('orientationchange', () => setTimeout(resize, 200));
 let now = 0, last = 0, booted = false, paused = false;
 // One simulation step: the clock, the driver, the traffic, the road ahead. The
 // loop calls it with the frame's dt; checks call it directly with the loop paused.
+// The clock runs the calendar: each midnight steps the date by one (past the season's last day, to its
+// first), and at 02:00 on the transition days the clock changes as Raleigh's does (UT, and so the sun,
+// runs on without a jump). The hour only ever loses exactly 24 or gains/loses exactly 1.
 function advanceClock(dt) {
   const cyc = SETTINGS.cycle;
-  if (cyc > 0) SKY.hour = ((SKY.hour + dt * 24 / cyc) % 24 + 24) % 24;
+  if (!(cyc > 0)) return;
+  let t = SKY.hour + dt * 24 / cyc, from = SKY.hour;
+  while (t >= 24) { t -= 24; from = 0; nextDate(); }
+  if (from < 2 && t >= 2) {
+    const [on, off] = dstDays(civilOf(SKY.mjd).y);
+    if (SKY.mjd === off && SKY.dst) { t -= 1; SKY.dst = false; }        // fall back: 02:00 EDT is 01:00 EST
+    else if (SKY.mjd === on && !SKY.dst) { t += 1; SKY.dst = true; }    // spring forward: 02:00 EST is 03:00 EDT
+  }
+  SKY.hour = t;
+}
+// One day on, wrapping at the season's end; the clock's daylight time is re-derived at midnight.
+function nextDate() {
+  const sd = SEASON_DATES[SETTINGS.season] || SEASON_DATES.spring;
+  SKY.mjd = SKY.mjd + 1 > sd[1] || SKY.mjd < sd[0] ? sd[0] : SKY.mjd + 1;
+  SKY.dst = utcOffset(SKY.mjd, 0) === -4;
+  SETTINGS.date = SKY.mjd; saveSettings();
+}
+// Set the date (the test hook's way in): daylight time re-derived by the rule at the current hour, and saved.
+function setDate(mjd) {
+  SKY.mjd = mjd; SKY.dst = utcOffset(mjd, SKY.hour) === -4;
+  SETTINGS.date = mjd; saveSettings();
+  updateSky();
 }
 function tick(dt) {
   now += dt;
@@ -2869,7 +2977,7 @@ function frame(ts) {
   const c3 = performance.now();
   SND.update(dt);
   perfFrame(t, raw, c1 - c0, c2 - c1, c3 - c2);
-  if (menuOpen()) { const tv = $('tod-val'); if (tv) tv.textContent = clockText(); }
+  if (menuOpen()) { const tv = $('tod-val'), dv = $('date-val'); if (tv) tv.textContent = clockText(); if (dv) dv.textContent = dateText(SKY.mjd); }
 }
 // GPU time: one query a frame while the detail stats are shown, read back a few frames later
 function gpuBegin() {
@@ -2904,7 +3012,7 @@ function boot() {
   resize();
   initGL();
   initVehicles();
-  SKY.hour = 13;
+  SKY.hour = 13; SKY.mjd = SETTINGS.date; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4;
   resetPlayer();
   updateSky();
   updateChunks(99);
@@ -2926,7 +3034,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { SEASONS, SEASONS_OPEN, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { SEASONS, SEASONS_OPEN, OBS, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, solar, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

@@ -10,13 +10,46 @@
  *
  *   .claude/scripts/gates.sh games/driving-simulator/index.html
  *
- * Exits 0/1 and prints "DRIVING SIMULATOR DRIVE: N passed, M failed" last.
+ * Exits 0/1 and prints "DRIVING SIMULATOR DRIVE: N passed, M failed" last; with DS_PAGE
+ * set (a copy under test) the line ends " (copy)" so it never reads as the shipping page's pass.
  * Needs Chromium; launches with SwiftShader so WebGL2 exists without a GPU.
  */
 const { chromium } = require('playwright-core');
-const PAGE = 'file:///home/user/ZackHelms.github.io/games/driving-simulator/index.html';
+const path = require('path');
+// DS_PAGE: a copy to test instead (negtest-copies.py); the default is this checkout's page,
+// so a worktree tests its own branch and never the primary checkout.
+const COPY = !!process.env.DS_PAGE;
+const PAGE = 'file://' + (process.env.DS_PAGE || path.join(process.cwd(), 'games', 'driving-simulator', 'index.html'));
+const TAIL = COPY ? ' (copy)' : '';
 let pass = 0, fail = 0;
 function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail++; console.log('FAIL  ' + n + (x !== undefined ? '  -> ' + JSON.stringify(x) : '')); } }
+
+// ---- the suite's own calendar and sun (never the page's) ----
+// MJD from the UTC calendar; the sun is the Astronomical Almanac's low-precision sun, turned to
+// alt/az through Meeus 12.4 GMST and Raleigh's longitude. Geometric altitude: no refraction.
+const MJD = (y, m, d) => Date.UTC(y, m - 1, d) / 86400000 + 40587;
+const MAY5 = MJD(2026, 5, 5), MAR20 = MJD(2026, 3, 20), JUN20 = MJD(2026, 6, 20);
+const RAL = { lat: 35.7796, lon: -78.6382 }, DR = Math.PI / 180;
+const jdOf = (mjd, local, off) => 2400000.5 + mjd + (local - off) / 24;
+function aaSun(jd) {
+  const n = jd - 2451545, L = 280.460 + 0.9856474 * n, g = (357.528 + 0.9856003 * n) * DR;
+  const lam = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * DR, eps = (23.439 - 0.0000004 * n) * DR;
+  return { ra: Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)) / DR, dec: Math.asin(Math.sin(eps) * Math.sin(lam)) / DR };
+}
+function gmst(jd) { const T = (jd - 2451545) / 36525; return ((280.46061837 + 360.98564736629 * (jd - 2451545) + 0.000387933 * T * T - T * T * T / 38710000) % 360 + 360) % 360; }
+function ownSun(jd) {   // { alt, dec, ha (deg, -180..180), v: [east, up, north] }
+  const s = aaSun(jd), ha = (((gmst(jd) + RAL.lon - s.ra) % 360) + 540) % 360 - 180, H = ha * DR, d = s.dec * DR, la = RAL.lat * DR;
+  const v = [-Math.cos(d) * Math.sin(H), Math.sin(la) * Math.sin(d) + Math.cos(la) * Math.cos(d) * Math.cos(H), Math.sin(d) * Math.cos(la) - Math.cos(d) * Math.sin(la) * Math.cos(H)];
+  return { alt: Math.asin(v[1]) / DR, dec: s.dec, ha, v };
+}
+// local clock hours of the -0.833 deg crossings on one date (minute scan, interpolated)
+function ownRiseSet(mjd, off) {
+  const ev = []; let prev = ownSun(jdOf(mjd, 0, off)).alt;
+  for (let m = 1; m <= 1440; m++) { const a = ownSun(jdOf(mjd, m / 60, off)).alt; if ((prev < -0.833) !== (a < -0.833)) ev.push({ h: (m - 1 + (-0.833 - prev) / (a - prev)) / 60, up: a > prev }); prev = a; }
+  return ev;
+}
+function ownNoon(mjd, off) { let t = 12; for (let i = 0; i < 6; i++) t -= ownSun(jdOf(mjd, t, off)).ha / 15 / 1.0027379; return t; }
+const angDeg = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) / DR;
 
 (async () => {
   const browser = await chromium.launch({
@@ -39,7 +72,8 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
     return { chunks: D.CHUNKS.size, cars: D.TRAFFIC.cars.length, fmt: ROAD_KIT.format, kinds: ROAD_KIT.vehicles.map(v => v.kind),
       lane: ROAD_KIT.standard.laneWidth, dash: [ROAD_KIT.standard.dashLength, ROAD_KIT.standard.dashGap],
       buildings: TOWN_KIT.buildings.length, forest: TOWN_KIT.forest.length, gl: !!document.getElementById('gl').getContext('webgl2'),
-      cycle: D.SETTINGS.cycle, badge: (document.getElementById('build-badge') || {}).textContent };
+      cycle: D.SETTINGS.cycle, badge: (document.getElementById('build-badge') || {}).textContent,
+      cal: { mjd: D.SKY.mjd, hour: D.SKY.hour, dst: D.SKY.dst, text: D.dateText(D.SKY.mjd), off: D.utcOffset(D.SKY.mjd, D.SKY.hour) } };
   });
   ok('boots with WebGL2, chunks and traffic', boot.gl && boot.chunks >= 12 && boot.cars >= 10, boot);
   ok('road kit is road-spec/v1 with six vehicle kinds', boot.fmt === 'road-spec/v1' && boot.kinds.length === 6, boot.kinds);
@@ -95,7 +129,7 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   ok('every section posts its own speed limit', road.limits === road.limitWant, road);
 
   // ---- 3. the clock: a 24-hour day in 2.4 minutes, configurable ----
-  const clock = await page.evaluate(() => {
+  const clock = await page.evaluate(MAY5 => {
     const D = window.__DS;
     const out = {};
     out.defaultCycle = D.SETTINGS.cycle;
@@ -108,13 +142,19 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
     D.SETTINGS.cycle = 600; D.SKY.hour = 0; for (let i = 0; i < 6000; i++) D.advanceClock(0.1);
     out.after600 = D.SKY.hour;
     D.SETTINGS.cycle = 0; D.SKY.hour = 9; D.advanceClock(50); out.stopped = D.SKY.hour;
+    D.setDate(MAY5);   // the days above stepped the date; noon, midnight and the sun's times are May 5's
     D.SKY.hour = 12; D.updateSky(); out.noon = { e: D.SKY.sun[1], lights: D.SKY.lights, day: D.SKY.day };
     D.SKY.hour = 0; D.updateSky(); out.midnight = { e: D.SKY.sun[1], lights: D.SKY.lights, night: D.SKY.night };
-    D.SKY.hour = 19.75; D.updateSky(); out.dusk = { e: D.SKY.sun[1] };
-    D.SKY.hour = 6.25; D.updateSky(); out.dawn = { e: D.SKY.sun[1] };
+    // the page's sun over the day, a minute at a time, for its -0.833 deg crossings (local clock hours)
+    const alt = h => { D.SKY.hour = h; D.updateSky(); return Math.asin(D.SKY.sun[1]) * 180 / Math.PI; };
+    const ev = []; let prev = alt(0);
+    for (let m = 1; m <= 1440; m++) { const a = alt(m / 60); if ((prev < -0.833) !== (a < -0.833)) ev.push({ h: (m - 1 + (-0.833 - prev) / (a - prev)) / 60, up: a > prev }); prev = a; }
+    out.sunEv = ev; out.mjd = D.SKY.mjd; out.dst = D.SKY.dst;
+    D.SKY.hour = 6.25; D.updateSky();
     D.SETTINGS.cycle = 144;
     return out;
-  });
+  }, MAY5);
+  const ownEv = ownRiseSet(MAY5, -4), hm = h => Math.floor(h) + ':' + String(Math.floor(h % 1 * 60)).padStart(2, '0');
   ok('default day length is 2.4 minutes', clock.defaultCycle === 144 && /2\.4 minutes/.test(clock.optionDefault), clock);
   ok('144 s of driving is exactly one 24-hour day', Math.abs(((clock.after144 - 6 + 24) % 24)) < 1e-6 || Math.abs(clock.after144 - 6) < 1e-6, clock.after144);
   ok('36 s is a quarter day (6 h)', Math.abs(clock.after36 - 12) < 1e-6, clock.after36);
@@ -122,7 +162,115 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   ok('"stopped" holds the time', clock.stopped === 9, clock.stopped);
   ok('sun high at noon, lights off', clock.noon.e > 0.6 && !clock.noon.lights && clock.noon.day > 0.95, clock.noon);
   ok('sun below the horizon at midnight, headlights on', clock.midnight.e < -0.3 && clock.midnight.lights && clock.midnight.night > 0.95, clock.midnight);
-  ok('a summer day: the sun sets about 7:45 pm and rises about 6:15 am', Math.abs(clock.dusk.e) < 0.05 && Math.abs(clock.dawn.e) < 0.05, clock);
+  ok('May 5 in Raleigh: sunrise and sunset within 10 min of the suite\'s own computation (about 6:18 am and 8:05 pm EDT)',
+    clock.mjd === MAY5 && clock.dst === true && clock.sunEv.length === 2 && ownEv.length === 2 && clock.sunEv[0].up && !clock.sunEv[1].up
+    && Math.abs(clock.sunEv[0].h - ownEv[0].h) < 10 / 60 && Math.abs(clock.sunEv[1].h - ownEv[1].h) < 10 / 60,
+    { page: clock.sunEv.map(e => hm(e.h)), own: ownEv.map(e => hm(e.h)), mjd: clock.mjd, dst: clock.dst });
+
+  // ---- 3b. the calendar: a date that steps at midnight, saved, on Raleigh's clock; the sun from the date ----
+  const cb = boot.cal;
+  ok('a first visit is Tue May 5, 2026 at 1:00 pm, EDT', cb.mjd === MAY5 && cb.hour >= 13 && cb.hour < 13.5 && cb.text === 'Tue May 5' && cb.dst === true && cb.off === -4, cb);
+  const K = { MAY5, MAR20, JUN20, APR1: MJD(2026, 4, 1), NOV1: MJD(2026, 11, 1), MAR14: MJD(2027, 3, 14) };
+  const cal = await page.evaluate(K => {
+    const D = window.__DS, o = {};
+    // three game days at the default 2.4-minute day, from 1 pm on May 5
+    D.SETTINGS.cycle = 144; D.SKY.hour = 13; D.setDate(K.MAY5);
+    const steps = [];
+    for (let i = 0; i < 3 * 1440; i++) { const m = D.SKY.mjd, h = D.SKY.hour; D.advanceClock(0.1); if (D.SKY.mjd !== m) steps.push([m, D.SKY.mjd, h, D.SKY.hour]); }
+    o.days = { end: D.SKY.mjd, hour: D.SKY.hour, steps, text: D.dateText(D.SKY.mjd) };
+    // the season's last day, 23:59, stepped past midnight
+    D.SKY.hour = 23 + 59 / 60; D.setDate(D.SEASON_DATES.spring[1]);
+    o.last = { mjd: D.SKY.mjd, text: D.dateText(D.SKY.mjd) };
+    for (let i = 0; i < 3; i++) D.advanceClock(0.1);
+    o.wrap = { mjd: D.SKY.mjd, hour: D.SKY.hour, text: D.dateText(D.SKY.mjd), dst: D.SKY.dst };
+    // a date saved by crossing midnight (Apr 1 -> Apr 2), for a second page to read
+    D.SKY.hour = 23.99; D.setDate(K.APR1);
+    for (let i = 0; i < 3; i++) D.advanceClock(0.1);
+    o.saved = { mjd: D.SKY.mjd, stored: JSON.parse(localStorage.getItem('drivingSimulator.settings.v1') || '{}').date };
+    return o;
+  }, K);
+  ok('crossing midnight steps the date by exactly one: three game days from May 5 are May 8, the hour where it started', cal.days.end === MAY5 + 3 && cal.days.steps.length === 3
+    && cal.days.steps.every(s => s[1] === s[0] + 1 && s[2] > 23.9 && s[3] < 0.1) && Math.abs(cal.days.hour - 13) < 1e-6 && cal.days.text === 'Fri May 8', cal.days);
+  ok('Jun 20 at 23:59, stepped past midnight, becomes Mar 20 (the season wraps to its first day)', cal.last.mjd === JUN20 && cal.last.text === 'Sat Jun 20'
+    && cal.wrap.mjd === MAR20 && cal.wrap.text === 'Fri Mar 20' && cal.wrap.hour > 0 && cal.wrap.hour < 0.1 && cal.wrap.dst === true, cal);
+  // a second page in the same browser reads the saved date; a saved date outside spring falls back to May 5
+  const visit = async () => { const p = await ctx.newPage(); p.on('pageerror', e => errors.push(String(e)));
+    await p.goto(PAGE); await p.waitForFunction(() => window.__DS && window.__DS.SKY, null, { timeout: 60000 });
+    const r = await p.evaluate(() => ({ mjd: window.__DS.SKY.mjd, date: window.__DS.SETTINGS.date, season: window.__DS.SETTINGS.season, text: window.__DS.dateText(window.__DS.SKY.mjd) }));
+    await p.close(); return r; };
+  const v1 = await visit();
+  await page.evaluate(d => { const k = 'drivingSimulator.settings.v1', s = JSON.parse(localStorage.getItem(k) || '{}'); s.date = d; localStorage.setItem(k, JSON.stringify(s)); }, MJD(2026, 8, 1));
+  const v2 = await visit();
+  await page.evaluate(MAY5 => { const D = window.__DS; D.SKY.hour = 13; D.setDate(MAY5); }, MAY5);   // back to May 5, and the store back to this page's own settings
+  ok('the date is saved at midnight and a second visit comes back to it; a saved date outside spring falls back to May 5',
+    cal.saved.mjd === K.APR1 + 1 && cal.saved.stored === K.APR1 + 1 && v1.mjd === K.APR1 + 1 && v1.text === 'Thu Apr 2' && v2.mjd === MAY5 && v2.date === MAY5 && v2.season === 'spring', { saved: cal.saved, v1, v2 });
+  const offs = await page.evaluate(K => {
+    const D = window.__DS, C = [[K.MAY5, 13, -4], [K.MAY5 + 210, 12, -5], [K.MAY5 - 59, 12, -5], [K.MAY5 - 58, 1.99, -5], [K.MAY5 - 58, 2, -4], [K.MAY5 - 57, 0, -4],
+      [K.NOV1 - 1, 23.5, -4], [K.NOV1, 1.99, -4], [K.NOV1, 2, -5], [K.NOV1 + 1, 0, -5], [K.MAR14 - 1, 12, -5], [K.MAR14, 1.99, -5], [K.MAR14, 2, -4], [K.MAR14 + 1, 0, -4]];
+    return C.map(([m, h, want]) => ({ m, h, want, got: D.utcOffset(m, h), text: D.dateText(m) }));
+  }, K);
+  ok('utcOffset follows the US rule: EDT on May 5, EST on Dec 1, the change at 02:00 on Mar 8 and Nov 1, 2026 and on Mar 14, 2027',
+    offs.every(c => c.got === c.want) && offs[3].text === 'Sun Mar 8' && offs[7].text === 'Sun Nov 1' && offs[11].text === 'Sun Mar 14', { wrong: offs.filter(c => c.got !== c.want), days: [offs[3].text, offs[7].text, offs[11].text] });
+  const dstRun = await page.evaluate(K => {
+    const D = window.__DS, o = {};
+    const run = n => { const hs = []; let move = 0, prev = D.SKY.sun.slice();
+      for (let i = 0; i < n; i++) { D.advanceClock(0.1); D.updateSky(); const s = D.SKY.sun;
+        move = Math.max(move, Math.acos(Math.min(1, prev[0] * s[0] + prev[1] * s[1] + prev[2] * s[2])) * 180 / Math.PI); prev = s.slice(); hs.push([D.SKY.hour, D.SKY.dst]); }
+      return { hs, move }; };
+    D.SETTINGS.cycle = 144;
+    // Nov 1, 2026 from 01:50 EDT, for two and a half game hours
+    D.SETTINGS.season = 'autumn'; D.SKY.hour = 1 + 50 / 60; D.setDate(K.NOV1);
+    const d0 = D.SKY.dst, f = run(150);
+    const backs = f.hs.map((x, i) => i && x[0] < f.hs[i - 1][0] ? i : -1).filter(i => i >= 0);
+    o.fall = { d0, backs: backs.length, after: backs.length ? f.hs[backs[0]] : null, end: f.hs[f.hs.length - 1], move: f.move };
+    // Mar 14, 2027 from 01:50 EST, for half an hour
+    D.SETTINGS.season = 'winter'; D.SKY.hour = 1 + 50 / 60; D.setDate(K.MAR14);
+    const s0 = D.SKY.dst, g = run(30);
+    const jumps = g.hs.map((x, i) => i && x[0] - g.hs[i - 1][0] > 0.5 ? i : -1).filter(i => i >= 0);
+    o.spring = { s0, jumps: jumps.length, after: jumps.length ? g.hs[jumps[0]] : null, end: g.hs[g.hs.length - 1], move: g.move };
+    D.SETTINGS.season = 'spring'; D.SKY.hour = 13; D.setDate(K.MAY5);
+    o.restored = { season: D.SETTINGS.season, mjd: D.SKY.mjd, dst: D.SKY.dst };
+    return o;
+  }, K);
+  const fa = dstRun.fall, sp = dstRun.spring;
+  ok('the clock changes at 02:00 as Raleigh\'s does: Nov 1 falls back to 01:0x EST once and never again that night, Mar 14 springs forward, the sun moving < 0.5 deg across each',
+    fa.d0 === true && fa.backs === 1 && fa.after[0] >= 1 && fa.after[0] < 1.1 && fa.after[1] === false && fa.end[0] > 3 && fa.end[1] === false && fa.move < 0.5
+    && sp.s0 === false && sp.jumps === 1 && sp.after[0] >= 3 && sp.after[0] < 3.1 && sp.after[1] === true && sp.move < 0.5
+    && dstRun.restored.season === 'spring' && dstRun.restored.mjd === MAY5 && dstRun.restored.dst === true, dstRun);
+  // the sun from the date: declination and solar noon at local noon, and the sun's direction at 9 am and 5 pm
+  const sunDates = await page.evaluate(([dates, home]) => {
+    const D = window.__DS;
+    const out = dates.map(mjd => { D.SKY.hour = 12; D.setDate(mjd); const r = { mjd, decl: D.SKY.decl, noon: D.SKY.solarNoon, dst: D.SKY.dst, sun: {} };
+      for (const h of [9, 17]) { D.SKY.hour = h; D.updateSky(); r.sun[h] = D.SKY.sun.slice(); }
+      return r; });
+    D.SKY.hour = 13; D.setDate(home);
+    return out;
+  }, [[MAR20, MAY5, JUN20], MAY5]);
+  const sunCmp = sunDates.map(r => ({ text: r.mjd, dDecl: r.decl - ownSun(jdOf(r.mjd, 12, -4)).dec, dNoonMin: (r.noon - ownNoon(r.mjd, -4)) * 60,
+    dSun9: angDeg(r.sun[9], ownSun(jdOf(r.mjd, 9, -4)).v), dSun17: angDeg(r.sun[17], ownSun(jdOf(r.mjd, 17, -4)).v), decl: r.decl, noon: r.noon, dst: r.dst }));
+  ok('the sun from the date: declination and solar noon within 0.1 deg and 1 min of the suite\'s own on Mar 20, May 5 and Jun 20 (and the sun within 0.1 deg at 9 am and 5 pm)',
+    sunCmp.length === 3 && sunCmp.every(c => c.dst === true && Math.abs(c.dDecl) < 0.1 && Math.abs(c.dNoonMin) < 1 && c.dSun9 < 0.1 && c.dSun17 < 0.1), sunCmp);
+  // the date in the settings' TIME section: shown, refreshed after a midnight on the next open, and the slider moves the hour only
+  const dateUI = await page.evaluate(MAY5 => {
+    const D = window.__DS, $ = id => document.getElementById(id), o = {};
+    D.SETTINGS.cycle = 144; D.SKY.hour = 23 + 58 / 60; D.setDate(MAY5);
+    D.openSettings();
+    let r = $('date-val').closest('.row'); while (r && r.tagName !== 'H3') r = r.previousElementSibling;
+    o.before = { shown: $('date-val').textContent, want: D.dateText(D.SKY.mjd), section: r && r.textContent, settings: !!$('date-val').closest('#settings') };
+    D.closeSettings();
+    for (let i = 0; i < 3; i++) D.advanceClock(0.1);
+    D.openSettings();
+    o.after = { shown: $('date-val').textContent, want: D.dateText(D.SKY.mjd), mjd: D.SKY.mjd };
+    const el = $('tod'); el.value = '600'; el.dispatchEvent(new Event('input'));
+    o.slide = { hour: D.SKY.hour, mjd: D.SKY.mjd, shown: $('date-val').textContent, clock: $('tod-val').textContent };
+    D.closeSettings();
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return o;
+  }, MAY5);
+  ok('the TIME section shows the date (#date-val), which reads the next day after a midnight on the next open; the time-of-day slider moves the hour, not the date',
+    dateUI.before.shown === 'Tue May 5' && dateUI.before.shown === dateUI.before.want && dateUI.before.section === 'TIME' && dateUI.before.settings
+    && dateUI.after.mjd === MAY5 + 1 && dateUI.after.shown === 'Wed May 6' && dateUI.after.shown === dateUI.after.want
+    && dateUI.slide.hour === 10 && dateUI.slide.mjd === MAY5 + 1 && dateUI.slide.shown === 'Wed May 6' && dateUI.slide.clock === '10:00 AM', dateUI);
 
   // ---- 4. the car: acceleration, braking, steering, reverse ----
   const car = await page.evaluate(() => {
@@ -491,6 +639,6 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
 
   ok('no page errors', errors.length === 0, errors.slice(0, 5));
   await browser.close();
-  console.log(`DRIVING SIMULATOR DRIVE: ${pass} passed, ${fail} failed`);
+  console.log(`DRIVING SIMULATOR DRIVE: ${pass} passed, ${fail} failed` + TAIL);
   process.exit(fail ? 1 : 0);
-})().catch(e => { console.error(e); console.log(`DRIVING SIMULATOR DRIVE: ${pass} passed, ${fail + 1} failed`); process.exit(1); });
+})().catch(e => { console.error(e); console.log(`DRIVING SIMULATOR DRIVE: ${pass} passed, ${fail + 1} failed` + TAIL); process.exit(1); });
