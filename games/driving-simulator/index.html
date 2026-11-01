@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 :root{
+  --sat:env(safe-area-inset-top); --sab:env(safe-area-inset-bottom); --sal:env(safe-area-inset-left); --sar:env(safe-area-inset-right);
   --bg:#06060e; --panel:#0b0b16; --border:#1a1a30; --green:#39ff14;
   --gold:#ffc300; --blue:#4488ff; --red:#ff2244; --white:#dde3ff;
   --dim:#8899bb; --purple:#b44fff;
@@ -49,7 +50,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-01 04:11 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-01 15:21 UTC</div>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
@@ -82,14 +83,19 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
     <select id="gfx-sel"><option value="0">low (fast)</option><option value="1">medium</option><option value="2">high</option></select></div>
   <div class="row"><label for="mirror-sel">Rear-view mirror</label>
     <select id="mirror-sel"><option value="1">on</option><option value="0">off</option></select></div>
+  <div class="row"><label for="perf-sel">Performance stats</label>
+    <select id="perf-sel"><option value="2">FPS and details</option><option value="1">FPS only</option><option value="0">off</option></select></div>
   <h3>SOUND</h3>
-  <div class="row"><label for="radio-sel">Radio</label>
-    <select id="radio-sel"><option value="1">on</option><option value="0">off</option></select></div>
-  <div class="row"><label for="vol">Volume</label><input id="vol" type="range" min="0" max="100" step="1"></div>
+  <div class="row"><label for="station-sel">Radio station</label><select id="station-sel"></select></div>
+  <div class="row"><label for="vol">All sound</label><input id="vol" type="range" min="0" max="100" step="1"></div>
+  <div id="chan-rows"></div>
   <h3>HOW TO DRIVE</h3>
+  <p>The game pauses while this menu is open.</p>
   <p><b>Steering wheel</b> (bottom left): put a finger on the rim and turn it. Let go and it centres itself. Tap the middle of it to sound the horn.</p>
-  <p><b>Pedals</b> (bottom right): the tall one is the accelerator and the wide one is the brake. Hold the brake at a standstill to back up.</p>
-  <p><b>Keyboard</b>: arrow keys or WASD to steer and drive, Space to brake, H for the horn, C to change the view.</p>
+  <p><b>Pedals</b> (bottom right): the tall one is the accelerator and the wide one is the brake. To back up, brake to a stop and keep holding the brake: after a second at 0 mph the car goes into reverse, the brake pedal drives it backwards and the wheel steers as it would in a real car. The accelerator puts it back in drive.</p>
+  <p><b>Cruise control</b> (the button above the accelerator): tap it at speed and the car holds that speed. Press the accelerator to go faster for a while; let go and it settles back. Braking, reversing or a crash switches it off, and so does another tap.</p>
+  <p><b>Keyboard</b>: arrow keys or WASD to steer and drive, Space to brake, H for the horn, X for cruise control, C to change the view, Esc to close this menu.</p>
+  <p><b>Performance stats</b>: FPS is frames a second. Frame is the time between frames (average and slowest in the last half second). CPU is the time the page's own code takes a frame: sim (driving, traffic, building the road ahead), 3D (preparing the picture) and HUD. GPU is the graphics chip's time, where the browser reports it. Calls and tris are draw calls and triangles a frame; res is the size of the 3D picture in pixels; chunks are loaded 96 m pieces of road, then cars, lights and memory where the browser reports it.</p>
   <p><b>Views</b>: the car button at the top right goes from the driver's seat to behind the car to a free orbit you can drag round and pinch in or out. In the driver's seat, drag across the windscreen to look round.</p>
   <h3>THE ROAD</h3>
   <p>An endless two-way US road, keep right. It runs through four kinds of road, each with its own speed limit: a <b>rural two-lane</b> (55 mph, dashed yellow centre line), a <b>town two-lane</b> (35 mph, kerbs, sidewalks and streetlights), a <b>four-lane arterial</b> (45 mph, double yellow) and a <b>six-lane highway</b> (65 mph). Lanes come and go on tapers as long as the federal rule asks for (lane width times speed), signed as the right lane ends.</p>
@@ -211,8 +217,18 @@ function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 
 // ---------------------------------------------------------------- settings
 const SET_KEY = 'drivingSimulator.settings.v1';
-const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, radio: 1, vol: 70, view: 0, muted: false };
-try { Object.assign(SETTINGS, JSON.parse(localStorage.getItem(SET_KEY) || '{}')); } catch (e) { /* private mode */ }
+// One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
+const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'];
+// perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
+const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2,
+  vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])) };
+try {
+  const saved = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {};
+  const vols = Object.assign({}, SETTINGS.vols, saved.vols || {});
+  Object.assign(SETTINGS, saved, { vols });
+  if (saved.radio === 0 && !saved.vols) SETTINGS.vols.music = 0;   // the old radio on/off switch becomes the radio's volume
+} catch (e) { /* private mode */ }
+delete SETTINGS.radio;
 function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } }
 
 // ---------------------------------------------------------------- the road
@@ -1147,6 +1163,20 @@ function buildCabin(car) {
 // ---------------------------------------------------------------- WebGL2
 const glc = document.getElementById('gl');
 const gl = glc.getContext('webgl2', { antialias: true, alpha: false, powerPreference: 'high-performance' });
+// performance counters: draw calls and triangles are counted at the context, so
+// every pass (shadow, mirror, main) is in them; CPU times come from the loop;
+// GPU time from a timer query where the browser offers one (desktop Chrome, mostly)
+const PERF = { calls: 0, tris: 0, lights: 0, t0: 0, n: 0, dtSum: 0, dtMax: 0, k: 0, sim: 0, r3d: 0, hud: 0, callSum: 0, triSum: 0,
+  gpuSum: 0, gpuN: 0, q: [], ext: null, out: { fps: 0, ms: 0, max: 0, sim: 0, r3d: 0, hud: 0, gpu: null, calls: 0, tris: 0, heap: null } };
+if (gl) {
+  const triCount = (mode, count, inst) => mode === gl.TRIANGLES ? count / 3 * inst : mode === gl.TRIANGLE_STRIP ? (count - 2) * inst : 0;
+  const wrap = (fn, cnt) => { const orig = gl[fn].bind(gl); gl[fn] = (...a) => { PERF.calls++; PERF.tris += cnt(a); return orig(...a); }; };
+  wrap('drawElements', a => triCount(a[0], a[1], 1));
+  wrap('drawArrays', a => triCount(a[0], a[2], 1));
+  wrap('drawArraysInstanced', a => triCount(a[0], a[2], a[3]));
+  wrap('drawElementsInstanced', a => triCount(a[0], a[1], a[4]));
+  PERF.ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+}
 const MAXL = 16;
 const GLSL_COMMON = `
 uniform vec3 uSunDir, uMoonDir, uSunCol, uMoonCol, uCamWrap;
@@ -1497,6 +1527,19 @@ function resetPlayer() {
   Object.assign(PLAYER, { x, z, u, yaw: p.th, vx: 0, vy: 0, r: 0, y: groundAt(p, u, x, z) });
 }
 const INPUT = { steer: 0, gas: 0, brake: 0, keySteer: 0, keyGas: 0, keyBrake: 0, horn: false, wheelAngle: 0, wheelHeld: false };
+const REVERSE_HOLD = 1.0;   // seconds the brake must be held at 0 mph before the car backs up
+// cruise control: on/off, the speed it holds (m/s), its integral term, and what it is applying
+const CRUISE = { on: false, v: 0, i: 0, thr: 0, brk: 0, deny: -1 };
+function setCruise(on) {
+  if (on === CRUISE.on) return true;
+  if (on) {
+    // it holds the speed the car is doing; it will not hold a standstill or reverse
+    if (PLAYER.gear < 0 || PLAYER.vx < 1) { CRUISE.deny = performance.now() / 1000; SND.cruise(-1); return false; }
+    Object.assign(CRUISE, { on: true, v: PLAYER.vx, i: 0 });
+    SND.cruise(1);
+  } else { CRUISE.on = false; SND.cruise(0); }
+  return true;
+}
 function maxSteer(v) { return 0.52 / (1 + (v / 7.5) ** 2) + 0.022; }
 function obb(x, z, hx, hz, yaw) { return { x, z, hx, hz, yaw }; }
 // SAT for two oriented rectangles; returns the push for A out of B, or null.
@@ -1540,16 +1583,18 @@ function stepPlayer(dt) {
   P.off = onRoad ? 0 : 1;
   const mu = onRoad ? 1.0 : 0.62;
   const Cf = m * G * 0.5 * 11, Cr = m * G * 0.5 * 12;
-  // pedals: gas and brake, with reverse when the brake is held at a standstill
+  // pedals: gas and brake, with reverse once the brake has been held for a second at 0 mph
   const gas = Math.max(INPUT.gas, INPUT.keyGas), brk = Math.max(INPUT.brake, INPUT.keyBrake);
   let thr = 0, brake = 0;
   if (P.gear > 0) {
     thr = gas; brake = brk;
-    if (brk > 0.5 && Math.abs(P.vx) < 0.3 && gas < 0.1) { P.revHold += dt; if (P.revHold > 0.6) { P.gear = -1; P.revHold = 0; } } else P.revHold = 0;
+    if (brk > 0.5 && Math.abs(P.vx) < 0.2 && gas < 0.1) { P.revHold += dt; if (P.revHold >= REVERSE_HOLD) { P.gear = -1; P.revHold = 0; setCruise(false); } } else P.revHold = 0;
   } else {
     thr = brk; brake = gas;
     if (gas > 0.3 && Math.abs(P.vx) < 0.3) { P.gear = 1; }
   }
+  // the brake pedal lets go of the cruise control, as in a real car
+  if (CRUISE.on && brk > 0.05) setCruise(false);
   // steering
   const sIn = clamp(INPUT.wheelHeld ? INPUT.steer : INPUT.keySteer !== 0 ? INPUT.keySteer : INPUT.steer, -1, 1);
   const target = sIn * maxSteer(Math.abs(P.vx));
@@ -1558,6 +1603,22 @@ function stepPlayer(dt) {
   const h = dt / N;
   // slope along the car from the road's grade
   const grade = (at(P.s + 2).y - at(P.s - 2).y) / 4 * Math.cos(P.yaw - pr.p.th);
+  // cruise control: a throttle that holds the set speed from what the car must
+  // overcome (drag, rolling, the grade) plus a little feedback, and a touch of
+  // brake on a descent the engine cannot hold. The driver's own accelerator
+  // overrides it while held; letting go brings the car back to the set speed.
+  if (CRUISE.on && P.gear > 0) {
+    const v = P.vx, e = CRUISE.v - v;
+    const Fdrive = Math.min(m * G * mu * 0.55, V.powerKw * 1000 * 0.8 / Math.max(Math.abs(v), 3.5)) / 1.08;
+    const Fres = 0.5 * 1.2 * V.dragArea * v * Math.abs(v) + m * G * (onRoad ? 0.012 : 0.07) + m * G * grade;
+    if (gas < 0.05) CRUISE.i = clamp(CRUISE.i + e * dt * 0.4, -1, 1);
+    const want = Fres + m * (clamp(e, -3, 3) * 0.9 + CRUISE.i);
+    CRUISE.thr = clamp(want / Fdrive, 0, 1);
+    const engineBrake = m * 0.25 * Math.min(1, Math.abs(v));
+    CRUISE.brk = e < -0.8 && -want > engineBrake ? clamp((-want - engineBrake) / (m * G * 0.95 * mu), 0, 0.3) : 0;
+    thr = Math.max(thr, CRUISE.thr); brake = Math.max(brake, CRUISE.brk);
+  } else { CRUISE.thr = 0; CRUISE.brk = 0; }
+  P.thr = thr;
   let hitSpeed = 0;
   for (let k = 0; k < N; k++) {
     const vx = P.vx, vy = P.vy, r = P.r, d = P.steer;
@@ -1579,9 +1640,12 @@ function stepPlayer(dt) {
       const af = Math.atan2(vy + a * r, spd) - d * Math.sign(vx), ar = Math.atan2(vy - b * r, spd);
       const Fyf = clamp(-Cf * af, -muF, muF), Fyr = clamp(-Cr * ar, -muR, muR);
       P.slip = Math.max(Math.abs(Cf * af) / muF, Math.abs(Cr * ar) / muR);
+      // the tyre forces turn the body the same way whichever way it is rolling; the
+      // reversed direction is already in the slip angles. (A sign(vx) on the yaw
+      // moment here once made reversing above 2 m/s spin the car on the spot.)
       nvy = vy + h * ((Fyf * Math.cos(d) + Fyr) / m - vx * r);
-      nr = r + h * ((a * Fyf * Math.cos(d) - b * Fyr) / Iz) * Math.sign(vx);
-      nvx = vx + h * (Fx - Fyf * Math.sin(d) * Math.sign(vx)) / m + h * vy * r;
+      nr = r + h * (a * Fyf * Math.cos(d) - b * Fyr) / Iz;
+      nvx = vx + h * (Fx - Fyf * Math.sin(d)) / m + h * vy * r;
     } else {
       // low speed: kinematic bicycle, lateral motion dies away
       nvx = vx + h * Fx / m;
@@ -1646,6 +1710,7 @@ function stepPlayer(dt) {
     resolve(nx, nz, Math.abs(pr2.u) - pr2.p.Rr - 200, 0.1);
   }
   if (hitSpeed > 1.2) { P.shake = Math.min(1, hitSpeed / 10); SND.crash(Math.min(1, hitSpeed / 14)); P.lastHit = now; }
+  if (hitSpeed > 3) setCruise(false);
   // ground following: four contact patches set height, pitch and roll
   const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), lx = Math.cos(P.yaw), lz = -Math.sin(P.yaw);
   const gh = (dx, dz) => { const x = P.x + fx * dz + lx * dx, z = P.z + fz * dz + lz * dx; const q = project(x, z, P.s); return groundAt(q.p, q.u, x, z) + (q.p.curb && Math.abs(q.u) > q.p.Rr && Math.abs(q.u) < q.p.Rr + STD.sidewalkWidth + 0.3 ? STD.curbHeight : 0); };
@@ -2126,6 +2191,7 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   gl.uniform1f(wp.U.uLaneW, LANE_W);
   gl.uniform1f(wp.U.uWind, now);
   const L = gatherLights(eye, recs);
+  if (!opt.mirrorPass) PERF.lights = L.n;
   gl.uniform4fv(wp.U.uLP, L.LP); gl.uniform4fv(wp.U.uLD, L.LD); gl.uniform3fv(wp.U.uLC, L.LC); gl.uniform1i(wp.U.uNL, L.n);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, SHADOW.tex); gl.uniform1i(wp.U.uShadow, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, TEX.signs); gl.uniform1i(wp.U.uSigns, 1);
@@ -2229,6 +2295,7 @@ function drawGauges() {
   g.fillStyle = PLAYER.gear < 0 ? '#f84' : '#6f6'; g.font = 'bold 22px Arial'; g.fillText(PLAYER.gear < 0 ? 'R' : 'D' + (PLAYER.gi + 1), W / 2, 140);
   g.fillStyle = '#9ab'; g.font = '16px Arial'; g.fillText(clockText(), W / 2, 168);
   if (SKY.lights) { g.fillStyle = '#3c6'; g.font = '16px Arial'; g.fillText('◖≡', W / 2 - 60, 140); }
+  if (CRUISE.on) { g.fillStyle = '#3c6'; g.font = '14px Arial'; g.fillText('CC ' + Math.round(CRUISE.v * (mph ? 2.23694 : 3.6)), W / 2 + 50, 140); }
   gl.bindTexture(gl.TEXTURE_2D, TEX.gauge);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, gaugeCv);
 }
@@ -2241,20 +2308,34 @@ function clockText() {
 // ---------------------------------------------------------------- HUD: wheel, pedals, speed
 const hud = document.getElementById('hud'), hg = hud.getContext('2d');
 let DPR = 1, HW = 0, HH = 0;
-const UI = { wheel: { x: 0, y: 0, r: 0 }, gas: { x: 0, y: 0, w: 0, h: 0 }, brake: { x: 0, y: 0, w: 0, h: 0 }, speed: { x: 0, y: 0, w: 0, h: 0 } };
+const UI = { wheel: { x: 0, y: 0, r: 0 }, gas: { x: 0, y: 0, w: 0, h: 0 }, brake: { x: 0, y: 0, w: 0, h: 0 }, speed: { x: 0, y: 0, w: 0, h: 0 },
+  cruise: { x: 0, y: 0, w: 0, h: 0 }, fps: null, perf: null };
 function layoutUI() {
   const m = Math.min(HW, HH);
   const r = clamp(m * 0.17, 58, 112);
-  const insetB = 18 + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--sab')) || 0);
+  const insetB = 18 + cssPx('--sab');
   UI.wheel = { x: r + 22, y: HH - r - insetB - 8, r };
   const gw = clamp(m * 0.11, 44, 70), gh = gw * 1.9;
   UI.gas = { x: HW - gw - 20, y: HH - gh - insetB, w: gw, h: gh };
   const bw = gw * 1.45, bh = gw * 1.15;
   UI.brake = { x: UI.gas.x - bw - 16, y: HH - bh - insetB - 6, w: bw, h: bh };
-  // the speed readout: bottom centre between the controls when there is room, else top centre between the chrome
+  // cruise control: above the accelerator, clear of its touch pad
+  const cw = clamp(gw * 1.3, 58, 84), chh = clamp(gw * 0.9, 42, 56);
+  UI.cruise = { x: HW - 20 - cw, y: UI.gas.y - 24 - chh, w: cw, h: chh };
+  // FPS: top centre, between the chrome buttons when they leave room, else on a line of its own under them
+  const sat = cssPx('--sat'), sal = cssPx('--sal'), sar = cssPx('--sar');
+  const fpsW = 84, fpsH = 26;
+  const fpsBeside = 2 * Math.min(HW / 2 - (134 + sal), (HW - 54 - sar) - HW / 2) - 8 >= fpsW;
+  let topY = 42 + sat;
+  UI.fps = SETTINGS.perf > 0 ? { x: HW / 2 - fpsW / 2, y: fpsBeside ? 6 + sat : topY, w: fpsW, h: fpsH } : null;
+  if (UI.fps && !fpsBeside) topY = UI.fps.y + fpsH + 6;
+  // the speed readout: bottom centre between the controls when there is room, else top centre under the chrome
   const roomy = UI.brake.x - (UI.wheel.x + UI.wheel.r) > 104 + 24;
-  UI.speed = roomy ? { x: HW / 2 - 52, y: HH - 74, w: 104, h: 56 } : { x: HW / 2 - 52, y: 56, w: 104, h: 56 };
+  UI.speed = roomy ? { x: HW / 2 - 52, y: HH - 74, w: 104, h: 56 } : { x: HW / 2 - 52, y: Math.max(56, topY + 14), w: 104, h: 56 };
+  // the other performance numbers: a block on the left, under the chrome (and under a top speed readout and its clock)
+  UI.perf = SETTINGS.perf > 1 ? { x: 8 + sal, y: roomy ? topY : UI.speed.y + UI.speed.h + 24, w: 156, h: 7 * 13 + 10 } : null;
 }
+function cssPx(name) { return parseFloat(getComputedStyle(document.documentElement).getPropertyValue(name)) || 0; }
 function drawHUD() {
   hg.setTransform(DPR, 0, 0, DPR, 0, 0);
   hg.clearRect(0, 0, HW, HH);
@@ -2301,6 +2382,61 @@ function drawHUD() {
     hg.fillStyle = '#9ab'; hg.font = "12px 'Share Tech Mono', monospace"; hg.fillText((mph ? 'mph' : 'km/h') + (PLAYER.gear < 0 ? '  R' : ''), HW / 2, S.y + 50);
     hg.fillText(clockText(), HW / 2, top ? S.y + S.h + 16 : S.y - 10);
   }
+  drawCruiseButton();
+  drawPerf();
+}
+// the cruise control button: the dashboard symbol (a speedometer), lit green with
+// the speed it holds while on, a red rim for a moment when it cannot take the speed
+function drawCruiseButton() {
+  const C = UI.cruise, deny = performance.now() / 1000 - CRUISE.deny < 0.7, on = CRUISE.on;
+  const col = deny ? '#ff5566' : on ? '#39ff14' : '#c8ccd8';
+  hg.save();
+  hg.fillStyle = on ? 'rgba(14,52,14,0.78)' : 'rgba(8,8,12,0.58)';
+  roundRect(hg, C.x, C.y, C.w, C.h, 9); hg.fill();
+  hg.lineWidth = 2; hg.strokeStyle = deny ? '#ff3344' : on ? '#39ff14' : 'rgba(200,205,220,0.4)'; hg.stroke();
+  const cx = C.x + C.w / 2, cy = C.y + C.h * 0.47, rr = C.h * 0.21;
+  hg.strokeStyle = col; hg.fillStyle = col; hg.lineWidth = 2; hg.lineCap = 'round';
+  hg.beginPath(); hg.arc(cx, cy, rr, Math.PI * 0.85, Math.PI * 2.15); hg.stroke();
+  for (const a of [Math.PI * 1.1, Math.PI * 1.5, Math.PI * 1.9]) { hg.beginPath(); hg.moveTo(cx + Math.cos(a) * rr * 0.62, cy + Math.sin(a) * rr * 0.62); hg.lineTo(cx + Math.cos(a) * rr * 0.86, cy + Math.sin(a) * rr * 0.86); hg.stroke(); }
+  const na = Math.PI * 1.72;
+  hg.beginPath(); hg.moveTo(cx, cy); hg.lineTo(cx + Math.cos(na) * rr * 0.9, cy + Math.sin(na) * rr * 0.9); hg.stroke();
+  hg.beginPath(); hg.arc(cx, cy, 2.2, 0, TAU); hg.fill();
+  hg.textAlign = 'center'; hg.textBaseline = 'alphabetic';
+  if (on) {
+    const mph = SETTINGS.units === 'mph';
+    hg.font = "bold 13px 'Share Tech Mono', monospace";
+    hg.fillText(Math.round(CRUISE.v * (mph ? 2.23694 : 3.6)) + (mph ? ' mph' : ' km/h'), cx, C.y + C.h - 5);
+  } else { hg.font = "10px 'Share Tech Mono', monospace"; hg.fillText('CRUISE', cx, C.y + C.h - 5); }
+  hg.restore();
+}
+// performance stats: FPS in pure green at the top, the rest in a block on the left
+function drawPerf() {
+  const o = PERF.out;
+  hg.save();
+  hg.lineJoin = 'round'; hg.fillStyle = '#00ff00'; hg.strokeStyle = 'rgba(0,0,0,0.85)';
+  if (UI.fps) {
+    const F = UI.fps;
+    hg.font = "bold 20px 'Share Tech Mono', monospace"; hg.textAlign = 'center'; hg.textBaseline = 'middle';
+    const txt = Math.round(o.fps) + ' FPS';
+    hg.lineWidth = 4; hg.strokeText(txt, F.x + F.w / 2, F.y + F.h / 2); hg.fillText(txt, F.x + F.w / 2, F.y + F.h / 2);
+  }
+  if (UI.perf) {
+    const B = UI.perf, f1 = v => v < 100 ? v.toFixed(1) : String(Math.round(v)), f2 = v => v < 100 ? v.toFixed(2) : String(Math.round(v));
+    const tris = o.tris >= 1e6 ? f1(o.tris / 1e6) + 'M' : Math.round(o.tris / 1000) + 'k';
+    const lines = [
+      `frame ${f1(o.ms)} ms  max ${f1(o.max)}`,
+      `cpu sim ${f2(o.sim)}  3d ${f2(o.r3d)}`,
+      `hud ${f2(o.hud)}  gpu ${o.gpu == null ? 'n/a' : f2(o.gpu)} ms`,
+      `calls ${o.calls}  tris ${tris}`,
+      `res ${glc.width}x${glc.height}  x${f2(glc.width / Math.max(1, HW))}`,
+      `chunks ${CHUNKS.size}  cars ${TRAFFIC.cars.length}`,
+      `lights ${PERF.lights}  heap ${o.heap == null ? 'n/a' : Math.round(o.heap) + ' MB'}`,
+    ];
+    hg.fillStyle = 'rgba(0,0,0,0.5)'; roundRect(hg, B.x, B.y, B.w, B.h, 6); hg.fill();
+    hg.fillStyle = '#00ff00'; hg.font = "11px 'Share Tech Mono', monospace"; hg.textAlign = 'left'; hg.textBaseline = 'top';
+    lines.forEach((l, i) => hg.fillText(l, B.x + 6, B.y + 5 + i * 13));
+  }
+  hg.restore();
 }
 function roundRect(g, x, y, w, h, r) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
 
@@ -2311,6 +2447,7 @@ function roleFor(x, y) {
   const W = UI.wheel, d = Math.hypot(x - W.x, y - W.y);
   if (d < W.r * 0.34) return 'horn';
   if (d < W.r * 1.25) return 'wheel';
+  if (inRect(UI.cruise, x, y, 6)) return 'cruise';
   if (inRect(UI.gas, x, y)) return 'gas';
   if (inRect(UI.brake, x, y)) return 'brake';
   return 'look';
@@ -2324,6 +2461,7 @@ function pointerStart(id, x, y) {
   TOUCHES.set(id, t);
   if (role === 'horn') { INPUT.horn = true; SND.horn(true); }
   if (role === 'wheel') INPUT.wheelHeld = true;
+  if (role === 'cruise') setCruise(!CRUISE.on);
   refreshPedals();
 }
 function pointerMove(id, x, y) {
@@ -2372,11 +2510,14 @@ addEventListener('mouseup', () => pointerEnd('m'));
 hud.addEventListener('wheel', e => { if (CAM.mode === 2) { CAM.orbitDist = clamp(CAM.orbitDist * Math.exp(e.deltaY * 0.001), 4, 40); e.preventDefault(); } }, { passive: false });
 const KEYS = new Set();
 addEventListener('keydown', e => {
+  if (e.key === 'Escape' && menuOpen()) { closeSettings(); return; }
   if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+  if (menuOpen()) return;
   const k = e.key.toLowerCase();
   if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', ' '].includes(k)) e.preventDefault();
   SND.unlock();
   if (k === 'c' && !e.repeat) cycleView();
+  if (k === 'x' && !e.repeat) setCruise(!CRUISE.on);
   if (k === 'h' && !e.repeat) { INPUT.horn = true; SND.horn(true); }
   KEYS.add(k);
 });
@@ -2405,15 +2546,31 @@ function cycleView() {
 document.getElementById('view-btn').addEventListener('click', cycleView);
 
 // ---------------------------------------------------------------- sound
+// Everything is synthesized. Every sound has its own channel gain (one slider
+// each in the settings), every channel has an analyser so a level can be
+// measured instead of guessed, and the radio has four stations, each a small
+// generative band scheduled a beat ahead. Each station's trim is measured off the
+// music probe so the selector does not double as a volume control.
+const STATIONS = [
+  { name: '88.1 FM · Lo-fi', bpm: 84, trim: 1.0 },
+  { name: '94.5 FM · Synthwave', bpm: 104, trim: 0.9 },
+  { name: '101.9 FM · Jazz', bpm: 132, trim: 1.38 },
+  { name: '106.3 FM · Classical', bpm: 76, trim: 1.54 },
+];
 const SND = (() => {
-  let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, radioOn = false, nextBeat = 0, beat = 0, probes = null;
+  let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null;
+  const ch = {}, probes = {};
   const S = {};
+  const level = k => { const v = clamp((SETTINGS.vols[k] ?? 100) / 100, 0, 1); return v * v; };   // a squared taper: the slider's middle is a quarter
+  const station = () => clamp(SETTINGS.station | 0, 0, STATIONS.length - 1);
   S.unlock = () => {
     if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
     try { ac = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return; }
     master = ac.createGain(); master.connect(ac.destination);
     sfx = ac.createGain(); sfx.connect(master);
     music = ac.createGain(); music.gain.value = 1.5; music.connect(master);   // measured: about half the engine at a cruise
+    for (const k of VOL_KEYS) { const g = ac.createGain(); g.gain.value = level(k); g.connect(k === 'music' ? music : sfx); ch[k] = g; }
+    radioOut = ac.createGain(); radioOut.gain.value = STATIONS[station()].trim; radioOut.connect(ch.music);
     noiseBuf = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate);
     const d = noiseBuf.getChannelData(0); let b = 0;
     for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1; b = 0.97 * b + 0.03 * w; d[i] = w * 0.5 + b * 2.5; }
@@ -2423,7 +2580,7 @@ const SND = (() => {
     const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 2.5;
     const eg = ac.createGain(); eg.gain.value = 0;
     const g3 = ac.createGain(); g3.gain.value = 0.35;
-    o1.connect(lp); o2.connect(lp); o3.connect(g3); g3.connect(lp); lp.connect(eg); eg.connect(sfx);
+    o1.connect(lp); o2.connect(lp); o3.connect(g3); g3.connect(lp); lp.connect(eg); eg.connect(ch.engine);
     const nz = ac.createBufferSource(); nz.buffer = noiseBuf; nz.loop = true;
     const tyreF = ac.createBiquadFilter(); tyreF.type = 'bandpass'; tyreF.frequency.value = 420; tyreF.Q.value = 0.6;
     const tyreG = ac.createGain(); tyreG.gain.value = 0;
@@ -2431,27 +2588,36 @@ const SND = (() => {
     const windG = ac.createGain(); windG.gain.value = 0;
     const skidF = ac.createBiquadFilter(); skidF.type = 'bandpass'; skidF.frequency.value = 1100; skidF.Q.value = 9;
     const skidG = ac.createGain(); skidG.gain.value = 0;
-    nz.connect(tyreF); tyreF.connect(tyreG); tyreG.connect(sfx);
-    nz.connect(windF); windF.connect(windG); windG.connect(sfx);
-    nz.connect(skidF); skidF.connect(skidG); skidG.connect(sfx);
+    nz.connect(tyreF); tyreF.connect(tyreG); tyreG.connect(ch.tyres);
+    nz.connect(windF); windF.connect(windG); windG.connect(ch.wind);
+    nz.connect(skidF); skidF.connect(skidG); skidG.connect(ch.skid);
+    // ambient: a breeze in the grass, birds by day and crickets by night, muffled by the glass in the driver's seat
+    const ambF = ac.createBiquadFilter(); ambF.type = 'lowpass'; ambF.frequency.value = 16000; ambF.connect(ch.ambient);
+    const breezeF = ac.createBiquadFilter(); breezeF.type = 'bandpass'; breezeF.frequency.value = 650; breezeF.Q.value = 0.5;
+    const breezeG = ac.createGain(); breezeG.gain.value = 0;
+    nz.connect(breezeF); breezeF.connect(breezeG); breezeG.connect(ambF);
+    amb = { ambF, breezeG, next: 0, cricket: 0 };
     o1.start(); o2.start(); o3.start(); nz.start();
     eng = { o1, o2, o3, lp, eg, tyreG, tyreF, windG, skidG };
-    // level probes (no ears in a test container): RMS of each bus
-    probes = { sfx: ac.createAnalyser(), music: ac.createAnalyser() };
-    sfx.connect(probes.sfx); music.connect(probes.music);
+    // level probes (no ears in a test container): RMS of each bus and of each channel
+    for (const [k, node] of [['sfx', sfx], ['music', music], ...VOL_KEYS.filter(k => k !== 'music').map(k => [k, ch[k]])]) {
+      const a = ac.createAnalyser(); node.connect(a); probes[k] = a;
+    }
     S.apply();
   };
   S.apply = () => {
     if (!ac) return;
-    master.gain.setTargetAtTime(SETTINGS.muted ? 0 : SETTINGS.vol / 100, ac.currentTime, 0.05);
-    radioOn = !!SETTINGS.radio;
+    const t = ac.currentTime;
+    master.gain.setTargetAtTime(SETTINGS.muted ? 0 : SETTINGS.vol / 100, t, 0.05);
+    for (const k of VOL_KEYS) ch[k].gain.setTargetAtTime(level(k), t, 0.03);
   };
+  S.level = level;
   S.update = (dt) => {
     if (!ac || !eng) return;
     const t = ac.currentTime, P = PLAYER, inside = CAM.mode === 0;
     const f = P.rpm / 60 * 2;    // four cylinders: two firings a revolution
     eng.o1.frequency.setTargetAtTime(f, t, 0.03); eng.o2.frequency.setTargetAtTime(f * 1.007, t, 0.03); eng.o3.frequency.setTargetAtTime(f * 0.5, t, 0.03);
-    const thr = Math.max(INPUT.gas, INPUT.keyGas) * (P.gear > 0 ? 1 : 0) + Math.max(INPUT.brake, INPUT.keyBrake) * (P.gear < 0 ? 1 : 0);
+    const thr = P.thr || 0;      // what the engine is asked for: the pedal, or the cruise control
     eng.lp.frequency.setTargetAtTime((inside ? 220 : 380) + thr * (inside ? 700 : 1400) + P.rpm * 0.12, t, 0.05);
     eng.eg.gain.setTargetAtTime((0.05 + thr * 0.07) * (inside ? 0.8 : 1), t, 0.05);
     const v = Math.abs(P.vx);
@@ -2459,36 +2625,111 @@ const SND = (() => {
     eng.tyreF.frequency.setTargetAtTime(P.off ? 160 : 380 + v * 6, t, 0.1);
     eng.windG.gain.setTargetAtTime(Math.min(0.09, v * v * 0.00009) * (inside ? 0.6 : 1), t, 0.1);
     eng.skidG.gain.setTargetAtTime(!P.off && P.slip > 0.9 && v > 4 ? Math.min(0.12, (P.slip - 0.9) * 0.4) : 0, t, 0.05);
-    // radio: a mellow chord loop scheduled ahead of time
-    if (radioOn && !SETTINGS.muted) {
+    // ambient
+    amb.ambF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);
+    const muff = inside ? 0.5 : 1;
+    amb.breezeG.gain.setTargetAtTime(0.045 * muff * (0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.23)), t, 0.4);
+    if (level('ambient') > 0 && !SETTINGS.muted) {
+      if (amb.next < t) amb.next = t + 0.5;
+      while (amb.next < t + 0.3) {
+        if (SKY.day > 0.35 && Math.random() < SKY.day) { bird(amb.next, muff); amb.next += 1.4 + Math.random() * 3.2; }
+        else if (SKY.night > 0.35) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
+        else amb.next += 1.5;
+      }
+    }
+    // the radio, scheduled a beat ahead
+    if (level('music') > 0 && !SETTINGS.muted) {
+      const st = station(), step = 60 / STATIONS[st].bpm / 2;
       if (nextBeat < t) nextBeat = t + 0.1;
-      while (nextBeat < t + 0.4) { radioBeat(nextBeat, beat++); nextBeat += 60 / 84 / 2; }
+      while (nextBeat < t + 0.4) { BEATS[st](nextBeat, beat++, step); nextBeat += step; }
     }
   };
-  const CHORDS = [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62]];
   const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
-  function tone(t, f, dur, type, gain, dest) {
+  function tone(t, f, dur, type, gain, dest, atk) {
     const o = ac.createOscillator(), g = ac.createGain();
     o.type = type; o.frequency.value = f;
-    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + Math.min(0.02, dur * 0.2));
+    g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + Math.min(atk || 0.02, dur * 0.5));
     g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     o.connect(g); g.connect(dest); o.start(t); o.stop(t + dur + 0.05);
   }
-  function radioBeat(t, k) {
-    const bar = Math.floor(k / 8) % 4, st = k % 8, ch = CHORDS[bar];
-    if (st === 0) for (const n of ch) tone(t, mtof(n), 2.6, 'triangle', 0.05, music);
-    if (st === 0 || st === 5) tone(t, mtof(ch[0] - 12), 0.5, 'sine', 0.22, music);
-    if (st % 2 === 1) { const s = ac.createBufferSource(); s.buffer = noiseBuf; const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 7000; const g = ac.createGain(); g.gain.setValueAtTime(0.05, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.05); s.connect(hp); hp.connect(g); g.connect(music); s.start(t, Math.random()); s.stop(t + 0.06); }
-    if (st === 0 || st === 4) { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12); g.gain.setValueAtTime(0.25, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18); o.connect(g); g.connect(music); o.start(t); o.stop(t + 0.2); }
-    if (st === 3 || st === 6) tone(t, mtof(ch[1 + (k >> 3) % 3] + 12), 0.4, 'sine', 0.035, music);
+  function noiseHit(t, dur, type, freq, gain, dest, q) {
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const f = ac.createBiquadFilter(); f.type = type; f.frequency.value = freq; if (q) f.Q.value = q;
+    const g = ac.createGain(); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    s.connect(f); f.connect(g); g.connect(dest); s.start(t, Math.random()); s.stop(t + dur + 0.02);
+  }
+  function kick(t, gain) { const o = ac.createOscillator(), g = ac.createGain(); o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(45, t + 0.12); g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.18); o.connect(g); g.connect(radioOut); o.start(t); o.stop(t + 0.2); }
+  // the stations: each is a function of the step number, so it loops exactly
+  const LOFI = [[57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65], [52, 55, 59, 62]];
+  const SYNTH = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]];                       // Am F C G
+  const JAZZ = [[50, 53, 57, 60], [43, 47, 50, 53], [48, 52, 55, 59], [45, 49, 52, 55]];        // Dm7 G7 Cmaj7 A7
+  const CLASS = [[48, 52, 55], [45, 48, 52], [41, 45, 48], [43, 47, 50]];                       // C Am F G
+  const BEATS = [
+    (t, k) => {   // lo-fi: a mellow chord loop
+      const bar = Math.floor(k / 8) % 4, st = k % 8, c = LOFI[bar];
+      if (st === 0) for (const n of c) tone(t, mtof(n), 2.6, 'triangle', 0.05, radioOut);
+      if (st === 0 || st === 5) tone(t, mtof(c[0] - 12), 0.5, 'sine', 0.22, radioOut);
+      if (st % 2 === 1) noiseHit(t, 0.05, 'highpass', 7000, 0.05, radioOut);
+      if (st === 0 || st === 4) kick(t, 0.25);
+      if (st === 3 || st === 6) tone(t, mtof(c[1 + (k >> 3) % 3] + 12), 0.4, 'sine', 0.035, radioOut);
+    },
+    (t, k, step) => {   // synthwave: pumping octave bass, a saw pad, a square arpeggio, four on the floor
+      const bar = Math.floor(k / 8) % 4, st = k % 8, c = SYNTH[bar];
+      tone(t, mtof(c[0] - 24 + (st % 2 ? 12 : 0)), step * 0.9, 'sawtooth', 0.075, radioOut, 0.005);
+      if (st === 0) for (const n of c) tone(t, mtof(n), step * 8, 'sawtooth', 0.016, radioOut, 0.4);
+      tone(t, mtof(c[st % 3] + 12 + (st >= 4 ? 12 : 0)), step * 0.7, 'square', 0.014, radioOut, 0.005);
+      if (st % 2 === 0) kick(t, 0.3);
+      if (st === 2 || st === 6) { noiseHit(t, 0.16, 'bandpass', 1800, 0.22, radioOut, 0.8); tone(t, 185, 0.08, 'triangle', 0.08, radioOut, 0.002); }
+      if (st % 2 === 1) noiseHit(t, 0.04, 'highpass', 8000, 0.05, radioOut);
+    },
+    (t, k, step) => {   // jazz: a walking bass, swung ride, comping on the off-beats
+      const bar = Math.floor(k / 8) % 4, st = k % 8, c = JAZZ[bar], next = JAZZ[(bar + 1) % 4];
+      const sw = st % 2 ? step * 0.34 : 0;      // swing the off-beats
+      if (st % 2 === 0) { const walk = [c[0], c[1], c[2], next[0] - 1][st / 2]; tone(t, mtof(walk), step * 1.8, 'triangle', 0.16, radioOut, 0.01); }
+      if (st % 2 === 0 || st === 3 || st === 7) noiseHit(t + sw, 0.22, 'highpass', 6500, 0.045, radioOut);
+      if (st === 2 || st === 6) noiseHit(t, 0.03, 'highpass', 9000, 0.03, radioOut);
+      if (st === 3 || (st === 6 && bar % 2)) for (const n of c) { tone(t + sw, mtof(n + 12), 0.5, 'sine', 0.03, radioOut, 0.01); tone(t + sw, mtof(n + 24), 0.25, 'sine', 0.006, radioOut, 0.005); }
+    },
+    (t, k, step) => {   // classical: an Alberti bass under a slow melody
+      const bar = Math.floor(k / 8) % 4, st = k % 8, c = CLASS[bar];
+      const alb = [c[0], c[2], c[1], c[2]][st % 4];
+      tone(t, mtof(alb), 0.9, 'triangle', 0.06, radioOut, 0.008);
+      if (st % 2 === 0) {
+        const phrase = [[2, 1, 0, 1], [2, 2, 1, 0], [0, 1, 2, 1], [1, 2, 0, 0]][bar], deg = phrase[st / 2];
+        const n = c[deg] + 12 + (bar === 2 && st === 6 ? 2 : 0);
+        tone(t, mtof(n), 1.5, 'triangle', 0.075, radioOut, 0.01); tone(t, mtof(n + 12), 0.8, 'sine', 0.015, radioOut, 0.01);
+      }
+    },
+  ];
+  // tuning to another station: the old one fades out and a burst of static covers the gap
+  S.tune = () => {
+    if (!ac) return;
+    const t = ac.currentTime, old = radioOut;
+    old.gain.setTargetAtTime(0, t, 0.04); setTimeout(() => old.disconnect(), 3500);
+    radioOut = ac.createGain(); radioOut.gain.value = STATIONS[station()].trim; radioOut.connect(ch.music);
+    beat = 0; nextBeat = t + 0.3;
+    noiseHit(t, 0.3, 'bandpass', 2600, 0.12, ch.music, 0.7);
+  };
+  function bird(t, muff) {
+    const n = 2 + Math.floor(Math.random() * 4), f0 = 2600 + Math.random() * 1800, pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    let dest = amb.ambF; if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(amb.ambF); dest = pan; }
+    for (let i = 0; i < n; i++) {
+      const s = t + i * (0.09 + Math.random() * 0.05), dur = 0.05 + Math.random() * 0.06;
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.setValueAtTime(f0 * (1 + (Math.random() - 0.5) * 0.2), s); o.frequency.exponentialRampToValueAtTime(f0 * (0.75 + Math.random() * 0.6), s + dur);
+      g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.055 * muff, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0005, s + dur);
+      o.connect(g); g.connect(dest); o.start(s); o.stop(s + dur + 0.02);
+    }
+  }
+  function cricket(t, muff) {
+    const f = 4400 + Math.random() * 400;
+    for (let i = 0; i < 3; i++) tone(t + i * 0.045, f, 0.03, 'sine', 0.03 * muff, amb.ambF, 0.004);
   }
   S.crash = (k) => {
     if (!ac) return;
-    const t = ac.currentTime, s = ac.createBufferSource(); s.buffer = noiseBuf;
-    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900 + k * 1500;
-    const g = ac.createGain(); g.gain.setValueAtTime(0.5 * k + 0.1, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.5 + k * 0.4);
-    s.connect(lp); lp.connect(g); g.connect(sfx); s.start(t, Math.random()); s.stop(t + 1);
-    tone(t, 70, 0.3, 'sine', 0.5 * k + 0.1, sfx);
+    const t = ac.currentTime;
+    noiseHit(t, 0.5 + k * 0.4, 'lowpass', 900 + k * 1500, 0.5 * k + 0.1, ch.crash);
+    tone(t, 70, 0.3, 'sine', 0.5 * k + 0.1, ch.crash);
   };
   S.horn = (on) => {
     if (!ac) return;
@@ -2497,7 +2738,7 @@ const SND = (() => {
       const g = ac.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.13, t + 0.02);
       const f = ac.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2400;
       const a = ac.createOscillator(), b = ac.createOscillator(); a.type = 'square'; b.type = 'square'; a.frequency.value = 415; b.frequency.value = 494;
-      a.connect(f); b.connect(f); f.connect(g); g.connect(sfx); a.start(); b.start();
+      a.connect(f); b.connect(f); f.connect(g); g.connect(ch.horn); a.start(); b.start();
       hornNodes = { g, a, b };
     } else if (!on && hornNodes) {
       const h = hornNodes; hornNodes = null;
@@ -2505,11 +2746,31 @@ const SND = (() => {
     }
   };
   S.rms = bus => {
-    if (!probes) return null;
-    const a = probes[bus], d = new Float32Array(a.fftSize); a.getFloatTimeDomainData(d);
+    const a = probes[bus]; if (!a) return null;
+    const d = new Float32Array(a.fftSize); a.getFloatTimeDomainData(d);
     let s = 0; for (const v of d) s += v * v; return Math.sqrt(s / d.length);
   };
-  S.click = () => { if (ac) tone(ac.currentTime, 1800, 0.04, 'square', 0.04, sfx); };
+  S.click = () => { if (ac) tone(ac.currentTime, 1800, 0.04, 'square', 0.04, ch.ui); };
+  // the cruise control's chimes: rising when it takes the speed, falling when it lets go, a low buzz when it cannot
+  S.cruise = (state) => {
+    if (!ac) return;
+    const t = ac.currentTime;
+    if (state > 0) { tone(t, 880, 0.09, 'sine', 0.06, ch.ui, 0.005); tone(t + 0.1, 1320, 0.12, 'sine', 0.06, ch.ui, 0.005); }
+    else if (state === 0) tone(t, 660, 0.14, 'sine', 0.06, ch.ui, 0.005);
+    else tone(t, 180, 0.18, 'square', 0.035, ch.ui, 0.005);
+  };
+  // a slider let go in the settings plays a short sample of its sound, so a change can be heard while paused
+  S.preview = (k) => {
+    if (!ac) return;
+    const t = ac.currentTime;
+    if (k === 'crash') S.crash(0.4);
+    else if (k === 'horn') { S.horn(true); setTimeout(() => { if (!INPUT.horn) S.horn(false); }, 350); }
+    else if (k === 'ui') S.click();
+    else if (k === 'skid') noiseHit(t, 0.5, 'bandpass', 1100, 0.9, ch.skid, 9);
+    else if (k === 'tyres') noiseHit(t, 0.8, 'bandpass', 520, 0.12, ch.tyres, 0.6);
+    else if (k === 'wind') noiseHit(t, 0.8, 'highpass', 900, 0.08, ch.wind);
+    else if (k === 'ambient') { if (SKY.night > 0.5) cricket(t, 1); else bird(t, 1); }
+  };
   S.suspend = (yes) => { if (!ac) return; if (yes) ac.suspend(); else ac.resume(); };
   return S;
 })();
@@ -2522,23 +2783,38 @@ paintMute();
 // ---------------------------------------------------------------- settings panel
 const $ = id => document.getElementById(id);
 const setPanel = $('settings');
+const menuOpen = () => setPanel.classList.contains('open');
+const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tyres on the road', wind: 'Wind',
+  skid: 'Tyre squeal', crash: 'Crashes', horn: 'Horn', ui: 'Buttons and chimes' };
+$('chan-rows').innerHTML = VOL_KEYS.map(k => `<div class="row"><label for="vol-${k}">${VOL_LABELS[k]}</label><input id="vol-${k}" data-k="${k}" class="chan" type="range" min="0" max="100" step="1"></div>`).join('');
+$('station-sel').innerHTML = STATIONS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('');
 function syncSettingsUI() {
   $('cycle-sel').value = String(SETTINGS.cycle); $('traffic-sel').value = String(SETTINGS.traffic);
   $('units-sel').value = SETTINGS.units; $('gfx-sel').value = String(SETTINGS.gfx); $('mirror-sel').value = String(SETTINGS.mirror);
-  $('radio-sel').value = String(SETTINGS.radio); $('vol').value = String(SETTINGS.vol);
+  $('perf-sel').value = String(SETTINGS.perf); $('station-sel').value = String(SETTINGS.station); $('vol').value = String(SETTINGS.vol);
+  for (const k of VOL_KEYS) $('vol-' + k).value = String(SETTINGS.vols[k]);
   $('tod').value = String(Math.floor(((SKY.hour % 24) + 24) % 24 * 60)); $('tod-val').textContent = clockText();
 }
-$('set-btn').addEventListener('click', () => { SND.unlock(); syncSettingsUI(); setPanel.classList.add('open'); });
-$('set-close').addEventListener('click', () => setPanel.classList.remove('open'));
-setPanel.addEventListener('click', e => { if (e.target === setPanel) setPanel.classList.remove('open'); });
+// the menu pauses the game: the loop stops ticking while it is open (the sound keeps
+// playing as it was, so every slider can be heard as it moves)
+function openSettings() { SND.unlock(); syncSettingsUI(); setPanel.classList.add('open'); }
+function closeSettings() { setPanel.classList.remove('open'); }
+$('set-btn').addEventListener('click', openSettings);
+$('set-close').addEventListener('click', closeSettings);
+setPanel.addEventListener('click', e => { if (e.target === setPanel) closeSettings(); });
 $('cycle-sel').addEventListener('change', e => { SETTINGS.cycle = +e.target.value; saveSettings(); });
 $('traffic-sel').addEventListener('change', e => { SETTINGS.traffic = +e.target.value; saveSettings(); });
-$('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); });
+$('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); if (booted) drawGauges(); });
 $('gfx-sel').addEventListener('change', e => { SETTINGS.gfx = +e.target.value; saveSettings(); resize(); makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
 $('mirror-sel').addEventListener('change', e => { SETTINGS.mirror = +e.target.value; saveSettings(); });
-$('radio-sel').addEventListener('change', e => { SETTINGS.radio = +e.target.value; saveSettings(); SND.apply(); });
+$('perf-sel').addEventListener('change', e => { SETTINGS.perf = +e.target.value; saveSettings(); layoutUI(); });
+$('station-sel').addEventListener('change', e => { SETTINGS.station = +e.target.value; saveSettings(); SND.tune(); });
 $('vol').addEventListener('input', e => { SETTINGS.vol = +e.target.value; saveSettings(); SND.apply(); });
-$('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; $('tod-val').textContent = clockText(); });
+for (const el of document.querySelectorAll('input.chan')) {
+  el.addEventListener('input', e => { SETTINGS.vols[e.target.dataset.k] = +e.target.value; saveSettings(); SND.apply(); });
+  el.addEventListener('change', e => SND.preview(e.target.dataset.k));
+}
+$('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; $('tod-val').textContent = clockText(); updateSky(); if (booted) drawGauges(); });
 
 // ---------------------------------------------------------------- boot + loop
 function resize() {
@@ -2570,16 +2846,52 @@ function tick(dt) {
 }
 function frame(ts) {
   requestAnimationFrame(frame);
-  const t = ts / 1000;
-  let dt = clamp(t - last, 0, 0.1); last = t;
+  const t = ts / 1000, raw = t - last;
+  let dt = clamp(raw, 0, 0.1); last = t;
   if (!booted) return;
-  if (!paused) tick(dt);
+  const c0 = performance.now();
+  if (!paused && !menuOpen()) tick(dt);
+  const c1 = performance.now();
   updateCamera(dt);
+  const gpuQ = gpuBegin();
+  PERF.calls = 0; PERF.tris = 0;
   if (CAM.mode === 0 && frameNo % 2 === 0) drawGauges();
   renderFrame();
+  if (gpuQ) gl.endQuery(PERF.ext.TIME_ELAPSED_EXT);
+  const c2 = performance.now();
   drawHUD();
+  const c3 = performance.now();
   SND.update(dt);
-  if (setPanel.classList.contains('open')) { const tv = $('tod-val'); if (tv) tv.textContent = clockText(); }
+  perfFrame(t, raw, c1 - c0, c2 - c1, c3 - c2);
+  if (menuOpen()) { const tv = $('tod-val'); if (tv) tv.textContent = clockText(); }
+}
+// GPU time: one query a frame while the detail stats are shown, read back a few frames later
+function gpuBegin() {
+  const P = PERF, E = P.ext;
+  if (!E) return null;
+  while (P.q.length) {
+    const q = P.q[0];
+    if (!gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) break;
+    if (!gl.getParameter(E.GPU_DISJOINT_EXT)) { P.gpuSum += gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6; P.gpuN++; }
+    gl.deleteQuery(q); P.q.shift();
+  }
+  while (P.q.length > 6) gl.deleteQuery(P.q.shift());
+  if (SETTINGS.perf < 2) return null;
+  const q = gl.createQuery(); gl.beginQuery(E.TIME_ELAPSED_EXT, q); P.q.push(q);
+  return q;
+}
+function perfFrame(t, raw, sim, r3d, hud) {
+  const P = PERF;
+  if (raw > 0 && raw < 1) { P.n++; P.dtSum += raw; P.dtMax = Math.max(P.dtMax, raw); }
+  P.k++; P.sim += sim; P.r3d += r3d; P.hud += hud; P.callSum += P.calls; P.triSum += P.tris;
+  if (t - P.t0 < 0.5) return;
+  const o = P.out;
+  o.fps = P.n ? P.n / P.dtSum : 0; o.ms = P.n ? P.dtSum / P.n * 1000 : 0; o.max = P.dtMax * 1000;
+  o.sim = P.sim / P.k; o.r3d = P.r3d / P.k; o.hud = P.hud / P.k;
+  o.calls = Math.round(P.callSum / P.k); o.tris = P.triSum / P.k;
+  if (P.gpuN) o.gpu = P.gpuSum / P.gpuN; else if (!P.ext) o.gpu = null;
+  o.heap = performance.memory ? performance.memory.usedJSHeapSize / 1048576 : null;
+  Object.assign(P, { t0: t, n: 0, dtSum: 0, dtMax: 0, k: 0, sim: 0, r3d: 0, hud: 0, callSum: 0, triSum: 0, gpuSum: 0, gpuN: 0 });
 }
 function boot() {
   if (!gl) { $('nogl').style.display = 'flex'; return; }
@@ -2608,7 +2920,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

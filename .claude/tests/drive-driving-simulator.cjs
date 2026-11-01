@@ -144,20 +144,61 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
     const y0 = P.yaw; for (let i = 0; i < 60; i++) D.tick(1 / 60);
     const turnL = { dyaw: P.yaw - y0, u: P.u };
     I.wheelHeld = false; I.steer = 0;
-    // reverse: hold the brake at a standstill
-    reset(s0); I.brakeTarget = 1; for (let i = 0; i < 240; i++) D.tick(1 / 60);
+    // reverse: brake to a stop and keep holding; it takes a full second at 0 mph
+    reset(s0); P.vx = 8; I.brakeTarget = 1; I.brake = 1;
+    let tZero = null, tRev = null, tr = 0;
+    for (let i = 0; i < 60 * 6; i++) { D.tick(1 / 60); tr += 1 / 60; if (tZero === null && Math.abs(P.vx) * 2.23694 < 0.5) tZero = tr; if (tRev === null && P.gear < 0) tRev = tr; }
     const gearR = P.gear, vR = P.vx;
-    I.brakeTarget = 0; I.gasTarget = 1; for (let i = 0; i < 120; i++) D.tick(1 / 60);
+    // steering in reverse at full reverse speed: a steady turn the way a real car turns, never a spin
+    I.wheelHeld = true; I.steer = 0.5; const yawR0 = P.yaw; let maxR = 0, minVx = 0;
+    for (let i = 0; i < 60 * 4; i++) { D.tick(1 / 60); maxR = Math.max(maxR, Math.abs(P.r)); minVx = Math.min(minVx, P.vx); }
+    const revTurn = { r: P.r, maxR, dyaw: P.yaw - yawR0, vy: P.vy, vx: P.vx, minVx, kin: P.vx / P.V.wheelbase * Math.tan(P.steer) };
+    I.wheelHeld = false; I.steer = 0;
+    I.brakeTarget = 0; I.brake = 0; I.gasTarget = 1; for (let i = 0; i < 180; i++) D.tick(1 / 60);
     const gearBack = P.gear;
     I.gasTarget = 0; I.gas = 0;
-    return { s0, t60, v25, brakeDist, turnL, gearR, vR, gearBack };
+    return { s0, t60, v25, brakeDist, turnL, gearR, vR, gearBack, tZero, tRev, revTurn, hold: D.REVERSE_HOLD };
   });
   ok('0-60 mph in a sedan-like 6-11 s', car.t60 !== null && car.t60 > 6 && car.t60 < 11, car.t60);
   ok('keeps accelerating past 60 mph toward its top speed', car.v25 > 30 && car.v25 < 59, car.v25);
   ok('stops from 60 mph in 30-50 m (about 0.9 g)', car.brakeDist > 30 && car.brakeDist < 50, car.brakeDist);
   ok('steering left turns the car left', car.turnL.dyaw > 0.05 && car.turnL.u < 1.6, car.turnL);
   ok('holding the brake at a standstill engages reverse and backs up', car.gearR === -1 && car.vR < -0.5, [car.gearR, car.vR]);
+  ok('reverse waits for a full second at 0 mph with the brake held (1.0-1.25 s)', car.hold === 1 && car.tZero !== null && car.tRev !== null && car.tRev - car.tZero > 0.98 && car.tRev - car.tZero < 1.25, car);
+  ok('steering in reverse turns the car steadily, the way a real car does (no spin)', car.revTurn.minVx < -4 && car.revTurn.maxR < 0.6 && car.revTurn.r < -0.15
+    && Math.abs(car.revTurn.r - car.revTurn.kin) < 0.15 && Math.abs(car.revTurn.dyaw) < 2.4 && Math.abs(car.revTurn.vy) < 1.2, car.revTurn);
   ok('the accelerator at a standstill puts it back in drive', car.gearBack === 1, car.gearBack);
+
+  // ---- 4b. cruise control ----
+  const cruise = await page.evaluate(() => {
+    const D = window.__DS, P = D.PLAYER, I = D.INPUT, C = D.CRUISE;
+    const keepLane = () => { const q = D.at(P.s), u = D.laneCenter(0, q.L); P.yaw = q.th; P.x = q.x - q.tz * u; P.z = q.z + q.tx * u; P.vy = 0; P.r = 0; };
+    const drive = (n) => { for (let i = 0; i < n; i++) { D.tick(1 / 60); keepLane(); } };
+    D.teleport(3000); D.TRAFFIC.cars.length = 0; D.setCruise(false);
+    I.gasTarget = 1; while (P.vx < 22) { D.tick(1 / 60); keepLane(); }
+    I.gasTarget = 0; I.gas = 0;
+    const on = D.setCruise(true), set = C.v;
+    // 90 s over real grades: the speed stays put without a foot on a pedal
+    let mn = 1e9, mx = -1e9, gMax = 0;
+    for (let i = 0; i < 60 * 90; i++) { D.tick(1 / 60); keepLane(); mn = Math.min(mn, P.vx); mx = Math.max(mx, P.vx); gMax = Math.max(gMax, Math.abs(D.at(P.s + 2).y - D.at(P.s - 2).y) / 4); }
+    // and with it off the same road bleeds speed (so the hold is the cruise control's doing)
+    D.setCruise(false); const vOff0 = P.vx; drive(60 * 10); const vOffLoss = vOff0 - P.vx;
+    P.vx = set; D.setCruise(true);
+    // the accelerator overrides it; letting go brings the car back to the set speed
+    I.gasTarget = 1; drive(180); const vOver = P.vx; I.gasTarget = 0; I.gas = 0;
+    drive(60 * 30); const vBack = P.vx, stillOn = C.on;
+    // the brake lets go of it
+    I.brakeTarget = 1; drive(3); const offByBrake = !C.on; I.brakeTarget = 0; I.brake = 0;
+    // it will not take a standstill
+    D.teleport(3000); P.vx = 0; const refused = D.setCruise(true) === false && !C.on;
+    return { on, set, mn, mx, gMax, vOffLoss, vOver, vBack, stillOn, offByBrake, refused };
+  });
+  ok('cruise control takes the current speed', cruise.on && Math.abs(cruise.set - 22) < 0.5, cruise);
+  ok('cruise holds the set speed within 0.3 m/s for 90 s over the road\'s grades', cruise.mx - cruise.set < 0.3 && cruise.set - cruise.mn < 0.3 && cruise.gMax > 0.01, cruise);
+  ok('without it the same road bleeds speed (the hold is the cruise control)', cruise.vOffLoss > 1, cruise.vOffLoss);
+  ok('the accelerator overrides cruise and letting go settles back to the set speed', cruise.vOver > cruise.set + 1.5 && Math.abs(cruise.vBack - cruise.set) < 0.3 && cruise.stillOn, cruise);
+  ok('the brake pedal switches cruise off', cruise.offByBrake, cruise);
+  ok('cruise refuses a standstill', cruise.refused, cruise);
 
   // ---- 5. collisions: a tree, a building, another car ----
   const hit = await page.evaluate(() => {
@@ -270,13 +311,17 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   for (const [w, h] of [[390, 844], [844, 390], [375, 667], [667, 375], [430, 932], [1024, 768], [320, 568]]) {
     await page.setViewportSize({ width: w, height: h });
     await frames(3);
-    const u = await page.evaluate(() => { const U = window.__DS.UI; return { wheel: U.wheel, gas: U.gas, brake: U.brake, speed: U.speed, w: innerWidth, h: innerHeight,
+    const u = await page.evaluate(() => { const U = window.__DS.UI; return { wheel: U.wheel, gas: U.gas, brake: U.brake, speed: U.speed, cruise: U.cruise, fps: U.fps, perf: U.perf, w: innerWidth, h: innerHeight,
       chrome: ['back-btn', 'mute-btn', 'set-btn', 'view-btn'].map(id => document.getElementById(id).getBoundingClientRect().toJSON()) }; });
     const wr = { x: u.wheel.x - u.wheel.r, y: u.wheel.y - u.wheel.r, w: u.wheel.r * 2, h: u.wheel.r * 2 };
-    const rects = { wheel: wr, gas: u.gas, brake: u.brake, speed: u.speed };
+    // the touch pads around the pedals (14 px) and the cruise button (6 px) must not reach each other either
+    const pad = (r, d) => ({ x: r.x - d, y: r.y - d, w: r.w + 2 * d, h: r.h + 2 * d });
+    if (!u.fps || !u.perf) sweep.push(`${w}x${h} perf stats not laid out`);
+    const rects = { wheel: wr, gas: pad(u.gas, 14), brake: u.brake, speed: u.speed, cruise: pad(u.cruise, 6), fps: u.fps || { x: -1, y: -1, w: 0, h: 0 }, perf: u.perf || { x: -1, y: -1, w: 0, h: 0 } };
     u.chrome.forEach((c, i) => { rects['chrome' + i] = { x: c.x, y: c.y, w: c.width, h: c.height }; });
     const names = Object.keys(rects);
-    for (const n of names) if (!(rects[n].x >= 0 && rects[n].y >= 0 && rects[n].x + rects[n].w <= u.w && rects[n].y + rects[n].h <= u.h)) sweep.push(`${w}x${h} ${n} off screen`);
+    for (const n of names) if (!['gas', 'cruise'].includes(n) && !(rects[n].x >= 0 && rects[n].y >= 0 && rects[n].x + rects[n].w <= u.w && rects[n].y + rects[n].h <= u.h)) sweep.push(`${w}x${h} ${n} off screen`);
+    for (const n of ['gas', 'cruise']) { const r = u[n]; if (!(r.x >= 0 && r.y >= 0 && r.x + r.w <= u.w && r.y + r.h <= u.h)) sweep.push(`${w}x${h} ${n} off screen`); }
     for (let i = 0; i < names.length; i++) for (let j = i + 1; j < names.length; j++) {
       if (names[i].startsWith('chrome') && names[j].startsWith('chrome')) continue;
       if (overlap(rects[names[i]], rects[names[j]])) sweep.push(`${w}x${h} ${names[i]}/${names[j]}`);
@@ -284,7 +329,7 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   }
   await page.setViewportSize({ width: 844, height: 390 });
   await frames(3);
-  ok('controls, speed readout and chrome fit without overlapping at seven phone/tablet sizes', sweep.length === 0, sweep);
+  ok('controls, cruise button, speed readout, FPS, stats and chrome fit without overlapping at seven phone/tablet sizes', sweep.length === 0, sweep);
 
   const cdp = await ctx.newCDPSession(page);
   const touch = async (type, pts) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: pts.map((p, i) => ({ x: p[0], y: p[1], id: p[2] ?? i })) });
@@ -310,6 +355,35 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   await touch('touchEnd', []);
   const hornOff = await page.evaluate(() => window.__DS.INPUT.horn);
   ok('tapping the middle of the wheel sounds the horn while held', horn === true && hornOff === false, [horn, hornOff]);
+
+  // cruise: a second finger taps the button while the first holds the accelerator
+  await page.evaluate(() => { const D = window.__DS; D.setPaused(true); D.teleport(3000); D.TRAFFIC.cars.length = 0; D.PLAYER.vx = 20; D.setCruise(false); });
+  const CB = await page.evaluate(() => window.__DS.UI.cruise);
+  const GP = await page.evaluate(() => window.__DS.UI.gas);
+  await touch('touchStart', [[GP.x + GP.w / 2, GP.y + GP.h / 2, 5]]);
+  await touch('touchStart', [[GP.x + GP.w / 2, GP.y + GP.h / 2, 5], [CB.x + CB.w / 2, CB.y + CB.h / 2, 6]]);
+  await touch('touchEnd', [[CB.x + CB.w / 2, CB.y + CB.h / 2, 6]]);   // CDP lifts the fingers a touchEnd NAMES; the gas finger stays down
+  const ccOn = await page.evaluate(() => ({ on: window.__DS.CRUISE.on, gasHeld: window.__DS.INPUT.gasTarget }));
+  await touch('touchEnd', []);
+  await touch('touchStart', [[CB.x + CB.w / 2, CB.y + CB.h / 2, 7]]);
+  await touch('touchEnd', []);
+  const ccOff = await page.evaluate(() => window.__DS.CRUISE.on);
+  ok('tapping the cruise button with a finger on the accelerator turns cruise on, a second tap off', ccOn.on === true && ccOn.gasHeld === 1 && ccOff === false, [ccOn, ccOff]);
+  await page.evaluate(() => { window.__DS.teleport(400); window.__DS.setPaused(false); });
+
+  // the settings menu pauses the game: no driving, traffic or clock while it is open
+  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.cycle = 144; D.INPUT.gasTarget = 1; });
+  await frames(4);
+  await page.click('#set-btn');
+  await frames(2);
+  const p0 = await page.evaluate(() => { const D = window.__DS; return { s: D.PLAYER.s, h: D.SKY.hour, cars: D.TRAFFIC.cars.map(c => c.s).join() }; });
+  await frames(6);
+  const p1 = await page.evaluate(() => { const D = window.__DS; return { s: D.PLAYER.s, h: D.SKY.hour, cars: D.TRAFFIC.cars.map(c => c.s).join(), open: D.menuOpen() }; });
+  await page.keyboard.press('Escape');
+  await frames(6);
+  const p2 = await page.evaluate(() => { const D = window.__DS; D.INPUT.gasTarget = 0; return { s: D.PLAYER.s, h: D.SKY.hour, open: D.menuOpen() }; });
+  ok('opening settings pauses the car, the traffic and the clock', p1.open && p1.s === p0.s && p1.h === p0.h && p1.cars === p0.cars, [p0.s, p1.s, p0.h, p1.h]);
+  ok('Escape closes settings and the game carries on', !p2.open && p2.s > p1.s && p2.h !== p1.h, [p1.s, p2.s]);
 
   const views = [];
   for (let k = 0; k < 3; k++) { await page.click('#view-btn'); await frames(3); views.push(await page.evaluate(() => [window.__DS.CAM.mode, window.__DS.SETTINGS.view])); }
@@ -342,17 +416,73 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
   ok('the frame is a real picture (many distinct colours)', day.distinct > 40, day);
   ok('midnight is much darker than noon', night.mean < day.mean * 0.45, [day.mean, night.mean]);
 
-  // ---- 9. sound: the radio is audible over the engine but does not drown it, and switches off ----
-  const lv = async () => page.evaluate(async () => { const S = window.__DS.SND; let a = 0, m = 0; for (let i = 0; i < 40; i++) { a += (S.rms('sfx') || 0) ** 2; m += (S.rms('music') || 0) ** 2; await new Promise(r => setTimeout(r, 50)); } return { sfx: Math.sqrt(a / 40), music: Math.sqrt(m / 40) }; });
-  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.radio = 1; D.SETTINGS.muted = false; D.SND.apply(); D.INPUT.gasTarget = 0.5; D.PLAYER.vx = 25; });
+  // ---- 9. sound: one volume per sound, the radio's stations, measured off the analysers ----
+  const lv = async (keys, secs = 2) => page.evaluate(async ([keys, secs]) => { const S = window.__DS.SND, acc = {}; for (const k of keys) acc[k] = 0; const n = secs * 20;
+    for (let i = 0; i < n; i++) { for (const k of keys) acc[k] += (S.rms(k) || 0) ** 2; await new Promise(r => setTimeout(r, 50)); }
+    for (const k of keys) acc[k] = Math.sqrt(acc[k] / n); return acc; }, [keys, secs]);
+  const setVol = (k, v) => page.evaluate(([k, v]) => { const D = window.__DS; D.SETTINGS.vols[k] = v; D.SND.apply(); }, [k, v]);
+  await page.evaluate(() => { const D = window.__DS; D.setPaused(true); D.SETTINGS.muted = false; D.SETTINGS.station = 0; D.SND.tune(); D.SND.apply();
+    D.CAM.mode = 1; D.SKY.hour = 12; D.updateSky(); D.PLAYER.vx = 25; D.PLAYER.thr = 0.5; });
   await page.waitForTimeout(1500);
-  const lvOn = await lv();
-  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.radio = 0; D.SND.apply(); });
-  await page.waitForTimeout(2500);
-  const lvOff = await lv();
-  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.radio = 1; D.SND.apply(); D.INPUT.gasTarget = 0; });
-  ok('the engine is audible and the radio sits under it (0.15-1.2x its level)', lvOn.sfx > 0.02 && lvOn.music > 0.15 * lvOn.sfx && lvOn.music < 1.2 * lvOn.sfx, lvOn);
-  ok('switching the radio off silences the music bus', lvOff.music < 0.002 && lvOff.sfx > 0.02, lvOff);
+  const lvOn = await lv(['sfx', 'music', 'engine', 'tyres', 'wind', 'ambient']);
+  await setVol('music', 0); await page.waitForTimeout(2500);
+  const lvOff = await lv(['sfx', 'music']);
+  await setVol('music', 100);
+  await setVol('engine', 0); await page.waitForTimeout(600);
+  const engOff = await lv(['engine', 'tyres', 'wind', 'music']);
+  await setVol('engine', 100); await setVol('engine', 50); await page.waitForTimeout(600);
+  const engHalf = await lv(['engine']);
+  await setVol('engine', 100);
+  ok('the engine is audible and the radio sits near it (0.5-1.6x the engine)', lvOn.engine > 0.02 && lvOn.music > 0.5 * lvOn.engine && lvOn.music < 1.6 * lvOn.engine, lvOn);
+  ok('the ambient bed is there by day but well under the engine (0.05-0.4x)', lvOn.ambient > 0.05 * lvOn.engine && lvOn.ambient < 0.4 * lvOn.engine, lvOn);
+  ok('the radio slider at 0 silences the music bus and nothing else', lvOff.music < 0.002 && lvOff.sfx > 0.02, lvOff);
+  ok('the engine slider at 0 silences the engine while tyres, wind and radio play on', engOff.engine < 0.0005 && engOff.tyres > 0.005 && engOff.wind > 0.005 && engOff.music > 0.01, engOff);
+  ok('the engine slider half way is a quarter of the level (a squared taper)', Math.abs(engHalf.engine / lvOn.engine - 0.25) < 0.08, [engHalf.engine, lvOn.engine]);
+  // every sound has its own slider in the menu, and the radio's on/off switch is gone
+  const menu = await page.evaluate(() => ({ chans: [...document.querySelectorAll('input.chan')].map(e => e.dataset.k), radioSel: !!document.getElementById('radio-sel'),
+    stations: [...document.getElementById('station-sel').options].map(o => o.textContent), firstRow: document.querySelector('#settings h3:nth-of-type(4) + .row select')?.id,
+    keys: window.__DS.SETTINGS.vols && Object.keys(window.__DS.SETTINGS.vols) }));
+  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
+  ok('a radio station selector heads the sound section, with four stations', menu.firstRow === 'station-sel' && menu.stations.length === 4, menu);
+  // a slider for a one-shot sound plays a sample of it when let go, through its own channel
+  const preview = await page.evaluate(async () => { const S = window.__DS.SND; let m = 0; const el = document.getElementById('vol-horn'); el.dispatchEvent(new Event('change'));
+    for (let i = 0; i < 6; i++) { m = Math.max(m, S.rms('horn') || 0); await new Promise(r => setTimeout(r, 40)); } return m; });
+  ok('letting go of the horn slider sounds the horn so the level can be heard', preview > 0.01, preview);
+  // the stations are level-matched (the selector is not a volume control)
+  const st = [];
+  for (let k = 0; k < 4; k++) {
+    await page.evaluate(k => { const D = window.__DS; D.SETTINGS.station = k; D.SND.tune(); }, k);
+    await page.waitForTimeout(800);
+    st.push((await lv(['music'], 8)).music);
+  }
+  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.station = 0; D.SND.tune(); D.PLAYER.thr = 0; });
+  ok('all four stations play and sit within 25% of each other', st.every(v => v > 0.015) && Math.max(...st) / Math.min(...st) < 1.25, st);
+
+  // ---- 10. performance stats: pure green FPS at the top, the rest on the left, both behind a setting ----
+  const greenIn = R => page.evaluate(R => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => {
+    if (!R) return res(-1);
+    const c = document.getElementById('hud'), g = c.getContext('2d'), d = devicePixelRatio > 0 ? Math.min(devicePixelRatio, 2) : 1;
+    const px = g.getImageData(Math.round(R.x * d), Math.round(R.y * d), Math.round(R.w * d), Math.round(R.h * d)).data;
+    let n = 0; for (let i = 0; i < px.length; i += 4) if (px[i + 3] > 200 && px[i] < 30 && px[i + 1] > 235 && px[i + 2] < 30) n++;
+    res(n);
+  }))), R);
+  await page.evaluate(() => { const D = window.__DS; D.setPaused(false); D.SETTINGS.perf = 2; D.layoutUI(); });
+  await frames(6);
+  const pf = await page.evaluate(() => ({ fps: window.__DS.UI.fps, perf: window.__DS.UI.perf, out: window.__DS.PERF.out, def: window.__DS.SETTINGS.perf }));
+  const gFps = await greenIn(pf.fps), gBlock = await greenIn(pf.perf);
+  const pick = v => page.evaluate(v => { const el = document.getElementById('perf-sel'); el.value = v; el.dispatchEvent(new Event('change')); }, v);
+  await pick('1');
+  await frames(3);
+  const only = await page.evaluate(() => ({ fps: !!window.__DS.UI.fps, perf: window.__DS.UI.perf }));
+  const gFps1 = await greenIn(pf.fps), gBlock1 = await greenIn(pf.perf);
+  await pick('0');
+  await frames(3);
+  const gFps0 = await greenIn(pf.fps);
+  await pick('2');
+  ok('performance stats default to on', pf.def === 2, pf.def);
+  ok('the FPS is drawn in pure green at the top centre', gFps > 40 && pf.fps.y < 60 && Math.abs(pf.fps.x + pf.fps.w / 2 - 422) < 2, [gFps, pf.fps]);
+  ok('the detail block shows frame, CPU, GPU, draw calls, triangles and more', gBlock > 200 && pf.out.fps > 0 && pf.out.ms > 0 && pf.out.calls > 20 && pf.out.tris > 1000 && pf.out.r3d > 0, [gBlock, pf.out]);
+  ok('"FPS only" keeps the FPS and drops the block; "off" drops both', only.fps && only.perf === null && gFps1 > 40 && gBlock1 < 5 && gFps0 < 5, [gFps1, gBlock1, gFps0]);
 
   ok('no page errors', errors.length === 0, errors.slice(0, 5));
   await browser.close();

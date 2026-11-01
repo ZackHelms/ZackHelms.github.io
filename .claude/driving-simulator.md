@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (55 checks).
+`.claude/tests/drive-driving-simulator.cjs` (77 checks).
 
 ## The CD's brief (verbatim)
 
@@ -36,8 +36,67 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Sun | Latitude 36 N, declination 15 deg, solar noon at 1 pm (summer time): sunrise ~6:15 am, sunset ~7:45 pm | A US summer clock |
 | Player's car | The kit's sedan, painted blue | |
 | Crashes | Bounce, lose speed, shake; the car you hit puts its hazards on and stops for 6 s | Free drive: no damage model |
-| Radio | On by default, a mellow chord loop | Every game here has music; it is the car radio |
+| Radio | On by default; four stations (Lo-fi, the original chord loop, first) | Every game here has music; it is the car radio. Stations added on the CD's ask (2026-11-01, second brief); their styles were assumed |
 | Views | Cockpit (default), chase, orbit (drag + pinch) | "Inside behind the wheel" and "outside" |
+
+## The second brief (2026-11-01, after "plays great"), verbatim
+
+> - If i hold brake long enough i reach 0 mph and still hold brake for 1 second at 0 then it should start going in reverse. It kind of does that now but spins the car too (which may be intentional but i want to control turning while going in reverse)
+> - Add a cruise control toggle on/off button that holds current speed
+> - Opening the settings menu should pause the game.
+> - Add separate audio controls in settings for bgm, ambient, engine, and each other sfx currently available. Each simply has a volume slider where all the way to left makes it 0 volume (muted). Replace "Radio on/off" toggle with slider.
+> - Add radio station selector in settings menu at top of sound section.
+> - Add a fps metric at the top in pure green (easy to see) and in settings menu a toggle for perfstats to show or not show stuff like this. Are there any other performance statistics? Go ahead and add those too so i can see.
+
+What was built, and the one cause that was traced:
+
+- **The spin was a bug, traced to code.** The dynamic branch of `stepPlayer`
+  (above 2 m/s) multiplied the yaw moment `a*Fyf*cos(d) - b*Fyr` by
+  `sign(vx)`. The slip angles already carry the direction of travel, so in
+  reverse that flipped the sign of the yaw damping and the car spun (measured:
+  wheel half left at 5.6 m/s backwards gave +2.4 rad/s, a turn every 2.6 s,
+  the wrong way). Removed, with the same stray `sign(vx)` on the front tyre's
+  drag. Now the same input gives a steady -0.36 rad/s, the kinematic value, and
+  the car turns as a real one backs up: wheel left, tail left.
+- **Reverse** engages after `REVERSE_HOLD` = 1.0 s with the brake held and the
+  speed under 0.2 m/s (0 on the readout); it was 0.6 s under 0.3 m/s.
+- **Cruise control** (`CRUISE`, `setCruise`): a HUD button above the
+  accelerator (touch role `cruise`, key X). It holds the speed it was tapped at
+  with a throttle computed from what the car must overcome (drag, rolling,
+  grade) plus a small P+I correction, and a touch of brake on a descent the
+  engine cannot hold. The accelerator overrides it while held and the car
+  settles back on release; the brake pedal, reverse or a crash over 3 m/s lets
+  it go; it refuses below 1 m/s (red rim and a low buzz). Lit green with the set
+  speed on the button and "CC nn" on the dash.
+- **The menu pauses** the loop (`menuOpen()` gates `tick`). The sound keeps
+  playing as it was, so each slider is heard as it moves, and a slider for a
+  one-shot sound (horn, crash, skid, tyres, wind, ambient, buttons) plays a
+  sample of it when let go (`SND.preview`). Esc closes the menu; the time-of-day
+  slider redraws the sky while paused.
+- **A volume per sound** (`SETTINGS.vols`, `VOL_KEYS`): radio, ambient, engine,
+  tyres, wind, tyre squeal, crashes, horn, buttons; 0-100 with 100 the measured
+  mix and a squared taper (half way is a quarter). "All sound" (the old master)
+  stays above them. An old save's `radio: 0` becomes `vols.music = 0`.
+- **Ambient**: there was no ambient sound to put a slider on, so one was built:
+  a breeze, birds by day, crickets by night (`bird()`, `cricket()`), muffled
+  behind the glass in the cockpit.
+- **Radio stations** (`STATIONS`, `BEATS`): 88.1 Lo-fi (the original loop),
+  94.5 Synthwave, 101.9 Jazz (swung), 106.3 Classical (Alberti bass), each a
+  function of the step number so it loops exactly, each trimmed to the same
+  level off the music probe. Tuning fades the old station and covers the gap
+  with a burst of static.
+- **Performance stats** (`PERF`, `drawPerf`, setting `perf`: 2 all / 1 FPS
+  only / 0 off, default all because the CD asked to see them): FPS in pure
+  `#00ff00` at the top centre (beside the chrome when there is room, on a line
+  under it on a narrow phone), and a block on the left: frame time (average and
+  slowest in the last half second), CPU ms for sim / 3D / HUD, GPU ms from
+  `EXT_disjoint_timer_query_webgl2` where the browser offers it ("n/a" on iOS),
+  draw calls and triangles (counted by wrapping the context's draw functions, so
+  every pass is in them), the 3D picture's resolution and scale, chunks, cars,
+  lights and JS heap (Chrome only).
+- `--sat/--sab/--sal/--sar` are now defined from `env(safe-area-inset-*)`. The
+  layout already read `--sab` but nothing set it, so the pedals sat in the
+  iPhone's home-indicator strip.
 
 ## Open questions for the CD
 
@@ -46,6 +105,8 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 2. Should the player be able to pick their car (the kit has six) or its colour?
 3. Weather, junctions with signals, or a destination next?
 4. Is the 6-lane class right undivided, or should it get a median?
+5. Cruise control has no +/- buttons (set, then tap again to change). Wanted?
+6. Should traffic make sound? Other cars are silent today.
 
 ## Follow-ups not yet done
 
@@ -124,7 +185,8 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 - **The car** (`stepPlayer`): a dynamic bicycle model with linear tyres clamped
   at the friction limit, a kinematic blend below 2 m/s, front-drive traction
   (55% of weight), power at the wheels, drag, rolling resistance, engine
-  braking and grade. Reverse: hold the brake at a standstill for 0.6 s. Ground
+  braking and grade. Reverse: hold the brake for 1 s at 0 mph. Cruise control
+  feeds the same throttle and brake (see the second brief). Ground
   following samples four contact patches; body pitch and roll ride a spring on
   the accelerations. Collisions: SAT against building boxes and traffic, circle
   vs box against trunks, poles and sign posts.
@@ -136,15 +198,21 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 - **Input**: touch events (never pointer events) with per-finger roles: the
   wheel rim (turned by angle, springs back on release, 135 deg = full lock),
   the hub (horn), the two pedals, anything else = look round (cockpit) or orbit
-  and pinch (orbit view). Keyboard: arrows/WASD, Space, H, C.
+  and pinch (orbit view), and the cruise button. Keyboard: arrows/WASD,
+  Space, H, C, X (cruise), Esc (close the menu).
 - **Sound**: engine (two saws and a square through a throttle-opened lowpass,
   four-cylinder firing frequency from the gearbox's rpm), tyre and wind noise,
-  skid squeal, crash, horn; the radio on the music bus. Muffled in the cockpit.
-  `SND.rms(bus)` is the level probe the suite uses.
+  skid squeal, crash, horn, an ambient bed; the radio's four stations on the
+  music bus. Every sound has its own channel gain (a slider each) and an
+  analyser: `SND.rms(name)` reads `sfx`, `music` or any channel. Muffled in the
+  cockpit.
 - **Settings** (cog): day length (24 s / 1 min / **2.4 min** / 10 min / 24 min /
   1 h / real time / stopped), time of day, traffic, units, graphics
-  (resolution scale, shadows, props distance), mirror, radio, volume, and the
-  how-to and road notes. Persisted in `drivingSimulator.settings.v1`.
+  (resolution scale, shadows, props distance), mirror, performance stats, the
+  radio station, all sound and a slider per sound, and the how-to and road
+  notes. Opening it pauses the game. Persisted in `drivingSimulator.settings.v1`.
+- **Performance stats** (`PERF`): see the second brief. The draw-call counter
+  wraps `gl.drawElements` / `drawArrays` / their instanced forms once at boot.
 
 ## Testing
 
@@ -155,12 +223,26 @@ the kits, the road invariants (classes, one-lane steps, MUTCD tapers,
 continuous lane counts, no doubling back, curvature, grades, signs before every
 lane drop in each direction), the clock (144 s = 24 h, other lengths, stopped,
 sun times), the car against real figures (0-60, braking, steering sense,
-reverse), collisions (trees, a car ahead), traffic discipline through a lane
+reverse after a full second at 0 mph, a steady reverse turn with no spin),
+cruise control (takes the speed, holds it within 0.3 m/s for 90 s of real
+grades, the accelerator overrides and it settles back, the brake and a
+standstill), collisions (trees, a car ahead), traffic discipline through a lane
 drop (own side, no overlaps, merges before the taper, lane changes happen),
 head-on stopping, two-finger touch on the wheel and pedals, the horn, the view
-cycle, settings, a seven-size layout sweep, day vs night pixels and the audio
-levels. Negative-tested 2026-11-01: removing lane-ends signs, the merge, the
-player-as-leader rule or halving the clock each turns rows red.
+cycle, settings, the cruise button tapped by a second finger while the first
+holds the accelerator, the menu pausing the car, traffic and clock (and Esc
+resuming), a seven-size layout sweep (cruise button, FPS and the stats block
+included, pedal and button touch pads padded), day vs night pixels, the audio
+levels per channel (radio and engine sliders silence only their own channel, the
+squared taper, a slider's preview, four level-matched stations) and the
+performance stats off pixels (pure green FPS, the block, the three settings).
+Negative-tested 2026-11-01: removing lane-ends signs, the merge, the
+player-as-leader rule or halving the clock each turns rows red. The second
+brief's rows were negative-tested the same day with eleven marked breaks in one
+run (the yaw sign back, a 0.6 s hold, cruise without its throttle, no menu
+pause, the engine channel deaf to its slider, untrimmed stations, a neon rather
+than pure green FPS, no cruise touch role, the block shown with FPS only, no
+horn preview, no Esc): 14 rows red, each break caught by its own row.
 
 Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for example
 `node .claude/scripts/shot-page.cjs games/driving-simulator/index.html /tmp/x.png w=844 h=390 wait=4000 eval="__DS.SETTINGS.cycle=0;__DS.SKY.hour=20.5;__DS.teleport(10600);__DS.CAM.mode=0"`
@@ -174,7 +256,13 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
 - Simulation (`tick`) median < 0.1 ms, p95 0.2 ms; worst 13 ms on a frame that
   builds a town chunk.
 - Audio: engine RMS ~0.04 idle, ~0.06 cruising, ~0.08 full throttle; radio ~0.5-0.75x
-  the engine.
+  the engine at half throttle, about 1.1x at a light cruise. The four stations
+  measured 0.0515 / 0.0569 / 0.0372 / 0.0335 untrimmed (a 1.7x spread); trimmed
+  1.0 / 0.9 / 1.38 / 1.54 they sit at 0.049-0.054. Ambient, outside at noon:
+  0.006 (0.14x the engine); at night 0.004; in the cockpit at idle 0.003.
+- Cruise control on a straight holds the set speed to the last digit (the
+  feed-forward is the car's own force model); over 90 s of real grades within
+  0.3 m/s.
 
 ## How to add...
 

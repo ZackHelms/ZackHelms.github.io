@@ -84,6 +84,24 @@ a bound first (`sectionAt(sMax + 3000)`), then loop only over what exists.
 - Audio measured off analyser probes (`SND.rms(bus)`): the radio came out 15x
   quieter than the engine, inaudible, and nothing else would have said so.
 
+## Reverse in a bicycle model: let the slip angles carry the direction
+
+The first build multiplied the yaw moment from the tyres by `sign(vx)`, on the
+reasoning that "things flip in reverse". The slip angles already flip
+(`atan2(vy + a*r, |vx|) - d*sign(vx)`), so the extra sign turned the yaw
+damping into yaw feedback: backing up above the 2 m/s blend into the dynamic
+model, any steering spun the car on the spot (+2.4 rad/s for a half-turned
+wheel; the kinematic value is -0.36). The checks never saw it because the only
+reverse row backed up in a straight line. Write the forces once, in the body
+frame, with no direction special case, and check a reverse **turn** against the
+kinematic rate `vx / L * tan(d)`. In reverse a real car steers by its trailing
+axle, which is stable well past any reverse speed (critical speed here ~39 m/s).
+
+A feed-forward cruise control is then nearly free: the throttle that holds a
+speed is the car's own resistance model (drag, rolling, grade) divided by the
+drive force available, and it holds a straight to the last digit; a small P+I
+term covers the corner drag the model leaves out.
+
 ## The plugin feedback loop
 
 Building the consumer in the same session as zmh-3d's road kit found two kit data
