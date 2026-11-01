@@ -107,9 +107,10 @@ What was built, and the one cause that was traced:
 4. Is the 6-lane class right undivided, or should it get a median?
 5. ~~Cruise control +/- buttons?~~ The CD, 2026-11-01: "Cruise control as is for now."
 6. ~~Should traffic make sound?~~ The CD, 2026-11-01: yes, in stereo with Doppler: backlog DS-2.
-7. The moon is placed by a rule of thumb (`celestial(H + 12.8, -DECL * 0.6)`), not by the
-   date. Should it follow the season's real date, phase included? (Not asked; noticed
-   while specifying DS-1.)
+7. ~~Should the moon follow the real date, phase included?~~ The CD, 2026-11-01: "Moon
+   realism: yes, add this (and sun position) to the backlog": DS-4. Asked then whether
+   the date should advance a day per game day, the CD chose **a day per game day**
+   (DS-1's calendar).
 
 ## Backlog (the CD's third message, 2026-11-01), specified for plan-gen
 
@@ -123,11 +124,19 @@ The CD, verbatim:
 >
 > Add to settings a season dropdown menu defaults to spring and other seasons are visible but not selectable (yet; add this to the backlog for "driving sim").
 
+Then, in the CD's fourth message:
+
+> Moon realism: yes, add this (and sun position) to the backlog for driving sim.
+
+The CD was then asked whether the in-game date should advance a day per game
+day (so the moon goes through its phases) or stay one fixed date per season,
+and chose **"A day per game day"**. DS-1 carries that calendar.
+
 The season dropdown itself shipped the same day (`build 2026-11-01 15:55 UTC`): a
 **Season** row in TIME, spring selected, summer / autumn / winter listed but
 disabled, `SETTINGS.season` saved, `SEASONS` and `SEASONS_OPEN` in the page, a
-suite row. The three items below are `TODO.md` § Now. Each is one plan. DS-3
-needs DS-1's date model, so it goes after it. Every step runs `gates.sh`, so a
+suite row. The four items below are `TODO.md` § Now. Each is one plan. DS-3 and
+DS-4 need DS-1's calendar, so they go after it. Every step runs `gates.sh`, so a
 step that moves the sun must restate the suite's sun row in that step (producer
 config § Plans, "plan the seams"). The defaults marked *chosen* were set when
 the item was written; the CD may overrule them at plan review, but they need no
@@ -147,19 +156,34 @@ zenith.
 
 1. **Observer.** Raleigh, NC: latitude 35.7796 N, longitude 78.6382 W. This
    replaces `LAT = 36 deg`.
-2. **One date per season** in a table that replaces `DECL` and `SOLAR_NOON`.
-   - Spring is **May 5, at UTC-4 (EDT)**, the middle of spring (*chosen*).
-   - The rows DS-3 will use: summer Aug 6 (UTC-4), autumn Nov 6 (UTC-5),
-     winter Feb 4 (UTC-5).
+2. **A calendar that advances a day per game day** (the CD's answer). It
+   replaces `DECL` and `SOLAR_NOON`.
+   - Each season is a run of dates, the astronomical seasons (*chosen*):
+     spring Mar 20 - Jun 20, 2026; summer Jun 21 - Sep 22, 2026; autumn
+     Sep 23 - Dec 20, 2026; winter Dec 21, 2026 - Mar 19, 2027.
+   - The date steps forward one day each time the game clock passes midnight
+     (`advanceClock()`), and after the season's last day it wraps to its first.
+     The wrap moves the sun, the stars and the moon once, about every 92 game
+     days (about 3.7 hours at the default 2.4-minute day).
+   - A first visit starts on the season's middle date at 1 pm (spring:
+     **May 5, 2026**). The date is saved beside the settings so the moon's
+     phase carries on between visits; the hour still starts at 1 pm.
+   - The time-of-day slider moves the hour only, never the date. The settings'
+     TIME section shows the date beside it (for example "Tue May 5").
+   - The UTC offset follows the US rule: EDT from the second Sunday of March to
+     the first Sunday of November, EST otherwise. Autumn's clock falls back an
+     hour on Nov 1, 2026, as Raleigh's does.
    - The sun's declination, the equation of time and solar noon come from the
-     date, by NOAA's general solar position equations. For the spring date,
-     computed here 2026-11-01: declination +16.0 deg, equation of time
-     +3.5 min, solar noon 13:11, sunrise 06:18, sunset 20:03 EDT.
+     date, by NOAA's general solar position equations. For May 5, computed
+     here 2026-11-01: declination +16.0 deg, equation of time +3.5 min, solar
+     noon 13:11, sunrise 06:18, sunset 20:03 EDT.
    - The suite recomputes these with its own copy of the formula; it never
      copies these numbers.
    - The suite's existing row ("the sun sets about 7:45 pm and rises about
      6:15 am") must be restated in the same step, to within 10 min of the
-     computed times.
+     computed times. The clock rows stay (144 s is still one game day); new
+     rows: crossing midnight advances the date by exactly one, and the day
+     after the season's last wraps to its first.
 3. **A real catalogue** of the stars the eye sees, to about magnitude 5.0
    (about 1,600 stars). Each star has RA and Dec (J2000), V magnitude and B-V
    colour. *Chosen* source: the Yale Bright Star Catalogue, 5th ed. (BSC5,
@@ -172,12 +196,14 @@ zenith.
      and asks the CD for the file; it does not invent star data.
    - Precession from J2000 to 2026 (about 0.36 deg) may be ignored; say so in
      the code.
-4. **One rotation from catalogue to sky.** Local sidereal time is
-   `LST(hour) = LST0(season) + 15 deg x hour`.
-   - It uses the solar rate on purpose. The game's date never advances, and the
-     true sidereal rate would jump the sky about 1 deg at every midnight.
-   - Spring LST0 (local midnight, May 5) is 204.4 deg; at 22:00, LST is
-     11.69 h.
+4. **One rotation from catalogue to sky.** Local sidereal time comes from the
+   true date and clock: the local time and the UTC offset give UT, the
+   standard GMST formula (Meeus, Astronomical Algorithms, 12.4) gives Greenwich
+   sidereal time, and adding the longitude gives LST.
+   - Because the date advances with the clock, LST runs on smoothly through
+     midnight (the stars come back about 4 minutes earlier each night, as they
+     do). It jumps only at the season's wrap.
+   - May 5, 2026 at local midnight: 204.4 deg. At 22:00 EDT that day: 11.69 h.
    - Axes are those of `celestial()`: x east, y up, z north. The celestial
      pole sits due north at an altitude equal to the latitude.
    - Stars rise in the east and set in the west. Stars north of
@@ -192,7 +218,7 @@ zenith.
      0.2 mag per airmass).
    - Delete the hash stars and `uStarRot`.
    - Cost: one draw call and about 1,600 vertices; check it on the perf block.
-6. **Out of scope:** the moon (open question 7) and the Milky Way.
+6. **Out of scope:** the moon (DS-4) and the Milky Way.
 
 **Checks.** Each is its own row and each is negative-tested.
 
@@ -297,14 +323,18 @@ file.
 
 ### DS-3. Summer, autumn and winter become selectable
 
-Comes after DS-1, which supplies the date per season and the sun and stars from
-that date.
+Comes after DS-1, which supplies the calendar and the sun and stars from the
+date.
 
 **Build.** Remove the `disabled` flags and grow `SEASONS_OPEN`; spring stays
-the default. Each season is Raleigh as it looks at that season's date, and
-every part below is *chosen*.
+the default. Choosing a season puts the calendar on its middle date, and from
+there it runs through that season's dates (DS-1). Each season has one look,
+Raleigh as it is through that season, and every part below is *chosen*. An
+option the CD may want later, not in this item: let the look follow the
+calendar within a season (leaf-out through late March and April, autumn colour
+peaking in late October, leaves down by December).
 
-- **Sun and stars come from DS-1's table.**
+- **Sun and stars come from DS-1's calendar.** On each season's middle date:
 
   | Season | Declination | Sunrise | Sunset | Clock | LST0 |
   |---|---|---|---|---|---|
@@ -312,8 +342,9 @@ every part below is *chosen*.
   | Autumn | -15.8 deg | 06:40 | 17:15 | EST | 41.8 deg |
   | Winter | -16.5 deg | 07:13 | 17:43 | EST | 130.5 deg |
 
-  These are NOAA computations made 2026-11-01; recompute them, don't copy
-  them. A winter evening should then show Orion high in the south.
+  These are NOAA computations for Aug 6, Nov 6 and Feb 4, made 2026-11-01;
+  recompute them, don't copy them. A winter evening should then show Orion
+  high in the south.
 - **Trees.** The broadleaf species (`oak-1`, `maple-1`, `birch-1`, `sapling-1`
   and the street trees `tree-1`..`tree-3`) change with the season. Conifers
   (`fir-1`, `pine-1`) do not change.
@@ -354,6 +385,99 @@ every part below is *chosen*.
 **Files:** `index.html` (the season table, the settings handler,
 `buildChunk()` and the tree builders, `grassColor()`, the ambient functions),
 the suite, and this file.
+
+### DS-4. The sun and the moon where they really are
+
+Comes after DS-1, which supplies the calendar, UT, sidereal time and the
+observer.
+
+**Today, traced 2026-11-01.**
+- `updateSky()` sets `SKY.moon = celestial(H + 12.8, -DECL * 0.6)`. That keeps
+  the moon roughly opposite the sun, so it is near full every night and never
+  in the day sky.
+- `skyCol()` draws the moon as an evenly lit disc with no phase, multiplied by
+  `uNight`, so it vanishes by day.
+- Moonlight (`SKY.moonCol`) follows the moon's altitude only.
+- The sun's disc (`smoothstep(0.99985, 0.99993, cs)`) is about 1.4-2 deg
+  across, roughly three times the real 0.53 deg.
+- Neither body is lifted by refraction at the horizon.
+
+**Build.**
+
+1. **The sun** uses DS-1's NOAA position for the date and clock, checked
+   through the whole day and not just at noon. May 5, computed here
+   2026-11-01:
+
+   | Time (EDT) | Altitude | Azimuth |
+   |---|---|---|
+   | 06:18 sunrise | -0.8 | 69 (east-north-east) |
+   | 09:00 | 31.2 | 92 |
+   | 13:11 solar noon | 70.3 | 180 |
+   | 17:00 | 35.7 | 264 |
+   | 20:03 sunset | -0.8 | 291 (west-north-west) |
+
+   Noon altitude is 90 - 35.78 + declination: 77.6 deg at the June solstice
+   and 53.7 deg at the March equinox.
+2. **Refraction.** Draw both bodies lifted by the standard refraction near the
+   horizon (Bennett's formula, about 34' at the horizon). Sunrise and sunset
+   then happen when the geometric centre is at -0.833 deg, as almanacs define
+   them.
+3. **Real sizes.** The sun's disc is 0.53 deg and the moon's 0.49-0.56 deg,
+   varying with its distance; a soft edge of a few pixels hides the aliasing.
+   *Chosen*. If they read too small on a phone, a minimum size in pixels is the
+   lever.
+4. **The moon's position** comes from a truncated lunar theory: the main
+   periodic terms of Meeus, Astronomical Algorithms, ch. 47 (about 20 for
+   longitude and 10 for latitude are plenty for 0.1-0.3 deg). Then convert
+   ecliptic to equatorial with the true obliquity, and to the observer's sky
+   through DS-1's sidereal rotation. Add topocentric parallax (up to about
+   1 deg near the horizon) and refraction.
+5. **Phase.** Shade the moon's disc as a sphere lit from the sun's direction:
+   per pixel, the disc's local normal dotted with the direction to the sun.
+   The terminator, the lit fraction and the crescent's tilt then all come out
+   right with no special cases, and the bright limb faces the sun.
+   - Faint earthshine on the dark part of a crescent (*chosen*).
+   - A few soft, low-frequency darker patches (the maria), fixed to the face
+     the moon always turns toward Earth (*chosen*).
+6. **Moonlight.** `SKY.moonCol` and the night ambient scale with the lit
+   fraction as well as the moon's altitude. The exposure keeps a full-moon
+   night clearly brighter than a moonless one, and both clearly night.
+   Moon shadows are not in this item (the shadow map runs by day only).
+7. **The moon by day.** Draw it whenever it is above the horizon, as added
+   light rather than multiplied by `uNight`, so it shows as a pale disc
+   against a blue sky.
+8. **A bright moon dims the stars.** A faint glow round the moon grows with
+   the phase, and DS-1's star pass fades its faintest stars by the sky's
+   brightness, so a full moon washes them out (*chosen*).
+
+**Checks.** Each is its own row and each is negative-tested.
+
+- **Sun.** Altitude and azimuth match the suite's own NOAA implementation
+  within 0.2 deg at five times of day on three dates. Sunrise and sunset fall
+  within 2 min of its times.
+- **Moon position.** Altitude and azimuth match the suite's own lunar
+  implementation within 0.3 deg at several times.
+- **Moon anchors.** These are mean phases from Meeus ch. 49, each within a day.
+  - The sun-moon angle is within 6 deg of 180 at the full moons of
+    2026-05-01 and 2026-05-31, and within 6 deg of 0 at the new moon of
+    2026-05-16.
+  - The lit fraction is over 0.97 at full, under 0.03 at new, and 0.5 +/- 0.05
+    at the last quarter (about 2026-05-09).
+- **The cycle.** Over 30 game days the phase runs new to full to new once, and
+  the moon rises on average about 50 min later each day (30-70 min).
+- **The bright limb faces the sun.** Through a test hook that draws the moon
+  alone, the centroid of its lit pixels lies toward the sun's projected
+  direction within 15 deg.
+- **Pixels.**
+  - With the moon above the horizon by day, its disc is brighter than the sky
+    around it.
+  - A full-moon midnight is brighter than a new-moon midnight (mean luminance
+    ratio over 1.5), and both are darker than dusk.
+  - The drawn sun disc spans 0.53 deg at the current field of view, within 20%.
+
+**Files:** `index.html` (`updateSky()`, `celestial()` or its replacement,
+`skyCol()`, the moonlight and exposure terms, the star pass's fade, a test
+hook), the suite, and this file.
 
 ## Follow-ups not yet done
 

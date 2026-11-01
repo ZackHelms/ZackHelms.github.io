@@ -17,9 +17,11 @@ in `.claude/<game>.md`.
   north pole and star field spins around like a spinning top"). Cause traced:
   `skyCol()` turns hash-grid stars about the zenith (`uStarRot = hour/24*TAU`). Build
   real catalogue stars (BSC5 to about mag 5) turned about the celestial pole at
-  latitude 35.78 N by the spring date's sidereal time, drawn in one `gl.POINTS` pass,
-  with the sun's clock taken from the same date (May 5: sunrise 06:18, sunset 20:03
-  EDT). Plan-shaped. Spec, the worked star positions the checks use, and the files:
+  latitude 35.78 N by true sidereal time, drawn in one `gl.POINTS` pass. It also
+  brings a **calendar that advances a day per game day** (the CD's choice,
+  2026-11-01), running through the selected season's dates and starting on May 5,
+  2026, with the sun's clock taken from the date (May 5: sunrise 06:18, sunset
+  20:03 EDT). Plan-shaped. Spec, the worked star positions the checks use, and the files:
   `.claude/driving-simulator.md` § Backlog, DS-1.
 
 - [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
@@ -40,6 +42,17 @@ in `.claude/<game>.md`.
   chunks in place. **After DS-1.** Plan-shaped; its defaults were chosen and can be
   overruled at plan review. Spec and checks: `.claude/driving-simulator.md` § Backlog,
   DS-3.
+
+- [driving-sim] **The sun and the moon where they really are** (the CD, 2026-11-01:
+  "Moon realism: yes, add this (and sun position) to the backlog for driving sim").
+  The moon is placed by a truncated lunar theory (Meeus ch. 47) for DS-1's date and
+  clock, with parallax and refraction; its phase is shaded as a sphere lit from the
+  sun, so the bright limb faces the sun; moonlight scales with the phase; and it is
+  seen by day. The sun is checked across the whole day, refracted at the horizon,
+  and both discs are their real size (0.53 deg). Today the moon is kept opposite the
+  sun (near full every night) and drawn with no phase. **After DS-1.** Plan-shaped.
+  Spec, the anchors (full moons 2026-05-01 and 05-31, new 05-16) and the checks:
+  `.claude/driving-simulator.md` § Backlog, DS-4.
 
 ## Needs Zack
 
