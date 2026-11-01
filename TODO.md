@@ -21,8 +21,14 @@ in `.claude/<game>.md`.
   brings a **calendar that advances a day per game day** (the CD's choice,
   2026-11-01), running through the selected season's dates and starting on May 5,
   2026, with the sun's clock taken from the date (May 5: sunrise 06:18, sunset
-  20:03 EDT). Plan-shaped. Spec, the worked star positions the checks use, and the files:
-  `.claude/driving-simulator.md` § Backlog, DS-1.
+  20:05 EDT). Spec, the worked star positions the checks use, and the files:
+  `.claude/driving-simulator.md` § Backlog, DS-1. *Decided 2026-11-01: the proxy
+  refuses the catalogue's host, and the CD will allow `cdsarc.cds.unistra.fr` in the
+  environment's network settings (the run stops at its catalogue step if it is still
+  refused).* DS-2 to DS-4 below wait for this one: they share its files, and DS-3 and
+  DS-4 build on its calendar.
+  **Plan ready (2026-11-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/dsstars.real-sky-and-calendar.md`
 
 - [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
   2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly

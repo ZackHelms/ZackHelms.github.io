@@ -136,7 +136,10 @@ The season dropdown itself shipped the same day (`build 2026-11-01 15:55 UTC`): 
 **Season** row in TIME, spring selected, summer / autumn / winter listed but
 disabled, `SETTINGS.season` saved, `SEASONS` and `SEASONS_OPEN` in the page, a
 suite row. The four items below are `TODO.md` § Now. Each is one plan. DS-3 and
-DS-4 need DS-1's calendar, so they go after it. Every step runs `gates.sh`, so a
+DS-4 need DS-1's calendar, so they go after it. **DS-1's plan:**
+`.claude/plans/dsstars.real-sky-and-calendar.md` (drafted 2026-11-01). DS-2 to DS-4
+wait until it lands: all three share its files, and DS-3 and DS-4 cite its contracts
+(`SEASON_DATES`, `SKY.mjd`, `utcOffset`, `solar()`, `SKY.lst`, `SKY.starM`). Every step runs `gates.sh`, so a
 step that moves the sun must restate the suite's sun row in that step (producer
 config § Plans, "plan the seams"). The defaults marked *chosen* were set when
 the item was written; the CD may overrule them at plan review, but they need no
@@ -174,9 +177,12 @@ zenith.
      the first Sunday of November, EST otherwise. Autumn's clock falls back an
      hour on Nov 1, 2026, as Raleigh's does.
    - The sun's declination, the equation of time and solar noon come from the
-     date, by NOAA's general solar position equations. For May 5, computed
-     here 2026-11-01: declination +16.0 deg, equation of time +3.5 min, solar
-     noon 13:11, sunrise 06:18, sunset 20:03 EDT.
+     date, by NOAA's solar calculator (Meeus-based). For May 5 at local noon,
+     recomputed 2026-11-01 by two independent methods that agree within 0.011
+     deg (that calculator, and the Astronomical Almanac's low-precision sun
+     with Meeus 12.4 sidereal time): declination +16.4 deg, equation of time
+     +3.3 min, solar noon 13:11, sunrise 06:18-06:19, sunset 20:05 EDT. (The
+     first draft of this item said +16.0 deg and 20:03.)
    - The suite recomputes these with its own copy of the formula; it never
      copies these numbers.
    - The suite's existing row ("the sun sets about 7:45 pm and rises about
@@ -194,6 +200,9 @@ zenith.
      page (the `build-kits.mjs` pattern); nobody types star data by hand.
    - This container's proxy may refuse the download. If it does, the plan stops
      and asks the CD for the file; it does not invent star data.
+     *Decided 2026-11-01 (plan-gen interview): the proxy refused
+     `cdsarc.cds.unistra.fr` and `heasarc.gsfc.nasa.gov`; the CD chose to allow
+     `cdsarc.cds.unistra.fr` in the environment's network settings.*
    - Precession from J2000 to 2026 (about 0.36 deg) may be ignored; say so in
      the code.
 4. **One rotation from catalogue to sky.** Local sidereal time comes from the
@@ -222,9 +231,12 @@ zenith.
 
 **Checks.** Each is its own row and each is negative-tested.
 
-- **Polaris** (RA 2h31m49s, Dec +89 15' 51'') sits at altitude 35.0-35.6 deg
-  and azimuth 359.0-0.5 deg at every hour of the game day. Computed for 22:00:
-  35.2 deg, 359.4 deg.
+- **Polaris** (RA 2h31m49s, Dec +89 15' 51'') is 0.74 deg from the pole at
+  J2000, so over a game day its altitude runs 35.04-36.52 deg and its azimuth
+  359.1-0.9 deg. The check: altitude 35.0-36.6 deg and azimuth within 1.0 deg of
+  north at every hour, each within 0.5 deg of the suite's own alt/az. Computed
+  for 22:00: 35.2 deg, 359.4 deg. (The first draft's 35.0-35.6 band was wrong;
+  corrected 2026-11-01.)
 - **Each star circles the pole, not the zenith.** Its angle to the pole stays
   constant within 0.05 deg over 24 game hours. Dubhe (dec +61.75 deg) never
   sets; Arcturus (dec +19.2 deg) rises and sets.
@@ -338,12 +350,13 @@ peaking in late October, leaves down by December).
 
   | Season | Declination | Sunrise | Sunset | Clock | LST0 |
   |---|---|---|---|---|---|
-  | Summer | +16.9 deg | 06:25 | 20:15 | EDT | 296.1 deg |
-  | Autumn | -15.8 deg | 06:40 | 17:15 | EST | 41.8 deg |
-  | Winter | -16.5 deg | 07:13 | 17:43 | EST | 130.5 deg |
+  | Summer | +16.6 deg | 06:26 | 20:14 | EDT | 296.1 deg |
+  | Autumn | -16.1 deg | 06:42 | 17:14 | EST | 41.8 deg |
+  | Winter | -16.1 deg | 07:12 | 17:45 | EST | 130.5 deg |
 
-  These are NOAA computations for Aug 6, Nov 6 and Feb 4, made 2026-11-01;
-  recompute them, don't copy them. A winter evening should then show Orion
+  These are NOAA computations for Aug 6, Nov 6 and Feb 4 (declination at local
+  noon), recomputed 2026-11-01; the first draft's declinations were 0.3-0.4 deg
+  off. Recompute them, don't copy them. A winter evening should then show Orion
   high in the south.
 - **Trees.** The broadleaf species (`oak-1`, `maple-1`, `birch-1`, `sapling-1`
   and the street trees `tree-1`..`tree-3`) change with the season. Conifers
@@ -411,13 +424,14 @@ observer.
    | Time (EDT) | Altitude | Azimuth |
    |---|---|---|
    | 06:18 sunrise | -0.8 | 69 (east-north-east) |
-   | 09:00 | 31.2 | 92 |
-   | 13:11 solar noon | 70.3 | 180 |
-   | 17:00 | 35.7 | 264 |
-   | 20:03 sunset | -0.8 | 291 (west-north-west) |
+   | 09:00 | 31.3 | 92 |
+   | 13:11 solar noon | 70.6 | 180 |
+   | 17:00 | 36.0 | 265 |
+   | 20:05 sunset | -0.8 | 291 (west-north-west) |
 
-   Noon altitude is 90 - 35.78 + declination: 77.6 deg at the June solstice
-   and 53.7 deg at the March equinox.
+   (Recomputed 2026-11-01 with declination +16.4; the first draft used +16.0
+   and was about 0.3 deg low.) Noon altitude is 90 - 35.78 + declination: 77.7
+   deg at the June solstice and 54.2 deg at the March equinox.
 2. **Refraction.** Draw both bodies lifted by the standard refraction near the
    horizon (Bennett's formula, about 34' at the horizon). Sunrise and sunset
    then happen when the geometric centre is at -0.833 deg, as almanacs define
