@@ -27,8 +27,13 @@ in `.claude/<game>.md`.
   environment's network settings (the run stops at its catalogue step if it is still
   refused).* DS-2 to DS-4 below wait for this one: they share its files, and DS-3 and
   DS-4 build on its calendar.
-  **Plan ready (2026-11-01)** — run:
+  **Step 1 of 5 done, waiting on the host (2026-11-01).** The calendar and the sun
+  from the date are built and green on branch `claude/brave-sagan-odwmrd` (not on
+  `main`). The run stopped at step 2 because the proxy still refused
+  `cdsarc.cds.unistra.fr`. Once it is allowed (Network access, Allowed domains, then a
+  new session), run:
   `/zmh-producer:oversee-implementation .claude/plans/dsstars.real-sky-and-calendar.md`
+  The plan's Resume section says to start from that branch, not from `main`.
 
 - [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
   2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly

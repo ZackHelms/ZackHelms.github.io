@@ -1,6 +1,9 @@
 # dsstars - Driving Simulator: the real sky over Raleigh, NC, and a calendar that runs a day per game day (DS-1)
 
-**Status:** DRAFT
+**Status:** PARTIALLY IMPLEMENTED 2026-11-01 - step 1 of 5 done, on branch `claude/brave-sagan-odwmrd`
+(not on `main`). Stopped at step 2: the agent proxy still refuses `cdsarc.cds.unistra.fr` (CONNECT
+403 at 19:05 and 20:17 UTC, in a container started after the CD's answer). Details and what to do:
+`dsstars.real-sky-and-calendar.follow-up.md`.
 **Requested:** 2026-11-01, the CD (third message of the day, verbatim):
 
 > Oh yeah, fix the star field rotation. It looks like i am at the earths rotational north pole and
@@ -320,7 +323,12 @@ Profile: **balanced** (assumed: this repo has no task-scoping skill, `.claude/zm
    immediately before any push to `main`.
 2. Read this file in full, including every step's Results. Then read `.claude/driving-simulator.md`:
    § Backlog DS-1, § Architecture, § Testing, and the "Assumed, not decided" table.
-3. Check out `ds-stars` (create it from `main` at step 1). Run the first step in the table below that
+3. **Step 1 is on `origin/claude/brave-sagan-odwmrd`, not `ds-stars`** (the session that ran it could
+   push only to its own designated branch, and `main` must not get the game's half before step 5).
+   Start from that branch: a worktree cut from `main` (as an oversee run cuts one) merges
+   `origin/claude/brave-sagan-odwmrd` in before anything else, then re-runs the gates (86 checks).
+   Read "ds-stars" below as the branch the arc lives on, and push to whatever branch your own
+   session may push to. Run the first step in the table below that
    is not DONE, and only that one. Then tick it, append a Results section (append, never rewrite),
    commit, push the branch (`git push -u origin ds-stars`), stop and report. **Never push to `main`
    before step 5.**
@@ -347,8 +355,8 @@ The CD's standing preferences:
 | # | Step | Status |
 |---|---|---|
 | 0 | The CD's words, the catalogue answer and the spec corrections recorded (this file) | DONE 2026-11-01 |
-| 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | |
-| 2 | Catalogue: V/50 downloaded and its terms read, `build-stars.mjs`, the STARS block; catalogue rows | |
+| 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | DONE 2026-11-01 |
+| 2 | Catalogue: V/50 downloaded and its terms read, `build-stars.mjs`, the STARS block; catalogue rows | BLOCKED 2026-11-01: host refused |
 | 3 | Sidereal time, sky matrix, star pass, `ridgeY()`, hash stars deleted; star and pixel rows | |
 | 4 | Break list run whole, frame cost, docs | |
 | 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
@@ -396,6 +404,94 @@ The CD's standing preferences:
   8. The TIME section shows `dateText()` in `#date-val`, which updates after a midnight crossing on
      the next open. The time-of-day slider moves the hour and not the date.
 - Suite 78 -> 86 (the restated row stays one row).
+
+#### Step 1 results
+
+Built (2026-11-01, oversee worktree `worktree-oversee+dsstars`):
+- **Suite page path.** `drive-driving-simulator.cjs` now `require('path')`s and reads
+  `PAGE = 'file://' + (process.env.DS_PAGE || path.join(process.cwd(), 'games', 'driving-simulator', 'index.html'))`.
+  With `DS_PAGE` set (`COPY`), the final line ends ` (copy)` (`TAIL`); the exit code is unchanged.
+- **Calendar** (a new "the calendar" block beside `SEASONS`, before `SETTINGS`): `mjdOf(y, m, d)`,
+  `civilOf(mjd)` -> `{ y, m, d }` (Hinnant, on `mjd - 40587`), `weekday(mjd)` (0 = Sunday),
+  `WEEKDAYS`, `MONTHS`, `dateText(mjd)` ("Tue May 5"), `SEASON_DATES` (`{ season: [first, last,
+  middle] }` as MJDs), `dstDays(y)` -> `[second Sunday of March, first Sunday of November]` and
+  `utcOffset(mjd, hour)`. No `Date` objects anywhere in it.
+- **Settings.** `SETTINGS.date` (an MJD, `null` by default) in the same `drivingSimulator.settings.v1`
+  object; after the season coercion, a missing, non-integer or out-of-season date becomes the
+  season's middle date.
+- **Sky.** `SKY` gains `mjd`, `dst`, `decl` (degrees), `eot` (minutes) and `solarNoon` (local clock
+  hours). `OBS = { lat: 35.7796, lon: -78.6382 }` (degrees) and `RAD` replace `LAT`, `DECL` and
+  `SOLAR_NOON`. `solar(jd)` is the plan's kernel verbatim; `julianDate()` gives the JD (UT) from
+  `SKY.mjd`, `SKY.hour` and `SKY.dst`. `updateSky()` sets `decl`, `eot`, `solarNoon`, then
+  `SKY.sun = celestial(H, SKY.decl)` and the moon by today's rule `celestial(H + 12.8, -SKY.decl * 0.6)`.
+  `celestial(hour, decl)` takes degrees and converts inside. No refraction.
+- **Clock.** `advanceClock(dt)`: `t = SKY.hour + dt * 24 / cyc`; `while (t >= 24) { t -= 24; nextDate(); }`;
+  then, if the step crossed 02:00, the fall-back (`t -= 1`, `dst = false`, only with `dst` true on
+  the first Sunday of November) or the spring-forward (`t += 1`, `dst = true`, only with `dst` false
+  on the second Sunday of March). `cyc <= 0` returns at once. `nextDate()` steps the date (past the
+  season's last day, or before its first, to its first), re-derives `dst` by the rule at 00:00 and
+  saves. `setDate(mjd)` sets the date, re-derives `dst` at the current hour, saves and calls
+  `updateSky()`; it is the hook's sanctioned way to change the date. Boot sets `SKY.mjd =
+  SETTINGS.date` and derives `dst` at 13:00; the time-of-day slider re-derives `dst` and never
+  touches the date.
+- **UI.** `#date-val` (styled with `#tod-val`, plus `white-space:nowrap`) sits on **its own line
+  under the slider**, a row `#date-row` labelled "Date" in TIME. Measured with Playwright at 320x568,
+  panel open: inside the Time-of-day row it pushed the clock to x = 289-335 px, past the row's right
+  edge at 285 px, so it moved; on its own row the span is 63 px wide (x 222-285), row scrollWidth =
+  clientWidth = 250, page width 320 (no horizontal scroll). `syncSettingsUI()` and the open-menu
+  refresh in `frame()` fill it.
+- **Hook.** `window.__DS` gains `OBS, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset,
+  solar, setDate`; the `SKY` export carries `mjd, dst, decl, eot, solarNoon`.
+
+Restated row (one row, in place): "a summer day: the sun sets about 7:45 pm and rises about 6:15 am"
+-> "May 5 in Raleigh: sunrise and sunset within 10 min of the suite's own computation (about 6:18 am
+and 8:05 pm EDT)". The page's `SKY.sun` scanned a minute at a time (interpolated) gives **06:18:09
+and 20:04:52 EDT**; the suite's own sun (Astronomical Almanac low-precision sun, Meeus 12.4 GMST,
+Raleigh's longitude: `aaSun`, `gmst`, `ownSun`, `ownRiseSet` at the top of the suite) gives **06:18:10
+and 20:04:51**. Page solar noon 13:11:15, decl +16.387 deg at local noon; the suite's own 13:11:15,
++16.385. The old row's `dusk` / `dawn` fields are gone. Rows 123/124 (noon high, midnight below) hold
+unchanged on May 5: the clock rows' stepping now crosses midnight (to May 6-7), so the block calls
+`setDate(MAY5)` before them.
+
+Suite: **78 -> 86** (8 new rows, the restated row still one). `gates.sh
+games/driving-simulator/index.html`: SMOKE, GAMES-SYNC, NEGTEST-SCAN GREEN, `DRIVING SIMULATOR
+DRIVE: 86 passed, 0 failed`, `GATES: GREEN`.
+
+Rows that can fail (scratch check, not the step-4 list): eight breaks on copies, run against a copy of
+the suite cut after the calendar rows, each turned at least one new row red: the date not stepping
+(4 rows), the wrap to the middle date (the wrap row), EST all year (6 rows), no fall-back (the 02:00
+row), the date not saved at midnight (the saved-date row), the sun kept at 15 deg (the sun-from-the-
+date row), the declination's sign flipped (3 rows, incl. noon and sunrise), the slider stepping the
+date (the TIME row).
+
+Assumed (step 4 moves these into the context file's Assumed table):
+- assumed: `SEASON_DATES` rows are arrays `[first, last, middle]`.
+- assumed: on the spring-forward day the hour that does not exist (02:00-02:59) reads as EDT in
+  `utcOffset()`; on the fall-back day the repeated hour reads as EDT (the plan's rule).
+- assumed: at a date step `dst` is re-derived for 00:00 of the new date, and the 02:00 check then runs
+  on that date (one rule for the midnight and the wrap).
+- assumed: `nextDate()` sends a date before the season's first day to the first day too (reachable
+  only through the hook).
+- assumed: choosing a different open season in the dropdown moves the date to that season's middle
+  date (unreachable while only spring is open; DS-3 may revisit).
+- assumed: `setDate()` saves, as a date step does.
+- assumed: the Date row is its own line at every width, not only on narrow screens.
+- assumed: row 1 accepts an hour of 13.0-13.5, not exactly 13: the live loop runs a few frames before
+  the suite pauses it (13.04-13.07 observed).
+- assumed: row 6 checks the spring-forward too (Mar 14, 2027, with `SETTINGS.season = 'winter'`) and
+  restores spring and May 5; row 7 also checks the sun's direction at 9 am and 5 pm within 0.1 deg of
+  the suite's own (this is what sees a `celestial()` that ignores `SKY.decl`).
+
+For steps 2-4:
+- `julianDate()` is the one JD; step 3's `SKY.lst` should use it. The suite's `gmst(jd)`, `jdOf()` and
+  `MJD()` are already at its top for the LST rows.
+- Restore state with `setDate(MAY5)` (and `SETTINGS.season = 'spring'`) after any row that moves the
+  date; `setDate` writes localStorage, and a later page in the same context reads it.
+- The calendar rows leave the clock at 06:15 on May 5, cycle 144, spring, as the clock block always did.
+- A full `negtest-copies.py` run of the eight scratch breaks at `--jobs 4` did not finish inside a
+  10-minute call (no verdict lines were printed before it was stopped); a solo suite run takes about
+  2.4 min. Hypothesis, not traced: four SwiftShader suites on four cores slow each other well past 4x.
+  Step 4 should budget for it (fewer jobs, or `--only` in batches).
 
 ### Step 2 - the catalogue
 
