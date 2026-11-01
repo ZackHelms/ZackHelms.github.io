@@ -284,7 +284,7 @@ try {
 } catch (e) { /* private mode */ }
 delete SETTINGS.radio;
 if (!SEASONS_OPEN.includes(SETTINGS.season)) SETTINGS.season = 'spring';
-// the saved date (an MJD) carries the moon's phase between visits; one outside the season starts on its middle date
+// the saved date (an MJD) comes back on the next visit; a missing one, or one outside the season, starts on its middle date
 { const sd = SEASON_DATES[SETTINGS.season];
   if (!(Number.isInteger(SETTINGS.date) && SETTINGS.date >= sd[0] && SETTINGS.date <= sd[1])) SETTINGS.date = sd[2]; }
 function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } }
