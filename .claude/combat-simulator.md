@@ -130,6 +130,12 @@ The CD, verbatim: "All three with selector in settings menu. Default to realisti
 Its a lot so put items in backlog in a combat simulator section and i can run
 "backlog-plan-gen" for them later."
 
+**Planned 2026-11-01** as one six-step arc, CS-1 landing on its own at step 3:
+`.claude/plans/csstyles.selector-toon-neon.md` (the design decided there: one program set
+per style compiled under a `#define STYLE`, ink by inverted hulls that discard by normal
+rather than cull, a per-vertex `aExt` on the arena, neon in display space with a
+quarter-resolution bloom).
+
 Shared rule for both items: **a style is paint.** `STYLE` is read only by the renderer
 and the HUD; the engine block never sees it (the suite's DOM-free check already holds the
 engine; add a check that a fixed-seed duel steps to byte-identical fighters under every
@@ -189,7 +195,7 @@ controls' layout at seven sizes, the settings pausing the duel (waits on frames)
 -> next rank saved, defeat -> retry, light by rank, the FPS counter on/off, no errors.
 
 **Negative controls** (`negtest-copies.py`, `CS_PAGE` env var points the suite at a
-copy): 19 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
+copy; the list is `.claude/tests/negtests/combat-simulator.json`): 19 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
 power parryable, combo pays at 3 only, power at 9, no cap, a chain of three, a staggered
 fighter that can act, a 1.2 s stagger, no armour, parry/dodge paying nothing, a ring that
 never closes, a ring that does not flash, a menu that does not pause, crowded buttons, a
