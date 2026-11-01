@@ -30,6 +30,7 @@ local-2p.
 | TAAS | `taas/` | management-sim | tap | run-based | resource-allocation, systems-simulation, scale-ladder, skill-teaching | solo | `.claude/taas.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Driving Simulator | `driving-simulator/` | driving-sim | steering-wheel, pedal-hold, multi-touch-chord, orbit-drag | open-sandbox | vehicle-physics, simulated-agents, procedural-generation, real-time-3d, day-night-cycle | solo | `.claude/driving-simulator.md` |
+| Combat Simulator | `combat-simulator/` | melee-duel | virtual-joystick, tap, multi-touch-chord | level-campaign | parry-timing, iframe-dodge, combo-chains, real-time-3d, inverse-kinematics | vs-ai | `.claude/combat-simulator.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -85,7 +86,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-59 games (57 in-repo + 2 external builds).
+60 games (58 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -232,6 +233,23 @@ local-2p.
   and `voice` are CYOA's, reused. What is new is that the narrator reads a **script**:
   the device's own voice over tables, so a game with no model, no key and no network
   still tells its tale aloud.
+
+### Newly opened by the 2026-11-01 Combat Simulator build
+- **`melee-duel`** genre + **`parry-timing`** / **`iframe-dodge`** / **`combo-chains`**
+  mechanics (combat-simulator, a direct CD commission placed after Driving
+  Simulator). The first third-person action game here and the first one-on-one
+  sword fight: a katana duel in WebGL2 against an AI opponent that reads your
+  swings and answers them, up a ladder of ten named masters. `brawler`
+  (stick-wars) is waves of taps; this is one opponent and timing: a parry inside a
+  quarter-second window staggers the attacker for a free +10% punish, a dodge has
+  invincible frames you can dash straight through a blade with, taps chain a
+  five-cut combo, and the successes fill a meter for a power attack that can only
+  be dodged. `virtual-joystick` (zed-shooter's) and `multi-touch-chord` are
+  reused (stick under one thumb, four buttons under the other);
+  `inverse-kinematics` (animation-rigs) poses the fighters from hand and blade
+  targets; `vs-ai` joins `match-vs-ai` without a local second player. Next on
+  this axis: other weapons (a spear's reach, two swords), a second human, or a
+  crowd of weaker foes at once.
 
 ### Newly opened by the 2026-11-01 build
 - **`driving-sim`** genre + **`steering-wheel`** / **`pedal-hold`** input +
