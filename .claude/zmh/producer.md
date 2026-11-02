@@ -40,6 +40,15 @@
     the off-box copy.
   - While a subagent is editing, the stop hook's "uncommitted changes" warning
     is its work in flight; committing it from the overseer would race it.
+- **Rows that time things go red when two Chromium suites share the box**
+  (2026-11-02, dsstars). With a broken copy running beside the gates (or two
+  copies at once), Driving Simulator's sound rows and its perf row failed in
+  almost every run and passed alone; the step-1 page failed the same way, so the
+  cause predates the change. Hypothesis, not traced: they measure over
+  wall-clock time. Run `gates.sh` alone (check `uptime` first), never in parallel
+  with scratch copies, and never count a catch that only such a row made. A
+  step-2 implementer stopped short of committing over exactly this; the
+  overseer's quiet re-run was GREEN.
 - **This session cannot delete anything on the remote.** `git push --delete`
   is hung up on by the agent proxy and `gh api -X DELETE` answers 403 ("Write
   access to this GitHub API path is not permitted through this proxy"). A
@@ -69,6 +78,14 @@
   plans use it)
 - Task-scoping skill: none
 - Metrics ledger: none
+- **A kit's conventions table is a list of claims to check against the host,
+  not to copy** (2026-11-02, dsstars). The plan read zmh-sky's "ENU is
+  [east, up, north]" and wrote "the page's x, y, z, no remap" without opening
+  the page's `M4.look`, whose world is (east, up, south); the kit's skill had
+  said to map a right-handed host explicitly. Step 3 found the mirror on a
+  screenshot. When plan-gen or the oversee preflight meets a kit convention
+  (handedness, row/column-major, units, epoch), grep the host's code for the
+  matching fact and cite the line.
 - **An arc's steps each pass the whole gate, so plan the seams** (2026-10-20,
   taasgoals). `gates.sh <page>` runs every drive suite of the game at the end of
   every step. So an engine-only step that changes what the page shows or how a
@@ -97,6 +114,13 @@
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
 
+  **2026-11-02, Driving Simulator (dsstars) pass** (pointer moved `15ad39d` ->
+  `fc7f66e`, range `15ad39d..fc7f66e`). Refined this session's work: `0f400b3`,
+  `51f6e0d`, `d0bff6c`, `47af46c`, `a3c97c4`, `98f6092` and `fc7f66e` (the DS-1
+  arc, landed). `97e42d0` is this session's own earlier refine commit and
+  `524eb6c` a merge, skippable. **Left behind, the Combat Simulator session's:**
+  `d92baba` (the game) and `81ad9d6` (its csstyles plan). Neither had a refine
+  pass in range; that session's to confirm.
   **2026-11-01, Driving Simulator pass** (pointer moved `44d949d` -> `15ad39d`,
   range `44d949d..15ad39d`, 5 commits). Refined this session's work: `15ad39d`
   (the game; its zmh-3d road kit landed in zmhstudio as `15bf09a`). `8471f5b` is
