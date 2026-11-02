@@ -1,6 +1,6 @@
 # csstyles - Combat Simulator: a Graphics style selector, the toon style and the neon style (plan arc)
 
-**Status:** DRAFT
+**Status:** PARTIALLY IMPLEMENTED. Steps 1-3 (CS-1, the selector and toon) landed on `main` 2026-11-02 as `7a3e760`, Pages deploy `success`. **Paused for quota in step 4.** Its unvalidated work (neon code, rows and breaks, partly run) is saved as commit `85bf3c2` on the remote branch `cs-styles-step4-wip`, not on `cs-styles` and not on `main`. To resume: run the handoff command at the end of this file; the overseer should cut its worktree from `main`, then `git fetch origin cs-styles-step4-wip && git cherry-pick 85bf3c2`, tell the step-4 implementer the WIP is unvalidated and partly run (re-read it, finish, re-run every step-4 break two at a time, gate alone at 76+), and continue from step 4.
 **Requested:** 2026-11-01. The CD answered the build's Look question with: "All three with selector in
 settings menu. Default to realistic webgl. Its a lot so put items in backlog in a combat simulator
 section and i can run "backlog-plan-gen" for them later." Realistic shipped (d92baba). The other two
@@ -277,8 +277,8 @@ Tools:
 |---|---|---|
 | 1 | Selector, styles, toon shading, hooks | DONE 2026-11-02 |
 | 2 | Toon ink | DONE 2026-11-02 |
-| 3 | CS-1 docs, land, Pages | DONE 2026-11-02 (docs and badge; landing by the overseer) |
-| 4 | Neon look | open |
+| 3 | CS-1 docs, land, Pages | DONE 2026-11-02 (landed `7a3e760`, Pages success) |
+| 4 | Neon look | paused, WIP `85bf3c2` on `cs-styles-step4-wip` |
 | 5 | Bloom | open |
 | 6 | Docs final, break lists, land, Pages | open |
 
