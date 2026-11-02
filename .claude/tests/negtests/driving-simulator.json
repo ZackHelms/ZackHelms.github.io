@@ -1,0 +1,177 @@
+[
+ {
+  "name": "date-no-step",
+  "row": "crossing midnight steps the date by exactly one",
+  "file": "games/driving-simulator/index.html",
+  "old": "  while (t >= 24) { t -= 24; from = 0; nextDate(); }",
+  "new": "  while (t >= 24) { t -= 24; from = 0; } /* @negtest */"
+ },
+ {
+  "name": "wrap-to-middle",
+  "row": "Jun 20 at 23:59, stepped past midnight, becomes Mar 20",
+  "file": "games/driving-simulator/index.html",
+  "old": "  SKY.mjd = SKY.mjd + 1 > sd[1] || SKY.mjd < sd[0] ? sd[0] : SKY.mjd + 1;",
+  "new": "  SKY.mjd = SKY.mjd + 1 > sd[1] || SKY.mjd < sd[0] ? sd[2] : SKY.mjd + 1; /* @negtest */"
+ },
+ {
+  "name": "est-all-year",
+  "row": "utcOffset follows the US rule (and the first-visit row: EDT)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function utcOffset(mjd, hour) {",
+  "new": "function utcOffset(mjd, hour) { return -5; /* @negtest */"
+ },
+ {
+  "name": "no-fall-back",
+  "row": "the clock changes at 02:00 as Raleigh's does",
+  "file": "games/driving-simulator/index.html",
+  "old": "    if (SKY.mjd === off && SKY.dst) { t -= 1; SKY.dst = false; }",
+  "new": "    if (false && SKY.mjd === off && SKY.dst) { t -= 1; SKY.dst = false; } /* @negtest */"
+ },
+ {
+  "name": "date-not-saved",
+  "row": "the date is saved at midnight and a second visit comes back to it",
+  "file": "games/driving-simulator/index.html",
+  "old": "  SETTINGS.date = SKY.mjd; saveSettings();",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "jd-ignores-dst",
+  "row": "the sun from the date (the sun at 9 am and 5 pm), May 5 sunrise and sunset, one sun vs astronomy-engine",
+  "file": "games/driving-simulator/index.html",
+  "old": "function julianDate() { return 2400000.5 + SKY.mjd + (SKY.hour - (SKY.dst ? -4 : -5)) / 24; }",
+  "new": "function julianDate() { return 2400000.5 + SKY.mjd + (SKY.hour + 5) / 24; } /* @negtest */"
+ },
+ {
+  "name": "lat-90",
+  "row": "one sun (the observer and the sun vs astronomy-engine); the pole of date; Polaris",
+  "file": "games/driving-simulator/index.html",
+  "old": "const OBS_SKY = { latDeg: OBS.lat, lonEastDeg: OBS.lon, heightM: 0 };",
+  "new": "const OBS_SKY = { latDeg: 90, lonEastDeg: OBS.lon, heightM: 0 }; /* @negtest */"
+ },
+ {
+  "name": "lon-sign",
+  "row": "one sun; the sun from the date; LST",
+  "file": "games/driving-simulator/index.html",
+  "old": "const OBS_SKY = { latDeg: OBS.lat, lonEastDeg: OBS.lon, heightM: 0 };",
+  "new": "const OBS_SKY = { latDeg: OBS.lat, lonEastDeg: -OBS.lon, heightM: 0 }; /* @negtest */"
+ },
+ {
+  "name": "star-no-transpose",
+  "row": "the planets are drawn where they are (Jupiter's pixel)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);",
+  "new": "gl.uniformMatrix3fv(sp.U.uStarM, false, SKY.starW); /* @negtest */"
+ },
+ {
+  "name": "mw-no-transpose",
+  "row": "the Milky Way all round the sky (the one-crossing row misses it: the wrong frame puts that patch at b = -6, still on the band)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW);",
+  "new": "gl.uniformMatrix3fv(sk.U.uStarM, false, SKY.starW); /* @negtest */"
+ },
+ {
+  "name": "stars-of-date",
+  "row": "the 22:00 sky (eight stars within 0.05 deg); the pole of date",
+  "file": "games/driving-simulator/index.html",
+  "old": "SKY.starM.set(s.starMatrix);",
+  "new": "SKY.starM.set(s.horizonMatrix); /* @negtest */"
+ },
+ {
+  "name": "moon-placeholder",
+  "row": "the moon in its real place",
+  "file": "games/driving-simulator/index.html",
+  "old": "SKY.moon = s.moon.enu;",
+  "new": "SKY.moon = (() => { const h = (SKY.hour + 12.8 - SKY.solarNoon) / 24 * TAU, la = OBS.lat * RAD, d = -SKY.decl * 0.6 * RAD; return [-Math.cos(d) * Math.sin(h), Math.sin(la) * Math.sin(d) + Math.cos(la) * Math.cos(d) * Math.cos(h), Math.sin(d) * Math.cos(la) - Math.cos(d) * Math.sin(la) * Math.cos(h)]; })(); /* @negtest */"
+ },
+ {
+  "name": "planets-as-j2000",
+  "row": "the planets are drawn where they are (vertices and Jupiter's pixel)",
+  "file": "games/driving-simulator/index.html",
+  "old": "[...ZMH_SKY.mat3MulVec(T, p.enu), p.valid ? p.mag : 99]",
+  "new": "[...p.enu, p.valid ? p.mag : 99] /* @negtest */"
+ },
+ {
+  "name": "planets-frozen",
+  "row": "the planets are drawn where they are (the vertices)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  writePlanets();\n  const e = SKY.sun[1];",
+  "new": "  if (!booted) writePlanets(); /* @negtest */\n  const e = SKY.sun[1];"
+ },
+ {
+  "name": "planets-frozen-gpu",
+  "row": "the planets' vertices on the GPU follow the date (a pixel cannot see it: Jupiter moves under a pixel between 13:00 and 22:00)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (STARS.buf) { gl.bindBuffer(gl.ARRAY_BUFFER, STARS.buf);",
+  "new": "  if (STARS.buf && !booted) { gl.bindBuffer(gl.ARRAY_BUFFER, STARS.buf); /* @negtest */"
+ },
+ {
+  "name": "no-star-pass",
+  "row": "one POINTS draw per pass; Jupiter's pixel; star pixels at midnight",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao) {",
+  "new": "  if (false && SKY.night > 0 && STARS.on && STARS.vao) { /* @negtest */"
+ },
+ {
+  "name": "stars-by-day",
+  "row": "one POINTS draw per pass (none by day): the draw gate alone (the gain still carries the night)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao) {",
+  "new": "  if (STARS.on && STARS.vao) { /* @negtest */"
+ },
+ {
+  "name": "stars-not-faded",
+  "row": "no star pixels at noon; one POINTS draw per pass (none by day)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao) {\n    const sp = PRG.stars; gl.useProgram(sp.p);\n    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);\n    gl.uniformMatrix4fv(sp.U.uVP, false, vp);\n    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);\n    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);",
+  "new": "  if (STARS.on && STARS.vao) { /* @negtest */\n    const sp = PRG.stars; gl.useProgram(sp.p);\n    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);\n    gl.uniformMatrix4fv(sp.U.uVP, false, vp);\n    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);\n    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure);"
+ },
+ {
+  "name": "stars-twilight",
+  "row": "the stars fade with the night (Polaris at SKY.night 0.5)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);",
+  "new": "gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * Math.max(SKY.night, 1)); /* @negtest */"
+ },
+ {
+  "name": "hash-star-left",
+  "row": "with STARS.on false at midnight no isolated bright pixels",
+  "file": "games/driving-simulator/index.html",
+  "old": "  return c;\n}\n// The distant hills'",
+  "new": "  if (uNight > 0.0 && d.y > 0.0) { vec2 g = vec2(atan(d.z, d.x) * 160.0, asin(clamp(d.y, -1.0, 1.0)) * 160.0); vec2 cell = floor(g); vec2 f = fract(g) - 0.5; float h = h21(cell * 1.37 + 3.1); c += vec3(0.9, 0.92, 1.0) * step(0.985, h) * smoothstep(0.12, 0.0, length(f)) * (0.4 + 2.0 * h21(cell + 9.1)) * uNight * smoothstep(0.0, 0.15, d.y); }${\"\" /* @negtest */}\n  return c;\n}\n// The distant hills'"
+ },
+ {
+  "name": "no-ridge-test",
+  "row": "a star behind the distant hills is hidden (Capella at 00:30 on May 6)",
+  "file": "games/driving-simulator/index.html",
+  "old": "if (d.y < ridgeY(atan(d.z, d.x), 1.0)) discard;",
+  "new": "${\"\" /* @negtest */}"
+ },
+ {
+  "name": "mw-world-coords",
+  "row": "the Milky Way where the suite's own galactic plane says it is",
+  "file": "games/driving-simulator/index.html",
+  "old": "zmhMilkyWay(transpose(uStarM) * d)",
+  "new": "zmhMilkyWay(d)${\"\" /* @negtest */}"
+ },
+ {
+  "name": "mw-by-day",
+  "row": "the noon sky byte-identical with MW.on true and false",
+  "file": "games/driving-simulator/index.html",
+  "old": "if (uNight > 0.0 && uMwGain > 0.0 && d.y >= ridge) c += uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y);",
+  "new": "if (uMwGain > 0.0 && d.y >= ridge) c += uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * smoothstep(0.0, 0.1, d.y);${\"\" /* @negtest */}"
+ },
+ {
+  "name": "no-world-flip-stars",
+  "row": "the planets are drawn where they are (Jupiter's pixel); the Milky Way all round the sky",
+  "file": "games/driving-simulator/index.html",
+  "old": "  SKY.starW.set(SKY.starM); for (let k = 6; k < 9; k++) SKY.starW[k] = -SKY.starW[k];",
+  "new": "  SKY.starW.set(SKY.starM); /* @negtest */"
+ },
+ {
+  "name": "no-world-flip-sun",
+  "row": "the sun is drawn where it is (also the one-crossing Milky Way row, through the mirrored moon glow)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const enuToWorld = v => [v[0], v[1], -v[2]];",
+  "new": "const enuToWorld = v => [v[0], v[1], v[2]]; /* @negtest */"
+ }
+]

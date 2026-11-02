@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (78 checks).
+`.claude/tests/drive-driving-simulator.cjs` (108 checks).
 
 ## The CD's brief (verbatim)
 
@@ -33,11 +33,25 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Four road classes | rural 2-lane 55 mph, town 2-lane 35 mph (kerbs, sidewalks, streetlights), arterial 4-lane 45 mph, highway 6-lane 65 mph (undivided, double yellow) | The kit's `standard.roadClasses`; a 6-lane road with a grass median was offered but not chosen |
 | Lane changes between classes | At most one lane per direction at a time, over the kit's MUTCD merge taper (L = W x S, ~165-238 m) | Real practice; a 2 -> 6 jump in one taper would be a 7 m lateral shift |
 | Start | 1:00 pm, at rest, in the right lane of a rural forest 2-lane | Sun high enough for shadows; sunset arrives about 40 s in at the default day |
-| Sun | Latitude 36 N, declination 15 deg, solar noon at 1 pm (summer time): sunrise ~6:15 am, sunset ~7:45 pm | A US summer clock |
+| Sun | *Superseded by DS-1 (2026-11-02):* the sun, moon, planets and stars of Raleigh, NC on the game's date, from zmh-sky. Was: latitude 36 N, declination 15 deg, solar noon at 1 pm | The CD asked for Raleigh's spring sky |
 | Player's car | The kit's sedan, painted blue | |
 | Crashes | Bounce, lose speed, shake; the car you hit puts its hazards on and stops for 6 s | Free drive: no damage model |
 | Radio | On by default; four stations (Lo-fi, the original chord loop, first) | Every game here has music; it is the car radio. Stations added on the CD's ask (2026-11-01, second brief); their styles were assumed |
 | Views | Cockpit (default), chase, orbit (drag + pinch) | "Inside behind the wheel" and "outside" |
+| Observer (DS-1) | `OBS = { lat: 35.7796, lon: -78.6382 }`; the kit's `OBS_SKY` has `heightM: 0` | The kit's own Raleigh observer. Raleigh is about 100 m up, which moves the moon's parallax by far under 0.001 deg |
+| Season dates (DS-1) | The astronomical seasons: spring Mar 20 - Jun 20, 2026; summer Jun 21 - Sep 22; autumn Sep 23 - Dec 20; winter Dec 21, 2026 - Mar 19, 2027. `SEASON_DATES` rows are `[first, last, middle]` as MJDs | DS-3 cites them; the DST rows use autumn and winter |
+| Start date (DS-1) | A first visit is the season's middle date at 1 pm: **Tue May 5, 2026** in spring. The hour always starts at 1 pm; the date is saved. A missing, broken or out-of-season saved date becomes the middle date | The CD chose a day per game day; the middle of spring shows a typical spring sky |
+| Date steps (DS-1) | At each midnight the date steps by one; past the season's last day (or before its first, through the hook only) it goes to the first day. `setDate()` saves, as a midnight does. Choosing another open season moves the date to its middle date (unreachable while only spring is open) | One rule for the midnight and the wrap |
+| Daylight saving (DS-1) | `SKY.dst` is state. On the fall-back day the clock goes 02:00 -> 01:00 once; on the spring-forward day 02:00 -> 03:00. At boot, a date step and the time-of-day slider `dst` is re-derived by the rule (`utcOffset`), with the repeated hour reading as EDT and the missing hour (02:00-02:59 on the spring day) as EDT. At a date step `dst` is derived for 00:00 of the new date | Raleigh's clock; pure (date, hour) is ambiguous in the repeated hour. Spring never meets a transition: only the hook reaches them |
+| Magnitude cut (DS-1) | The splice's `--mag 5`: 1,627 stars | Naked-eye under a light-polluted sky; one flag to change it |
+| `STAR_GAIN = 3.2` (DS-1) | The star pass's gain after the tonemap, times `SKY.exposure` and `SKY.night` | Read off pixels at 22:00 on May 5: at 1.6 Spica (mag 0.97) peaked at luminance 118, not white; at 3.2 it reads 209 and Arcturus saturates |
+| `MW_GAIN = 0.012` (DS-1) | The Milky Way's linear scale before the tonemap: the kit's `MILKY_WAY_PEAK` | Faint, as Raleigh's sky is: Cygnus reads luminance 32.8 against 19.5 off the band |
+| Planet colours and clamp (DS-1) | Mercury and Venus white; Mars (1.0, 0.62, 0.42); Jupiter (1.0, 0.95, 0.85); Saturn (1.0, 0.9, 0.7). Point intensity clamped at 2.5 (Sirius = 1). A planet outside the kit's 1800-2050 elements gets magnitude 99 and draws nothing | Venus a bright point, not a flare |
+| Star profile (DS-1) | The kit's Gaussian point with sigma floored at 0.5 framebuffer px and the point at least 3 px wide; the centre keeps the law's value. From about 2.8 px up it is exactly the kit's | The kit's 1-2 px point is sub-pixel at pixel centres: faint stars came out at a fifth of their law or not at all |
+| Star fade (DS-1) | `smoothstep(0, 2, alt)` over the first 2 deg; nothing below the horizon or under the ridge | The kit's 2-deg fade, written as a smoothstep |
+| The world frame (DS-1) | The page's world is (east, up, **south**). `SKY.sun / moon / planets / starM` stay in the kit's ENU; the GPU gets `SKY.sunW`, `SKY.moonW` and `SKY.starW` through `enuToWorld(v) = [v[0], v[1], -v[2]]` | `M4.look` is an OpenGL lookAt, so the renderer is right-handed; fed ENU unmapped, the sky drew mirrored (traced in step 3). The plan's "no remap" was wrong |
+| The Date row (DS-1) | `#date-val` on its own row (`#date-row`, "Date") under the time-of-day slider, at every width | Inside the Time-of-day row it pushed the clock past the row's edge at 320 px |
+| Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
 
@@ -160,6 +174,11 @@ answer to start.
 
 ### DS-1. A real star field: the sky from Raleigh, NC, in spring
 
+**Built 2026-11-02** (plan `dsstars`, steps 1-4; the spec below was checked
+against the code). One correction to it: the kit's ENU is not the page's x, y,
+z. The page's world is (east, up, south), and the GPU gets every body through
+`enuToWorld` (see Architecture, "The sky").
+
 **The cause, traced 2026-11-01.** `skyCol()` in `GLSL_COMMON` turns the star
 lookup direction about the world's vertical axis (`sd.xz` rotated by
 `uStarRot`), and `setFrameUniforms()` sets `uStarRot = SKY.hour / 24 * TAU`.
@@ -232,9 +251,12 @@ zenith.
    - Because the date advances with the clock, LST runs on smoothly through
      midnight (the stars come back about 4 minutes earlier each night, as they
      do). It jumps only at the season's wrap.
-   - Axes are those of `celestial()` and the kit's ENU: x east, y up, z north.
-     The celestial pole **of date** sits due north at an altitude equal to the
-     latitude. The J2000 pole is 0.15 deg from it in 2026.
+   - The kit's ENU is x east, y up, z north, and `SKY.sun`, `.moon`,
+     `.planets` and `.starM` stay in it. The page's world is (east, up, south):
+     the GPU gets `SKY.starW = W * starM` with `W = diag(1, 1, -1)` (the first
+     draft said "no remap", which drew the sky mirrored). The celestial pole
+     **of date** sits due north at an altitude equal to the latitude. The J2000
+     pole is 0.15 deg from it in 2026.
    - Stars rise in the east and set in the west. Stars north of dec +54.2 deg
      never set.
 5. **Drawing.** One `gl.POINTS` draw right after the sky in `renderScene()`,
@@ -564,6 +586,58 @@ carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
   (buildings without furniture, street trees, forest species, bushes, boulders,
   recipe colours). Python owns WHAT; this page owns HOW (meshing, materials,
   placement). Never hand-edit the block.
+- **The sky kit.** `ZMH_SKY` (zmh-sky's whole library), `SKY_DATA` (1,627
+  stars to mag 5 as `{ fields: ['hip', 'ra', 'dec', 'mag', 'bv'], rows }`, and
+  the planets' elements) and `ZMH_SKY_GLSL` live between `/*ZMH-SKY:BEGIN*/`
+  and `/*ZMH-SKY:END*/`, right after the KITS block. The kit's CLI writes it;
+  never hand-edit it. To regenerate, from the repo root:
+  `node <zmhstudio>/plugins/zmh-sky/cli/zmh-sky.mjs splice --page games/driving-simulator/index.html --mag 5 --parts stars,planets,glsl`
+  (it prints `ZMH-SKY=<page> bytes=98547 stars=1627`; a second run leaves the
+  page byte-identical). The attribution is `#sky-notes` in THE ROAD notes and
+  `LICENSE-d3-celestial.txt` beside the page.
+- **The calendar.** The date is an integer MJD, `SKY.mjd` (`SKY.day` is the
+  daylight factor). `mjdOf()`, `civilOf()`, `weekday()` and `dateText()` are pure
+  arithmetic, with no `Date` objects: the player's time zone is not Raleigh's.
+  `SEASON_DATES` holds each season's `[first, last, middle]`. `advanceClock()`
+  steps the date at each midnight through `nextDate()` (wrapping at the season's
+  end, saving `SETTINGS.date`) and changes the clock at 02:00 on the DST days;
+  `SKY.dst` is state, re-derived by `utcOffset(mjd, hour)` only at boot, a date
+  step, `setDate()` and the time-of-day slider. `julianDate()` is the one Julian
+  date (UT): `2400000.5 + SKY.mjd + (SKY.hour - offset) / 24`. Never pass it to
+  GLSL.
+- **The sky.** `updateSky()` calls `ZMH_SKY.skyAt(julianDate(), OBS_SKY,
+  SKY_DATA.planets)` once. **One sun**: `SKY.sun` is its `sun.enu`, and the light,
+  the sun disc and the shadows all use it; nothing else in the page computes a
+  sun. `SKY.moon` is the topocentric moon (its look and light are still the old
+  ones until DS-4), `SKY.moonPhase` is kept for DS-4, `SKY.lst` is the kit's LST,
+  and `SKY.planets` holds the five naked-eye planets. **The star matrix**
+  `SKY.starM` is the kit's `starMatrix`: J2000 to ENU, precession included,
+  flat row-major, determinant -1 (ENU is left-handed). It is uploaded with
+  `uniformMatrix3fv(loc, true, ...)` (transpose = true). **The world frame** is
+  (east, up, south), because `M4.look` is an OpenGL lookAt (facing +z, +x is on
+  the screen's left). So `SKY.*` stay ENU, exactly as the kit gives them, and the
+  GPU gets `SKY.sunW` and `SKY.moonW` (`enuToWorld(v) = [v[0], v[1], -v[2]]`) and
+  `SKY.starW` (`starM` with its third row negated).
+- **The star pass** (`VS_STARS` / `FS_STARS`, `PRG.stars`), one `gl.POINTS`
+  draw right after the sky in `renderScene()`, so the mirror gets it too (with
+  `uPx` 1 there and `RSCALE` in the main pass). The VAO (`initStars()`) holds 7
+  floats a vertex: the J2000 unit vector, the magnitude and the `bvToRGB`
+  colour; 1,627 stars, then the five planets in `PLANET_IDS` order. The
+  planets' vertices are rewritten by `writePlanets()` on every `updateSky()`:
+  each planet's ENU direction taken back to J2000 through `transpose(starM)`, so
+  the shader lands it exactly on `p.enu`, and `bufferSubData`'d. The kit's law:
+  gamma 0.5 on flux about Sirius, 0.2 mag per Kasten-Young air mass, 1-4 px.
+  Additive (`ONE, ONE`) after the sky's tonemap, depth test off, blend off
+  afterwards; skipped when `SKY.night <= 0` or `STARS.on` is false; gain
+  `uStarK = STAR_GAIN * exposure * night`. The hills are not geometry, so
+  `FS_STARS` discards below the same `ridgeY()` the sky shader draws them with.
+- **The Milky Way** is the kit's `MILKY_WAY_GLSL` in `FS_SKY` only (not
+  `GLSL_COMMON`, so the fog and the paint reflections stay without it): above the
+  ridge, only when `uNight > 0` and `uMwGain > 0` (`MW.on`), it adds
+  `MW_GAIN * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * night` before
+  the tonemap. The day sky's pixels are byte-identical with it on or off.
+- **The hash stars are gone** (`uStarRot` and the hash in `skyCol()`), so there
+  are no stars in the fog or in paint reflections any more. That is intended.
 - **The road** is a pure function of `WORLD_SEED` and `s` (distance along it).
   `extendPlan()` appends straights, 70 m spirals and arcs (radius 380-1500 m);
   the next curve's sign is biased back toward heading 0 and capped at |1.3 rad|,
@@ -602,8 +676,8 @@ carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
   map (texel-snapped, ~150 m box), hemisphere ambient, up to 16 local lights
   (our two headlights, the five nearest cars' headlights, the nearest
   streetlights), exponential fog toward the sky's horizon colour, ACES tonemap.
-  The sky shader draws the gradient, sun, moon, stars and a hazed ridge at
-  infinity.
+  The sky shader draws the gradient, sun, moon, the Milky Way and a hazed
+  ridge at infinity; the stars are their own pass (below).
 - **Vehicles** (`buildVehicle`) loft the kit's profile: a 7-point ring per
   station, glazing where the kit says `belt < top` (side glass where both
   stations are glazed; a steep top segment under a glazed roof is a windscreen
@@ -682,6 +756,44 @@ pause, the engine channel deaf to its slider, untrimmed stations, a neon rather
 than pure green FPS, no cruise touch role, the block shown with FPS only, no
 horn preview, no Esc): 14 rows red, each break caught by its own row.
 
+**The sky (DS-1, 31 rows: 30 new and the restated sunrise row).** The calendar (section 3b): the first visit, the
+midnight step, the wrap, the saved date, `utcOffset`, the 02:00 changes, the sun
+from the date, the Date row; the restated sunrise and sunset row (section 3).
+The kit (3c): the block and its attribution, one sun, the moon, the planets.
+The stars (3d): LST, the pole of date, Polaris, the nine stars circling it,
+Dubhe and Arcturus, the 22:00 sky, stars moving west. The star pass (8b): one
+POINTS draw per pass, Jupiter's pixel, star pixels at midnight, none at noon,
+none with the pass off, the Milky Way at one crossing, then (step 4) the Milky
+Way all round the sky, a star behind the hills, the planets' vertices on the GPU,
+the sun drawn where it is, and the stars fading with the night.
+
+The oracles are never the page's or the kit's code. The suite has its own
+Astronomical Almanac sun, Meeus 12.4 GMST, Meeus 21.2-21.4 precession, Meeus
+49.1 mean phases, SIMBAD J2000 positions typed in sexagesimal, the IAU galactic
+pole, and its own (east, up, south) map and OpenGL-convention projection. It
+also types in astronomy-engine's values from zmh-sky's `vectors/golden.v1.json`,
+by record id: `2026-05-06T02Z/raleigh/sun`, `.../raleigh/moon`,
+`.../geo/moon` (lit fraction), `.../geo/ven`, `.../geo/jup` and
+`.../raleigh/hip<N>` for the eight stars of the 22:00 table.
+
+**The break list** (`.claude/tests/negtests/driving-simulator.json`, 25 breaks,
+run whole on copies 2026-11-02 with `negtest-copies.py --jobs 2` in `--only`
+pairs): every break caught by the row meant for it. Five were missed at first
+(or caught only by a sound row, which is no catch) and each got a row:
+the star matrix uploaded without transpose to the Milky Way (the one-crossing
+row passed: the wrong frame put that patch at b = -6, still on the band), the
+planets' GPU buffer left at boot (Jupiter moves under a pixel between 13:00 and
+22:00), the ridge test removed, the stars' gain without the night (a twilight
+change only), and the sun's world flip removed (caught by the one-crossing
+Milky Way row only through the mirrored moon's glow, so it got its own row).
+Each `row` field in the list names the row meant to see it.
+
+**A known flake (untraced hypothesis):** under machine load (two suites at
+once, or the gates beside a break run) the sound rows (the engine and radio
+levels, the engine slider, the four stations within 25%) and the perf block's
+row (FPS 0) can go red. They measure over wall-clock time. A break "caught"
+only by one of them is not caught. Run the gates alone.
+
 Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for example
 `node .claude/scripts/shot-page.cjs games/driving-simulator/index.html /tmp/x.png w=844 h=390 wait=4000 eval="__DS.SETTINGS.cycle=0;__DS.SKY.hour=20.5;__DS.teleport(10600);__DS.CAM.mode=0"`
 (sections at the default seed: forest 2-lane from the start, 4-lane from ~1.1 km,
@@ -690,6 +802,16 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
 (300-800 ms a frame), so it says nothing about phone frame rate.
 
 ## Measured (2026-11-01)
+
+- **The sky's frame cost (2026-11-02, SwiftShader, 22:00 on May 5).** Per frame,
+  paused, 844x390: chase 74 draw calls with the stars and the Milky Way, 74 with
+  the stars only, 73 with both off; cockpit 132 / 132 / 130 (the star pass runs
+  in the mirror too); triangles unchanged (187,151 chase, 282,584 cockpit:
+  `triCount` gives 0 for POINTS); the Milky Way adds no call (it is inside the
+  sky's draw). `renderFrame()` CPU time 0.1-0.3 ms each way. `frame-budget.cjs
+  swiftshader=1` (390x844 at dpr 3): median 883 / 900 / 883 ms the three ways,
+  equal within noise. SwiftShader has no GPU timer and says how the renderer
+  behaves with no GPU at all, not a phone's frame rate.
 
 - Simulation (`tick`) median < 0.1 ms, p95 0.2 ms; worst 13 ms on a frame that
   builds a town chunk.

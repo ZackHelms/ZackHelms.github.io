@@ -480,7 +480,7 @@ The CD's standing preferences:
 | 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | DONE 2026-11-01 |
 | 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows || DONE 2026-11-02 |
 | 3 | The star pass with planets, `ridgeY()`, the Milky Way, hash stars deleted; star, planet, Milky Way and pixel rows | DONE 2026-11-02 |
-| 4 | Break list run whole, frame cost, docs | |
+| 4 | Break list run whole, frame cost, docs | DONE 2026-11-02 |
 | 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
 
 (Step 2 was the BSC5 download until 2026-11-02; it was blocked on 2026-11-01 because the host was
@@ -941,6 +941,81 @@ faint stars (worth a note to zmhstudio: its demo draws stars at 2-6 CSS px, whic
     the KITS block as generated.
   - `CLAUDE.md`: the Driving Simulator row gains the calendar, the zmh-sky block ("spliced by the
     kit's CLI, never hand-edited"), one sun from `skyAt()` and the star matrix convention.
+
+#### Step 4 results
+
+Done 2026-11-02 (oversee run, worktree branch `worktree-oversee+dsstars`, from ed140fa). The container
+restarted once mid-step; every batch had already finished and its log was on disk, so nothing was re-run for that.
+
+**The break list:** `.claude/tests/negtests/driving-simulator.json`, 25 breaks. Each carries a `row` field naming the
+row meant to see it. GLSL breaks put the marker in `${"" /* @negtest */}`, JS inside the template literal, so it is
+outside any string. Run on copies with `negtest-copies.py --jobs 2 --freeze ...` in `--only` pairs: a solo suite took
+5:12 the first time (2:38 on the fresh container), and a pair 6-7 minutes, so batches of three would not fit in 9.
+- **Caught by the row meant for them (20):** the date not stepping, the wrap to the middle date, EST all year, no
+  fall-back, the date not saved, `julianDate()` ignoring `dst` (step 1's six); latitude 90 and the longitude's sign
+  (the observer's two); the star pass's matrix without transpose (Jupiter's pixel), the stars through
+  `s.horizonMatrix` (the 22:00 table, the pole of date, Polaris), the placeholder moon (the moon row), the planet
+  vertices given `p.enu` and the planets frozen at boot in JS (the planets row); the star pass not drawn, its draw gate
+  open by day (the draw row's "none by day"), stars not faded by day (`stars-not-faded`, both the gate and the gain:
+  the noon pixel row and the draw row), a hash star back in `skyCol()` (the STARS.on-false row); the Milky Way in world
+  coordinates (the Milky Way row) and not faded by day (the noon byte-identical row); the stars' world flip removed
+  (Jupiter's pixel).
+- **Missed at first, each now caught by a new row (5 new rows, 103 -> 108):**
+  - `mw-no-transpose` (the sky shader's star matrix without transpose): the one-crossing Milky Way row passed. Traced
+    with the kit's own `galacticFromJ2000`: the wrong frame puts that row's band patch at b = -6.0 (still on the band)
+    and its off patch at b = +33. New row **"the Milky Way all round the sky"**: at 02:30 EDT on May 16 (the new moon,
+    the moon down) the 35-deg almucantar read every 10 deg through four aimed frames; the 4 patches the suite's own
+    plane puts within 4 deg of it (30.0-40.1) all beat the 17 more than 25 deg off (max 19.5); with `MW.on` false all 36
+    within 0.02. Surveyed first with the kit: this moment also rejects the world-coordinates and no-flip frames.
+  - `planets-frozen-gpu` (the planets' `bufferSubData` skipped after boot): Jupiter moves under a pixel between 13:00 and
+    22:00, so no pixel row can see it. New row **"the planets' vertices on the GPU follow the date"**: the 35 floats
+    read back with `getBufferSubData` after a step to May 20 equal `STARS.data`, land on `SKY.planets[i].enu` through
+    `starM` (error 8e-8), and Venus's moved 18.0 deg since May 5.
+  - `no-ridge-test` (the star pass's ridge discard removed): no row looked below 6.4 deg. New row **"a star behind the
+    distant hills is hidden"**: Capella (SIMBAD J2000, precessed by the suite) at 00:30 EDT on May 6 is 1.99 deg up in the
+    NNW, past the 2-deg fade and 1.3 deg under the skyline (the ridge formula evaluated in a scratch script only, never
+    in the suite); its pixel reads 30 with the stars on and off. With the break it reads 105. Control: at 21:00 on May 5
+    (30.8 deg up) the same aim reads 255 against 63.
+  - `stars-twilight` (`uStarK` without the night, an extra break of this step): it only shows while 0 < night < 1. New row
+    **"the stars fade with the night"**: what Polaris adds to its pixel at `SKY.night` 0.5 is 90 of 179 at 1 (0.50);
+    with the break 179 of 179.
+  - `no-world-flip-sun` (`enuToWorld` the identity): caught only by the one-crossing Milky Way row's "equal with
+    MW.on false" half, through the mirrored moon's glow landing near one patch. New row **"the sun is drawn where it
+    is"**: at 17:00 on May 5, aimed 8 deg to the side of the suite's own sun, the saturated disc (146 px) is centred
+    0.1 px from where it projects; with the break it is centred 60 px away.
+- The 19 breaks run before the new rows were run against the 103-row suite; adding rows cannot un-catch them. The
+  five misses and `stars-not-faded` were re-run whole against the 108-row suite: all caught.
+- **The sound and perf rows under load** (`--jobs 2`): the engine/radio level row, the engine slider row, the four
+  stations row and the perf block's row (FPS 0) went red in most broken copies, whatever the break. No verdict above
+  rests on them. Hypothesis, not traced: they measure over wall-clock time and the two SwiftShader suites starve them.
+
+**Frame cost** (night, 22:00 on May 5). Per frame, paused, 844x390, SwiftShader, read off `PERF.calls` / `PERF.tris`:
+
+| | stars + Milky Way | stars only | both off |
+|---|---|---|---|
+| chase: calls | 74 | 74 | 73 |
+| cockpit: calls | 132 | 132 | 130 |
+| triangles (chase / cockpit) | 187,151 / 282,584 | same | same |
+| `renderFrame()` CPU, median ms (chase) | 0.3 | 0.2 | 0.2 |
+
+So +1 call (+2 with the mirror), triangles unchanged, the Milky Way adds no call. `frame-budget.cjs ... swiftshader=1`
+(390x844, dpr 3, the default): median 883.4 / 900.0 / 883.3 ms, equal within noise. SwiftShader has no GPU timer and
+software-renders everything, so these say how the renderer behaves with no GPU at all, not a phone's frame rate. No
+gross cost; no escalation.
+
+**Docs:**
+- `.claude/driving-simulator.md`: header 108 checks; DS-1 marked built, with the ENU correction in its item 4; 14
+  assumed rows (the observer and `heightM`, the season dates, the start date, the date steps, DST, the mag-5 cut,
+  `STAR_GAIN`, `MW_GAIN`, the planet colours and the clamp, the star profile, the fade, the world frame, the Date row,
+  the link CSS) and the old Sun row marked superseded; Architecture: the sky kit block and its command, the calendar,
+  the sky (one sun, the star matrix convention, the world frame), the star pass, the Milky Way, the hash stars gone;
+  Testing: the 31 sky rows, the oracles with record ids, the break list, the load flake; Measured: the frame cost.
+- `.claude/tests/README.md`: the suite's row (108 checks, the sky rows, the break list line, the flake).
+- `games/CLAUDE.md`: the entry (~4,100 lines, the sky, `ZMH-SKY` beside `KITS` as generated, 108 checks).
+- `CLAUDE.md`: the Driving Simulator row gains the calendar, the zmh-sky block, one sun, the star matrix and the
+  world flip.
+
+**Suite: 108** (103 + 5 new rows, all from the break list). `gates.sh games/driving-simulator/index.html` run alone: SMOKE, GAMES-SYNC, NEGTEST-SCAN GREEN, `DRIVING SIMULATOR DRIVE: 108 passed, 0 failed`, `GATES: GREEN`; no sound row went red.
 
 ### Step 5 - ship
 

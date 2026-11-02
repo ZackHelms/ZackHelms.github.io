@@ -855,6 +855,83 @@ const AE = {
   ok('the Milky Way where the suite\'s own galactic plane says it is: at 02:30 EDT on May 6, a patch on the band 35 deg up in the east beats one 40 deg off it by a clear margin with MW.on true; with MW.on false the two are equal',
     Math.abs(mwInfo.bBand) < 2 && Math.abs(mwInfo.bOff) > 20 && Math.abs(mwInfo.arc - 40) < 0.5 && mwInfo.moonSep.every(v => v > 50)
     && mwq.on[0] - mwq.on[1] >= 6 && Math.abs(mwq.off[0] - mwq.off[1]) <= 1, mwInfo);
+  // row: the Milky Way all round the sky. At 02:30 EDT on May 16 (the new moon; the moon below the horizon) the 35-deg
+  // almucantar is read every 10 deg of azimuth through four aimed frames (the stars off). Every patch the suite's own galactic
+  // plane puts within 4 deg of it is brighter than every patch it puts more than 25 deg from it; with MW.on false all are equal.
+  // One crossing of the band (the row above) can be met by a wrong frame by chance; 36 patches round the sky cannot.
+  const MAY16 = MAY5 + 11, JDr = jdOf(MAY16, 2.5, -4);
+  const ring = []; for (let a = 0; a < 4; a++) for (let o = -40; o <= 40; o += 10) { const az = a * 90 + o; ring.push({ aim: a, az: (az + 360) % 360, b: +galB(enuToJ2000(enuOf(35, az), JDr)).toFixed(1) }); }
+  const mwr = await page.evaluate(([MAY16, aims, ring]) => {
+    const D = window.__DS, W = window; D.SKY.hour = 2.5; D.setDate(MAY16); D.STARS.on = false;
+    const read = () => aims.map((aim, a) => { const pts = ring.filter(p => p.aim === a), F = W.__dsAimed(aim, 0, pts.map(p => p.w));
+      return F.at.map(q => { let s = 0, n = 0; for (let y = Math.round(q.y) - 7; y <= Math.round(q.y) + 7; y++) for (let x = Math.round(q.x) - 7; x <= Math.round(q.x) + 7; x++) { s += F.L(x, y); n++; } return +(s / n).toFixed(2); }); }).flat();
+    D.MW.on = true; const on = read(); D.MW.on = false; const off = read(); D.MW.on = true; D.STARS.on = true;
+    const moonUp = D.SKY.moon[1], night = D.SKY.night; D.SKY.hour = 6.25; D.setDate(MAY16 - 11);
+    return { on, off, moonUp, night };
+  }, [MAY16, [0, 90, 180, 270].map(az => enuToWorldOwn(enuOf(35, az))), ring.map(p => ({ aim: p.aim, w: enuToWorldOwn(enuOf(35, p.az)) }))]);
+  ring.forEach((p, k) => { p.on = mwr.on[k]; p.off = mwr.off[k]; });
+  const rOn = ring.filter(p => Math.abs(p.b) < 4), rOff = ring.filter(p => Math.abs(p.b) > 25);
+  const rMin = Math.min(...rOn.map(p => p.on)), rMax = Math.max(...rOff.map(p => p.on)), rFlat = Math.max(...mwr.off) - Math.min(...mwr.off);
+  ok('the Milky Way all round the sky: at 02:30 EDT on May 16 (no moon), around the 35-deg almucantar every 10 deg, every patch the suite\'s own galactic plane puts within 4 deg of it is brighter than every patch more than 25 deg from it; with MW.on false all 36 are equal',
+    rOn.length >= 3 && rOff.length >= 12 && mwr.moonUp < 0 && mwr.night > 0.99 && rMin >= rMax + 3 && rFlat <= 1,
+    { onBand: rOn.map(p => p.az + ':' + p.on), offMax: rMax, nOff: rOff.length, flat: rFlat, moonUp: mwr.moonUp });
+  // row: a star behind the distant hills is hidden. The hills are drawn by the sky shader, not as geometry, so only the star
+  // pass's own ridge test can hide a star behind them. At 00:30 EDT on May 6 Capella (mag 0.1) is about 2 deg up in the
+  // north-north-west (SIMBAD J2000 05 16 41.359 +45 59 52.77, precessed by the suite), past the 2-deg fade and about 1.3 deg under the skyline there; aimed at it as the Jupiter row is, its
+  // place reads the same with the stars on and off. At 21:00 on May 5, about 31 deg up, the same aim finds it (the detector sees it).
+  const capW = [[MAY5 + 1, 0.5], [MAY5, 21]].map(([m, h]) => { const jd = jdOf(m, h, -4), q = precess(hms('05 16 41.359'), dms('+45 59 52.77'), jd), v = ownAltAz(q.ra, q.dec, jd); return { m, h, alt: +v.alt.toFixed(2), w: enuToWorldOwn(v.v) }; });
+  const cap = await page.evaluate(caps => {
+    const D = window.__DS, W = window;
+    const look = (c, on) => { D.STARS.on = on; const F = W.__dsAimed(c.w, 8, [c.w]), a = F.at[0]; let best = -1e9;
+      for (let y = Math.round(a.y) - 3; y <= Math.round(a.y) + 3; y++) for (let x = Math.round(a.x) - 3; x <= Math.round(a.x) + 3; x++) best = Math.max(best, F.L(x, y));
+      return { x: +a.x.toFixed(1), y: +a.y.toFixed(1), L: Math.round(best) }; };
+    const out = caps.map(c => { D.SKY.hour = c.h; D.setDate(c.m); return { h: c.h, alt: c.alt, on: look(c, true), off: look(c, false) }; });
+    D.STARS.on = true; D.SKY.hour = 6.25; D.setDate(caps[1].m);
+    return out;
+  }, capW);
+  ok('a star behind the distant hills is hidden: Capella at 00:30 EDT on May 6 (about 2 deg up, under the skyline) adds nothing where it projects; at 21:00 on May 5 it is a bright point there',
+    capW[0].alt > 1.8 && capW[0].alt < 2.5 && Math.abs(cap[0].on.L - cap[0].off.L) <= 2 && cap[1].on.L - cap[1].off.L >= 60, cap);
+  // row: the planets' vertices on the GPU follow the date. The 35 floats read back from the star buffer after a date step to May 20
+  // equal STARS.data's planet slots, turn through SKY.starM onto SKY.planets[i].enu within 1e-4, and Venus's has moved over 5 deg
+  // since May 5 (a pixel cannot see a buffer left at boot: Jupiter moves under a pixel in a day).
+  const gpu = await page.evaluate(MAY5 => {
+    const D = window.__DS, g = document.getElementById('gl').getContext('webgl2');
+    const read = () => { const b = new Float32Array(35); g.bindBuffer(g.ARRAY_BUFFER, D.STARS.buf); g.getBufferSubData(g.ARRAY_BUFFER, D.STARS.n * 28, b); g.bindBuffer(g.ARRAY_BUFFER, null); return Array.from(b); };
+    D.SKY.hour = 22; D.setDate(MAY5); const a = read();
+    D.setDate(MAY5 + 15); const b = read(), cpu = Array.from(D.STARS.data.subarray(D.STARS.n * 7, D.STARS.n * 7 + 35));
+    const r = { a, b, cpu, starM: Array.from(D.SKY.starM), enu: D.STARS.planets.map(id => (D.SKY.planets.find(p => p.id === id) || {}).enu) };
+    D.SKY.hour = 6.25; D.setDate(MAY5); return r;
+  }, MAY5);
+  const gM = rows3(gpu.starM), gErr = [0, 1, 2, 3, 4].map(k => { const d = gpu.b.slice(k * 7, k * 7 + 3), e = gpu.enu[k]; return e ? Math.max(...mul3(gM, d).map((x, i) => Math.abs(x - e[i]))) : 1; });
+  const venMove = angDeg(gpu.a.slice(7, 10), gpu.b.slice(7, 10)), gpuCpu = Math.max(...gpu.b.map((x, i) => Math.abs(x - gpu.cpu[i])));
+  ok('the planets\' vertices on the GPU follow the date: read back from the star buffer after a step to May 20 they equal STARS.data, land on SKY.planets[i].enu through SKY.starM within 1e-4, and Venus\'s has moved over 5 deg since May 5',
+    gpuCpu < 1e-7 && gErr.every(e => e < 1e-4) && venMove > 5, { gpuCpu, gErr, venMove });
+  // row: the sun is drawn where it is. At 17:00 EDT on May 5, aimed 8 deg to the side of the suite's own sun (through its own
+  // (east, up, south) map), the sun's saturated disc is centred within 4 px of where that sun projects. A world without the
+  // ENU-to-world flip puts it at azimuth 180 - az, 10 deg away.
+  const sunW17 = enuToWorldOwn(ownSun(jdOf(MAY5, 17, -4)).v);
+  const sunPx = await page.evaluate(([MAY5, sw]) => {
+    const D = window.__DS, W = window; D.SKY.hour = 17; D.setDate(MAY5);
+    const F = W.__dsAimed(sw, 8, [sw]), a = F.at[0]; let sx = 0, sy = 0, n = 0;
+    for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const i = (y * F.w + x) * 4; if (F.px[i] >= 250 && F.px[i + 1] >= 250 && F.px[i + 2] >= 240) { sx += x; sy += y; n++; } }
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return { at: { x: +a.x.toFixed(1), y: +a.y.toFixed(1) }, n, c: n ? { x: +(sx / n).toFixed(1), y: +(sy / n).toFixed(1) } : null, w: F.w };
+  }, [MAY5, sunW17]);
+  ok('the sun is drawn where it is: at 17:00 EDT on May 5, aimed 8 deg to its side, the sun\'s saturated disc is centred within 4 px of where the suite\'s own sun projects',
+    sunPx.n >= 20 && !!sunPx.c && Math.hypot(sunPx.c.x - sunPx.at.x, sunPx.c.y - sunPx.at.y) < 4 && Math.abs(sunPx.at.x - sunPx.w / 2) > 40, sunPx);
+  // row: the stars fade with the night. At 22:00 on May 5, aimed at Polaris as the Jupiter row is, what the star adds to its pixel
+  // with SKY.night forced to 0.5 is 0.3-0.75 of what it adds at 1 (the pass's gain carries the night, so dusk stars are faint).
+  const polW = enuToWorldOwn(ownStar('Polaris', jdOf(MAY5, 22, -4)).v);
+  const fade = await page.evaluate(([MAY5, pw]) => {
+    const D = window.__DS, W = window; D.SKY.hour = 22; D.setDate(MAY5);
+    const add = night => { const v = []; for (const on of [true, false]) { D.STARS.on = on; D.SKY.night = night; const F = W.__dsAimed(pw, 8, [pw]), a = F.at[0]; let best = -1e9;
+      for (let y = Math.round(a.y) - 3; y <= Math.round(a.y) + 3; y++) for (let x = Math.round(a.x) - 3; x <= Math.round(a.x) + 3; x++) best = Math.max(best, F.L(x, y)); v.push(best); }
+      return v[0] - v[1]; };
+    const full = add(1), half = add(0.5); D.STARS.on = true; D.SKY.hour = 6.25; D.setDate(MAY5);
+    return { full: Math.round(full), half: Math.round(half) };
+  }, [MAY5, polW]);
+  ok('the stars fade with the night: what Polaris adds to its pixel with SKY.night at 0.5 is 0.3-0.75 of what it adds at 1',
+    fade.full >= 60 && fade.half / fade.full >= 0.3 && fade.half / fade.full <= 0.75, fade);
   await page.evaluate(y => { const D = window.__DS; D.PLAYER.yaw = y; D.CAM.chase = null; }, yaw8b);
 
   // ---- 9. sound: one volume per sound, the radio's stations, measured off the analysers ----
