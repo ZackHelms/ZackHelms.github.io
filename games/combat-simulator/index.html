@@ -73,6 +73,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 <div id="settings"><div class="panel">
   <h2>COMBAT SIMULATOR</h2>
   <h3>PICTURE</h3>
+  <div class="row"><label for="style-sel">Graphics style</label><select id="style-sel"><option value="realistic">realistic</option><option value="toon">toon</option></select></div>
   <div class="row"><label for="gfx-sel">Graphics</label>
     <select id="gfx-sel"><option value="0">low (fast)</option><option value="1">medium</option><option value="2">high</option></select></div>
   <div class="row"><label for="perf-sel">Performance stats</label>
@@ -392,8 +393,11 @@ function aiIntent(F, dt) {
 
 // ---------------------------------------------------------------- settings and the ladder save
 const SET_KEY = 'combatSimulator.settings.v1', SAVE_KEY = 'combatSimulator.ladder.v1';
-const SETTINGS = { gfx: 1, perf: 1, vol: 80, vols: { music: 70, ambient: 70, sfx: 85 }, muted: false };
+// the graphics styles, in the order the select offers them; a style's index is its GLSL STYLE number
+const STYLES = ['realistic', 'toon'];
+const SETTINGS = { gfx: 1, perf: 1, vol: 80, vols: { music: 70, ambient: 70, sfx: 85 }, muted: false, style: 'realistic' };
 try { const s = JSON.parse(localStorage.getItem(SET_KEY) || 'null'); if (s) { Object.assign(SETTINGS, s); SETTINGS.vols = Object.assign({ music: 70, ambient: 70, sfx: 85 }, s.vols || {}); } } catch (e) { /* private mode */ }
+if (!STYLES.includes(SETTINGS.style)) SETTINGS.style = 'realistic';     // an old save without the key, or a junk value
 function saveSettings() { try { localStorage.setItem(SET_KEY, JSON.stringify(SETTINGS)); } catch (e) { /* ignore */ } }
 const SAVE = { rank: 1, best: 1, wins: 0, losses: 0 };
 try { const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); if (s && s.rank >= 1) Object.assign(SAVE, s); } catch (e) { /* ignore */ }
@@ -512,6 +516,36 @@ vec3 shade(vec3 P, vec3 N, vec3 V, vec3 alb, float rough, float spec, float refl
   }
   return col;
 }
+#if STYLE == 1
+// toon: saturation push, a two-colour sky, and light in three bands with a hard terminator
+vec3 satp(vec3 c, float k){ float l = dot(c, vec3(0.299, 0.587, 0.114)); return clamp(mix(vec3(l), c, k), 0.0, 1.0); }
+// skyCol's zenith and horizon colours alone: no sun, moon or stars
+void toonSkyCols(vec3 d, out vec3 zen, out vec3 hor){
+  float sy = uSunDir.y;
+  zen = mix(vec3(0.004, 0.006, 0.018), vec3(0.06, 0.17, 0.48), uDay);
+  hor = mix(vec3(0.020, 0.026, 0.050), vec3(0.46, 0.58, 0.74), uDay);
+  float sunset = 1.0 - smoothstep(0.0, 0.35, abs(sy + 0.02));
+  vec2 dh = normalize(d.xz + 1e-5), sh = normalize(uSunDir.xz + 1e-5);
+  float toward = max(dot(dh, sh), 0.0);
+  hor = mix(hor, vec3(1.05, 0.46, 0.18) * (0.25 + uDay), sunset * (0.3 + 0.7 * toward * toward));
+  zen = mix(zen, vec3(0.18, 0.14, 0.30) * (0.2 + uDay), sunset * 0.45);
+}
+vec3 toonHor(vec3 d){ vec3 z, h; toonSkyCols(d, z, h); return h; }
+vec3 toonSky(vec3 d){ vec3 z, h; toonSkyCols(d, z, h); return mix(h, z, smoothstep(0.02, 0.55, d.y)); }
+vec3 shadeToon(vec3 P, vec3 N, vec3 V, vec3 alb, vec4 sp, float ao){
+  float ndl = max(dot(N, uKeyDir), 0.0);
+  float k = ndl > 0.0 ? ndl * shadowAt(sp, ndl) : 0.0;
+  float band = k > 0.55 ? 0.7 : k > 0.12 ? 0.4 : 0.0;
+  vec3 amb = max(mix(uAmbGnd, uAmbSky, 0.5) * ao, uKeyCol * 0.1 + 0.1);
+  vec3 local = vec3(0.0);
+  for (int i = 0; i < ${NLAMP}; i++) {
+    vec3 Lv = uLP[i].xyz - P; float d2 = dot(Lv, Lv); vec3 Ld = Lv * inversesqrt(d2);
+    float li = uLP[i].w / (1.0 + d2 * 0.6) * (max(dot(N, Ld), 0.0) * 0.85 + 0.15);
+    local += uLC[i] * (step(0.08, li) * 0.15 + step(0.3, li) * 0.45);
+  }
+  return alb * (uKeyCol * band + amb + local);
+}
+#endif
 `;
 const VS_WORLD = `#version 300 es
 precision highp float;
@@ -530,6 +564,27 @@ void main(){
   vec3 V = normalize(uEye - vW), P = vW;
   vec3 alb = vCol; float rough = 0.9, spec = 0.03, refl = 0.0, ao = 1.0; vec3 emis = vec3(0.0);
   int m = vMat;
+#if STYLE == 1
+  // toon: every material flat, the flagstones' joints a flat darker line, the gravel's furrows two tones
+  if (m == 0) {
+    vec2 q = P.xz * vec2(0.95, 1.35);
+    float row = floor(q.y); q.x += h21(vec2(row, 3.0)) * 0.9 + row * 0.5;
+    vec2 c = floor(q), f = fract(q);
+    float jx = 0.5 + (h21(c + 7.0) - 0.5) * 0.3;
+    float e = min(min(f.x, 1.0 - f.x), min(f.y, 1.0 - f.y)); e = min(e, abs(f.x - jx));
+    alb = mix(vCol, vCol * 0.42, 1.0 - step(0.022, e));
+  } else if (m == 1) {
+    alb = vCol * (sin(length(P.xz) * 6.2832 / 0.16) > 0.0 ? 1.0 : 0.8);
+  } else if (m == 4) {
+    alb = vec3(0.85, 0.80, 0.68);
+    emis = vec3(1.0, 0.62, 0.30) * (0.25 + 3.2 * uNight);
+  }
+  vec3 col = shadeToon(P, N, V, satp(alb, 1.6), vSh, ao) + emis;
+  float dist = length(uEye - vW);
+  float fogK = 1.0 - exp(-max(dist - 12.0, 0.0) * uFog);
+  col = mix(col, toonHor(vec3(-V.x, 0.0, -V.z)), fogK);
+  frag = vec4(satp(tonemap(col * uExposure), 1.15), 1.0);
+#else
   if (m == 0) {
     // flagstones laid in running bond, worn smooth toward the middle
     vec2 q = P.xz * vec2(0.95, 1.35);
@@ -581,6 +636,7 @@ void main(){
   float fogK = 1.0 - exp(-max(dist - 12.0, 0.0) * uFog);
   col = mix(col, skyCol(normalize(vec3(-V.x, 0.04, -V.z))), fogK);
   frag = vec4(tonemap(col * uExposure), 1.0);
+#endif
 }`;
 // a fighter is a list of tapered capsules, one instance each; the sword's steel,
 // skin, cloth and hair are told apart by a material id in the instance colour's w
@@ -611,6 +667,13 @@ void main(){
   vec3 N = normalize(vN), V = normalize(uEye - vW);
   vec3 alb = vCol; float rough = 0.9, spec = 0.03, refl = 0.0, wrap = 0.15; vec3 emis = vec3(0.0);
   int m = vMat;
+#if STYLE == 1
+  // toon: flat saturated colour, three bands, no specular or reflection but the blade's one hard highlight
+  if (m == 2) alb = vec3(0.62, 0.64, 0.68);
+  vec3 col = shadeToon(vW, N, V, satp(alb, 1.6), vSh, 1.0);
+  if (m == 2) col += vec3(4.0) * step(0.985, dot(N, normalize(uKeyDir + V))) + uGlow * 1.8;
+  frag = vec4(satp(tonemap(col * uExposure), 1.15), 1.0);
+#else
   if (m == 0) {        // cloth: a woven texture and folds along the limb
     float fold = vn(vec2(vT.x * 9.0, vT.y * 2.0)) * 0.5 + vn(vec2(vT.x * 40.0, vT.y * 12.0)) * 0.2;
     alb = vCol * (0.78 + 0.4 * fold); rough = 0.95; wrap = 0.25;
@@ -630,6 +693,7 @@ void main(){
   // a cool rim so a fighter reads against a dark ground at night
   col += vec3(0.25, 0.3, 0.4) * pow(1.0 - max(dot(N, V), 0.0), 3.0) * (0.15 + 0.5 * uNight) * (m == 2 ? 0.0 : 1.0);
   frag = vec4(tonemap(col * uExposure), 1.0);
+#endif
 }`;
 const VS_SH_WORLD = `#version 300 es
 layout(location=0) in vec3 aPos; uniform mat4 uShVP; void main(){ gl_Position = uShVP * vec4(aPos, 1.0); }`;
@@ -657,6 +721,23 @@ uniform mat4 uInvVP;
 in vec2 vP; out vec4 frag;
 void main(){
   vec4 a = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(a.xyz / a.w);
+#if STYLE == 1
+  // toon: horizon to zenith in two colours, flat clouds, a flat sun and moon, two flat ranges
+  vec3 c = toonSky(d);
+  if (d.y > 0.0) { vec2 cp = d.xz / (d.y + 0.15) * 1.6;
+    float cl = step(0.66, vn(cp) * 0.6 + vn(cp * 3.1) * 0.4) * step(0.03, d.y);
+    c = mix(c, mix(vec3(0.07, 0.07, 0.11), vec3(1.25, 1.2, 1.12), uDay), cl * 0.85); }
+  c = mix(c, vec3(3.0, 2.6, 1.9) * (0.3 + uDay), step(0.9992, dot(d, uSunDir)) * step(-0.05, uSunDir.y));
+  vec3 md = normalize(vec3(-uSunDir.x, abs(uSunDir.y) * 0.8 + 0.25, -uSunDir.z));
+  c = mix(c, vec3(1.3, 1.32, 1.4), step(0.99965, dot(d, md)) * uNight);
+  float az = atan(d.z, d.x);
+  float rfar = 0.07 + 0.05 * (sin(az * 2.0 + 1.0) * 0.5 + 0.5) + 0.025 * sin(az * 7.0 + 0.4) + 0.01 * sin(az * 23.0);
+  float rnear = 0.035 + 0.03 * (sin(az * 3.0 + 2.2) * 0.5 + 0.5) + 0.012 * sin(az * 13.0 + 1.0) + 0.005 * sin(az * 41.0);
+  vec3 hz = toonHor(d);
+  if (d.y < rfar) c = mix(vec3(0.05, 0.08, 0.14) * (0.3 + uDay * 2.5), hz, 0.45);
+  if (d.y < rnear) c = mix(vec3(0.03, 0.06, 0.05) * (0.3 + uDay * 2.0), hz, 0.25);
+  frag = vec4(satp(tonemap(c * uExposure), 1.15), 1.0);
+#else
   vec3 c = skyCol(d);
   // thin cloud above, two ranges of mountains on the horizon
   if (d.y > 0.0) { vec2 cp = d.xz / (d.y + 0.15) * 1.6; float cl = smoothstep(0.55, 0.9, vn(cp) * 0.6 + vn(cp * 3.1) * 0.4);
@@ -668,6 +749,7 @@ void main(){
   if (d.y < rfar) c = mix(mix(vec3(0.03, 0.045, 0.07) * (0.2 + uDay * 2.5), hz, 0.55), c, smoothstep(rfar - 0.004, rfar, d.y));
   if (d.y < rnear) c = mix(vec3(0.02, 0.035, 0.03) * (0.2 + uDay * 2.0), hz, 0.35);
   frag = vec4(tonemap(c * uExposure), 1.0);
+#endif
 }`;
 // sparks, motes and the power aura: additive camera-facing quads
 const VS_GLOW = `#version 300 es
@@ -679,15 +761,21 @@ void main(){ vQ = aQ; vC = iC; gl_Position = uVP * vec4(iPS.xyz + (uRight * aQ.x
 const FS_GLOW = `#version 300 es
 precision mediump float;
 in vec2 vQ; in vec4 vC; out vec4 o;
-void main(){ float r = length(vQ); if (r > 1.0) discard; float a = exp(-r * r * 4.0) + 0.6 * exp(-r * r * 30.0); o = vec4(vC.rgb * a * vC.a, 1.0); }`;
-// sword trails and ground rings: coloured triangles, additive
+#if STYLE == 1
+// toon: a solid five-point star, crisp edged, in the particle's colour
+void main(){ float r = length(vQ); if (r > 0.32 + 0.68 * pow(abs(cos(atan(vQ.y, vQ.x) * 2.5)), 6.0)) discard; o = vec4(min(vC.rgb, vec3(1.0)) * vC.a, 1.0); }
+#else
+void main(){ float r = length(vQ); if (r > 1.0) discard; float a = exp(-r * r * 4.0) + 0.6 * exp(-r * r * 30.0); o = vec4(vC.rgb * a * vC.a, 1.0); }
+#endif`;
+// sword trails and ground rings: coloured triangles, premultiplied, so the same program
+// draws additively (ONE, ONE) and as a solid crescent (toon's trail: ONE, ONE_MINUS_SRC_ALPHA)
 const VS_FLAT = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aP; layout(location=1) in vec4 aC;
 uniform mat4 uVP; out vec4 vC;
 void main(){ vC = aC; gl_Position = uVP * vec4(aP, 1.0); }`;
 const FS_FLAT = `#version 300 es
-precision mediump float; in vec4 vC; out vec4 o; void main(){ o = vec4(vC.rgb * vC.a, 1.0); }`;
+precision mediump float; in vec4 vC; out vec4 o; void main(){ o = vec4(vC.rgb * vC.a, vC.a); }`;
 
 function compile(vs, fs, name) {
   const mk = (type, src) => {
@@ -703,6 +791,26 @@ function compile(vs, fs, name) {
   const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
   for (let i = 0; i < n; i++) { const info = gl.getActiveUniform(p, i); U[info.name.replace(/\[0\]$/, '')] = gl.getUniformLocation(p, info.name); }
   return { p, U };
+}
+// a style's shader: '#define STYLE n' straight after the version line, which must come first
+function withStyle(src, n) {
+  const head = '#version 300 es\n';
+  if (src.indexOf(head) !== 0) throw new Error('withStyle: no "#version 300 es" first line to put STYLE after');
+  return head + '#define STYLE ' + n + '\n' + src.slice(head.length);
+}
+// one program set per style, compiled the first time the style is drawn; the shadow and flat
+// programs do not depend on the style and are shared (PRG)
+const PROGS = {};
+function progsFor(look) {
+  if (PROGS[look]) return PROGS[look];
+  const n = STYLES.indexOf(look);
+  if (n < 0) return progsFor('realistic');
+  const S = src => withStyle(src, n);
+  return (PROGS[look] = {
+    world: compile(S(VS_WORLD), S(FS_WORLD), 'world/' + look), limb: compile(S(VS_LIMB), S(FS_LIMB), 'limb/' + look),
+    sky: compile(S(VS_SKY), S(FS_SKY), 'sky/' + look), glow: compile(S(VS_GLOW), S(FS_GLOW), 'glow/' + look),
+    shWorld: PRG.shWorld, shLimb: PRG.shLimb, flat: PRG.flat,
+  });
 }
 
 // ---------------------------------------------------------------- the arena: a stone floor in a walled courtyard
@@ -835,10 +943,10 @@ function makeShadow(size) {
 }
 function initGL() {
   PRG = {
-    world: compile(VS_WORLD, FS_WORLD, 'world'), limb: compile(VS_LIMB, FS_LIMB, 'limb'),
     shWorld: compile(VS_SH_WORLD, FS_SH, 'shadow-world'), shLimb: compile(VS_SH_LIMB, FS_SH, 'shadow-limb'),
-    sky: compile(VS_SKY, FS_SKY, 'sky'), glow: compile(VS_GLOW, FS_GLOW, 'glow'), flat: compile(VS_FLAT, FS_FLAT, 'flat'),
+    flat: compile(VS_FLAT, FS_FLAT, 'flat'),
   };
+  progsFor('realistic');      // the default set at boot, as before; any other style compiles on its first frame
   // arena
   const mb = buildArena();
   const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
@@ -1355,6 +1463,8 @@ function setCommon(prog, shVP) {
   if (U.uShadow) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, SHADOW.tex); gl.uniform1i(U.uShadow, 0); }
   if (U.uShVP) gl.uniformMatrix4fv(U.uShVP, false, shVP);
 }
+// test-only switches for passes a later style adds (toon's ink, neon's bloom); render() does not read them yet
+const FX = { ink: true, bloom: true };
 const FLATV = [];
 function flatTri(a, b, c, ca, cb, cc) { FLATV.push(a[0], a[1], a[2], ca[0], ca[1], ca[2], ca[3], b[0], b[1], b[2], cb[0], cb[1], cb[2], cb[3], c[0], c[1], c[2], cc[0], cc[1], cc[2], cc[3]); }
 function flatRing(cx, cz, r0, r1, col, seg) {
@@ -1367,6 +1477,7 @@ function flatRing(cx, cz, r0, r1, col, seg) {
 }
 function render(W, H, dpr) {
   if (!gl) return;
+  const look = SETTINGS.style, P = progsFor(look);      // the one read of the style a frame
   const t0 = performance.now();
   const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
   if (glc.width !== pw || glc.height !== ph) { glc.width = pw; glc.height = ph; }
@@ -1382,9 +1493,9 @@ function render(W, H, dpr) {
   gl.bindFramebuffer(gl.FRAMEBUFFER, SHADOW.fb); gl.viewport(0, 0, SHADOW.size, SHADOW.size);
   gl.clear(gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
   gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.5, 3);
-  gl.useProgram(PRG.shWorld.p); gl.uniformMatrix4fv(PRG.shWorld.U.uShVP, false, shVP);
+  gl.useProgram(P.shWorld.p); gl.uniformMatrix4fv(P.shWorld.U.uShVP, false, shVP);
   gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0);
-  gl.useProgram(PRG.shLimb.p); gl.uniformMatrix4fv(PRG.shLimb.U.uShVP, false, shVP);
+  gl.useProgram(P.shLimb.p); gl.uniformMatrix4fv(P.shLimb.U.uShVP, false, shVP);
   gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps);
   gl.disable(gl.POLYGON_OFFSET_FILL);
   // main pass
@@ -1392,39 +1503,48 @@ function render(W, H, dpr) {
   gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   // sky
   gl.depthMask(false);
-  gl.useProgram(PRG.sky.p); setCommon(PRG.sky);
-  gl.uniformMatrix4fv(PRG.sky.U.uInvVP, false, M4.inv(M4.mul(CAM.P, M4.lookAt([0, 0, 0], v3.sub(CAM.at, CAM.E), [0, 1, 0]))));
+  gl.useProgram(P.sky.p); setCommon(P.sky);
+  gl.uniformMatrix4fv(P.sky.U.uInvVP, false, M4.inv(M4.mul(CAM.P, M4.lookAt([0, 0, 0], v3.sub(CAM.at, CAM.E), [0, 1, 0]))));
   gl.bindVertexArray(SKYVAO); gl.drawArrays(gl.TRIANGLES, 0, 3);
   gl.depthMask(true);
   // arena
-  gl.useProgram(PRG.world.p); setCommon(PRG.world, shVP);
-  gl.uniformMatrix4fv(PRG.world.U.uVP, false, CAM.VP); gl.uniform3fv(PRG.world.U.uEye, CAM.E);
-  gl.uniform1f(PRG.world.U.uFog, 0.012 + 0.01 * SKY.night); gl.uniform1f(PRG.world.U.uTime, APP.time);
+  gl.useProgram(P.world.p); setCommon(P.world, shVP);
+  gl.uniformMatrix4fv(P.world.U.uVP, false, CAM.VP); gl.uniform3fv(P.world.U.uEye, CAM.E);
+  gl.uniform1f(P.world.U.uFog, 0.012 + 0.01 * SKY.night); gl.uniform1f(P.world.U.uTime, APP.time);
   gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0);
   // fighters (drawn per fighter so the blade can glow in its owner's colour)
-  gl.useProgram(PRG.limb.p); setCommon(PRG.limb, shVP);
-  gl.uniformMatrix4fv(PRG.limb.U.uVP, false, CAM.VP); gl.uniform3fv(PRG.limb.U.uEye, CAM.E); gl.uniform1f(PRG.limb.U.uTime, APP.time);
+  gl.useProgram(P.limb.p); setCommon(P.limb, shVP);
+  gl.uniformMatrix4fv(P.limb.U.uVP, false, CAM.VP); gl.uniform3fv(P.limb.U.uEye, CAM.E); gl.uniform1f(P.limb.U.uTime, APP.time);
   gl.bindVertexArray(LIMB.vao); gl.bindBuffer(gl.ARRAY_BUFFER, LIMB.buf);
   const half = Math.floor(caps.length / 12);
   for (let k = 0; k < 2; k++) {
     const who = k ? 'e' : 'p', g = VIS[who].glow;
-    gl.uniform3fv(PRG.limb.U.uGlow, who === 'p' ? [g * 1.0, g * 0.7, g * 0.2] : [g * 1.0, g * 0.15, g * 0.08]);
+    gl.uniform3fv(P.limb.U.uGlow, who === 'p' ? [g * 1.0, g * 0.7, g * 0.2] : [g * 1.0, g * 0.15, g * 0.08]);
     for (const loc of [2, 3, 4, 5]) gl.vertexAttribPointer(loc, [3, 3, 2, 4][loc - 2], gl.FLOAT, false, 48, [0, 12, 24, 32][loc - 2] + k * half * 48);
     gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, half);
   }
   for (const loc of [2, 3, 4, 5]) gl.vertexAttribPointer(loc, [3, 3, 2, 4][loc - 2], gl.FLOAT, false, 48, [0, 12, 24, 32][loc - 2]);
-  // additive: trails, power rings, sparks
+  // additive: trails, power rings, sparks (toon's trail is a solid white crescent drawn over, not added)
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
   FLATV.length = 0;
-  for (const who of ['p', 'e']) {
-    const V = VIS[who], f = F[who], tr = V.trail;
+  const solidTrail = look === 'toon';
+  const trailOf = who => {
+    const V = VIS[who], tr = V.trail;
     const base = who === 'p' ? [0.9, 0.95, 1.0] : [1.0, 0.85, 0.8];
     for (let i = 1; i < tr.length; i++) {
-      const s0 = tr[i - 1], s1 = tr[i], k0 = (1 - s0.age / 0.14) * 0.45, k1 = (1 - s1.age / 0.14) * 0.45;
+      const s0 = tr[i - 1], s1 = tr[i];
+      if (solidTrail) { const w = [1, 1, 1, 0.9]; flatTri(s0.a, s0.b, s1.b, w, w, w); flatTri(s0.a, s1.b, s1.a, w, w, w); continue; }
+      const k0 = (1 - s0.age / 0.14) * 0.45, k1 = (1 - s1.age / 0.14) * 0.45;
       const c = s1.power ? (who === 'p' ? [1, 0.7, 0.2] : [1, 0.2, 0.1]) : base;
       const c0 = [c[0], c[1], c[2], k0], c1 = [c[0], c[1], c[2], k1], z0 = [c[0], c[1], c[2], 0];
       flatTri(s0.a, s0.b, s1.b, z0, c0, c1); flatTri(s0.a, s1.b, s1.a, z0, c1, z0);
     }
+  };
+  if (solidTrail) { trailOf('p'); trailOf('e'); }
+  const nSolid = FLATV.length / 7;
+  for (const who of ['p', 'e']) {
+    const f = F[who];
+    if (!solidTrail) trailOf(who);
     if (f.st === 'power') {
       const ph = phasesOf(f, RULES.power), u = clamp(f.t / ph.w, 0, 1), R = RULES.power.reach + RULES.body;
       const col = who === 'p' ? [1, 0.65, 0.15] : [1, 0.12, 0.06];
@@ -1435,11 +1555,13 @@ function render(W, H, dpr) {
     }
   }
   if (FLATV.length) {
-    const n = Math.min(FLATV.length / 7, MAX_FLAT);
+    const n = Math.min(FLATV.length / 7, MAX_FLAT), ns = Math.min(nSolid, n);
     FLAT.data.set(FLATV.slice(0, n * 7));
     gl.bindBuffer(gl.ARRAY_BUFFER, FLAT.buf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, FLAT.data.subarray(0, n * 7));
-    gl.useProgram(PRG.flat.p); gl.uniformMatrix4fv(PRG.flat.U.uVP, false, CAM.VP);
-    gl.bindVertexArray(FLAT.vao); gl.drawArrays(gl.TRIANGLES, 0, n);
+    gl.useProgram(P.flat.p); gl.uniformMatrix4fv(P.flat.U.uVP, false, CAM.VP);
+    gl.bindVertexArray(FLAT.vao);
+    if (ns) { gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA); gl.drawArrays(gl.TRIANGLES, 0, ns); gl.blendFunc(gl.ONE, gl.ONE); }
+    if (n > ns) gl.drawArrays(gl.TRIANGLES, ns, n - ns);
   }
   if (PARTS.length) {
     const d = GLOW.data; let n = 0;
@@ -1447,8 +1569,8 @@ function render(W, H, dpr) {
       d[o] = q.p[0]; d[o + 1] = q.p[1]; d[o + 2] = q.p[2]; d[o + 3] = q.size * (0.6 + 0.6 * k);
       d[o + 4] = q.col[0] * 2; d[o + 5] = q.col[1] * 2; d[o + 6] = q.col[2] * 2; d[o + 7] = k; n++; }
     gl.bindBuffer(gl.ARRAY_BUFFER, GLOW.buf); gl.bufferSubData(gl.ARRAY_BUFFER, 0, d.subarray(0, n * 8));
-    gl.useProgram(PRG.glow.p); gl.uniformMatrix4fv(PRG.glow.U.uVP, false, CAM.VP);
-    gl.uniform3fv(PRG.glow.U.uRight, CAM.right); gl.uniform3fv(PRG.glow.U.uUp, CAM.up);
+    gl.useProgram(P.glow.p); gl.uniformMatrix4fv(P.glow.U.uVP, false, CAM.VP);
+    gl.uniform3fv(P.glow.U.uRight, CAM.right); gl.uniform3fv(P.glow.U.uUp, CAM.up);
     gl.bindVertexArray(GLOW.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
   }
   gl.depthMask(true); gl.disable(gl.BLEND);
@@ -1754,8 +1876,10 @@ function toggleSettings(open) {
 }
 document.getElementById('set-btn').addEventListener('click', () => { SND.init(); SND.ui(); toggleSettings(); });
 document.getElementById('set-close').addEventListener('click', () => { SND.ui(); toggleSettings(false); });
-const gfxSel = document.getElementById('gfx-sel'), perfSel = document.getElementById('perf-sel');
-gfxSel.value = String(SETTINGS.gfx); perfSel.value = String(SETTINGS.perf);
+const gfxSel = document.getElementById('gfx-sel'), perfSel = document.getElementById('perf-sel'), styleSel = document.getElementById('style-sel');
+gfxSel.value = String(SETTINGS.gfx); perfSel.value = String(SETTINGS.perf); styleSel.value = SETTINGS.style;
+// a style is paint: the next render() picks it up, with no reload and no new duel
+styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; saveSettings(); });
 gfxSel.addEventListener('change', () => { SETTINGS.gfx = +gfxSel.value; saveSettings(); if (gl) makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
 perfSel.addEventListener('change', () => { SETTINGS.perf = +perfSel.value; saveSettings(); });
 const VOLS = { vol: null, 'vol-music': 'music', 'vol-ambient': 'ambient', 'vol-sfx': 'sfx' };
@@ -1777,6 +1901,7 @@ syncMute();
 
 // ---------------------------------------------------------------- the loop
 let FRAME_DT = 1 / 60, lastTs = 0;
+const dprNow = () => Math.min(window.devicePixelRatio || 1, [1.25, 1.75, 2][SETTINGS.gfx] || 1.75);
 function frame(ts) {
   requestAnimationFrame(frame);
   APP.frames++;
@@ -1784,7 +1909,7 @@ function frame(ts) {
   FRAME_DT = dt;
   const W = window.innerWidth, H = window.innerHeight;
   if (W !== LAY.W || H !== LAY.H) layout();
-  const dpr = Math.min(window.devicePixelRatio || 1, [1.25, 1.75, 2][SETTINGS.gfx] || 1.75);
+  const dpr = dprNow();
   const t0 = performance.now();
   if (!APP.paused && !APP.testPaused) update(dt);
   PERF.sim += performance.now() - t0;
@@ -1811,8 +1936,25 @@ window.__CS = {
   setPaused(b) { APP.testPaused = !!b; },
   tick(dt, n) { for (let i = 0; i < (n || 1); i++) update(dt); },
   press(k) { pressBtn(k); },
-  hud() { drawHUD(window.innerWidth, window.innerHeight, Math.min(window.devicePixelRatio || 1, [1.25, 1.75, 2][SETTINGS.gfx] || 1.75)); },
+  hud() { drawHUD(window.innerWidth, window.innerHeight, dprNow()); },
   stick(x, y) { INPUT.sx = x; INPUT.sy = y; },
+  // graphics styles: setStyle does not save (rows that test saving go through the select's change)
+  STYLES, PARTS, FX,
+  setStyle(s) { SETTINGS.style = s; styleSel.value = s; },
+  // one frame drawn now, frozen: no time passes and the camera snaps, so two draws of one state are one picture
+  draw() { const keep = FRAME_DT; FRAME_DT = 0; CAM.init = false; CAM.shake = 0; try { render(window.innerWidth, window.innerHeight, dprNow()); } finally { FRAME_DT = keep; } },
+  // draw(), then read back in the same task; x, y, w, h in CSS px from the top left (default: the whole
+  // frame). The rows come back bottom-up, in device px.
+  pixels(x, y, w, h) {
+    this.draw();
+    const k = glc.width / window.innerWidth;
+    const gx = Math.round((x || 0) * k), gw = Math.round((w === undefined ? window.innerWidth : w) * k), gh = Math.round((h === undefined ? window.innerHeight : h) * k);
+    const gy = glc.height - Math.round((y || 0) * k) - gh;
+    const px = new Uint8Array(gw * gh * 4);
+    gl.readPixels(gx, gy, gw, gh, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    return { w: gw, h: gh, d: Array.from(px) };
+  },
+  glError() { return gl.getError(); },
 };
 </script>
 </body>

@@ -275,7 +275,7 @@ Tools:
 
 | Step | What | Status |
 |---|---|---|
-| 1 | Selector, styles, toon shading, hooks | open |
+| 1 | Selector, styles, toon shading, hooks | DONE 2026-11-02 |
 | 2 | Toon ink | open |
 | 3 | CS-1 docs, land, Pages | open |
 | 4 | Neon look | open |
@@ -490,7 +490,114 @@ its jobs read. Beyond the gate, only the CD can say whether the looks are right 
 
 ## Results (append, do not rewrite)
 
-(none yet)
+### Step 1 results
+
+Built on `2bff358`. The ENGINE span is byte-identical (the md5 of `ENGINE:BEGIN..END` is the
+same before and after). `gates.sh games/combat-simulator/index.html` is GREEN, and the suite is
+**61 + 10 = 71 passed, 0 failed**, with no extra rows.
+
+**The realistic frame did not change (the one-off proof).** The procedure: `startDuel(3, 4242)`;
+125 ticks of 1/60 for the intro; 240 ticks of 1/120 with `press('atk')` every 30 ticks; sparks
+cleared and `APP.time = 100`; then, in one evaluate, `FRAME_DT = 0`, `CAM.init = false`,
+`CAM.shake = 0`, `render()` and a full-frame `readPixels` at 844x390, hashed with sha256.
+- On the unchanged page, two separate loads gave `2ddf4aa3cb07bfa35de7a863a0a2bb9630fcba19f0f7206702a04321935729be`
+  both times, so SwiftShader is deterministic across loads and the GLSL fallback was not needed.
+- After the edit, with `style = 'realistic'`, the same hash: `2ddf4aa3...935729be`. I took it
+  twice, once before the toon tuning and once at the end.
+- Toon gives `5646b48a...` on the same state: it compiles and differs.
+
+**The 10 rows** (part 2 unless noted):
+1. (part 1) `!/style/i.test(ENG)`.
+2. At boot, with nothing stored: `SETTINGS.style` and `#style-sel` both read `realistic`.
+3. The select's options are exactly `['realistic','toon']` (a literal in the suite).
+4. A `change` on the select to toon: `SETTINGS.style` is toon, `"style":"toon"` is stored, and
+   the next `pixels()` differs from the realistic one by more than 2,000 px (measured: 329,160,
+   every pixel, because toon's final `satp` touches the whole frame). `__CS.F` is the same object
+   and `F.t` has not moved.
+5. After a reload: toon, and the select reads toon.
+6. A stored settings object without `style`, and one with `style: 'chalk'`, each load as
+   realistic. Realistic is then stored and the page reloaded.
+7. A skin is paint: per style, `startDuel(5, 777)`, 1,200 ticks of 1/120, `press('atk')` every
+   30 ticks, `draw()` every 4, the stick at rest; the snapshot
+   `{p, e, ai, t, nextAtk, r: rng()}` is byte-identical across styles (17 cuts landed in the
+   scenario).
+8. The same scenario, switched realistic -> toon at tick 600, gives the same snapshot.
+9. Toon is banded: `startDuel(1, 99)`, `F.p` z -1.5 and `F.e` z 1.5, both free, one frozen frame
+   per style, a 12 x 40 CSS px box at `project([F.e.x, 1.25, F.e.z])`, luminance quantised to 64,
+   levels with at least 3 px counted. The threshold is `realistic >= 20 && toon * 2 <= realistic`.
+   Measured on the unbroken page (rank 1 is the row; ranks 5 and 10 measured beside it):
+
+   | rank | realistic | toon | toon, unbanded (`shade()`) |
+   |---|---|---|---|
+   | 1 | 37 | 14 | 33 |
+   | 5 | 38 | 14 | 24 |
+   | 10 | 34 | 17 | 36 |
+
+   Toon's ratio is 0.38-0.50. The leftover levels are edge pixels, MSAA-blended against the
+   courtyard behind the silhouette, plus the hand and the obi crossing the box. At rank 1, 85% of
+   toon's box sits in three levels, against 32% for realistic.
+10. Every element at once: a real cut stepped until the trail has 3 or more samples,
+    `F.e.st = 'power'` at t 0.05 (its ring), and 40 sparks. For each style, `pixels()`;
+    `glError() === 0` and the frame is not one colour.
+
+**Breaks** (`.claude/tests/negtests/combat-simulator-styles.json`, 9 of 9 caught, none by a crash;
+run in five chunks, alone on the box):
+
+| break | caught by |
+|---|---|
+| `style-engine` (the engine's `F.t += dt` scales by 1.0001 under toon) | row 1, rows 7 and 8 |
+| `style-render-writes-fighter` (`render()` adds 1e-9 to `F.p.x` under toon) | rows 7 and 8 |
+| `style-default-toon` | row 2 (and row 6's no-key case) |
+| `style-option-missing` | row 3 (and rows 4 and 5) |
+| `style-not-saved` | row 4 (nothing stored), row 5 |
+| `style-needs-reload` (render reads a copy of the style taken on its first frame) | row 4 (no difference), row 9 (37 / 37) |
+| `style-junk-kept` | row 6 (`chalk` kept) |
+| `style-toon-unbanded` (toon's limbs call `shade()`) | row 9 (37 / 33) |
+| `style-switch-new-duel` (the handler calls `startDuel`) | row 4 (a new `F`) |
+
+**Draw calls per frame** (`PERF.calls` for one `draw()`, the rank-4 scene of row 10):
+- Idle (sky, arena, two fighters, two shadow draws): 6 in realistic, 6 in toon.
+- With a trail, a power ring and sparks: 8 in realistic, 9 in toon. Toon's solid trail is its
+  own `drawArrays` under `ONE, ONE_MINUS_SRC_ALPHA`, ahead of the additive rings.
+
+**How it is built:**
+- `withStyle()` throws unless the source starts `#version 300 es\n`.
+- `progsFor(look)` compiles `world`, `limb`, `sky` and `glow` per style on first use. The shadow
+  and `flat` programs stay in `PRG` and are shared. `initGL()` builds only realistic's set.
+- `render()` opens with `const look = SETTINGS.style, P = progsFor(look);`, and every `PRG.` in
+  it became `P.`.
+- `FS_FLAT` now writes alpha `vC.a`. That is harmless for the additive passes, as the hash shows.
+- `__CS` gains `STYLES`, `PARTS`, `FX`, `setStyle`, `draw`, `pixels` (whole frame by default)
+  and `glError`.
+- `dprNow()` replaces the loop's and the HUD hook's copies of the dpr expression.
+- `FX = { ink: true, bloom: true }` exists, and nothing reads it yet.
+
+**Assumed look choices, for step 3 to write into `.claude/combat-simulator.md`:**
+- **Bands**: `k = ndl * shadow`, with a lit band of 0.7 above k = 0.55, a mid band of 0.4 above
+  0.12, else 0. The plan's 1.0 / 0.55 blew out the pale flagstones at rank 1 after the 1.6
+  saturation push, so I dropped it to 0.7 / 0.4.
+- **Ambient floor**: `max(mix(ambGnd, ambSky, 0.5) * ao, keyCol * 0.1 + 0.1)`. The plan's
+  0.18 + 0.12 also washed out rank 1. Ranks 1, 5 and 10 were checked by eye.
+- **Lanterns**: two steps, `+0.15` at li > 0.08 and `+0.45` at li > 0.3, in the lamp colour.
+  The paper's emission does not flicker in toon.
+- **Albedo**:
+  - Saturation is pushed by 1.6 before shading, and by `satp(…, 1.15)` again after the tonemap.
+  - The flagstone joints are a hard line at `e < 0.022`, at 0.42 x the stone colour.
+  - The gravel is two tones, 1.0 and 0.8, on the sign of the furrow sine.
+- **Blade**: a white highlight of strength 4.0 (pre-tonemap) where `dot(N, H) > 0.985`. It keeps
+  the power glow `uGlow * 1.8`. No rim in toon.
+- **Sky**:
+  - The colours are skyCol's zenith and horizon, blended `smoothstep(0.02, 0.55, d.y)`.
+  - The clouds sit at a noise threshold of 0.66, 85% opaque. Their tint is
+    `mix(0.07-grey, 1.2-white, uDay)`.
+  - The sun is a flat disc at `cos > 0.9992`, the moon at `cos > 0.99965`. There are no stars.
+  - The far range is `(0.05, 0.08, 0.14)` and the near one `(0.03, 0.06, 0.05)`, each scaled by
+    the day and mixed 45% / 25% toward the horizon colour.
+- **Fog** mixes toward toon's horizon colour.
+- **Trail**: solid white at alpha 0.9 at every vertex, power cuts included (power is not tinted
+  in toon).
+- **Sparks**: the plan's star; the colour is clamped to 1 and scaled by life, with no 2x
+  over-bright.
 
 ## Handoff
 
