@@ -275,9 +275,9 @@ Tools:
 
 | Step | What | Status |
 |---|---|---|
-| 1 | Selector, styles, toon shading, hooks | open |
-| 2 | Toon ink | open |
-| 3 | CS-1 docs, land, Pages | open |
+| 1 | Selector, styles, toon shading, hooks | DONE 2026-11-02 |
+| 2 | Toon ink | DONE 2026-11-02 |
+| 3 | CS-1 docs, land, Pages | DONE 2026-11-02 (docs and badge; landing by the overseer) |
 | 4 | Neon look | open |
 | 5 | Bloom | open |
 | 6 | Docs final, break lists, land, Pages | open |
@@ -490,7 +490,245 @@ its jobs read. Beyond the gate, only the CD can say whether the looks are right 
 
 ## Results (append, do not rewrite)
 
-(none yet)
+### Step 1 results
+
+Built on `2bff358`. The ENGINE span is byte-identical (the md5 of `ENGINE:BEGIN..END` is the
+same before and after). `gates.sh games/combat-simulator/index.html` is GREEN, and the suite is
+**61 + 10 = 71 passed, 0 failed**, with no extra rows.
+
+**The realistic frame did not change (the one-off proof).** The procedure: `startDuel(3, 4242)`;
+125 ticks of 1/60 for the intro; 240 ticks of 1/120 with `press('atk')` every 30 ticks; sparks
+cleared and `APP.time = 100`; then, in one evaluate, `FRAME_DT = 0`, `CAM.init = false`,
+`CAM.shake = 0`, `render()` and a full-frame `readPixels` at 844x390, hashed with sha256.
+- On the unchanged page, two separate loads gave `2ddf4aa3cb07bfa35de7a863a0a2bb9630fcba19f0f7206702a04321935729be`
+  both times, so SwiftShader is deterministic across loads and the GLSL fallback was not needed.
+- After the edit, with `style = 'realistic'`, the same hash: `2ddf4aa3...935729be`. I took it
+  twice, once before the toon tuning and once at the end.
+- Toon gives `5646b48a...` on the same state: it compiles and differs.
+
+**The 10 rows** (part 2 unless noted):
+1. (part 1) `!/style/i.test(ENG)`.
+2. At boot, with nothing stored: `SETTINGS.style` and `#style-sel` both read `realistic`.
+3. The select's options are exactly `['realistic','toon']` (a literal in the suite).
+4. A `change` on the select to toon: `SETTINGS.style` is toon, `"style":"toon"` is stored, and
+   the next `pixels()` differs from the realistic one by more than 2,000 px (measured: 329,160,
+   every pixel, because toon's final `satp` touches the whole frame). `__CS.F` is the same object
+   and `F.t` has not moved.
+5. After a reload: toon, and the select reads toon.
+6. A stored settings object without `style`, and one with `style: 'chalk'`, each load as
+   realistic. Realistic is then stored and the page reloaded.
+7. A skin is paint: per style, `startDuel(5, 777)`, 1,200 ticks of 1/120, `press('atk')` every
+   30 ticks, `draw()` every 4, the stick at rest; the snapshot
+   `{p, e, ai, t, nextAtk, r: rng()}` is byte-identical across styles (17 cuts landed in the
+   scenario).
+8. The same scenario, switched realistic -> toon at tick 600, gives the same snapshot.
+9. Toon is banded: `startDuel(1, 99)`, `F.p` z -1.5 and `F.e` z 1.5, both free, one frozen frame
+   per style, a 12 x 40 CSS px box at `project([F.e.x, 1.25, F.e.z])`, luminance quantised to 64,
+   levels with at least 3 px counted. The threshold is `realistic >= 20 && toon * 2 <= realistic`.
+   Measured on the unbroken page (rank 1 is the row; ranks 5 and 10 measured beside it):
+
+   | rank | realistic | toon | toon, unbanded (`shade()`) |
+   |---|---|---|---|
+   | 1 | 37 | 14 | 33 |
+   | 5 | 38 | 14 | 24 |
+   | 10 | 34 | 17 | 36 |
+
+   Toon's ratio is 0.38-0.50. The leftover levels are edge pixels, MSAA-blended against the
+   courtyard behind the silhouette, plus the hand and the obi crossing the box. At rank 1, 85% of
+   toon's box sits in three levels, against 32% for realistic.
+10. Every element at once: a real cut stepped until the trail has 3 or more samples,
+    `F.e.st = 'power'` at t 0.05 (its ring), and 40 sparks. For each style, `pixels()`;
+    `glError() === 0` and the frame is not one colour.
+
+**Breaks** (`.claude/tests/negtests/combat-simulator-styles.json`, 9 of 9 caught, none by a crash;
+run in five chunks, alone on the box):
+
+| break | caught by |
+|---|---|
+| `style-engine` (the engine's `F.t += dt` scales by 1.0001 under toon) | row 1, rows 7 and 8 |
+| `style-render-writes-fighter` (`render()` adds 1e-9 to `F.p.x` under toon) | rows 7 and 8 |
+| `style-default-toon` | row 2 (and row 6's no-key case) |
+| `style-option-missing` | row 3 (and rows 4 and 5) |
+| `style-not-saved` | row 4 (nothing stored), row 5 |
+| `style-needs-reload` (render reads a copy of the style taken on its first frame) | row 4 (no difference), row 9 (37 / 37) |
+| `style-junk-kept` | row 6 (`chalk` kept) |
+| `style-toon-unbanded` (toon's limbs call `shade()`) | row 9 (37 / 33) |
+| `style-switch-new-duel` (the handler calls `startDuel`) | row 4 (a new `F`) |
+
+**Draw calls per frame** (`PERF.calls` for one `draw()`, the rank-4 scene of row 10):
+- Idle (sky, arena, two fighters, two shadow draws): 6 in realistic, 6 in toon.
+- With a trail, a power ring and sparks: 8 in realistic, 9 in toon. Toon's solid trail is its
+  own `drawArrays` under `ONE, ONE_MINUS_SRC_ALPHA`, ahead of the additive rings.
+
+**How it is built:**
+- `withStyle()` throws unless the source starts `#version 300 es\n`.
+- `progsFor(look)` compiles `world`, `limb`, `sky` and `glow` per style on first use. The shadow
+  and `flat` programs stay in `PRG` and are shared. `initGL()` builds only realistic's set.
+- `render()` opens with `const look = SETTINGS.style, P = progsFor(look);`, and every `PRG.` in
+  it became `P.`.
+- `FS_FLAT` now writes alpha `vC.a`. That is harmless for the additive passes, as the hash shows.
+- `__CS` gains `STYLES`, `PARTS`, `FX`, `setStyle`, `draw`, `pixels` (whole frame by default)
+  and `glError`.
+- `dprNow()` replaces the loop's and the HUD hook's copies of the dpr expression.
+- `FX = { ink: true, bloom: true }` exists, and nothing reads it yet.
+
+**Assumed look choices, for step 3 to write into `.claude/combat-simulator.md`:**
+- **Bands**: `k = ndl * shadow`, with a lit band of 0.7 above k = 0.55, a mid band of 0.4 above
+  0.12, else 0. The plan's 1.0 / 0.55 blew out the pale flagstones at rank 1 after the 1.6
+  saturation push, so I dropped it to 0.7 / 0.4.
+- **Ambient floor**: `max(mix(ambGnd, ambSky, 0.5) * ao, keyCol * 0.1 + 0.1)`. The plan's
+  0.18 + 0.12 also washed out rank 1. Ranks 1, 5 and 10 were checked by eye.
+- **Lanterns**: two steps, `+0.15` at li > 0.08 and `+0.45` at li > 0.3, in the lamp colour.
+  The paper's emission does not flicker in toon.
+- **Albedo**:
+  - Saturation is pushed by 1.6 before shading, and by `satp(…, 1.15)` again after the tonemap.
+  - The flagstone joints are a hard line at `e < 0.022`, at 0.42 x the stone colour.
+  - The gravel is two tones, 1.0 and 0.8, on the sign of the furrow sine.
+- **Blade**: a white highlight of strength 4.0 (pre-tonemap) where `dot(N, H) > 0.985`. It keeps
+  the power glow `uGlow * 1.8`. No rim in toon.
+- **Sky**:
+  - The colours are skyCol's zenith and horizon, blended `smoothstep(0.02, 0.55, d.y)`.
+  - The clouds sit at a noise threshold of 0.66, 85% opaque. Their tint is
+    `mix(0.07-grey, 1.2-white, uDay)`.
+  - The sun is a flat disc at `cos > 0.9992`, the moon at `cos > 0.99965`. There are no stars.
+  - The far range is `(0.05, 0.08, 0.14)` and the near one `(0.03, 0.06, 0.05)`, each scaled by
+    the day and mixed 45% / 25% toward the horizon colour.
+- **Fog** mixes toward toon's horizon colour.
+- **Trail**: solid white at alpha 0.9 at every vertex, power cuts included (power is not tinted
+  in toon).
+- **Sparks**: the plan's star; the colour is clamped to 1 and scaled by life, with no 2x
+  over-bright.
+
+### Step 2 results
+
+Built on `ade4d81`. The ENGINE span is byte-identical (md5 of `ENGINE:BEGIN..END`
+`db0815e8...` before and after). `gates.sh games/combat-simulator/index.html`, run alone, is
+GREEN, and the suite is **71 + 3 = 74 passed, 0 failed**, with no extra rows.
+
+**The realistic frame did not change.** Step 1's procedure (`startDuel(3, 4242)`, 125 ticks of
+1/60, 240 ticks of 1/120 with `press('atk')` every 30, sparks cleared, `APP.time = 100`, one
+frozen `pixels()` at 844x390, sha256) gives `2ddf4aa3cb07bfa35de7a863a0a2bb9630fcba19f0f7206702a04321935729be`
+on the edited page, with `FX.ink` true and with it false: the same hash as step 1. Toon with
+`FX.ink` false gives `de186cd2...`, which is exactly the unedited page's toon frame (so
+the 13-float vertex changed nothing but the new pass); toon with ink gives `e10f0c03...`.
+Shadows still fall: the realistic hash covers the shadow pass, which reads the same VAO.
+
+**How it is built:**
+- The arena vertex is 13 floats (stride 52). `vert(mb, p, nr, c, m, e)` takes the ink
+  extrusion `e` (default `NOEXT`, `[0, 0, 0]`), and `initGL()` has five pointers. `aExt` is
+  location 4, at offset 40.
+- `box()` walks a `BOXC` sign table. A corner's `e` is `sx X + sy Y + sz Z` in the box's own
+  axes, and `quad()` takes four extrusions. The corners' positions are computed exactly as
+  before, so the vertex order and values are bit-identical.
+- `cyl()`: a side vertex is `[c, -1, s]` on the bottom ring and `[c, 1, s]` on the top ring.
+  The cap centre is `[0, 1, 0]` and the cap ring `[c, 1, s]`.
+- The floor disc and both annuli stay 0.
+- `VS_INK_WORLD` moves `aPos + aExt * uInk * |uEye - aPos|`. `VS_INK_LIMB` is `VS_LIMB`'s frame
+  with the vertex pushed out along `n` by `uInk * |uEye - s|`. `FS_INK` discards where
+  `dot(vN, uEye - vW) > 0` and writes `uInkCol` flat (no tonemap).
+- `INK = { toon: { px: 1.5, col: #0d0b10 } }` beside `progsFor()`. `progsFor()` compiles
+  `inkWorld` and `inkLimb` (under the style's `STYLE`) only for a style in `INK`. `render()`
+  computes `const ink = FX.ink && INK[look]` and
+  `inkW = ink.px * 2 * tan(CAM.fov / 2) / (ph / dpr)`.
+- There are two passes, both through `inkSet()`: the arena hull straight after the arena
+  draw, and one instanced draw of all `nCaps` capsules after the fighters' colour draws (once
+  the attribute offsets are reset). Step 4 extends both by adding `neon` to `INK`, plus a
+  per-fighter colour.
+
+**The 3 rows** (part 2). One evaluate runs `startDuel(1, 99)` with `F.p` at z -1.5 and `F.e` at
+z 1.5, both free and sparks cleared. It renders toon with ink on and off and realistic with ink
+on and off, and counts near-black pixels (every channel < 30) in three regions:
+- the opponent's box: the projected AABB 0.6 m round it, 2 m tall;
+- outside both fighters' wide boxes (1.3 m, 2.4 m), which is the courtyard alone;
+- the 12 x 40 px torso box of step 1's row 9.
+
+Measured on the unbroken page at 844x390:
+
+| frame | opponent box | courtyard | torso box (of 480) |
+|---|---|---|---|
+| toon, ink on | 734 | 3,334 | 27 |
+| toon, ink off | 186 | 0 | 0 |
+| realistic, on = off | 198 | 0 | 0 |
+| toon on, rank 5 / rank 10 (beside the row) | 814 / 1,633 | 3,334 / 3,612 | 30 / 158 |
+
+1. **Ink round a fighter**: the opponent box rises by `>= 300` (measured +548; +114 of that is
+   the courtyard's own ink behind the opponent, which is what is left with the fighter pass
+   removed). Also, the torso box is at most 25% near-black with ink on (measured 5.6%: the ink
+   is a rim, not a fill). The second clause is the one that catches the culled hull.
+2. **Ink round the courtyard**: the courtyard rises by `>= 1500` (measured +3,334).
+3. **Realistic is untouched by the ink**: realistic's full frames with `FX.ink` true and false
+   are byte-identical.
+
+Step 1's row 9 still passes with ink on: toon has 13 levels on the torso, against 14 without
+ink and 37 for realistic.
+
+**Breaks** (appended to `.claude/tests/negtests/combat-simulator-styles.json`; 5 of 5 caught by
+their own rows, none by a crash; run in three foreground chunks, alone on the box):
+
+| break | caught by | measured |
+|---|---|---|
+| `ink-off-fighters` (the fighter pass deleted) | row 1 | opponent box 300 vs 186: +114 < 300 |
+| `ink-off-arena` (the arena pass deleted) | row 2 | courtyard 0 vs 0 |
+| `ink-in-realistic` (`INK` gains a `realistic` entry) | row 3 | frames differ; courtyard 3,334 in realistic |
+| `ink-ext-zero` (`vert()` writes 0, 0, 0 for every `ext`) | row 2 | courtyard 0: the shell collapses onto the mesh and is discarded or hidden |
+| `ink-cull-not-discard` (the limb pass compiles `FS_INK` without the discard and draws under `gl.cullFace(gl.FRONT)`) | row 1, by its fill clause | torso 475 of 480 near-black; opponent box 4,760 |
+
+All 14 anchors in the list match exactly once on the final page, and every `new` carries
+`/* @negtest */`. None of step 1's 9 anchors was touched by this step. Row 9's picture
+changed, though, so I re-ran `style-toon-unbanded` (still caught by row 9: 37 / 32) and
+`style-needs-reload` (still caught, by rows 4, 9 and now row 1).
+
+**The cull evidence: the derivation holds.** With front faces culled and the discard taken
+out, the fighter came out **covered in black**: 99% of the torso box, and more than six times
+the ink-on count in the opponent's box. That is "the wrong way round" (more black, not less).
+So the capsules' outward faces reach the rasteriser wound clockwise, which is what a
+left-handed `(u, ax, v)` frame in `VS_LIMB` predicts. `gl.cullFace(gl.BACK)` would therefore
+be the culling that keeps the far shell. Discarding by normal stays the design, because it
+does not depend on winding. A rise-only row 1 would have **passed** this break, which is why
+row 1 has the torso-fill ceiling.
+
+**Draw calls per frame** (`PERF.calls` for one `draw()`, the rank-4 scene of step 1's row 10):
+- Idle: 6 in realistic, 8 in toon (the two ink passes).
+- With a trail, a power ring and sparks: 8 in realistic, 11 in toon (9 with `FX.ink` off).
+
+**Assumed look choices, for step 3 to write into `.claude/combat-simulator.md`:**
+- Ink is the plan's `#0d0b10` at the plan's 1.5 CSS px, with the same width on the blade. At
+  the duel's distance the blade is narrower than its two ink edges, so in toon it reads as a
+  dark line with a light core.
+- The arena's overlapping wall boxes (each is `hl + 0.02` long) draw a short vertical ink line
+  at every segment joint, so the wall reads as panels. I kept these rather than special-casing
+  them.
+- The open bottom of a pine's foliage cone shows the shell's bottom ring as a dark band
+  where the camera sees under it. I kept this as the rim's own line.
+- The ink is drawn flat in display space (no tonemap, no fog), so a far pine's outline is as
+  dark as a near one's.
+- The ink writes depth, so the additive effects depth-test against it like any other geometry.
+
+### Step 3 results
+
+Docs only: the `ENGINE` block and the page's code did not change, and only the badge line of
+`games/combat-simulator/index.html` did (the `GAMES[]` facet and the badge in
+`games/index.html`).
+
+**Files changed:** `.claude/combat-simulator.md` (a new "Graphics styles" section; 14 assumed
+rows; Backlog CS-1 marked shipped 2026-11-02 and CS-2 marked open; Tests: 74 checks, the 13
+style rows named, both break lists with counts; the header and Architecture lines),
+`.claude/tests/README.md` (the `drive-combat-simulator.cjs` row), `.claude/games-index.md`
+(Combat Simulator gains `art-styles`; the `art-styles` paragraph names it as the first WebGL
+page with styles; there is no facet-count line to update), `games/index.html` (the COMBAT
+SIMULATOR `GAMES[]` entry's `mech` gains `art-styles`; badge), `games/CLAUDE.md` and root
+`CLAUDE.md` ("a Graphics style selector: realistic, toon"; the inventory's 74 checks and
+19 + 14 breaks), `TODO.md` (the entry says CS-1 shipped, CS-2 open), `DONE.md` (a CS-1 line),
+`games/combat-simulator/index.html` (badge line only), and this plan.
+
+**Counts, read from the code:** suite 74 (61 + 10 + 3), of which 13 are style rows (the
+engine row in part 1); break lists 19 (`combat-simulator.json`) and 14
+(`combat-simulator-styles.json`: 9 from step 1, 5 from step 2).
+
+**Badges:** `games/combat-simulator/index.html` `build 2026-11-02 22:04 UTC`;
+`games/index.html` `build 2026-11-02 22:04 UTC` (both read back from the files).
+
+Landing on main done by the overseer.
 
 ## Handoff
 

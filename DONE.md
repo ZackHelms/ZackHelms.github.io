@@ -1,5 +1,17 @@
 # DONE — done log
 
+- 2026-11-02 [combat-sim] **A Graphics style selector and the toon style** (CS-1; the CD, 2026-11-01,
+  "All three with selector in settings menu. Default to realistic webgl"): a `Graphics style`
+  select at the top of PICTURE (realistic, the default, and toon), saved, applied on the next
+  frame with no reload and no new duel. Toon is lit in three bands with a hard terminator, a
+  saturated flat palette, a two-colour sky with flat clouds, a solid white blade crescent and
+  star-burst sparks, with ink outlines (inverted hulls drawn by discarding by normal, a screen-
+  constant 1.5 px) round the fighters and the courtyard. One program set per style under a
+  `#define STYLE`, compiled on first use; realistic's frame is pixel-identical (same sha256
+  before and after). A style is paint: a fixed-seed duel steps to byte-identical fighters under
+  both. Suite 61 -> 74, new break list 14/14 (`combat-simulator-styles.json`). Neon is CS-2,
+  still open. Badge `build 2026-11-02 22:04 UTC`. Plan: `.claude/plans/csstyles.selector-toon-neon.md`.
+
 - 2026-11-02 [driving-sim] **No column under a low sun or moon; brighter stars** (DS-7, DS-5;
   the CD, 2026-11-02: "Sun rise, sun set, moon rise, and moon set all show a vertical smearing at
   the horizon" and "in game the stars are too dim, increase brightness"). DS-7: the fog, the
