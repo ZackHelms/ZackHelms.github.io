@@ -12,14 +12,38 @@ in `.claude/<game>.md`.
 
 ## Now
 
+- [driving-sim] **The sky arc: no column under a low sun or moon, brighter stars, the sun and
+  the moon as they really look, and a slider for each thing in the sky** (DS-7, DS-5, DS-4, DS-6;
+  one seven-step arc, all four edit the same shaders). DS-7 and DS-5 land on `main` on their own
+  at step 2.
+  - **DS-7, bug** (the CD, 2026-11-02, with screenshots: "Sun rise, sun set, moon rise, and moon
+    set all show a vertical smearing at the horizon"). Traced in the code: the fog, the distant
+    hills and paint reflections sample the sky with the elevation clamped to 1.15 deg, and that
+    sky includes the sun and moon discs. Fix: the discs only on the real view ray.
+  - **DS-5** (the CD, 2026-11-02: "in game the stars are too dim, increase brightness"). Measure
+    five reference stars at the phone's render scale first (the cause is not traced), then raise
+    them so Polaris reads white and a mag-4 star is plainly visible.
+  - **DS-4** (the CD, 2026-11-01: "Moon realism: yes, add this (and sun position) to the backlog
+    for driving sim"). The moon's phase with the kit's lit-sphere disc (bright limb toward the sun),
+    earthshine and soft maria; both bodies refracted and at their real sizes; moonlight by phase;
+    the moon by day; a bright moon dims the stars.
+  - **DS-6** (the CD, 2026-11-02: "sliders in the settings menu for each celestial object (stars,
+    milky way, sun, moon (sunshine), moon (earthshine), any others i missed)"). A SKY section with
+    Stars, Planets, Milky Way, Sun, Moonlight and Earthshine, 0-200%, saved.
+  Specs and checks: `.claude/driving-simulator.md` § Backlog, DS-4 to DS-7.
+  **Plan ready (2026-11-02)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/dssky.horizon-stars-moon-sliders.md`
+
 - [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
   2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly
   (a little in left too is realistic), also doppler effect should be realistically
   simulated"). A pool of 6 voices for the nearest cars (engine and tyre roar),
   distance and air absorption, an equal-power pan clamped to plus or minus 0.8 (right
   about 0.99, left about 0.16 abeam), a Doppler factor computed every frame
-  (c = 343 m/s), and an "Other cars" volume slider. Plan-shaped. Spec and checks:
-  `.claude/driving-simulator.md` § Backlog, DS-2.
+  (c = 343 m/s), and an "Other cars" volume slider. Run it after the sky arc above (both
+  edit the page and the suite). Spec and checks: `.claude/driving-simulator.md` § Backlog, DS-2.
+  **Plan ready (2026-11-02)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/dssound.traffic-stereo-doppler.md`
 
 - [driving-sim] **Summer, autumn and winter become selectable** in the Season
   dropdown. The dropdown shipped 2026-11-01 with spring selected and the other three
@@ -27,44 +51,12 @@ in `.claude/<game>.md`.
   season becomes Raleigh at its date: the sun, moon, planets and stars (zmh-sky, from DS-1's dates), the
   broadleaf trees (deeper green, autumn colours, bare in winter; conifers unchanged),
   grass from fresh green to dormant straw, insects and birds; switching rebuilds the
-  chunks in place. DS-1 landed 2026-11-02: re-sweep with
-  `/zmh-producer:backlog-plan-gen driving-sim`. Plan-shaped; its defaults were chosen and can be
-  overruled at plan review. Spec and checks: `.claude/driving-simulator.md` § Backlog,
-  DS-3.
-
-- [driving-sim] **The sun and the moon as they really look** (the CD, 2026-11-01:
-  "Moon realism: yes, add this (and sun position) to the backlog for driving sim").
-  - **Where they are comes with DS-1** (revised 2026-11-02): zmh-sky's `skyAt()` gives
-    both, the moon topocentric. Since DS-1 (2026-11-02) the moon is in its real place,
-    but still drawn with no phase and lit by the old rule.
-  - **This item is how they look and light.** Its phase uses the kit's lit-sphere moon
-    disc, so the bright limb faces the sun, with earthshine and soft maria. Both bodies
-    are refracted at the horizon (`refractionDeg`) and drawn at their real sizes (0.53
-    deg). Moonlight scales with the kit's `moonIlluminanceLux`. The moon is seen by
-    day, and a bright moon dims the stars and the Milky Way.
-  - DS-1 landed 2026-11-02: re-sweep with `/zmh-producer:backlog-plan-gen driving-sim`.
-    Plan-shaped. Spec, the phase anchors (full moons 2026-05-01 and
-    05-31, new 05-16) and the checks: `.claude/driving-simulator.md` § Backlog, DS-4.
-
-- [driving-sim] **No column of light under a rising or setting sun or moon** (bug; the
-  CD, 2026-11-02, with screenshots: "Sun rise, sun set, moon rise, and moon set all show a
-  vertical smearing at the horizon"). Traced in the code: the fog, the distant hills and
-  paint reflections sample the sky with the elevation clamped to 1.15 deg, and that sky
-  includes the sun and moon discs, so a body within about a degree of that height paints a
-  column down everything at its azimuth. Since the game shipped. Fix: the discs only on the
-  real view ray. Plan-shaped. Spec: `.claude/driving-simulator.md` § Backlog, DS-7.
-
-- [driving-sim] **Brighter stars** (the CD, 2026-11-02: "in game the stars are too dim,
-  increase brightness"). Measure five reference stars at the iPhone viewport first (the
-  cause is not traced: the gain, or points sized in framebuffer pixels on a 2x screen),
-  then raise the default so Polaris reads white and a mag-4 star is plainly visible.
-  Plan-shaped. Spec: `.claude/driving-simulator.md` § Backlog, DS-5.
-
-- [driving-sim] **A slider for each thing in the sky** (the CD, 2026-11-02: "sliders in
-  the settings menu for each celestial object (stars, milky way, sun, moon (sunshine), moon
-  (earthshine), any others i missed)"). A SKY section with Stars, Planets, Milky Way, Sun,
-  Moonlight and (with DS-4) Earthshine, 0-200%, saved. After DS-5. Plan-shaped. Spec:
-  `.claude/driving-simulator.md` § Backlog, DS-6.
+  chunks in place. Plan-shaped; its defaults were chosen and can be overruled at plan review.
+  *Not planned on 2026-11-02:* it shares the settings panel with DS-6 and the ambient sound with
+  DS-2, and both plans are waiting to run; and its winter trees want the tree-expert look first
+  (`.claude/driving-simulator.md` § Follow-ups). Re-sweep with
+  `/zmh-producer:backlog-plan-gen driving-sim` once the sky arc and DS-2 have landed. Spec and
+  checks: `.claude/driving-simulator.md` § Backlog, DS-3.
 
 - [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,
   2026-11-01: "All three with selector in settings menu. Default to realistic webgl. Its a

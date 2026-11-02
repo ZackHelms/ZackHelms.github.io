@@ -543,8 +543,10 @@ the kit supplies nearly all of it.
 - **Sun.** Altitude and azimuth match the suite's own sun within 0.2 deg at five
   times of day on three dates. Sunrise and sunset fall within 2 min of its
   times, with refraction.
-- **Moon position and anchors** are DS-1's rows. Here, refraction: a body on the
-  horizon is drawn about 0.57 deg higher than its geometric place.
+- **Moon position and anchors** are DS-1's rows. Here, refraction: a body is drawn
+  `refractionDeg(geometric altitude)` higher than its geometric place, 0.48 deg at a true
+  altitude of 0 (corrected 2026-11-02: the kit's formula takes the true altitude; the first
+  draft's 0.57 deg, 34', is the refraction at apparent altitude 0).
 - **Phase.** At the Meeus mean phases (ch. 49, each within a day), the lit
   fraction is over 0.97 at full (2026-05-01, 2026-05-31) and under 0.03 at new
   (2026-05-16), and 0.5 +/- 0.05 at the last quarter (about 2026-05-09).
@@ -580,9 +582,14 @@ carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
 The screenshots (badge `build 2026-11-02 12:27 UTC`, an iPhone, chase view): at
 7:50-7:57 PM a bright column at the sun's place runs from the hilltops down
 through the grass and over the car to the bottom of the screen; at 3:29 and 3:41 AM
-a paler column does the same under the rising moon. DS-5 to DS-7 are three plans,
-in `TODO.md` § Now. DS-7 is a bug fix and stands alone; DS-5 and DS-6 share
-`STAR_GAIN`, so DS-6 goes after DS-5.
+a paler column does the same under the rising moon. DS-5 to DS-7 are in `TODO.md`
+§ Now. DS-7 is a bug fix; DS-5 and DS-6 share `STAR_GAIN`, so DS-6 goes after DS-5.
+
+**Plans (2026-11-02).** DS-7, DS-5, DS-4 and DS-6 are one seven-step arc,
+`.claude/plans/dssky.horizon-stars-moon-sliders.md` (in that order; DS-7 and DS-5 land on
+`main` at step 2; DS-6 goes after DS-4 so its Earthshine row exists). DS-2 is
+`.claude/plans/dssound.traffic-stereo-doppler.md`, run after the arc. DS-3 is not planned yet:
+re-sweep once both have landed.
 
 ### DS-5. Brighter stars
 
