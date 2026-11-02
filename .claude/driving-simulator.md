@@ -44,13 +44,15 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Date steps (DS-1) | At each midnight the date steps by one; past the season's last day (or before its first, through the hook only) it goes to the first day. `setDate()` saves, as a midnight does. Choosing another open season moves the date to its middle date (unreachable while only spring is open) | One rule for the midnight and the wrap |
 | Daylight saving (DS-1) | `SKY.dst` is state. On the fall-back day the clock goes 02:00 -> 01:00 once; on the spring-forward day 02:00 -> 03:00. At boot, a date step and the time-of-day slider `dst` is re-derived by the rule (`utcOffset`), with the repeated hour reading as EDT and the missing hour (02:00-02:59 on the spring day) as EDT. At a date step `dst` is derived for 00:00 of the new date | Raleigh's clock; pure (date, hour) is ambiguous in the repeated hour. Spring never meets a transition: only the hook reaches them |
 | Magnitude cut (DS-1) | The splice's `--mag 5`: 1,627 stars | Naked-eye under a light-polluted sky; one flag to change it |
-| `STAR_GAIN = 3.2` (DS-1) | The star pass's gain after the tonemap, times `SKY.exposure` and `SKY.night` | Read off pixels at 22:00 on May 5: at 1.6 Spica (mag 0.97) peaked at luminance 118, not white; at 3.2 it reads 209 and Arcturus saturates |
+| `STAR_GAIN = 3.2` (DS-1; *superseded by DS-5: 4.0*) | The star pass's gain after the tonemap, times `SKY.exposure` and `SKY.night` | Read off pixels at 22:00 on May 5: at 1.6 Spica (mag 0.97) peaked at luminance 118, not white; at 3.2 it reads 209 and Arcturus saturates |
 | `MW_GAIN = 0.012` (DS-1) | The Milky Way's linear scale before the tonemap: the kit's `MILKY_WAY_PEAK` | Faint, as Raleigh's sky is: Cygnus reads luminance 32.8 against 19.5 off the band |
 | Planet colours and clamp (DS-1) | Mercury and Venus white; Mars (1.0, 0.62, 0.42); Jupiter (1.0, 0.95, 0.85); Saturn (1.0, 0.9, 0.7). Point intensity clamped at 2.5 (Sirius = 1). A planet outside the kit's 1800-2050 elements gets magnitude 99 and draws nothing | Venus a bright point, not a flare |
-| Star profile (DS-1) | The kit's Gaussian point with sigma floored at 0.5 framebuffer px and the point at least 3 px wide; the centre keeps the law's value. From about 2.8 px up it is exactly the kit's | The kit's 1-2 px point is sub-pixel at pixel centres: faint stars came out at a fifth of their law or not at all |
+| Star profile (DS-1; *the floor superseded by DS-5*) | The kit's Gaussian point with sigma floored at 0.5 framebuffer px and the point at least 3 px wide; the centre keeps the law's value. From about 2.8 px up it is exactly the kit's | The kit's 1-2 px point is sub-pixel at pixel centres: faint stars came out at a fifth of their law or not at all |
 | Star fade (DS-1) | `smoothstep(0, 2, alt)` over the first 2 deg; nothing below the horizon or under the ridge | The kit's 2-deg fade, written as a smoothstep |
 | The world frame (DS-1) | The page's world is (east, up, **south**). `SKY.sun / moon / planets / starM` stay in the kit's ENU; the GPU gets `SKY.sunW`, `SKY.moonW` and `SKY.starW` through `enuToWorld(v) = [v[0], v[1], -v[2]]` | `M4.look` is an OpenGL lookAt, so the renderer is right-handed; fed ENU unmapped, the sky drew mirrored (traced in step 3). The plan's "no remap" was wrong |
 | The Date row (DS-1) | `#date-val` on its own row (`#date-row`, "Date") under the time-of-day slider, at every width | Inside the Time-of-day row it pushed the clock past the row's edge at 320 px |
+| Star sigma floor (DS-5) | `max(sz * 0.5 / sqrt(8), 0.5 * max(uPx, 1))`: half a CSS pixel, and never under half a framebuffer pixel. The mirror pass (`uPx = 1`) and the suite's own scale-1 context (RSCALE 0.85) keep 0.5 framebuffer px | The plan's lever 1 is `0.5 * uPx`; below RSCALE 1 that is under half a framebuffer pixel, the sub-pixel case the DS-1 floor was there to stop (measured at RSCALE 0.85 with `0.5 * uPx`: Polaris 59 at a pixel corner, against 86 before) |
+| `STAR_GAIN = 4.0` (DS-5) | Raised from 3.2, after the CSS-px floor | The floor alone left Polaris at 166 at a pixel corner on the phone; 200 / 166 x 3.2 = 3.86, rounded up to 4.0 (Polaris 207, iota Leo 88 at their worst phase). The kit's law, the 2.5 clamp and `MW_GAIN` are unchanged |
 | Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
@@ -627,6 +629,42 @@ tied to 3.2. New: the five reference stars' peaks and the patch count at the
 phone viewport meet item 2; a break that halves the gain fails it.
 
 **Files:** `index.html` (`STAR_GAIN` and maybe `uPx`), the suite, this file.
+
+**Measured and built (dssky step 2, 2026-11-02).** Measured in a second browser context at the
+phone's numbers: 844x390 CSS px at `deviceScaleFactor` 3, so the page reads DPR 2 and RSCALE 1.7
+(1435x663 framebuffer), 22:00 EDT on May 5, `SKY.night` 1, `SKY.exposure` 1.8. The camera stood 30 m
+above the car with a 0.8-rad field of view, aimed so that the star's centre landed exactly at the
+framebuffer point (717 + o, 331 + o) for o = 0, 1/4, 1/2 and 3/4 (1/2 is a pixel corner). The figure
+is what the star adds at its brightest pixel: STARS on minus STARS off, 8-bit luminance, over a sky of
+14-27. The fifth star is Megrez (HIP 59774, V 3.32) and the magnitude-4 star iota Leonis (HIP 55642, V 4.00),
+both from `SKY_DATA`. The patch is 200x100 CSS px (340x170 framebuffer) centred on Polaris, counting
+the local maxima of the difference at 40 or more.
+
+| star (HIP, V, altitude) | before: 3.2, floor 0.5 fb px (min) | floor 0.5 CSS px, 3.2 (min) | after: floor 0.5 CSS px, 4.0 (min) |
+| - | - | - | - |
+| Arcturus (69673, -0.05, 52.0) | 239 / 239 / 236 / 239 (236) | 239 / 239 / 238 / 239 (238) | 239 / 239 / 239 / 239 (239) |
+| Vega (91262, 0.03, 12.2) | 229 / 229 / 164 / 229 (164) | 229 / 229 / 223 / 229 (223) | 229 / 229 / 229 / 229 (229) |
+| Regulus (49669, 1.36, 58.4) | 226 / 183 / 94 / 183 (94) | 226 / 209 / 165 / 209 (165) | 240 / 236 / 201 / 236 (201) |
+| Polaris (11767, 1.97, 35.4) | 230 / 182 / 86 / 182 (**86**) | 230 / 215 / 166 / 215 (166) | 236 / 236 / 207 / 236 (**207**) |
+| Megrez (59774, 3.32, 68.1) | 108 / 84 / 39 / 84 (39) | 108 / 99 / 76 / 99 (76) | 135 / 124 / 95 / 124 (95) |
+| iota Leo (55642, 4.00, 64.3) | 100 / 78 / 37 / 78 (**37**) | 100 / 91 / 71 / 91 (71) | 125 / 115 / 88 / 115 (**88**) |
+| patch round Polaris, stars at 40+ | 3 | 7 | 9 |
+
+The stars did NOT meet the targets at the phone's numbers, so the escalation trigger did not fire.
+The cause, now traced to pixels: **the sub-pixel phase, then the gain.** With sigma floored at 0.5 framebuffer px
+(0.29 CSS px at RSCALE 1.7), a faint star's brightest pixel fell to 37% of its centre whenever
+the centre sat on a pixel corner. Polaris added 230 on a pixel centre and 86 on a corner. The
+plan's "points sized in framebuffer pixels" stays ruled out (`uPx` already sized them). **Levers used,
+in the plan's order:** (1) the sigma floor in CSS pixels, half a CSS pixel and never under half a
+framebuffer pixel (the "Assumed" table says why); that alone brought Polaris's worst phase from 86 to
+166, and the mag-4 star's from 37 to 71. (2) `STAR_GAIN` from 3.2 to 4.0 for the rest. At the suite's own
+scale-1 context (RSCALE 0.85, so the floor is unchanged there) the gain alone moved Polaris's worst
+phase from 86 to 108 and iota Leo's from 37 to 46. Rows: "at the phone's render scale (RSCALE 1.7)
+Polaris adds at least 200 and a magnitude-4 star at least 60 at every sub-pixel phase" and "the
+patch round Polaris holds at least 7 stars that add 40 or more" (9 measured, less 20%). Both are red on
+the step-1 page, and the first is red with either lever alone. Restated: "the sky above the ridge is
+unchanged by the split" now takes its frames with the star pass off, because its two night frames held
+the stars. Its stars-off values were recorded on the same pre-split page.
 
 ### DS-6. A slider for each thing in the sky
 

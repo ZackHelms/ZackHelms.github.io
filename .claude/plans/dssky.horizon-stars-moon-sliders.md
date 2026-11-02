@@ -418,6 +418,67 @@ Worktree branch `worktree-oversee+dssky`, from `bbf3d0e` (the page's shaders as 
   the TODO entry to `DONE.md` with the badge string; the entry keeps DS-4 and DS-6.
 - Then merge `origin/main` into the arc's branch.
 
+#### Results (step 2)
+
+Worktree branch `worktree-oversee+dssky`, on `2fb91c0` (step 1). **Measure, raise and rows: DONE
+2026-11-02. Landing: overseer** (badge, gates after the stamp, `land-on-main.sh`, Pages, TODO/DONE).
+
+- **Measured before any change** in a second browser context: 844x390 CSS px at
+  `deviceScaleFactor` 3, which gave DPR 2, **RSCALE 1.7** and a 1435x663 framebuffer, at 22:00 EDT on
+  May 5, with `SKY.night` 1 and `SKY.exposure` 1.8. The camera stood 30 m above the car (0.8 rad), aimed by
+  Newton on the suite's own projection so that the star's centre lands exactly at (717 + o, 331 + o)
+  for o = 0, 1/4, 1/2 and 3/4 of a pixel along the diagonal (1/2 is the pixel corner). Each figure is
+  what the star adds at its brightest pixel (STARS on minus off, 8-bit luminance). The fifth star is
+  Megrez (HIP 59774, V 3.32) and the magnitude-4 star iota Leonis (HIP 55642, V 4.00), both from
+  `SKY_DATA`. The patch is 200x100 CSS px (340x170 framebuffer) round Polaris, counting stars at 40 or more.
+
+  | star (min over the four phases) | before (3.2, floor 0.5 fb px) | floor 0.5 CSS px, 3.2 | after (floor 0.5 CSS px, 4.0) |
+  | - | - | - | - |
+  | Arcturus | 236 | 238 | 239 |
+  | Vega (12 deg up) | 164 | 223 | 229 |
+  | Regulus | 94 | 165 | 201 |
+  | **Polaris** | **86** (230 / 182 / 86 / 182) | 166 | **207** (236 / 236 / 207 / 236) |
+  | Megrez (3.32) | 39 | 76 | 95 |
+  | **iota Leo (4.00)** | **37** (100 / 78 / 37 / 78) | 71 | **88** (125 / 115 / 88 / 115) |
+  | patch, stars at 40+ | 3 | 7 | 9 |
+
+  The full per-phase table is in `.claude/driving-simulator.md` § Backlog DS-5. The targets were not
+  met before, so the escalation trigger did not fire. **The cause, traced to pixels:** the sub-pixel
+  phase first, then the gain. The 0.5-framebuffer-px sigma floor is 0.29 CSS px at RSCALE 1.7, so a
+  faint star on a pixel corner kept only 37% of its centre value (Polaris 230 on a centre, 86 on a corner).
+- **Levers, in the plan's order:** (1) `vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0))`.
+  This moved Polaris's worst phase from 86 to 166 and iota Leo's from 37 to 71, so the mag-4 target
+  was met and Polaris's was not. (2) `STAR_GAIN` from 3.2 to 4.0 (200 / 166 x 3.2 = 3.86, rounded up).
+  The kit's law, the 2.5 clamp (Venus) and `MW_GAIN` are unchanged.
+- **Decision not in the plan: the floor is `0.5 * max(uPx, 1.0)`, not `0.5 * uPx`.** Below RSCALE 1
+  (the suite's own context, 0.85, and the low graphics setting), `0.5 * uPx` falls under half a
+  framebuffer pixel, which is the sub-pixel case DS-1's floor exists to stop. Measured with
+  `0.5 * uPx` at RSCALE 0.85, Polaris at a pixel corner dropped from 86 to 59. The mirror pass
+  (`uPx = 1`) is unchanged either way. The row is in the "Assumed, not decided" table, beside one for
+  `STAR_GAIN = 4.0`.
+- **Rows (in the second context, which is closed after them):** "at the phone's render scale (RSCALE 1.7)
+  Polaris adds at least 200 and a magnitude-4 star (iota Leonis, HIP 55642) at least 60 at every
+  sub-pixel phase"; "at the phone's render scale the 200x100 CSS px patch round Polaris holds at least
+  7 stars that add 40 or more" (9 measured, less 20%, floored). Polaris comes from the suite's own
+  SIMBAD and precession (`ownStar`). For iota Leo, the J2000 RA/Dec and magnitude are read from the kit's
+  catalogue data and turned to alt/az by the suite's own `precess()` and `ownAltAz()`. The suite's
+  values matched the scratch measurement to the unit.
+- **The rows bite:** run against copies, the step-1 page turns both red (Polaris 86, iota Leo 37,
+  patch 3). The new gain with the floor back at 0.5 framebuffer px turns the phase row red (Polaris
+  108, iota Leo 46 at the corner), and so does the new floor with the gain back at 3.2 (Polaris 166).
+  The patch row catches only the step-1 page: with either lever alone the patch already holds 7 or
+  more. For step 6's break list: "the star floor back to 0.5" and "`STAR_GAIN` halved" both land on the
+  phase row.
+- **Restated: "the sky above the ridge is unchanged by the split"** (step 1's row). Its 22:00 and
+  04:00 frames held the stars, so this step's brighter stars changed their hashes (`a3451048`,
+  `ecb17b0b`; means +0.011 and +0.019). It now takes all five frames with `STARS.on` false. The
+  stars-off values were recorded on the same pre-split page (`bbf3d0e`): night22 22.164 `4eb245a1`,
+  moon4 34.395 `6e7d7372`. On that page the stars-on values reproduced step 1's recorded ones exactly,
+  and the step-1 and step-2 pages give the same stars-off values. The three daytime frames are unchanged, because
+  the star pass does not draw by day. No other row was tied to 3.2 or the 0.5 px floor: the Jupiter
+  row, the four star-pixel rows and "the stars fade with the night" stayed green unchanged.
+- **Suite total: 112** (110 + 2), all green.
+
 ### Step 3 - DS-4a: the sun and the moon as they look
 
 - `updateSky()`: `SKY.sunDiscW`, `SKY.moonDiscW` (refracted), `SKY.sunR`, `SKY.moonR`,

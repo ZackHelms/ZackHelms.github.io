@@ -2405,6 +2405,9 @@ void main(){
 // to the point's edge) is sub-pixel for a 1-2 px star, and the fragment runs at pixel centres, so a faint
 // star came out at a fifth of its law or not at all. Sigma is floored at 0.5 px and the point rasterised at
 // least 3 px wide: the centre keeps the law's intensity; from about 2.8 px up the profile is exactly the kit's.
+// The floor is half a CSS pixel (0.5 * uPx), and never under half a framebuffer pixel (DS-5): at the phone's
+// render scale 1.7 a 0.5-framebuffer-px sigma was a third of a CSS pixel, so a star's brightest pixel fell to
+// 37% of its centre whenever the centre sat on a pixel corner (Polaris adding 86 there against 230 on a centre).
 const VS_STARS = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aDir; layout(location=1) in float aMag; layout(location=2) in vec3 aColor;
@@ -2419,7 +2422,7 @@ void main(){
   float alt = degrees(asin(clamp(w.y, -1.0, 1.0)));
   float I = pow(10.0, -0.4 * STAR_GAMMA * (aMag + EXT_K * airmass(alt) - STAR_MAG_REF));
   float sz = mix(1.0, 4.0, min(1.0, I)) * uPx;
-  vSig = max(sz * 0.5 / sqrt(8.0), 0.5); vSize = max(sz, 6.0 * vSig);
+  vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0)); vSize = max(sz, 6.0 * vSig);
   gl_PointSize = vSize;
   vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt);
   gl_Position = uVP * vec4(w * 1000.0, 1.0);
@@ -2980,9 +2983,10 @@ const enuToWorld = v => [v[0], v[1], -v[2]];
 // vector, the magnitude and the linear colour (zmh-sky's bvToRGB; no B-V gives white). The 1,627 stars of
 // the ZMH-SKY block come first, then the five naked-eye planets in PLANET_IDS order, rewritten by updateSky()
 // as the sky moves (a planet outside the kit's 1800-2050 elements gets magnitude 99 and draws nothing).
-// STAR_GAIN scales the pass after the tonemap (a magnitude-1 star reads white); MW_GAIN is the Milky Way's
+// STAR_GAIN scales the pass after the tonemap (a magnitude-1 star reads white; 4.0 since DS-5, so that at the phone's
+// render scale Polaris adds 200 and a magnitude-4 star 60 at every sub-pixel phase); MW_GAIN is the Milky Way's
 // linear scale before it (the kit's MILKY_WAY_PEAK: faint, as Raleigh's sky is). Both assumed.
-const STAR_GAIN = 3.2, MW_GAIN = 0.012;
+const STAR_GAIN = 4.0, MW_GAIN = 0.012;
 const PLANET_IDS = ['mer', 'ven', 'mar', 'jup', 'sat'];
 const PLANET_RGB = { mer: [1, 1, 1], ven: [1, 1, 1], mar: [1.0, 0.62, 0.42], jup: [1.0, 0.95, 0.85], sat: [1.0, 0.9, 0.7] };
 const STARS = (() => {

@@ -968,7 +968,11 @@ const AE = {
   // SKY_BEFORE: each frame's mean luminance and FNV-1a hash of its RGBA bytes, recorded 2026-11-02 by this row's own code on the
   // page before the split (one skyCol(), the page of e43a233, in the worktree at bbf3d0e); after it every mean is within 0.5
   // and every hash equal (the bodies' terms are kept in the same sum in the same order, so the bits are the same).
-  const SKY_BEFORE = { noon: [169.486, 'ce2df9fc'], noonSun: [182.519, '5963df34'], sun17: [193.474, 'a0571206'], night22: [22.208, '16a94f02'], moon4: [34.476, '45be3111'] };
+  // Restated at dssky step 2: the frames are taken with STARS.on false, because step 2 brightens the star pass (a pass of its
+  // own, after the sky's) and the row is about the sky pass. The stars-off values were recorded the same way on the same
+  // pre-split page (bbf3d0e) on 2026-11-02, where its stars-on values reproduced the ones recorded at step 1 exactly; by day the
+  // star pass does not draw, so the three daytime values are the step-1 ones unchanged.
+  const SKY_BEFORE = { noon: [169.486, 'ce2df9fc'], noonSun: [182.519, '5963df34'], sun17: [193.474, 'a0571206'], night22: [22.164, '4eb245a1'], moon4: [34.395, '6e7d7372'] };
   const skyNow = await page.evaluate(MAY5 => {
     const D = window.__DS, W = window, DR = Math.PI / 180, altOf = v => Math.asin(v[1]) / DR;
     const enu = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
@@ -980,14 +984,73 @@ const AE = {
       return { mean: +(s / (F.w * F.h)).toFixed(3), hash: fnv(F.px), low: +low.toFixed(1) }; };
     const fixed = () => D.enuToWorld(enu(32, 200));
     const atBody = b => () => { const v = D.SKY[b], az = Math.atan2(v[0], v[2]) / DR; return D.enuToWorld(enu(Math.max(altOf(v), 32), az)); };
+    D.STARS.on = false;
     const out = { noon: frame(MAY5, 12, fixed), noonSun: frame(MAY5, 12, atBody('sun')), sun17: frame(MAY5, 17, atBody('sun')), night22: frame(MAY5, 22, fixed), moon4: frame(MAY5 + 1, 4, atBody('moon')) };
+    D.STARS.on = true;
     D.SKY.hour = 6.25; D.setDate(MAY5);
     return out;
   }, MAY5);
   const skyDiff = Object.keys(SKY_BEFORE).map(k => ({ k, low: skyNow[k].low, dMean: +(skyNow[k].mean - SKY_BEFORE[k][0]).toFixed(3), hash: skyNow[k].hash, same: skyNow[k].hash === SKY_BEFORE[k][1] }));
-  ok('the sky above the ridge is unchanged by the split: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon) match their recorded means within 0.5 and their hashes',
+  ok('the sky above the ridge is unchanged by the split: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon), the star pass off, match their recorded means within 0.5 and their hashes',
     skyDiff.every(r => r.low > 5 && Math.abs(r.dMean) <= 0.5 && r.same), skyDiff);
   await page.evaluate(y => { const D = window.__DS; D.PLAYER.yaw = y; D.CAM.chase = null; }, yaw8b);
+
+  // ---- 8c. the stars at the phone's numbers (DS-5, dssky step 2) ----
+  // A second browser context at an iPhone 13 in landscape: 844x390 CSS px at deviceScaleFactor 3, so the page caps DPR at 2 and
+  // renders the main pass at RSCALE = min(2 * 0.85, 1.75) = 1.7 at medium graphics. The suite's own context (scale 1, RSCALE
+  // 0.85) never sees that. The helpers are this context's own (page.evaluate defined the others in the first page only): a
+  // read-back, and a camera aimed so that a world direction lands EXACTLY on a chosen framebuffer point (Newton on the same
+  // OpenGL-convention projection as __dsAimed), so the star's centre can be put at four sub-pixel phases, 0, 1/4, 1/2 and 3/4 of
+  // a pixel along the diagonal (1/2 puts it on a pixel corner, the worst case). What a star adds is the brightest pixel of
+  // STARS.on minus STARS.on false in a 10x10 window round it (8-bit luminance; the pass is added after the tonemap).
+  // The stars: Polaris from SIMBAD through the suite's own precession and GMST (ownStar); for the magnitude-4 star, iota Leonis
+  // (HIP 55642, V 4.00), its J2000 RA/Dec and magnitude are read from the kit's catalogue (SKY_DATA, data, not code) and turned
+  // to alt/az by the same precess() and ownAltAz(). The patch: 200x100 CSS px (340x170 framebuffer px) centred on Polaris, the
+  // local maxima of the difference at 40 or more. Measured 2026-11-02 (the table in .claude/driving-simulator.md DS-5): before,
+  // Polaris 230 / 182 / 86 / 182 (min 86), iota Leo 100 / 78 / 37 / 78 (min 37), 3 stars in the patch; after (sigma floor in CSS
+  // px, STAR_GAIN 4.0) Polaris min 207, iota Leo min 88, 9 in the patch, so the row asks for 7 (9 less 20%, floored).
+  const JD22p = jdOf(MAY5, 22, -4);
+  const ctxP = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+  const pageP = await ctxP.newPage();
+  pageP.on('pageerror', e => errors.push('phone: ' + String(e)));
+  await pageP.goto(PAGE);
+  await pageP.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 90000 });
+  const iotaJ = await pageP.evaluate(() => { const S = SKY_DATA.stars, I = k => S.fields.indexOf(k), r = S.rows.find(r => r[I('hip')] === 55642); return r ? { ra: r[I('ra')], dec: r[I('dec')], mag: r[I('mag')] } : null; });
+  const iotaW = iotaJ ? (q => enuToWorldOwn(ownAltAz(q.ra, q.dec, JD22p).v))(precess(iotaJ.ra, iotaJ.dec, JD22p)) : null;
+  const phone = await pageP.evaluate(([MAY5, polW, iotaW]) => {
+    const D = window.__DS; D.setPaused(true); D.SETTINGS.cycle = 0; D.SKY.hour = 22; D.setDate(MAY5);
+    const c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height, fov = 0.8, up = [0, 1, 0];
+    const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const nrm = v => { const l = Math.hypot(...v); return v.map(x => x / l); };
+    const basis = f => { const sv = nrm(cr(f, up)); return { f, sv, u: cr(sv, f) }; };
+    const proj = (B, d) => { const t = Math.tan(fov / 2); return { x: (dt(d, B.sv) / dt(d, B.f) / (t * w / h) * 0.5 + 0.5) * w - 0.5, y: (dt(d, B.u) / dt(d, B.f) / t * 0.5 + 0.5) * h - 0.5 }; };
+    const px = f => { g.bindFramebuffer(g.FRAMEBUFFER, null); g.viewport(0, 0, w, h); g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT);
+      renderScene([D.PLAYER.x, D.PLAYER.y + 30, D.PLAYER.z], f, up, fov, 0.2, w, h, { propDist: 560, shadows: false, hidePlayer: false }, []);
+      const p = new Uint8Array(w * h * 4); g.readPixels(0, 0, w, h, g.RGBA, g.UNSIGNED_BYTE, p); return (x, y) => { const i = (y * w + x) * 4; return p[i] * 0.2126 + p[i + 1] * 0.7152 + p[i + 2] * 0.0722; }; };
+    const aimFor = (d, X, Y) => { const B0 = basis(d); let a = 0, b = 0;
+      const at = (a, b) => proj(basis(nrm([0, 1, 2].map(i => B0.f[i] + a * B0.sv[i] + b * B0.u[i]))), d);
+      for (let k = 0; k < 8; k++) { const p = at(a, b), e = 1e-5, pa = at(a + e, b), pb = at(a, b + e);
+        const j11 = (pa.x - p.x) / e, j21 = (pa.y - p.y) / e, j12 = (pb.x - p.x) / e, j22 = (pb.y - p.y) / e, det = j11 * j22 - j12 * j21, ex = X - p.x, ey = Y - p.y;
+        a += (j22 * ex - j12 * ey) / det; b += (-j21 * ex + j11 * ey) / det; }
+      return nrm([0, 1, 2].map(i => B0.f[i] + a * B0.sv[i] + b * B0.u[i])); };
+    const X0 = Math.floor(w / 2), Y0 = Math.floor(h / 2);
+    const pair = f => { D.STARS.on = true; const A = px(f); D.STARS.on = false; const B = px(f); D.STARS.on = true; return (x, y) => A(x, y) - B(x, y); };
+    const phases = d => [0, 0.25, 0.5, 0.75].map(o => { const f = aimFor(d, X0 + o, Y0 + o), p = proj(basis(f), d), A = pair(f); let best = -1;
+      for (let y = Y0 - 4; y <= Y0 + 5; y++) for (let x = X0 - 4; x <= X0 + 5; x++) best = Math.max(best, A(x, y));
+      return { o, at: [+p.x.toFixed(2), +p.y.toFixed(2)], add: Math.round(best) }; });
+    const pol = phases(polW), iota = iotaW ? phases(iotaW) : [];
+    const A = pair(aimFor(polW, X0, Y0)), PW = Math.round(100 * RSCALE), PH = Math.round(50 * RSCALE); let n40 = 0;
+    for (let y = Y0 - PH; y < Y0 + PH; y++) for (let x = X0 - PW; x < X0 + PW; x++) { const v = A(x, y); if (v < 40) continue; let mx = true;
+      for (let dy = -1; dy <= 1 && mx; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && A(x + dx, y + dy) > v) { mx = false; break; }
+      if (mx) n40++; }
+    return { w, h, RSCALE, DPR, night: D.SKY.night, pol, iota, polMin: Math.min(...pol.map(q => q.add)), iotaMin: iota.length ? Math.min(...iota.map(q => q.add)) : -1, patch: { w: 2 * PW, h: 2 * PH, n40 } };
+  }, [MAY5, polW, iotaW]);
+  await ctxP.close();
+  ok('at the phone\'s render scale (RSCALE 1.7) Polaris adds at least 200 and a magnitude-4 star (iota Leonis, HIP 55642) at least 60 at every sub-pixel phase',
+    phone.RSCALE === 1.7 && phone.DPR === 2 && phone.night > 0.95 && !!iotaJ && Math.abs(iotaJ.mag - 4) <= 0.05 && phone.pol.length === 4 && phone.iota.length === 4
+    && phone.polMin >= 200 && phone.iotaMin >= 60, { RSCALE: phone.RSCALE, DPR: phone.DPR, iotaMag: iotaJ && iotaJ.mag, pol: phone.pol, iota: phone.iota });
+  ok('at the phone\'s render scale the 200x100 CSS px patch round Polaris holds at least 7 stars that add 40 or more',
+    phone.RSCALE === 1.7 && phone.patch.w === 340 && phone.patch.h === 170 && phone.patch.n40 >= 7, phone.patch);
 
   // ---- 9. sound: one volume per sound, the radio's stations, measured off the analysers ----
   const lv = async (keys, secs = 2) => page.evaluate(async ([keys, secs]) => { const S = window.__DS.SND, acc = {}; for (const k of keys) acc[k] = 0; const n = secs * 20;
