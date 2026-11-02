@@ -1,5 +1,19 @@
 # DONE — done log
 
+- 2026-11-02 [driving-sim] **No column under a low sun or moon; brighter stars** (DS-7, DS-5;
+  the CD, 2026-11-02: "Sun rise, sun set, moon rise, and moon set all show a vertical smearing at
+  the horizon" and "in game the stars are too dim, increase brightness"). DS-7: the fog, the
+  distant hills and paint reflections sampled a sky that held the sun and moon discs at a clamped
+  1.15 deg, so a body near that height drew a column down everything at its azimuth (measured
+  1.96x the ground beside it at sunset, 11.2x at moonrise; now 0.99x and 1.13x). The discs are
+  now on the real view ray only, and the sky above the hills is bit-identical. DS-5: measured at
+  the phone's render scale (1.7) before changing anything; a faint star on a pixel corner kept
+  37% of its brightness (Polaris adding 86 there, 230 on a pixel centre). The star's spread is
+  now floored at half a CSS pixel and `STAR_GAIN` is 4.0 (was 3.2): Polaris adds at least 207 at
+  every sub-pixel phase, a mag-4 star at least 88. Suite 108 -> 112. Badge
+  `build 2026-11-02 17:17 UTC`. Plan (steps 1-2 of 7):
+  `.claude/plans/dssky.horizon-stars-moon-sliders.md`.
+
 - 2026-11-02 [driving-sim] **The real sky over Raleigh, and a calendar** (DS-1; the CD,
   2026-11-01, "fix the star field rotation ... Should look like star field looks to me in the sky
   from perspective of raleigh north Carolina in the spring", revised 2026-11-02 for zmh-sky): a date
