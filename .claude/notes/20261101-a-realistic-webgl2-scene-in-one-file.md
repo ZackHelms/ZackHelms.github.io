@@ -110,3 +110,25 @@ validator ranges tighter than the generator's own variation. Each went back into
 the kit as data plus a validator rule, not into a host-side workaround, so the
 next consumer inherits the fix. When a session both writes a generator and
 consumes it, look at the consumer's first screenshots as tests of the kit.
+
+## A lookAt world is (east, up, south): the sky was mirrored for a day (2026-11-02)
+
+`M4.look` is a standard OpenGL lookAt: screen-right is `f x up`, so facing +z
+with up +y the right is (-1, 0, 0). Put east on +x and north on +z and east
+draws on the LEFT: every body in the sky is a mirror image, the constellations
+read backwards and the sky turns the wrong way about Polaris. Driving Simulator
+shipped that way (its step-1 sun was mirrored too); the dsstars plan said "the
+kit's ENU is the page's x, y, z, no remap", which was wrong, even though
+zmh-sky's own skill says a right-handed host must map one axis explicitly.
+Wayfinder had it right from the start (`+x east, +z south`, its line 395).
+
+- The fix is one map where values go to the GPU: `enuToWorld(v) = [v[0], v[1], -v[2]]`,
+  and `W * starM` for the star matrix. Keep the astronomy state in the kit's ENU so
+  every numeric check stays in the kit's frame.
+- **No alt/az row can see a mirror.** The step-1 and step-2 rows checked the sun's
+  altitude and azimuth to 0.05 deg and were all green on a mirrored sky. What
+  caught it was a screenshot (the sun 17 deg left of centre where the real sky has
+  it 17 deg right). The suite now has a row that projects the suite's own sun
+  through the camera and finds it on screen, and a Jupiter pixel row aimed off
+  centre so a left-right flip lands it in the wrong place. Any new sky or compass
+  in a lookAt world needs one such on-screen-side row.
