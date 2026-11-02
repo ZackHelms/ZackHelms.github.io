@@ -932,6 +932,61 @@ const AE = {
   }, [MAY5, polW]);
   ok('the stars fade with the night: what Polaris adds to its pixel with SKY.night at 0.5 is 0.3-0.75 of what it adds at 1',
     fade.full >= 60 && fade.half / fade.full >= 0.3 && fade.half / fade.full <= 0.75, fade);
+  // rows (DS-7): no column of light under a low sun or moon, and the sky above the ridge unchanged by the fix. The fog, the
+  // distant hills and paint reflections sample the sky with the elevation clamped to about 1.15 deg, so while they took the
+  // sun and moon discs with it, a body near that height painted a column down everything below it at its azimuth. The times
+  // are found by bisection on the page's own SKY (its sun and moon are proven against astronomy-engine above), not typed in:
+  // sunset with the sun at 1.0 deg on May 5, moonrise with the moon at 1.0 deg on May 6. Aimed at the body from 30 m above
+  // the car, in the rows from 4 px under the horizon's projection to the bottom, the 3-px strip at the body's x is compared
+  // with the strips where the directions 10 deg either side in azimuth (same altitude) project.
+  const col = await page.evaluate(MAY5 => {
+    const D = window.__DS, W = window, DR = Math.PI / 180, altOf = v => Math.asin(v[1]) / DR;
+    const enu = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
+    const at = (mjd, h, body) => { D.SKY.hour = h; D.setDate(mjd); return altOf(D.SKY[body]); };
+    const find = (mjd, lo, hi, body) => { let a = at(mjd, lo, body); if ((a - 1) * (at(mjd, hi, body) - 1) >= 0) return null;
+      for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, v = at(mjd, m, body); if ((v - 1) * (a - 1) > 0) { lo = m; a = v; } else hi = m; } return (lo + hi) / 2; };
+    const column = (mjd, lo, hi, body) => {
+      const h = find(mjd, lo, hi, body); if (h === null) return null;
+      at(mjd, h, body);
+      const v = D.SKY[body], alt = altOf(v), az = Math.atan2(v[0], v[2]) / DR;
+      const dirs = [v, enu(alt, az - 10), enu(alt, az + 10), enu(0, az)].map(D.enuToWorld);
+      const F = W.__dsAimed(dirs[0], 0, dirs), hy = Math.floor(F.at[3].y) - 4;
+      const strip = x0 => { let s = 0, n = 0; for (let y = 0; y <= hy; y++) for (let x = Math.round(x0) - 1; x <= Math.round(x0) + 1; x++) { s += F.L(x, y); n++; } return s / n; };
+      const [c, l, r] = [0, 1, 2].map(k => strip(F.at[k].x));
+      return { h: +h.toFixed(4), alt: +alt.toFixed(3), az: +((az + 360) % 360).toFixed(2), x: F.at.slice(0, 3).map(a => +a.x.toFixed(1)), rows: hy + 1,
+        c: +c.toFixed(2), l: +l.toFixed(2), r: +r.toFixed(2), ratio: +(c / Math.min(l, r)).toFixed(3) };
+    };
+    const out = { sun: column(MAY5, 19, 20.5, 'sun'), moon: column(MAY5 + 1, 0, 1.5, 'moon') };
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return out;
+  }, MAY5);
+  ok('no column of light under a low sun or moon: at sunset (sun 1.0 deg) and moonrise (moon 1.0 deg) the ground below the body is at most 1.25x as bright as 10 deg either side',
+    !!col.sun && !!col.moon && col.sun.h > 19.5 && col.sun.h < 20.5 && col.moon.h > 0 && col.moon.h < 1 && [col.sun, col.moon].every(k => k.rows > 100 && k.ratio <= 1.25), col);
+  // The sky above the ridge, unchanged by the split: five frames from 30 m above the car, each wholly above the ridge (its lowest
+  // corner over 5 deg up, so no hills and no ground in it): 12:00 aimed at 32 deg up in azimuth 200 and at the sun (65 deg up),
+  // 17:00 at the sun (36 deg), 22:00 at 32 deg / 200 (stars, Milky Way), 04:00 on May 6 at the moon (25 deg up, aimed 32 deg up).
+  // SKY_BEFORE: each frame's mean luminance and FNV-1a hash of its RGBA bytes, recorded 2026-11-02 by this row's own code on the
+  // page before the split (one skyCol(), the page of e43a233, in the worktree at bbf3d0e); after it every mean is within 0.5
+  // and every hash equal (the bodies' terms are kept in the same sum in the same order, so the bits are the same).
+  const SKY_BEFORE = { noon: [169.486, 'ce2df9fc'], noonSun: [182.519, '5963df34'], sun17: [193.474, 'a0571206'], night22: [22.208, '16a94f02'], moon4: [34.476, '45be3111'] };
+  const skyNow = await page.evaluate(MAY5 => {
+    const D = window.__DS, W = window, DR = Math.PI / 180, altOf = v => Math.asin(v[1]) / DR;
+    const enu = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
+    const fnv = px => { let h = 0x811c9dc5; for (let i = 0; i < px.length; i++) { h ^= px[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+    const frame = (mjd, h, aim) => { D.SKY.hour = h; D.setDate(mjd); const a = aim(), F = W.__dsAimed(a, 0); let s = 0;
+      for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) s += F.L(x, y);
+      // the frame's lowest corner, from the aimed camera (0.8 rad, up = world up)
+      const el = Math.asin(a[1]), t = Math.tan(0.4), k = t * F.w / F.h, low = Math.asin((Math.sin(el) - t * Math.cos(el)) / Math.hypot(k, Math.cos(el) + t * Math.sin(el), Math.sin(el) - t * Math.cos(el))) / DR;
+      return { mean: +(s / (F.w * F.h)).toFixed(3), hash: fnv(F.px), low: +low.toFixed(1) }; };
+    const fixed = () => D.enuToWorld(enu(32, 200));
+    const atBody = b => () => { const v = D.SKY[b], az = Math.atan2(v[0], v[2]) / DR; return D.enuToWorld(enu(Math.max(altOf(v), 32), az)); };
+    const out = { noon: frame(MAY5, 12, fixed), noonSun: frame(MAY5, 12, atBody('sun')), sun17: frame(MAY5, 17, atBody('sun')), night22: frame(MAY5, 22, fixed), moon4: frame(MAY5 + 1, 4, atBody('moon')) };
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return out;
+  }, MAY5);
+  const skyDiff = Object.keys(SKY_BEFORE).map(k => ({ k, low: skyNow[k].low, dMean: +(skyNow[k].mean - SKY_BEFORE[k][0]).toFixed(3), hash: skyNow[k].hash, same: skyNow[k].hash === SKY_BEFORE[k][1] }));
+  ok('the sky above the ridge is unchanged by the split: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon) match their recorded means within 0.5 and their hashes',
+    skyDiff.every(r => r.low > 5 && Math.abs(r.dMean) <= 0.5 && r.same), skyDiff);
   await page.evaluate(y => { const D = window.__DS; D.PLAYER.yaw = y; D.CAM.chase = null; }, yaw8b);
 
   // ---- 9. sound: one volume per sound, the radio's stations, measured off the analysers ----

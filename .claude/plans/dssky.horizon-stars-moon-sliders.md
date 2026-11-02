@@ -311,7 +311,7 @@ Tools:
 
 ## Steps
 
-### Step 1 - DS-7: no column under a low sun or moon
+### Step 1 - DS-7: no column under a low sun or moon (DONE 2026-11-02)
 
 - **First, the repro row, on today's page.** Add the row below and run it before touching the
   shaders. It must FAIL on today's page; record the measured ratios in the Results. (If it passes,
@@ -333,6 +333,72 @@ Tools:
   view, fixed yaw); after it the means match within 0.5 and the 12:00 hash is equal. The sun row
   (`:920`) and the four star-pixel rows also stay green.
 - The repro row now passes, and all 108 earlier rows stay green. Suite 108 + 2 = 110.
+
+#### Results (step 1)
+
+Worktree branch `worktree-oversee+dssky`, from `bbf3d0e` (the page's shaders as on `e43a233`).
+
+- **The times, by bisection on the page's own `SKY`** (40 halvings of `SKY.hour` through `setDate()`):
+  the sun at 1.0 deg setting on May 5 at **19.9203 h (19:55:13 EDT)**, azimuth 289.70; the moon at
+  1.0 deg rising on May 6 at **0.3287 h (00:19:43 EDT)**, azimuth 126.79. Both match the plan's
+  kit-computed 19:55 and 00:20.
+- **The repro row, on today's page, FAILED** as the traced cause predicted. The ratio is the body's
+  strip against the dimmer of the two side strips (the strictest reading of "either side"); rows
+  from 4 px under the horizon to the bottom, 155 rows; 8-bit luminance.
+
+  | | sun: body / left / right | sun ratio | moon: body / left / right | moon ratio |
+  | - | - | - | - | - |
+  | before, the suite | 245.98 / 129.70 / 125.77 | **1.956** | 195.89 / 18.91 / 17.46 | **11.217** |
+  | before, a scratch run (another car position) | 246.63 / 119.85 / 119.65 | 2.061 | 196.23 / 19.03 / 18.79 | 10.443 |
+  | after, the suite | 118.46 / 125.63 / 120.24 | **0.985** | 19.70 / 18.94 / 17.49 | **1.126** |
+  | break check: a copy with only the fog back on `skyView()` | 223.31 / 127.38 / 124.34 | 1.796 (FAIL) | 171.25 / 18.89 / (cut off in the log) | over 9 (FAIL) |
+
+  The sun's case came out just under 2x, not "far above" it: the sides are bright too (the sunset
+  tint and the broad lobe in the haze toward the sun). The moon's column is 10-11x, because the
+  night ground is so dark. Fixing only the fog (hills and reflections still on `skyView()`) is
+  enough for the row to see the difference, so the row bites on the fog line alone.
+- **The sky above the ridge, recorded before the split** (by the row's own code, run once from a
+  scratch script and once inside the suite, where the car stood elsewhere: the same values both
+  times, so the frames hold sky only). Five frames from `__dsAimed` (30 m above the car, 0.8 rad),
+  each with its lowest corner over 5 deg up: mean 8-bit luminance and the FNV-1a hash of the
+  RGBA bytes.
+
+  | frame | aim | lowest corner | mean | hash |
+  | - | - | - | - | - |
+  | `noon` | 12:00 May 5, 32 deg up, azimuth 200 | 6.9 deg | 169.486 | `ce2df9fc` |
+  | `noonSun` | 12:00 May 5, at the sun (65 deg up) | 30.8 deg | 182.519 | `5963df34` |
+  | `sun17` | 17:00 May 5, at the sun (36 deg up) | 9.9 deg | 193.474 | `a0571206` |
+  | `night22` | 22:00 May 5, 32 deg up, azimuth 200 | 6.9 deg | 22.208 | `16a94f02` |
+  | `moon4` | 04:00 May 6, toward the moon (25 deg up), aimed 32 deg up | 6.9 deg | 34.476 | `45be3111` |
+
+  After the split all five means are equal (difference 0.000) and **all five hashes are equal**.
+  The row requires every mean within 0.5 and every hash equal: the plan's default asked for the
+  12:00 hash only, but the 12:00 frame in the plan's sense has no body in it, so it could not
+  see the sum's rounding (see the next point); the two sun frames and the moon frame can.
+- **Decision not in the plan: one sum with the bodies weighted 0 or 1, not two functions added.**
+  The first build was the plan's literal shape, `skyBase(d)` plus a separate `skyBodies(d)` added
+  in `FS_SKY` above the ridge. It cured the column (sun 1.02, moon 1.09 in the scratch run) but
+  changed the bits: `noon` hashed `23875c83` and `sun17` `58c0bcea`, with every mean equal to
+  three decimals (float re-association: the sun's terms had been one `uSunCol * (disc + lobe +
+  aureole)`). So the shipped shape is `skySum(d, bodies)`, the old `skyCol()`'s one expression in
+  its old order with the sun disc, the aureole and the moon disc each times `bodies`
+  (`x * 1 = x`, `x + 0 = x` exactly); `skyBase(d) = skySum(d, 0.0)` (fog, hills, paint
+  reflections) and `skyView(d) = skySum(d, 1.0)` (the sky pass's own ray). "Only above the ridge"
+  holds because the hills already replace `c` under the ridge, so a body behind them stays
+  hidden, exactly as before. There is no `skyBodies()` function at step 1: it would be
+  `skyView - skyBase`. Step 3 rewrites the bodies with sky-pass-only uniforms (`uSunDisc`,
+  `uMoonDisc`, radii) and will change the sky above the ridge anyway, so it can split them into
+  their own `skyBodies()` in `FS_SKY` then.
+- **Decision not in the plan: aimed frames, not the chase view, for the unchanged row.** The sky
+  pass's pixels depend only on the view direction and the time (the eye moves nothing in it), so
+  an aimed camera at fixed world directions gives a hash that cannot move with the car's place or
+  the chase camera's lag, as long as no geometry is in the frame (checked by the lowest corner).
+- **Suite total: 110** (108 + 2), all green; no row restated. The sun row ("the sun is drawn where it
+  is") and the four star-pixel rows stayed green unchanged.
+- `check-inline-js` GREEN; `gates.sh games/driving-simulator/index.html`: **GATES: GREEN** (smoke,
+  games-sync, negtest scan, the suite 110/0), run alone. The badge is not stamped (step 2 does).
+- For step 6's break list: "the disc back in the fog" is caught by the repro row (shown above);
+  "the disc in the hills" and "bodies below the ridge" are untested here.
 
 ### Step 2 - DS-5: brighter stars; land DS-7 and DS-5
 
