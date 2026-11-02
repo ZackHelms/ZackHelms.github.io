@@ -3008,7 +3008,7 @@ function julianDate() { return 2400000.5 + SKY.mjd + (SKY.hour - (SKY.dst ? -4 :
 function updateSky() {
   const off = SKY.dst ? -4 : -5, jd = julianDate();
   const s = ZMH_SKY.skyAt(jd, OBS_SKY, SKY_DATA.planets);
-  // The kit's ENU [east, up, north] is the page's x, y, z: no remap. The sun, moon and planets are of
+  // SKY.* stay in the kit's ENU [east, up, north]; the GPU gets them through enuToWorld (above). The sun, moon and planets are of
   // date (s.*.enu); the stars are J2000 and go through s.starMatrix (row-major, J2000 -> ENU,
   // precession included, determinant -1), uploaded with transpose = true.
   SKY.sun = s.sun.enu;
