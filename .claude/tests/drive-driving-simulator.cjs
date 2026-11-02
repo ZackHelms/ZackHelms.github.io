@@ -1006,7 +1006,13 @@ const AE = {
   // that hold a disc or the aureole hash as recorded on this step's page (SKY_STEP3, 2026-11-02, by this row's own code), so a
   // later change to them shows here. Measured on this step's page: means -0.000, -0.003, -0.003, 0.000 and -0.144 (moon4: the
   // old moon disc was 1.0-1.3 deg across and uniformly lit; the new one is 0.49 deg and 82% lit).
+  // Restated at dssky step 4, which scales the moon's light by its phase: the moon's broad glow (in skyBase(), uMoonCol) with it,
+  // and the Milky Way dimmed under a bright moon. moon4 (a 0.68-lit moon 25 deg up) is the one frame either touches: its mean
+  // fell 6.142 and its hash moved. Traced on this step's page (a scratch run): with the old moonlight put back in SKY.moonCol and
+  // SKY.starDim at 1, the frame hashes 63e2c7c4, step 3's value, exactly (the glow alone is -5.2 of the mean, the Milky Way's
+  // dimming -0.8). So moon4 is now held to its step-4 mean (within 0.5) and hash (SKY_STEP4), the other four as before.
   const SKY_STEP3 = { noon: 'f74f5560', noonSun: '0174b859', sun17: '6379ab21', night22: '4eb245a1', moon4: '63e2c7c4' };
+  const SKY_STEP4 = { moon4: [28.253, '411be863'] };
   const SKY_BEFORE = { noon: [169.486, 'ce2df9fc'], noonSun: [182.519, '5963df34'], sun17: [193.474, 'a0571206'], night22: [22.164, '4eb245a1'], moon4: [34.395, '6e7d7372'] };
   const skyNow = await page.evaluate(MAY5 => {
     const D = window.__DS, W = window, DR = Math.PI / 180, altOf = v => Math.asin(v[1]) / DR;
@@ -1025,8 +1031,9 @@ const AE = {
     D.SKY.hour = 6.25; D.setDate(MAY5);
     return out;
   }, MAY5);
-  const skyDiff = Object.keys(SKY_BEFORE).map(k => ({ k, low: skyNow[k].low, dMean: +(skyNow[k].mean - SKY_BEFORE[k][0]).toFixed(3), hash: skyNow[k].hash, same: skyNow[k].hash === SKY_STEP3[k] }));
-  ok('the sky above the ridge away from the bodies is unchanged: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon), the star pass off, match their pre-split means within 0.5; 22:00 (no body in it) its pre-split hash, the four with a body their step-3 hashes',
+  const skyRef = k => SKY_STEP4[k] || [SKY_BEFORE[k][0], SKY_STEP3[k]];
+  const skyDiff = Object.keys(SKY_BEFORE).map(k => ({ k, low: skyNow[k].low, dMean: +(skyNow[k].mean - skyRef(k)[0]).toFixed(3), hash: skyNow[k].hash, same: skyNow[k].hash === skyRef(k)[1] }));
+  ok('the sky above the ridge away from the bodies is unchanged: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon), the star pass off, match their pre-split means within 0.5; 22:00 (no body in it) its pre-split hash, the three with the sun their step-3 hashes, 04:00 at the moon its step-4 mean and hash (the moon\'s glow and the Milky Way by its phase)',
     skyDiff.every(r => r.low > 5 && Math.abs(r.dMean) <= 0.5 && r.same) && SKY_STEP3.night22 === SKY_BEFORE.night22[1], skyDiff);
   // ---- 8b2. the sun and the moon as they look (DS-4, dssky step 3) ----
   // The light stays geometric (SKY.sun, SKY.moon); the discs are drawn at SKY.sunDiscW / SKY.moonDiscW, lifted by refraction, at
@@ -1184,6 +1191,87 @@ const AE = {
     D.SKY.hour = 6.25; D.setDate(MAY6 - 1); return o; }, [MAY5 + 1]);
   ok('no stray pixels from the moon disc: aimed at the moon and at the point 90 deg from it, the moon adds nothing (1 level at most) to any pixel over 2 radii from its disc, and the first frame holds the disc',
     !!stray && Math.abs(stray.sep - 90) < 0.01 && stray.at.inside >= 4 && stray.at.maxOut <= 1 && stray.far.maxOut <= 1 && stray.far.inside === 0, stray);
+  // ---- 8b3. moonlight by phase; a bright moon dims the stars; earthshine by night only (DS-4, dssky step 4) ----
+  // row: a full moon lights the night. Two frames from 30 m above the car (__dsAimed, 0.8 rad, no cars drawn), aimed 30 deg down at
+  // world azimuths 20 and 200 deg, so that each frame is all ground (its top edge 7 deg under the horizon): the land as the moon
+  // and the sky's ambient light it, without the headlights and the night sky, which do not change with the moon and would only
+  // dilute the ratio (the chase view is recorded beside it, not tested). The mean 8-bit luminance of the two at 01:00 EDT on
+  // 2026-05-31 (the full moon of May 31, high in the south: the row checks it is over 20 deg up on the page), on 2026-05-16 (the
+  // new moon, under the horizon), and at dusk, the hour on the evening of May 16 at which the page's sun is at -3 deg (by
+  // bisection). The full-moon night is at least 1.5x the moonless one, and both are under half of dusk. And the light goes by the
+  // phase (the new moon is under the horizon at 01:00, so the pair alone cannot see it): the first quarter of May 23, high in the
+  // evening at the hour the page's sun reaches -25 deg (by bisection: the moon at about the full moon's height, and past the
+  // twilight still in the scene at -15 deg, traced with the moon's light taken out: the land 12.24 at -15 against 9.49 moonless,
+  // 9.488 at -25), lifts the land over the moonless night by at
+  // most 0.35 of what the full moon lifts it (the kit's phase law gives a quarter about 0.11 of the full moon's light). MOON_AMB was tuned on
+  // this row (1.0: measured 18.18 / 10.09 / 44.87, so 1.80x and 0.41 of dusk, the quarter's lift 0.18; at 1.4 the full moon came
+  // to 0.45 of dusk, at 0 to 1.29x). On the step-3 page (the old moonlight, no phase, no moonlit ambient): 13.32 / 10.08, 1.32x,
+  // and the quarter, higher in the sky, lit the land 1.28x as much as the full moon did.
+  const MAY31 = MAY5 + 26;   // MAY16 is the Milky Way row's (8b)
+  const nightAt = async (mjd, h) => { const st = await page.evaluate(([mjd, h]) => { const D = window.__DS, W = window, DR = Math.PI / 180;
+    D.SETTINGS.cycle = 0; D.CAM.mode = 1; D.SKY.hour = h; D.setDate(mjd);
+    const enu = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
+    const ground = [20, 200].map(az => { const F = W.__dsAimed(D.enuToWorld(enu(-30, az)), 0); let s = 0; for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) s += F.L(x, y); return s / (F.w * F.h); });
+    return { h: +h.toFixed(4), sun: +(Math.asin(D.SKY.sun[1]) / DR).toFixed(2), moon: +(Math.asin(D.SKY.moon[1]) / DR).toFixed(2), lit: +D.SKY.moonPhase.illuminatedFraction.toFixed(3),
+      at: Math.round(D.PLAYER.s), ground: +((ground[0] + ground[1]) / 2).toFixed(2) }; }, [mjd, h]);
+    await frames(4); return { ...st, chase: +(await lum()).mean.toFixed(2) }; };
+  const duskH = await page.evaluate(MAY16 => window.__dsWhen('sun', MAY16, 19.5, 22, -3), MAY16);
+  const qH = await page.evaluate(M => window.__dsWhen('sun', M, 21, 24, -25), MAY5 + 18);
+  const moonNight = { full: await nightAt(MAY31, 1), none: await nightAt(MAY16, 1), dusk: duskH === null ? null : await nightAt(MAY16, duskH), quarter: qH === null ? null : await nightAt(MAY5 + 18, qH) };
+  await page.evaluate(MAY5 => { const D = window.__DS; D.SKY.hour = 6.25; D.setDate(MAY5); }, MAY5);
+  if (moonNight.dusk) { const r = (a, b, k) => +(moonNight[a][k] / moonNight[b][k]).toFixed(3);
+    Object.assign(moonNight, { ratio: r('full', 'none', 'ground'), fullDusk: r('full', 'dusk', 'ground'), noneDusk: r('none', 'dusk', 'ground'), chaseRatio: r('full', 'none', 'chase'), chaseFullDusk: r('full', 'dusk', 'chase') });
+    if (moonNight.quarter) moonNight.qLift = +((moonNight.quarter.ground - moonNight.none.ground) / (moonNight.full.ground - moonNight.none.ground)).toFixed(3); }
+  ok('a full moon lights the night: the full-moon midnight (2026-05-31 01:00 EDT, the moon high) is at least 1.5x the new-moon midnight (2026-05-16 01:00) in mean luminance, and both are under half of dusk (the sun at -3 deg); a first-quarter moon high lifts the night at most 0.35 as much as the full one',
+    !!moonNight.dusk && !!moonNight.quarter && moonNight.full.moon > 20 && moonNight.full.lit > 0.97 && moonNight.none.moon < 0 && Math.abs(moonNight.dusk.sun + 3) < 0.01
+    && moonNight.ratio >= 1.5 && moonNight.fullDusk < 0.5 && moonNight.noneDusk < 0.5
+    && moonNight.quarter.moon > 20 && Math.abs(moonNight.quarter.lit - 0.5) < 0.1 && moonNight.qLift >= 0 && moonNight.qLift <= 0.35, moonNight);
+  // row: a bright moon dims the stars. What Polaris adds to its pixel (STARS.on minus off, the brightest pixel in 7x7 round where
+  // the page's own Polaris vertex projects, aimed 8 deg to its side as the fade row is) at 01:00 EDT on May 31 (full moon high),
+  // and on May 16 (no moon) at the hour, by bisection in 01:30-03:00, at which the page's Polaris stands at the same altitude (the
+  // same side of the pole, so the same azimuth too, and the same extinction): the full-moon value is 0.3-0.75 of the moonless one.
+  // The pass's gain as handed to the GPU (uStarK, read back with getUniform) is recorded beside it.
+  const polDim = await page.evaluate(([MAY16, MAY31]) => { const D = window.__DS, W = window, DR = Math.PI / 180;
+    const idx = D.SKY_DATA.stars.rows.findIndex(r => r[0] === 11767);
+    const pol = () => D.enuToWorld(D.starDir(idx)), alt = () => Math.asin(D.starDir(idx)[1]) / DR;
+    const add = () => { const p = pol(), v = []; let k = null; for (const on of [true, false]) { D.STARS.on = on; const F = W.__dsAimed(p, 8, [p]), a = F.at[0]; let best = -1e9;
+      if (on) k = gl.getUniform(PRG.stars.p, PRG.stars.U.uStarK);
+      for (let y = Math.round(a.y) - 3; y <= Math.round(a.y) + 3; y++) for (let x = Math.round(a.x) - 3; x <= Math.round(a.x) + 3; x++) best = Math.max(best, F.L(x, y)); v.push(best); }
+      D.STARS.on = true; return { add: Math.round(v[0] - v[1]), uStarK: +k.toFixed(4) }; };
+    D.SKY.hour = 1; D.setDate(MAY31); const a31 = alt(), az31 = Math.atan2(D.starDir(idx)[0], D.starDir(idx)[2]) / DR;
+    const full = { alt: +a31.toFixed(4), moon: +(Math.asin(D.SKY.moon[1]) / DR).toFixed(1), ...add() };
+    const at = h => { D.SKY.hour = h; D.setDate(MAY16); return alt() - a31; };
+    let lo = 1.5, hi = 3, f = at(lo), h = null;
+    if (f * at(hi) < 0) { for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, v = at(m); if (v * f > 0) { lo = m; f = v; } else hi = m; } h = (lo + hi) / 2; at(h); }
+    const none = h === null ? null : { h: +h.toFixed(4), alt: +alt().toFixed(4), dAz: +Math.abs(Math.atan2(D.starDir(idx)[0], D.starDir(idx)[2]) / DR - az31).toFixed(4), moon: +(Math.asin(D.SKY.moon[1]) / DR).toFixed(1), ...add() };
+    D.SKY.hour = 6.25; D.setDate(MAY16 - 11);
+    return { full, none, ratio: none ? +(full.add / none.add).toFixed(3) : null };
+  }, [MAY16, MAY31]);
+  ok('a bright moon dims the stars: what Polaris adds at the full-moon midnight (May 31, 01:00 EDT) is 0.3-0.75 of what it adds on the moonless night of May 16 at the same altitude, and the gain handed to the star pass falls with it',
+    !!polDim.none && Math.abs(polDim.none.alt - polDim.full.alt) < 1e-3 && polDim.none.dAz < 0.05 && polDim.full.moon > 20 && polDim.none.moon < 0
+    && polDim.none.add >= 60 && polDim.ratio >= 0.3 && polDim.ratio <= 0.75 && polDim.full.uStarK < polDim.none.uStarK * 0.75, polDim);
+  // row (the overseer's, dssky step 4): earthshine is a night thing. By day the moon's dark part is no brighter than the sky beside
+  // it. On May 11 at the hour the sun reaches 30 deg (the moon about 45 deg up, a third lit), through a 0.1 rad field: the pixels
+  // well inside the dark part (under 0.85 radii from the centre, and 0.3 radii or more on the dark side of the terminator, which
+  // crosses the sun's axis at 1 - 2 x the lit fraction), the moon on against the moon off (the disc moved under the horizon) and
+  // against the sky on a ring 2 deg off. With earthshine by day the dark part sat lighter than the blue (dssky step 3's note).
+  const dayDark = await page.evaluate(MAY11 => { const D = window.__DS, W = window, DR = Math.PI / 180;
+    const h = W.__dsWhen('sun', MAY11, 7.5, 10, 30); if (h === null) return null;
+    const m = D.SKY.moonDiscW, sw = D.SKY.sunW, R = Math.tan(D.SKY.moonR), k = D.SKY.moonPhase.illuminatedFraction;
+    const sd = sw[0] * m[0] + sw[1] * m[1] + sw[2] * m[2], st0 = [0, 1, 2].map(i => sw[i] - m[i] * sd), sl = Math.hypot(...st0), st = st0.map(v => v / sl);
+    const F = W.__dsMoonPair(m, 0, [m], 0.1), c = F.at[0], r2 = Math.tan(2 * DR) * F.pxPerRad;
+    let n = 0, on = 0, off = 0, maxDiff = -1e9, ring = 0, nr = 0;
+    for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) {
+      if (Math.abs(Math.hypot(x - c.x, y - c.y) - r2) < 2) { ring += F.L(x, y); nr++; continue; }
+      const d = F.dir(x, y), dm = d[0] * m[0] + d[1] * m[1] + d[2] * m[2], o = [0, 1, 2].map(i => (d[i] / dm - m[i]) / R);
+      const r = Math.hypot(...o), u = o[0] * st[0] + o[1] * st[1] + o[2] * st[2];
+      if (r < 0.85 && u < 1 - 2 * k - 0.3) { n++; on += F.L(x, y); off += F.off.L(x, y); maxDiff = Math.max(maxDiff, F.diff(x, y)); } }
+    const o = { h: +h.toFixed(3), sunUp: +(Math.asin(D.SKY.sun[1]) / DR).toFixed(1), moonUp: +(Math.asin(D.SKY.moon[1]) / DR).toFixed(1), night: D.SKY.night, frac: +k.toFixed(3),
+      n, dark: +(on / n).toFixed(2), behind: +(off / n).toFixed(2), maxDiff: +maxDiff.toFixed(1), ring: +(ring / nr).toFixed(2), nr };
+    D.SKY.hour = 6.25; D.setDate(MAY11 - 6); return o; }, MAY5 + 6);
+  ok('by day the moon\'s dark part is no brighter than the sky beside it: on May 11 with the sun 30 deg up, the pixels well inside the dark part add at most 1 level to the sky behind them and sit within 1 level of the sky 2 deg off',
+    !!dayDark && dayDark.sunUp > 20 && dayDark.moonUp > 20 && dayDark.night === 0 && dayDark.frac > 0.2 && dayDark.frac < 0.5 && dayDark.n >= 100 && dayDark.nr > 100
+    && dayDark.maxDiff <= 1 && dayDark.dark <= dayDark.ring + 1, dayDark);
   await page.evaluate(y => { const D = window.__DS; D.PLAYER.yaw = y; D.CAM.chase = null; }, yaw8b);
 
   // ---- 8c. the stars at the phone's numbers (DS-5, dssky step 2) ----

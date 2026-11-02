@@ -2993,6 +2993,7 @@ const SKY = { hour: 13, mjd: SETTINGS.date, dst: true, decl: 0, eot: 0, solarNoo
   sun: [0, 1, 0], moon: [0, -1, 0], moonPhase: null, lst: 0, starM: new Float32Array(9), planets: [],
   sunW: [0, 1, 0], moonW: [0, -1, 0], starW: new Float32Array(9),
   sunDiscW: [0, 1, 0], moonDiscW: [0, -1, 0], sunR: 0.265 * Math.PI / 180, moonR: 0.0045, moonES: 0, poleW: [0, 0, -1],
+  moonLight: 0, moonBright: 0, starDim: 1,
   sunCol: [0, 0, 0], moonCol: [0, 0, 0], day: 1, night: 0, ambSky: [0, 0, 0], ambGnd: [0, 0, 0], exposure: 1, lights: false };
 // The observer: Raleigh, NC, in degrees (east positive). Every body in the sky comes from the zmh-sky
 // block (ZMH_SKY.skyAt, once per updateSky()): one sun for the light, the sun disc and the moon. The light is
@@ -3022,6 +3023,13 @@ const STAR_GAIN = 4.0, MW_GAIN = 0.012;
 // before the tonemap (the old disc's 1.2), never times the night. ES_GAIN: earthshine on the dark part is ES_GAIN times the
 // kit's earthshineFraction(phase angle), so a thin crescent's dark part sits at about 5% of its lit limb (8.2e-5 x 600). Assumed.
 const SUN_R = 0.265 * RAD, MOON_R_KM = 1737.4, MOON_K = 1.2, ES_GAIN = 600;
+// Moonlight by phase (DS-4). MOON_RGB: the moon's light at its full strength, high in a night sky (the old moonlight's colour and
+// level); updateSky() scales it by SKY.moonLight = night x the kit's moonIlluminanceLux(phase angle, altitude) / its full-moon lux,
+// so a full moon high lights the night at about 0.9 of it, a quarter at about 0.1 and a new moon not at all, with the kit's 5-deg
+// ramp at the horizon. MOON_AMB: the moonlit share of the sky's ambient, MOON_AMB x MOON_RGB x SKY.moonLight, tuned on the suite's
+// row (a full-moon midnight at least 1.5x a new-moon one). MOON_DIM: a bright moon dims the stars and the Milky Way by
+// 1 - MOON_DIM x moonPhaseFactor x clamp(moon altitude / 5 deg, 0, 1). Assumed.
+const MOON_RGB = [0.04, 0.052, 0.088], MOON_AMB = 1.0, MOON_DIM = 0.6;
 // A body's apparent direction: its ENU direction lifted in its own vertical plane by the kit's refraction at its true altitude.
 function refracted(v) {
   const h = Math.hypot(v[0], v[2]); if (h < 1e-9) return v.slice();
@@ -3079,7 +3087,6 @@ function updateSky() {
   // the drawn discs (DS-4): apparent directions, real sizes, the earthshine; the light above and below stays geometric
   SKY.sunDiscW = enuToWorld(refracted(SKY.sun)); SKY.moonDiscW = enuToWorld(refracted(SKY.moon));
   SKY.sunR = SUN_R; SKY.moonR = Math.asin(MOON_R_KM / m.topoDistanceKm);
-  SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg);
   // the celestial pole of date: north at altitude = latitude, exactly (0, sin lat, cos lat) in ENU; the maria's frame
   SKY.poleW = enuToWorld([0, Math.sin(OBS.lat * RAD), Math.cos(OBS.lat * RAD)]);
   SKY.starW.set(SKY.starM); for (let k = 6; k < 9; k++) SKY.starW[k] = -SKY.starW[k];
@@ -3087,15 +3094,20 @@ function updateSky() {
   const e = SKY.sun[1];
   SKY.day = smooth(-0.16, 0.28, e);
   SKY.night = 1 - smooth(-0.2, 0.03, e);
+  // earthshine by night only: by day it would light the disc's dark part over the blue sky, which the real one never does
+  SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg) * SKY.night;
   const warm = smooth(0.0, 0.42, e);
   const sunI = smooth(-0.025, 0.05, e);
   SKY.sunCol = [lerp(1.0, 1.0, warm), lerp(0.42, 0.95, warm), lerp(0.14, 0.86, warm)].map(v => v * lerp(1.1, 3.0, warm) * sunI);
-  const mu = smooth(-0.05, 0.2, SKY.moon[1]) * SKY.night;
-  SKY.moonCol = [0.05, 0.065, 0.11].map(v => v * mu * 0.8);
+  // the moon's light by its phase and height (the glow round it in skyBase() is uMoonCol too, so it grows with the phase)
+  SKY.moonLight = SKY.night * ZMH_SKY.moonIlluminanceLux(m.phaseAngleDeg, m.altDeg) / ZMH_SKY.FULL_MOON_ILLUMINANCE_LUX;
+  SKY.moonCol = MOON_RGB.map(v => v * SKY.moonLight);
+  SKY.moonBright = ZMH_SKY.moonPhaseFactor(m.phaseAngleDeg) * clamp(m.altDeg / 5, 0, 1);
+  SKY.starDim = 1 - MOON_DIM * SKY.moonBright;
   const dk = SKY.day;
   SKY.ambSky = [lerp(0.0025, 0.32, dk), lerp(0.0035, 0.42, dk), lerp(0.008, 0.62, dk)];
   const sset = 1 - smooth(0, 0.3, Math.abs(e + 0.03));
-  SKY.ambSky = SKY.ambSky.map((v, k) => v + [0.12, 0.05, 0.02][k] * sset * dk);
+  SKY.ambSky = SKY.ambSky.map((v, k) => v + [0.12, 0.05, 0.02][k] * sset * dk + MOON_AMB * MOON_RGB[k] * SKY.moonLight);
   SKY.ambGnd = [lerp(0.0015, 0.15, dk), lerp(0.002, 0.16, dk), lerp(0.003, 0.11, dk)];
   SKY.exposure = lerp(1.8, 0.95, smooth(0, 1, dk));
   SKY.lights = SKY.day < 0.5;
@@ -3335,7 +3347,7 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   const sk = PRG.sky; gl.useProgram(sk.p); setFrameUniforms(sk, eye);
   gl.uniformMatrix4fv(sk.U.uInvVP, false, M4.invert(vp));
   gl.uniform1f(sk.U.uMtn, 1);
-  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN : 0);
+  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN * SKY.starDim : 0);
   gl.uniform3fv(sk.U.uSunDisc, SKY.sunDiscW); gl.uniform3fv(sk.U.uMoonDisc, SKY.moonDiscW); gl.uniform3fv(sk.U.uPoleW, SKY.poleW);
   gl.uniform1f(sk.U.uSunR, SKY.sunR); gl.uniform1f(sk.U.uMoonR, SKY.moonR); gl.uniform1f(sk.U.uMoonES, SKY.moonES); gl.uniform1f(sk.U.uMoonK, MOON_K);
   gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3);
@@ -3346,7 +3358,7 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
     gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);
     gl.uniformMatrix4fv(sp.U.uVP, false, vp);
     gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);
-    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);
+    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     gl.bindVertexArray(STARS.vao); gl.drawArrays(gl.POINTS, 0, STARS.count);
     gl.disable(gl.BLEND); gl.bindVertexArray(null);
@@ -4120,7 +4132,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

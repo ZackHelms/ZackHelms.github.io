@@ -57,8 +57,12 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Real sizes, no minimum (DS-4) | The sun's radius 0.265 deg; the moon's `asin(1737.4 km / topoDistanceKm)`, 0.244-0.278 deg at 22:00 over spring 2026. No minimum size in pixels: the sun is about 4.5 px across at the suite's 0.8 rad, about 3.6 CSS px in the chase view | Chosen in the plan; the CD can ask for a minimum if they read too small |
 | The sun disc's edge (DS-4) | `1 - smoothstep(r, r + one pixel's angle, length(d - s))`, the pixel from `fwidth(d)`, times 30 as before; the aureole `pow(cs, 120) * 0.6` about the drawn disc | The chord `length(d - s)`, not `acos(dot)`: `acos` near 1 resolves about 0.02 deg in floats, a tenth of the disc |
 | `MOON_K = 1.2` (DS-4) | The moon disc's level before the tonemap (the old disc's 1.2), never times `uNight`: by day it is added light over the blue | The plan's default |
-| `ES_GAIN = 600` (DS-4) | Earthshine on the dark part is `600 * earthshineFraction(phase angle)`: 0.049 at new, 0.037 at a quarter-lit crescent | The plan's default (a thin crescent's dark part at about 5% of its lit limb, linear). Measured after the tonemap: the dark part of the May 20 crescent at night adds 43 levels to its pixels against 169 for the lit limb, and by day it lightens the dark part of the disc against the blue too. Worth the CD's look |
+| `ES_GAIN = 600` (DS-4) | Earthshine on the dark part is `600 * earthshineFraction(phase angle)`: 0.049 at new, 0.037 at a quarter-lit crescent, times the night since dssky step 4 | The plan's default (a thin crescent's dark part at about 5% of its lit limb, linear). Measured after the tonemap: the dark part of the May 20 crescent at night adds 43 levels to its pixels against 169 for the lit limb. Worth the CD's look |
 | The maria (DS-4) | The page's own: four soft patches at fixed points on the face, roughly Imbrium, Serenitatis-Tranquillitatis, Procellarum and Nubium, edges roughened by `vn()` at low frequency, at most 25% off the disc's shade (`MARE_DARK`), in a frame built from the drawn moon and the celestial pole of date (exactly (0, sin lat, cos lat) in ENU, `SKY.poleW`), so the face turns with the sky through a night; libration ignored | The plan asked for 3-4 patches from `vn()`. Patches that come from `vn()`'s hash alone vary in number with a GPU's `sin()` precision (the hash is `fract(sin(x) * 43758)` at arguments in the thousands): a first try gave one patch in SwiftShader. On the night disc, near saturation at exposure 1.8, they read faintly |
+| Moonlight by phase (DS-4) | `SKY.moonCol = MOON_RGB * SKY.moonLight`, `MOON_RGB = [0.04, 0.052, 0.088]` (the old moonlight's colour at its old full level), `SKY.moonLight = night * moonIlluminanceLux(phase angle, altitude) / FULL_MOON_ILLUMINANCE_LUX`: about 0.88 for the full moon of May 31, 0.14 at a quarter, the kit's linear 5-deg ramp at the horizon replacing `smooth(-0.05, 0.2, ...)`. The kit's floor (1e-4 lux, 4e-4 of full) stays, so a moon under the horizon lights at 4e-4: invisible | The plan's design; "keeps its colour" read as the old vector at full strength. The moon's broad glow in `skyBase()` is `uMoonCol` too, so it is times `moonPhaseFactor` (and the ramp) through it, not by a second uniform: multiplying again would square the phase |
+| `MOON_AMB = 1.0` (DS-4) | The moonlit share of the night sky's ambient: `SKY.ambSky += MOON_AMB * MOON_RGB * SKY.moonLight`, so a full moon high adds about [0.035, 0.046, 0.078] to the moonless [0.0025, 0.0035, 0.008] | Tuned on the suite's row (the land from 30 m, two frames 30 deg down): 1.0 gives 1.80x the moonless night and 0.41 of dusk; 1.4 gave 0.45 of dusk, 0 gave 1.29x. Measured on frames of the ground, not the chase view, whose headlit road and night sky do not change with the moon (and whose mean moved 18-36 between runs of the same page) |
+| `MOON_DIM = 0.6` (DS-4) | A bright moon dims the star pass's gain (`uStarK`) and the Milky Way's (`uMwGain`) by `1 - 0.6 * moonPhaseFactor * clamp(moon altitude / 5 deg, 0, 1)`: 0.47 under the full moon of May 31 | The plan's default |
+| Earthshine by night only (DS-4) | `SKY.moonES = ES_GAIN * earthshineFraction(phase angle) * SKY.night`; the lit disc itself is still never times the night | Decided by the arc's overseer on the CD's behalf (dssky step 4): step 3 found the dark part of the moon lighter than the blue by day (13 levels on the May 11 moon), and real earthshine is invisible by day |
 | Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
@@ -589,6 +593,18 @@ through the day, refraction, the sizes, the phase, the cycle, the bright limb, t
 no stray pixels), two restated ("the sun is drawn where it is" at a 0.2 rad field of view, and
 the sky above the ridge, now "away from the bodies"); the suite at 120. Measured values and
 the break checks: the plan's step 3 Results.
+
+**Built (dssky step 4, 2026-11-02): DS-4b**, items 6 and 8. `updateSky()`: `SKY.moonLight`
+(night x the kit's `moonIlluminanceLux` over its full-moon lux), `SKY.moonCol = MOON_RGB *
+SKY.moonLight`, a moonlit share `MOON_AMB * MOON_RGB * SKY.moonLight` in `SKY.ambSky`,
+`SKY.moonBright` and `SKY.starDim = 1 - MOON_DIM * SKY.moonBright`, which `renderScene()` puts
+on `uStarK` and `uMwGain`; the glow round the moon follows `uMoonCol`, so it grows with the
+phase. Earthshine is handed to the GPU times the night (the overseer's addition). The hook adds
+`__DS.MOON_RGB`, `MOON_AMB`, `MOON_DIM`. Three rows: a full moon lights the night (and a quarter
+far less), a bright moon dims the stars (Polaris at the same altitude), by day the moon's dark
+part is no brighter than the sky beside it; one restated (the sky away from the bodies: its
+moon frame pinned to step 4's mean and hash); the suite at 123. Numbers and break checks: the
+plan's step 4 Results.
 
 ### The CD's first playtest of the real sky (2026-11-02), verbatim
 

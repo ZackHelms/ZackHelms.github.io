@@ -595,7 +595,7 @@ Worktree branch `worktree-oversee+dssky`, on `e02063d` (steps 1-2, landed on `ma
 - **Suite total: 120** (112 + 8), all green. `check-inline-js` GREEN; `gates.sh games/driving-simulator/index.html`: **GATES: GREEN**
   (smoke, games-sync, negtest scan, the suite 120/0), run alone. The badge is not stamped (step 7 does).
 
-### Step 4 - DS-4b: moonlight by phase; a bright moon dims the stars
+### Step 4 - DS-4b: moonlight by phase; a bright moon dims the stars (DONE 2026-11-02)
 
 - `SKY.moonCol`, the moonlit ambient share, the star and Milky Way dimming (Design).
 - Rows:
@@ -606,6 +606,73 @@ Worktree branch `worktree-oversee+dssky`, on `e02063d` (steps 1-2, landed on `ma
     at the same height, or compare `uStarK` handed to the GPU plus one pixel row);
   - restate "midnight is much darker than noon" (`:740`) if its numbers move.
 - Expected total: 120 + 2 = 122.
+
+#### Results (step 4)
+
+Worktree branch `worktree-oversee+dssky`, on `dcc8db5` (step 3). The container restarted mid-step; the page edit survived on
+disk and the step was finished from it.
+
+- **Built** (`updateSky()`, `renderScene()`; the shaders are unchanged):
+  - `SKY.moonLight = SKY.night * ZMH_SKY.moonIlluminanceLux(phaseAngleDeg, moon.altDeg) / ZMH_SKY.FULL_MOON_ILLUMINANCE_LUX`
+    (the kit's 5-deg ramp replaces `smooth(-0.05, 0.2, ...)`); `SKY.moonCol = MOON_RGB * SKY.moonLight` with
+    `MOON_RGB = [0.04, 0.052, 0.088]`, the old moonlight's colour at its old full level. 0.882 under the full moon of May 31
+    at 01:00 (phase angle 5.25 deg, 26.9 deg up), 0.29 for the gibbous of 04:00 May 6.
+  - The moonlit ambient: `SKY.ambSky += MOON_AMB * MOON_RGB * SKY.moonLight`, **`MOON_AMB = 1.0`**, tuned on the row below.
+  - `SKY.moonBright = moonPhaseFactor(phaseAngleDeg) * clamp(altDeg / 5, 0, 1)`, `SKY.starDim = 1 - MOON_DIM * moonBright`,
+    **`MOON_DIM = 0.6`**; `uStarK = STAR_GAIN * exposure * night * starDim` and `uMwGain = MW_GAIN * starDim`.
+  - **The glow round the moon** (`skyBase()`'s `uMoonCol * pow(cm, 30) * 0.6`) is times `moonPhaseFactor` through `uMoonCol`,
+    which now carries the phase: no second uniform (a second factor would square the phase). Fog and hills take the same
+    `uMoonCol`, so they stay consistent.
+  - **The overseer's addition, earthshine by night only:** `SKY.moonES = ES_GAIN * earthshineFraction(phaseAngleDeg) * SKY.night`.
+    The lit disc is still never times `uNight`.
+  - The hook: `__DS.MOON_RGB`, `MOON_AMB`, `MOON_DIM`; `SKY.moonLight`, `.moonBright`, `.starDim`.
+- **Rows (three new), measured in the suite on this page:**
+
+  | row | measured |
+  | - | - |
+  | a full moon lights the night (+ a first quarter lifts it at most 0.35 as much) | the land from 30 m (two frames 30 deg down, azimuths 20 and 200): full 18.18, moonless 10.09, dusk (May 16, the sun at -3 deg at 20:26) 44.87: **1.80x**, full **0.405** and moonless 0.225 of dusk; the first quarter of May 23 (0.57 lit, 39 deg up, the sun at -25 deg at 22:56) lifts the land **0.177** of the full moon's lift. The moon 26.9 deg up at full, -33.3 at new |
+  | a bright moon dims the stars | Polaris at 35.1848 deg on both nights (May 31 01:00; May 16 at 01:59, by bisection, azimuth within 0.0006 deg): adds **113** under the full moon against **233** without one, **0.485**; `uStarK` read back 3.3907 against 7.2 (0.471) |
+  | by day the moon's dark part is no brighter than the sky beside it (the overseer's) | May 11 at 08:49 (the sun 30 deg up, the moon 46.2 deg, 0.335 lit), 273 pixels well inside the dark part: they add **0** to the sky behind them (max 0.0), mean 141.94 against **141.81** on the ring 2 deg off |
+
+  Each time is found on the page's own `SKY` by bisection; only the two dates of the plan's row and their 01:00 are typed in.
+- **Decision not in the plan: the night row measures the land, not the chase view.** The plan's row does not name a view. In
+  the chase view the headlit road, the car and the night sky do not change with the moon, so they dilute the ratio: at
+  `MOON_AMB = 1.4` the chase view gave 1.44x at the suite's place (1.63x in a scratch run at another), with full / dusk at 0.46,
+  a window too narrow to hold. And its mean is not stable from run to run of the same page (the moonless 01:00 frame read 20.7,
+  29.0 and 17.8 in three runs; the chase camera's lag runs on real frame time), which is also true of the older "midnight is
+  much darker than noon" row's input. The land frames (`__dsAimed`, no cars, all ground) are bit-stable and see what moonlight
+  changes. The chase values are still recorded in the row's detail, not tested.
+- **Decision not in the plan: the row also checks the phase law** with a first-quarter moon high. Its pair alone cannot: at
+  01:00 on May 16 the new moon is under the horizon, so moonlight without the phase leaves the pair as it was. The quarter is
+  taken at the sun's -25 deg, not -15: traced in a scratch run, with the moon's light taken out the land at -15 deg reads 12.24
+  against the moonless 9.49 (the twilight still in the scene), at -25 deg 9.488.
+- **Restated (named), not added: "the sky above the ridge away from the bodies is unchanged"**. Its `moon4` frame (04:00 May 6,
+  a 0.68-lit moon 25 deg up) fell 6.142 in mean and changed hash (`411be863`). Traced on this page in a scratch run: with the
+  old moonlight put back in `SKY.moonCol` and `SKY.starDim` at 1 the frame hashes `63e2c7c4`, step 3's value, exactly; the
+  glow is -5.2 of the mean, the Milky Way's dimming -0.8. `moon4` is now held to its step-4 mean (28.253, within 0.5) and hash;
+  the other four frames as before.
+- **"midnight is much darker than noon" stayed green, not restated:** noon 143.97, 00:30 18.86 (0.13x; the bound is 0.45x).
+  On the step-3 page the same row read 142.56 / 35.20, but that row's input is the chase view, whose mean moves from run to run
+  (above), so the change is not attributed to this step.
+- **Break checks** (scratch copies, the suite run against each alone):
+
+  | break | row that went red | value |
+  | - | - | - |
+  | moonlight without the phase (`moonIlluminanceLux(0, alt)`) | a full moon lights the night | the quarter's lift 1.09x the full moon's (19.89 against 19.12 over 10.09; wants 0.35 at most); also the sky-away row (`moon4` +5.27) |
+  | no star dimming (`starDim = 1`) | a bright moon dims the stars | Polaris 233 / 233, ratio 1.0, `uStarK` 7.2 both; also the sky-away row (`moon4` +0.785) |
+  | earthshine by day restored (no `* SKY.night`) | by day the moon's dark part | adds 13.3, mean 154 against the ring's 141.8 |
+  | no moonlit ambient (`MOON_AMB = 0`) | a full moon lights the night | 1.288x |
+  | the whole step-3 page | all three new rows and the sky-away row | 1.32x and the quarter 1.28x; Polaris 1.0; the dark part 154 |
+
+  The sky-away row's catches are second catches, never counted as the row named.
+- **Kept green:** step 3's earthshine row (the May 20 crescent's dark part at night, `SKY.night` above 0.95 there) and "the
+  moon by day" (the lit part, unchanged).
+- **Expected totals shift by one:** the overseer's row makes this step 120 + 3 = 123 (the plan said 122), so step 5's expected
+  total is **128**, not 127.
+- **Suite total: 123**, all green. `check-inline-js` GREEN; `gates.sh games/driving-simulator/index.html`: **GATES: GREEN**
+  (smoke, games-sync, negtest scan, the suite 123/0), run alone. The badge is not stamped (step 7 does).
+- **For step 6's break list:** "moonlight without the phase" and "no star dimming by the moon" land on the two rows above;
+  add "earthshine by day" (the overseer's row) and "no moonlit ambient" (the night row), both shown above.
 
 ### Step 5 - DS-6: a slider for each thing in the sky
 
