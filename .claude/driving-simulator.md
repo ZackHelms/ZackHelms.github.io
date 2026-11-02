@@ -522,6 +522,7 @@ the kit supplies nearly all of it.
    - Pass the one sun from DS-1, never a second one.
    - Faint earthshine on the dark part of a crescent: `earthshineFraction()`,
      or a multiple of it (*chosen*).
+     If DS-6 has landed, add its **Earthshine** slider row here (DS-6, 2026-11-02).
    - A few soft, low-frequency darker patches (the maria), fixed to the face
      the moon always turns toward Earth (*chosen*). The kit has none, so this is
      the page's own.
@@ -566,6 +567,132 @@ the kit supplies nearly all of it.
 sun discs, the moonlight and exposure terms, the star pass's and Milky Way's
 fade, a test hook), the suite, and this file. The `ZMH-SKY` block already
 carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
+
+### The CD's first playtest of the real sky (2026-11-02), verbatim
+
+> Add backlog items for driving sim for the following:
+>
+> * in game the stars are too dim, increase brightness
+> * Add sliders in the settings menu for each celestial object (stars, milky way, sun, moon (sunshine), moon (earthshine), any others i missed)
+>
+> * Sun rise, sun set, moon rise, and moon set all show a vertical smearing at the horizon. Im attaching some screenshots to show what i see
+
+The screenshots (badge `build 2026-11-02 12:27 UTC`, an iPhone, chase view): at
+7:50-7:57 PM a bright column at the sun's place runs from the hilltops down
+through the grass and over the car to the bottom of the screen; at 3:29 and 3:41 AM
+a paler column does the same under the rising moon. DS-5 to DS-7 are three plans,
+in `TODO.md` § Now. DS-7 is a bug fix and stands alone; DS-5 and DS-6 share
+`STAR_GAIN`, so DS-6 goes after DS-5.
+
+### DS-5. Brighter stars
+
+**Today** (`index.html`, read 2026-11-02). The star pass draws zmh-sky's
+`starAppearance` law (intensity `10^(-0.4 * 0.5 * (m + 1.46))`, Sirius = 1;
+0.2 mag of extinction per air mass; 1-4 px) after the tonemap, scaled by one
+constant, `STAR_GAIN = 3.2`, times `SKY.exposure * SKY.night`
+(`uStarK`). Points are sized in framebuffer pixels times `uPx = RSCALE`, the
+main pass's render scale. Step 3 of DS-1 set 3.2 in SwiftShader at 844x390,
+where Spica peaked at luminance 209; nobody had looked at a phone. The kit's
+point profile is under 0.4 px wide for faint stars, which DS-1 floored at
+0.5 px (the zmh-sky report below).
+
+**Build.**
+1. **Measure first, on the phone's numbers.** At the iPhone 13 viewport and
+   the render scale the page picks there (`DPR` capped at 2, then the graphics
+   setting), read back the peak luminance of five reference stars at 22:00 on
+   May 5 (Arcturus 0.0, Vega 0.0, Regulus 1.4, Polaris 2.0, and one star of
+   magnitude 3.0-3.5 picked from `SKY_DATA` and cited by HIP) and the count of stars above a visible threshold
+   in a fixed patch. Record them in this file. The cause of "too dim" is not
+   traced; candidates to measure, not assume: the gain, points sized in
+   framebuffer pixels on a 2x screen (physically half the size), and the
+   additive pass landing after the tonemap.
+2. **Raise the default** so that, at the phone's render scale, a mag-2 star
+   (Polaris) reads clearly white and a mag-4 star is plainly visible against
+   Raleigh's night sky (*chosen*: Polaris peak >= 200, mag 4 >= 60 in 8-bit
+   luminance above the sky). If the measure shows the point size, not the
+   gain, is short, size points in CSS pixels (`uPx` times `DPR`) instead of
+   raising the gain past the clamp, and say which in the results.
+3. Keep the kit's law and the 2.5 clamp, so Venus stays a point, not a flare.
+   Keep the Milky Way's `MW_GAIN` as is (DS-6 gives it a slider).
+
+**Checks.** The step-3 star rows stay green, restated where a threshold was
+tied to 3.2. New: the five reference stars' peaks and the patch count at the
+phone viewport meet item 2; a break that halves the gain fails it.
+
+**Files:** `index.html` (`STAR_GAIN` and maybe `uPx`), the suite, this file.
+
+### DS-6. A slider for each thing in the sky
+
+**Build.** A **SKY** section in the settings, after TIME, with one slider per
+object, 0-200%, default 100% (today's look), saved as new fields of the same
+`drivingSimulator.settings.v1` object (never a new key; an old save without
+them reads 100%):
+
+| Slider | Scales (*chosen*) |
+|---|---|
+| Stars | the star pass's gain for the stars (`STAR_GAIN`) |
+| Planets | the five planet vertices' gain, separately from the stars |
+| Milky Way | `MW_GAIN` |
+| Sun | the sun's disc and glow in `skyCol()`, and its light on the scene (`SKY.sunCol`) |
+| Moonlight | the moon's disc and glow, and its light on the scene (`SKY.moonCol`), i.e. sunshine off the moon |
+| Earthshine | the earthshine on the moon's dark part; **comes with DS-4**, which adds earthshine; until then the row is not drawn |
+
+- One slider scales how bright the thing looks **and** the light it casts
+  (*chosen*). If the CD wants those apart (a bright sun disc with a dim day),
+  that is a second row each, a plan-review call.
+- Others the CD may want, not built unless asked: the twilight sky glow, and
+  the night sky's light-pollution glow (both are the page's own colours, not
+  the kit's).
+- 0% removes the thing (its pass or term is skipped, so 0% also costs nothing).
+- The rows use the existing range-row markup (`.row` + `type="range"`, as the
+  volume rows do) and must fit at 320 px wide.
+
+**Checks.** Per slider: 0% removes its pixels (the star, planet, Milky Way, sun
+disc and moon disc rows of DS-1, run at 0%, find nothing) and 200% doubles its
+measured contribution within 10%; the settings round-trip a reload; an old save
+reads 100% everywhere; the sky's day pixels are byte-identical at 100% to
+before. **Files:** `index.html` (the settings markup, `SETTINGS`, the gains'
+uniforms), the suite, this file.
+
+### DS-7. No column of light under a rising or setting sun or moon (bug)
+
+**Cause, traced in the code 2026-11-02** (not yet reproduced in a render; the
+plan's first step does that). Three places sample `skyCol()` with the
+direction's elevation **clamped to a constant**, and `skyCol()` includes the sun
+disc (`smoothstep(0.99985, 0.99993, cs) * 30.0` plus two glow lobes) and the
+moon disc:
+- the world's fog colour, `skyCol(normalize(vec3(-V.x, max(-V.y, 0.0) * 0.4 + 0.02, -V.z)))`
+  (`FS_WORLD`, about line 2351): every fragment below the horizon gets the sky
+  at elevation 0.02 rad (1.15 deg) and its own azimuth;
+- the distant hills, `skyCol(normalize(vec3(d.x, 0.02, d.z)))` (`FS_SKY`, about
+  line 2382);
+- paint reflections, `R.y` clamped at -0.05 (about line 2343).
+
+So when the sun or the moon stands within about a degree of 1.15 deg altitude,
+every hill, grass, road, tree and car fragment at its azimuth gets the disc
+(times 30 for the sun) in its fog colour: a column as wide as the disc, from
+the horizon to the bottom of the screen, over everything, faded only by the fog
+factor. That is the screenshots' shape, and it explains why it shows only at
+rise and set. Both lines date from the game's first commit (`15ad39d`), so it
+predates DS-1; DS-1's real rise and set times made it easy to see.
+
+**Fix (*chosen*).** Split the sky colour from the bodies: `skyBase(d)` (the
+gradient, the sunset tint and the broad glow that colours the haze) and the
+discs added only where the direction is the real view ray (the sky pass's own
+`d`). Fog, hills and reflections call `skyBase()`. Keep the wide sunset glow in
+the haze: a warm horizon toward the sun is right; a disc in it is not.
+
+**Checks.** At sunset (sun altitude 1.0 deg) and moonrise (moon 1.0 deg), chase
+view facing the body, the column of pixels below the horizon at the body's
+projected x is no brighter than the columns 10 deg either side (within the
+noise of the scene); the disc above the horizon is still drawn; a break that
+puts the disc back in the fog colour fails the row. The sky's pixels above the
+ridge stay byte-identical. **Files:** `index.html` (`GLSL_COMMON`, `FS_SKY`,
+`FS_WORLD`), the suite, this file.
+
+**Also seen in the night screenshots, not asked about:** faint concentric rings
+in the dark sky. Hypothesis, not traced: 8-bit banding of the night gradient,
+which a little dither in the sky pass would hide. Noted here, not planned.
 
 ## Follow-ups not yet done
 
