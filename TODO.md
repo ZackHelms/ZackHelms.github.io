@@ -65,19 +65,20 @@ in `.claude/<game>.md`.
   Spec, the anchors (full moons 2026-05-01 and 05-31, new 05-16) and the checks:
   `.claude/driving-simulator.md` § Backlog, DS-4.
 
-- [combat-sim] **A Graphics style selector, and the toon style** (the CD, 2026-11-01:
-  "All three with selector in settings menu. Default to realistic webgl. Its a lot so put
-  items in backlog in a combat simulator section"). A `Graphics style` select at the top of
-  PICTURE in the settings (realistic, the default, and toon), saved and applied live; toon
-  is cel-shaded in three bands with ink outlines by an inverted-hull pass, a saturated
-  flat palette, a flat gradient sky. A style is paint: the engine never reads it.
-  Plan-shaped. Spec and checks: `.claude/combat-simulator.md` § Backlog, CS-1.
-
-- [combat-sim] **The neon style** for Combat Simulator: the site's Neon Arcade palette in
-  3D (glowing grid-line flagstones, emissive edges on walls and torii, fighters as dark
-  bodies with green and red rims, a white-hot blade, stronger trails, a cheap bloom), the
-  third option in CS-1's selector. **After CS-1.** Plan-shaped. Spec and checks:
-  `.claude/combat-simulator.md` § Backlog, CS-2.
+- [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,
+  2026-11-01: "All three with selector in settings menu. Default to realistic webgl. Its a
+  lot so put items in backlog in a combat simulator section"). Backlog items CS-1 and CS-2,
+  planned as one six-step arc. **CS-1** is a `Graphics style` select at the top of
+  PICTURE in the settings (realistic, the default, and toon), saved and applied live.
+  Toon is cel-shaded in three bands with ink outlines by an inverted-hull pass, a
+  saturated flat palette and a flat gradient sky. CS-1 lands on `main` on its own at step 3.
+  **CS-2** is neon: the site's Neon Arcade palette in 3D (glowing flagstone joints, emissive
+  edges on walls and torii, fighters as dark bodies with green and red rims, a white-hot
+  blade, stronger trails, a cheap bloom), the third option in the select. A style is
+  paint: the engine never reads it. Spec and checks: `.claude/combat-simulator.md`
+  § Backlog, CS-1 and CS-2.
+  **Plan ready (2026-11-01)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/csstyles.selector-toon-neon.md`
 
 ## Needs Zack
 

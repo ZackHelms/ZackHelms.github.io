@@ -1,0 +1,116 @@
+[
+ {
+  "name": "stagger-bonus",
+  "file": "games/combat-simulator/index.html",
+  "old": "  staggerBonus: 1.10,",
+  "new": "  staggerBonus: 1.0, /* @negtest */"
+ },
+ {
+  "name": "no-iframes",
+  "file": "games/combat-simulator/index.html",
+  "old": "  f.inv = f.st === 'dodge' && f.t >= RULES.dodge.i0 && f.t <= RULES.dodge.i1;",
+  "new": "  f.inv = false; /* @negtest */"
+ },
+ {
+  "name": "power-parryable",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (!power && d.st === 'parry' && d.t < RULES.parry.win) {",
+  "new": "  if (d.st === 'parry' && d.t < RULES.parry.win) { /* @negtest */"
+ },
+ {
+  "name": "combo-energy-3-only",
+  "file": "games/combat-simulator/index.html",
+  "old": "  comboEnergyAt: [3, 5],",
+  "new": "  comboEnergyAt: [3], /* @negtest */"
+ },
+ {
+  "name": "power-at-9",
+  "file": "games/combat-simulator/index.html",
+  "old": "    if (f.energy < RULES.powerCost) return false;",
+  "new": "    if (f.energy < 9) return false; /* @negtest */"
+ },
+ {
+  "name": "no-energy-cap",
+  "file": "games/combat-simulator/index.html",
+  "old": "  f.energy = Math.min(RULES.energyMax, f.energy + n);",
+  "new": "  f.energy = Math.min(99, f.energy + n); /* @negtest */"
+ },
+ {
+  "name": "chain-of-three",
+  "file": "games/combat-simulator/index.html",
+  "old": "        if (!power && f.queued && f.chain < RULES.chain.length - 1) { startHit(F, f, f.chain + 1); break; }",
+  "new": "        if (!power && f.queued && f.chain < 2) { startHit(F, f, f.chain + 1); break; } /* @negtest */"
+ },
+ {
+  "name": "stagger-can-act",
+  "file": "games/combat-simulator/index.html",
+  "old": "    case 'stagger': decay(f, 4, dt); if (f.t >= RULES.stagger) setSt(f, 'free'); break;",
+  "new": "    case 'stagger': decay(f, 4, dt); if (f.buf && begin(F, f, o, f.buf, inp)) { f.buf = null; break; } if (f.t >= RULES.stagger) setSt(f, 'free'); break; /* @negtest */"
+ },
+ {
+  "name": "stagger-short",
+  "file": "games/combat-simulator/index.html",
+  "old": "  stagger: 1.5, flinch: 0.22,",
+  "new": "  stagger: 1.2, flinch: 0.22, /* @negtest */"
+ },
+ {
+  "name": "no-hyper-armour",
+  "file": "games/combat-simulator/index.html",
+  "old": "      f.armor = power && f.t < ph.w + ph.a;",
+  "new": "      f.armor = false; /* @negtest */"
+ },
+ {
+  "name": "parry-no-energy",
+  "file": "games/combat-simulator/index.html",
+  "old": "    setSt(d, 'free'); d.stats.parries++; gain(F, d, 1, 'parry');",
+  "new": "    setSt(d, 'free'); d.stats.parries++; /* @negtest */"
+ },
+ {
+  "name": "dodge-no-energy",
+  "file": "games/combat-simulator/index.html",
+  "old": "    if (!d.seen[a.atkId]) { d.seen[a.atkId] = 1; d.stats.dodges++; gain(F, d, 1, 'dodge'); }",
+  "new": "    if (!d.seen[a.atkId]) { d.seen[a.atkId] = 1; d.stats.dodges++; } /* @negtest */"
+ },
+ {
+  "name": "ring-never-closes",
+  "file": "games/combat-simulator/index.html",
+  "old": "      const rad = r * (ring ? 1.24 : 1.1), have = clamp(e - ring * 10, 0, 10), full = have >= 10;",
+  "new": "      const rad = r * (ring ? 1.24 : 1.1), have = clamp(e - ring * 10, 0, 10), full = have >= 11; /* @negtest */"
+ },
+ {
+  "name": "ring-no-flash",
+  "file": "games/combat-simulator/index.html",
+  "old": "    const e = F.p.energy, flash = ready ? 0.55 + 0.45 * Math.sin(APP.time * 9) : 0;",
+  "new": "    const e = F.p.energy, flash = ready ? 1 : 0; /* @negtest */"
+ },
+ {
+  "name": "menu-no-pause",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (!APP.paused && !APP.testPaused) update(dt);",
+  "new": "  if (!APP.testPaused) update(dt); /* @negtest */"
+ },
+ {
+  "name": "buttons-crowded",
+  "file": "games/combat-simulator/index.html",
+  "old": "  const ax = W - s.r - 18 - R, ay = H - s.b - 18 - R, d = 2.15 * R;",
+  "new": "  const ax = W - s.r - 18 - R, ay = H - s.b - 18 - R, d = 1.6 * R; /* @negtest */"
+ },
+ {
+  "name": "ladder-no-advance",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (won) { SAVE.wins++; SAVE.rank = F.rank + 1;",
+  "new": "  if (won) { SAVE.wins++; SAVE.rank = F.rank; /* @negtest */"
+ },
+ {
+  "name": "ai-slower-at-top",
+  "file": "games/combat-simulator/index.html",
+  "old": "    react: lerp(0.40, 0.09, t),",
+  "new": "    react: lerp(0.09, 0.40, t), /* @negtest */"
+ },
+ {
+  "name": "multitouch-one-role",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (k) { INPUT.touches.set(id, k); pressBtn(k); return; }",
+  "new": "  if (k) { if (INPUT.stick) return; INPUT.touches.set(id, k); pressBtn(k); return; } /* @negtest */"
+ }
+]
