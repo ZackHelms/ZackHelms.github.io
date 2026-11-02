@@ -1,5 +1,17 @@
 # DONE — done log
 
+- 2026-11-02 [driving-sim] **The real sky over Raleigh, and a calendar** (DS-1; the CD,
+  2026-11-01, "fix the star field rotation ... Should look like star field looks to me in the sky
+  from perspective of raleigh north Carolina in the spring", revised 2026-11-02 for zmh-sky): a date
+  that steps a day per game day (Tue May 5, 2026 on a first visit, wraps Jun 20 to Mar 20, saved,
+  on Raleigh's daylight-saving clock); the sun, the moon in its real place, the five naked-eye
+  planets and the J2000 star matrix (precession included) from one `ZMH_SKY.skyAt()` call; 1,627
+  real stars to mag 5 in one `gl.POINTS` pass with the planets, hidden behind the hills; the Milky
+  Way band, faint; the hash stars and the zenith spin gone. The sky had been drawn mirrored since
+  the game shipped (the page's world is east, up, south); fixed with `enuToWorld`. Star data
+  XHIP via d3-celestial (BSD-3), licence beside the page. Suite 78 -> 108, break list 25/25.
+  Badge `build 2026-11-02 12:27 UTC`. Plan: `.claude/plans/DONE/dsstars.real-sky-and-calendar.md`.
+
 - 2026-10-27 [taas] **Robot factory v2 updates** (the CD): configurations at the terminal (save,
   load and delete the robots on the floor with their names, prompts, lines and cuts; kept in the
   browser apart from the save; loading casts parts by name, buys what it is short of at the flat

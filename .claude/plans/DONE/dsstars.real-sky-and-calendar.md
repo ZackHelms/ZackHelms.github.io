@@ -1,10 +1,10 @@
 # dsstars - Driving Simulator: the real sky over Raleigh, NC (zmh-sky), and a calendar that runs a day per game day (DS-1)
 
-**Status:** PARTIALLY IMPLEMENTED - step 1 of 5 done (2026-11-01), on branch
-`claude/brave-sagan-odwmrd`, not on `main`. **Revised 2026-11-02 for zmh-sky:** steps 2-5 were
-rewritten around zmhstudio's new sky kit, so the catalogue download that stopped the first run
-(the proxy refused `cdsarc.cds.unistra.fr`) is gone. The first run's record:
-`dsstars.real-sky-and-calendar.follow-up.md`.
+**Status:** IMPLEMENTED 2026-11-02 - steps 1-5, branch `claude/brave-sagan-odwmrd` (step 1
+2026-11-01; steps 2-4 2881a5b..0679012 by the oversee run of 2026-11-02, then the ship commit),
+landed on `main` as one commit. Steps 2-5 were rewritten on 2026-11-02 around zmhstudio's new sky
+kit, so the catalogue download that stopped the first run (the proxy refused
+`cdsarc.cds.unistra.fr`) is gone. The runs' record: `dsstars.real-sky-and-calendar.follow-up.md`.
 **Requested:** 2026-11-01, the CD (third message of the day, verbatim):
 
 > Oh yeah, fix the star field rotation. It looks like i am at the earths rotational north pole and
@@ -481,7 +481,7 @@ The CD's standing preferences:
 | 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows || DONE 2026-11-02 |
 | 3 | The star pass with planets, `ridgeY()`, the Milky Way, hash stars deleted; star, planet, Milky Way and pixel rows | DONE 2026-11-02 |
 | 4 | Break list run whole, frame cost, docs | DONE 2026-11-02 |
-| 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
+| 5 | Ship: badge, gates, land on `main`, Pages, report to the CD || DONE 2026-11-02 |
 
 (Step 2 was the BSC5 download until 2026-11-02; it was blocked on 2026-11-01 because the host was
 refused, and the revision replaced it.)
@@ -1043,6 +1043,13 @@ gross cost; no escalation.
   - the assumed rows most worth a look: the start date, the DST jump, `STAR_GAIN`, `MW_GAIN`, the
     magnitude cut;
   - the re-sweep command.
+
+#### Step 5 results
+
+Done 2026-11-02 by the overseer (the procedure, so no separate implementer). Badge
+`build 2026-11-02 12:27 UTC`; `check-inline-js` and `gates.sh` GREEN after the stamp (suite 108).
+`origin/main` had not moved since 98f6092, so no merge was needed. Landed with `land-on-main.sh`
+(dry run first); the landed SHA and the Pages result are in the follow-up and the CD's report.
 
 ## Gotchas / bindings
 

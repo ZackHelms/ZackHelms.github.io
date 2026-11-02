@@ -151,7 +151,7 @@ The season dropdown itself shipped the same day (`build 2026-11-01 15:55 UTC`): 
 disabled, `SETTINGS.season` saved, `SEASONS` and `SEASONS_OPEN` in the page, a
 suite row. The four items below are `TODO.md` § Now. Each is one plan. DS-3 and
 DS-4 need DS-1's calendar, so they go after it. **DS-1's plan:**
-`.claude/plans/dsstars.real-sky-and-calendar.md` (drafted 2026-11-01; step 1 built the
+`.claude/plans/DONE/dsstars.real-sky-and-calendar.md` (drafted 2026-11-01; step 1 built the
 same day on `claude/brave-sagan-odwmrd`; revised 2026-11-02 for zmh-sky). DS-2 to DS-4
 wait until it lands: all three share its files, and DS-3 and DS-4 cite its contracts
 (`SEASON_DATES`, `SKY.mjd`, `utcOffset`, `julianDate()`, `OBS_SKY`, `SKY.starM`, and the
@@ -325,7 +325,7 @@ against the page's or the kit's code.
 **Files:** `index.html` (the `ZMH-SKY` block, `updateSky()`, `setFrameUniforms()`,
 `skyCol()` and `FS_SKY`, `renderScene()`, the THE ROAD notes),
 `LICENSE-d3-celestial.txt` beside the page, the suite, and this file. Plan:
-`.claude/plans/dsstars.real-sky-and-calendar.md`.
+`.claude/plans/DONE/dsstars.real-sky-and-calendar.md`.
 
 ### DS-2. Other cars make sound, in stereo, with real Doppler
 

@@ -12,31 +12,6 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **A real star field: the sky from Raleigh, NC, in spring** (the CD,
-  2026-11-01: "fix the star field rotation. It looks like i am at the earths rotational
-  north pole and star field spins around like a spinning top"). Cause traced:
-  `skyCol()` turns hash-grid stars about the zenith (`uStarRot = hour/24*TAU`).
-  - **The fix uses zmhstudio's zmh-sky kit** (revised 2026-11-02, at the CD's request).
-    Its 1,627 real stars to magnitude 5 turn about the celestial pole of date (35.78 deg
-    up in the north) by the kit's star matrix, with precession. They are drawn in one
-    `gl.POINTS` pass, and the kit's CLI splices them in as a `ZMH-SKY` block. Nothing
-    is downloaded.
-  - **Also in it, the CD's choice 2026-11-02:** the five naked-eye planets (Venus and
-    Jupiter in the west on the first night), the moon in its real place (its phase and
-    light stay DS-4), and the Milky Way band.
-  - **It brings a calendar that advances a day per game day** (the CD's choice,
-    2026-11-01). The calendar starts on May 5, 2026, and the sun comes from the date
-    (May 5: sunrise 06:18, sunset 20:05 EDT).
-  - Spec, the star positions the checks use (now precessed, from astronomy-engine) and
-    the files: `.claude/driving-simulator.md` § Backlog, DS-1. DS-2 to DS-4 below wait
-    for this one: they share its files, and DS-3 and DS-4 build on its calendar.
-
-  **Step 1 of 5 done (2026-11-01); the plan is revised and ready (2026-11-02).** The
-  calendar and the sun from the date are built and green on branch
-  `claude/brave-sagan-odwmrd`, not on `main`. Steps 2-5 now use zmh-sky. Run:
-  `/zmh-producer:oversee-implementation .claude/plans/dsstars.real-sky-and-calendar.md`
-  The plan's Resume section says to start from that branch, not from `main`.
-
 - [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
   2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly
   (a little in left too is realistic), also doppler effect should be realistically
@@ -52,21 +27,23 @@ in `.claude/<game>.md`.
   season becomes Raleigh at its date: the sun, moon, planets and stars (zmh-sky, from DS-1's dates), the
   broadleaf trees (deeper green, autumn colours, bare in winter; conifers unchanged),
   grass from fresh green to dormant straw, insects and birds; switching rebuilds the
-  chunks in place. **After DS-1.** Plan-shaped; its defaults were chosen and can be
+  chunks in place. DS-1 landed 2026-11-02: re-sweep with
+  `/zmh-producer:backlog-plan-gen driving-sim`. Plan-shaped; its defaults were chosen and can be
   overruled at plan review. Spec and checks: `.claude/driving-simulator.md` § Backlog,
   DS-3.
 
 - [driving-sim] **The sun and the moon as they really look** (the CD, 2026-11-01:
   "Moon realism: yes, add this (and sun position) to the backlog for driving sim").
   - **Where they are comes with DS-1** (revised 2026-11-02): zmh-sky's `skyAt()` gives
-    both, the moon topocentric. Today the moon is kept opposite the sun (near full
-    every night) and drawn with no phase.
+    both, the moon topocentric. Since DS-1 (2026-11-02) the moon is in its real place,
+    but still drawn with no phase and lit by the old rule.
   - **This item is how they look and light.** Its phase uses the kit's lit-sphere moon
     disc, so the bright limb faces the sun, with earthshine and soft maria. Both bodies
     are refracted at the horizon (`refractionDeg`) and drawn at their real sizes (0.53
     deg). Moonlight scales with the kit's `moonIlluminanceLux`. The moon is seen by
     day, and a bright moon dims the stars and the Milky Way.
-  - **After DS-1.** Plan-shaped. Spec, the phase anchors (full moons 2026-05-01 and
+  - DS-1 landed 2026-11-02: re-sweep with `/zmh-producer:backlog-plan-gen driving-sim`.
+    Plan-shaped. Spec, the phase anchors (full moons 2026-05-01 and
     05-31, new 05-16) and the checks: `.claude/driving-simulator.md` § Backlog, DS-4.
 
 - [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,
