@@ -79,6 +79,8 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
     <select id="season-sel"><option value="spring">spring</option><option value="summer" disabled>summer</option><option value="autumn" disabled>autumn</option><option value="winter" disabled>winter</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
   <div class="row" id="date-row"><span class="lbl">Date</span><span id="date-val">---</span></div>
+  <h3>SKY</h3>
+  <div id="sky-rows"></div>
   <h3>ROAD</h3>
   <div class="row"><label for="traffic-sel">Traffic</label>
     <select id="traffic-sel"><option value="0.5">light</option><option value="1">normal</option><option value="1.8">heavy</option></select></div>
@@ -1154,6 +1156,10 @@ function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 const SET_KEY = 'drivingSimulator.settings.v1';
 // One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
 const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'];
+// One brightness per thing in the sky (DS-6), a percentage 0-200: 100 is the sky as built, 0 takes it away, 200 doubles its gain.
+// stars, planets: their vertices' gain in the one star pass; mw: the Milky Way's; sun: the sun's colour (its disc, aureole, broad
+// lobe and its light); moon: the moon's disc, its glow and its light with its share of the ambient; earthshine: its dark part.
+const SKY_KEYS = ['stars', 'planets', 'mw', 'sun', 'moon', 'earthshine'];
 // perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
 // season: only spring is selectable so far (the calendar runs Raleigh's spring, Mar 20 - Jun 20, 2026); the others are listed, greyed out
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring'];
@@ -1205,11 +1211,14 @@ function utcOffset(mjd, hour) {
 }
 
 const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2, season: 'spring',
-  date: null, vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])) };
+  date: null, vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])), sky: Object.fromEntries(SKY_KEYS.map(k => [k, 100])) };
 try {
   const saved = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {};
   const vols = Object.assign({}, SETTINGS.vols, saved.vols || {});
-  Object.assign(SETTINGS, saved, { vols });
+  // the sky's six merge as the volumes do, so an old save (no sky) reads 100 everywhere; a value that is not a number 0-200 reads 100
+  const sky = Object.assign({}, SETTINGS.sky);
+  for (const k of SKY_KEYS) { const v = saved.sky && saved.sky[k]; if (typeof v === 'number' && v >= 0 && v <= 200) sky[k] = v; }
+  Object.assign(SETTINGS, saved, { vols, sky });
   if (saved.radio === 0 && !saved.vols) SETTINGS.vols.music = 0;   // the old radio on/off switch becomes the radio's volume
 } catch (e) { /* private mode */ }
 delete SETTINGS.radio;
@@ -2441,6 +2450,7 @@ const VS_STARS = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aDir; layout(location=1) in float aMag; layout(location=2) in vec3 aColor;
 uniform mat3 uStarM; uniform mat4 uVP; uniform float uPx;
+uniform float uStarsK, uPlanetK; uniform int uNStars;     // the SKY sliders (DS-6): the stars' gain, the planets' (the vertices from uNStars on)
 out vec3 vDir, vColor; out float vI, vSize, vSig;
 const float STAR_GAMMA = 0.5, STAR_MAG_REF = -1.46, EXT_K = 0.2, I_MAX = 2.5;
 float airmass(float h){ h = clamp(h, 0.0, 90.0); return 1.0 / (sin(radians(h)) + 0.50572 * pow(h + 6.07995, -1.6364)); }
@@ -2453,7 +2463,7 @@ void main(){
   float sz = mix(1.0, 4.0, min(1.0, I)) * uPx;
   vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0)); vSize = max(sz, 6.0 * vSig);
   gl_PointSize = vSize;
-  vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt);
+  vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt) * (gl_VertexID >= uNStars ? uPlanetK : uStarsK);
   gl_Position = uVP * vec4(w * 1000.0, 1.0);
 }`;
 const FS_STARS = `#version 300 es
@@ -3095,19 +3105,21 @@ function updateSky() {
   SKY.day = smooth(-0.16, 0.28, e);
   SKY.night = 1 - smooth(-0.2, 0.03, e);
   // earthshine by night only: by day it would light the disc's dark part over the blue sky, which the real one never does
-  SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg) * SKY.night;
+  // the SKY sliders (DS-6), as fractions: sun, moonlight, earthshine (the stars, planets, Milky Way and the moon's disc in renderScene())
+  const SK = SETTINGS.sky, kSun = SK.sun / 100, kMoon = SK.moon / 100;
+  SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg) * SKY.night * (SK.earthshine / 100);
   const warm = smooth(0.0, 0.42, e);
   const sunI = smooth(-0.025, 0.05, e);
-  SKY.sunCol = [lerp(1.0, 1.0, warm), lerp(0.42, 0.95, warm), lerp(0.14, 0.86, warm)].map(v => v * lerp(1.1, 3.0, warm) * sunI);
+  SKY.sunCol = [lerp(1.0, 1.0, warm), lerp(0.42, 0.95, warm), lerp(0.14, 0.86, warm)].map(v => v * lerp(1.1, 3.0, warm) * sunI * kSun);
   // the moon's light by its phase and height (the glow round it in skyBase() is uMoonCol too, so it grows with the phase)
   SKY.moonLight = SKY.night * ZMH_SKY.moonIlluminanceLux(m.phaseAngleDeg, m.altDeg) / ZMH_SKY.FULL_MOON_ILLUMINANCE_LUX;
-  SKY.moonCol = MOON_RGB.map(v => v * SKY.moonLight);
+  SKY.moonCol = MOON_RGB.map(v => v * SKY.moonLight * kMoon);
   SKY.moonBright = ZMH_SKY.moonPhaseFactor(m.phaseAngleDeg) * clamp(m.altDeg / 5, 0, 1);
   SKY.starDim = 1 - MOON_DIM * SKY.moonBright;
   const dk = SKY.day;
   SKY.ambSky = [lerp(0.0025, 0.32, dk), lerp(0.0035, 0.42, dk), lerp(0.008, 0.62, dk)];
   const sset = 1 - smooth(0, 0.3, Math.abs(e + 0.03));
-  SKY.ambSky = SKY.ambSky.map((v, k) => v + [0.12, 0.05, 0.02][k] * sset * dk + MOON_AMB * MOON_RGB[k] * SKY.moonLight);
+  SKY.ambSky = SKY.ambSky.map((v, k) => v + [0.12, 0.05, 0.02][k] * sset * dk + MOON_AMB * MOON_RGB[k] * SKY.moonLight * kMoon);
   SKY.ambGnd = [lerp(0.0015, 0.15, dk), lerp(0.002, 0.16, dk), lerp(0.003, 0.11, dk)];
   SKY.exposure = lerp(1.8, 0.95, smooth(0, 1, dk));
   SKY.lights = SKY.day < 0.5;
@@ -3347,18 +3359,21 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   const sk = PRG.sky; gl.useProgram(sk.p); setFrameUniforms(sk, eye);
   gl.uniformMatrix4fv(sk.U.uInvVP, false, M4.invert(vp));
   gl.uniform1f(sk.U.uMtn, 1);
-  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN * SKY.starDim : 0);
+  // the SKY sliders (DS-6): the Milky Way, the moon's disc and the star pass here; the sun, the moon's light and the earthshine in updateSky()
+  const SK = SETTINGS.sky;
+  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN * SKY.starDim * (SK.mw / 100) : 0);
   gl.uniform3fv(sk.U.uSunDisc, SKY.sunDiscW); gl.uniform3fv(sk.U.uMoonDisc, SKY.moonDiscW); gl.uniform3fv(sk.U.uPoleW, SKY.poleW);
-  gl.uniform1f(sk.U.uSunR, SKY.sunR); gl.uniform1f(sk.U.uMoonR, SKY.moonR); gl.uniform1f(sk.U.uMoonES, SKY.moonES); gl.uniform1f(sk.U.uMoonK, MOON_K);
+  gl.uniform1f(sk.U.uSunR, SKY.sunR); gl.uniform1f(sk.U.uMoonR, SKY.moonR); gl.uniform1f(sk.U.uMoonES, SKY.moonES); gl.uniform1f(sk.U.uMoonK, MOON_K * (SK.moon / 100));
   gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3);
   // stars and planets: after the sky, before the world (which covers them); additive, then blend off.
   // The kit's matrices are row-major, hence transpose = true. uPx: the main pass's render scale, 1 in the mirror.
-  if (SKY.night > 0 && STARS.on && STARS.vao) {
+  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) {
     const sp = PRG.stars; gl.useProgram(sp.p);
     gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);
     gl.uniformMatrix4fv(sp.U.uVP, false, vp);
     gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);
     gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim);
+    gl.uniform1f(sp.U.uStarsK, SK.stars / 100); gl.uniform1f(sp.U.uPlanetK, SK.planets / 100); gl.uniform1i(sp.U.uNStars, STARS.n);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     gl.bindVertexArray(STARS.vao); gl.drawArrays(gl.POINTS, 0, STARS.count);
     gl.disable(gl.BLEND); gl.bindVertexArray(null);
@@ -3970,12 +3985,15 @@ const menuOpen = () => setPanel.classList.contains('open');
 const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tyres on the road', wind: 'Wind',
   skid: 'Tyre squeal', crash: 'Crashes', horn: 'Horn', ui: 'Buttons and chimes' };
 $('chan-rows').innerHTML = VOL_KEYS.map(k => `<div class="row"><label for="vol-${k}">${VOL_LABELS[k]}</label><input id="vol-${k}" data-k="${k}" class="chan" type="range" min="0" max="100" step="1"></div>`).join('');
+const SKY_LABELS = { stars: 'Stars', planets: 'Planets', mw: 'Milky Way', sun: 'Sun', moon: 'Moonlight', earthshine: 'Earthshine' };
+$('sky-rows').innerHTML = SKY_KEYS.map(k => `<div class="row"><label for="sky-${k}">${SKY_LABELS[k]}</label><input id="sky-${k}" data-k="${k}" class="skyk" type="range" min="0" max="200" step="1"></div>`).join('');
 $('station-sel').innerHTML = STATIONS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('');
 function syncSettingsUI() {
   $('cycle-sel').value = String(SETTINGS.cycle); $('traffic-sel').value = String(SETTINGS.traffic); $('season-sel').value = SETTINGS.season;
   $('units-sel').value = SETTINGS.units; $('gfx-sel').value = String(SETTINGS.gfx); $('mirror-sel').value = String(SETTINGS.mirror);
   $('perf-sel').value = String(SETTINGS.perf); $('station-sel').value = String(SETTINGS.station); $('vol').value = String(SETTINGS.vol);
   for (const k of VOL_KEYS) $('vol-' + k).value = String(SETTINGS.vols[k]);
+  for (const k of SKY_KEYS) $('sky-' + k).value = String(SETTINGS.sky[k]);
   $('tod').value = String(Math.floor(((SKY.hour % 24) + 24) % 24 * 60)); $('tod-val').textContent = clockText(); $('date-val').textContent = dateText(SKY.mjd);
 }
 // the menu pauses the game: the loop stops ticking while it is open (the sound keeps
@@ -3996,6 +4014,10 @@ $('mirror-sel').addEventListener('change', e => { SETTINGS.mirror = +e.target.va
 $('perf-sel').addEventListener('change', e => { SETTINGS.perf = +e.target.value; saveSettings(); layoutUI(); });
 $('station-sel').addEventListener('change', e => { SETTINGS.station = +e.target.value; saveSettings(); SND.tune(); });
 $('vol').addEventListener('input', e => { SETTINGS.vol = +e.target.value; saveSettings(); SND.apply(); });
+// a sky slider: saved, then the sky's light terms again where it changes one (the sun, the moonlight, the earthshine); the stars,
+// planets, Milky Way and the moon's disc are read by renderScene() each frame
+for (const el of document.querySelectorAll('input.skyk')) el.addEventListener('input', e => { const k = e.target.dataset.k; SETTINGS.sky[k] = +e.target.value; saveSettings();
+  if (k === 'sun' || k === 'moon' || k === 'earthshine') updateSky(); });
 for (const el of document.querySelectorAll('input.chan')) {
   el.addEventListener('input', e => { SETTINGS.vols[e.target.dataset.k] = +e.target.value; saveSettings(); SND.apply(); });
   el.addEventListener('change', e => SND.preview(e.target.dataset.k));
@@ -4132,7 +4154,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

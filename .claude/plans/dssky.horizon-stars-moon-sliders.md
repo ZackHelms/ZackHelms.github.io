@@ -674,7 +674,7 @@ disk and the step was finished from it.
 - **For step 6's break list:** "moonlight without the phase" and "no star dimming by the moon" land on the two rows above;
   add "earthshine by day" (the overseer's row) and "no moonlit ambient" (the night row), both shown above.
 
-### Step 5 - DS-6: a slider for each thing in the sky
+### Step 5 - DS-6: a slider for each thing in the sky (DONE 2026-11-02)
 
 - The SKY section, `SETTINGS.sky`, the loader merge, `syncSettingsUI()`, the `input` handlers
   (`saveSettings()` then `updateSky()` where a light term changes), the gains (Design).
@@ -690,6 +690,67 @@ disk and the step was finished from it.
     before-hash in this Results at the start of the step).
 - The per-slider claims are one row each for 0 and for 200 (the failing slider named in its
   detail). Expected total: 122 + 5 = 127.
+
+#### Results (step 5)
+
+Worktree branch `worktree-oversee+dssky`, on `1125705` (step 4).
+
+- **The before-hashes, recorded first.** The page of `1125705` was copied aside (sha1 `e7f2f911...`) before any edit, and the
+  byte-identical row was written and run against that copy (`DS_PAGE`): seven frames from 30 m above the car, the star pass on,
+  each holding what one slider scales, FNV-1a of the RGBA bytes: noon at the sun `0174b859`, the land at 17:00 `e7c77ffc`, 22:00
+  at 32 deg / azimuth 200 `a3451048`, 22:00 at Jupiter's vertex `261017ad`, 04:00 May 6 at the moon `9a58595c`, the land at the
+  full-moon midnight of May 31 `50d59823`, the May 20 crescent at 1.5 deg `937d0897`. On the built page all seven hash the same.
+  **Traced on the way (two recordings thrown away):** the two land frames were not the same from run to run of the same page.
+  First cause, the trees sway on the page's clock (`uWind = now`, real time): the row now holds `now` at 100 s for each frame.
+  That left them still moving; second cause, the car is where the earlier rows that drive on real frames left it (the
+  "Escape closes settings and the game carries on" row drives it), so the row teleports it to s = 400 first. With both, the
+  before copy and the built page give the same seven hashes.
+- **Built** (the page): `SKY_KEYS`, `SETTINGS.sky` merged on load as `vols` (plus: a value that is not a number 0-200 reads 100);
+  `<h3>SKY</h3>` after TIME and `#sky-rows` built from `SKY_KEYS` (`input.skyk`, ids `sky-<key>`, `min 0 max 200 step 1`), labels
+  Stars, Planets, Milky Way, Sun, Moonlight, Earthshine; `syncSettingsUI()` sets them; an `input` saves, then `updateSky()` for
+  sun, moon and earthshine. `VS_STARS`: `uStarsK`, `uPlanetK`, `uNStars` (`STARS.n`), `vI *= gl_VertexID >= uNStars ? uPlanetK :
+  uStarsK`, one POINTS draw, skipped when stars and planets are both 0. `renderScene()`: `uMwGain = MW_GAIN * starDim * mw/100`,
+  `uMoonK = MOON_K * moon/100`. `updateSky()`: `SKY.sunCol *= sun/100`, `SKY.moonCol` and the moonlit ambient `* moon/100`,
+  `SKY.moonES *= earthshine/100`. Every factor is multiplied on last, so at 100 it is an exact `* 1`. `__DS.SKY_KEYS`.
+- **Rows (five new), measured in the suite on this page** (the 0 and 200 values from the break runs below, whose pages differ
+  from this one only in the broken line; each break leaves the other sliders' values as here):
+
+  | row | measured |
+  | - | - |
+  | at 100% everywhere the frame is byte-identical | the seven hashes above, all equal |
+  | the SKY section | the h3 right after TIME; six range rows, labels and `data-k` in order, 0-200 step 1, value 100; at 320 x 568: every label and slider inside the panel, each label left of its slider, sliders at least 80 px wide, no sideways scroll in the panel or the page |
+  | saved and restored | the six moved through the panel (an `input` event each, 37 / 150 / 0 / 200 / 64 / 121) are in the store and on a second page, its sliders showing them; the store without `sky` reads 100 everywhere; `sky: { stars: 50, moon: 0 }` reads those two and 100 for the rest |
+  | each slider at 0 | at 100: Polaris adds 223, HIP 55642 103, Jupiter 235, the band 11.12 over the patch off it, the sun 267 saturated pixels, the gibbous moon adds up to 194, the crescent's dark part 60.97. Stars 0: Polaris 0, HIP 55642 0, Jupiter 235. Planets 0: Jupiter 0, Polaris 223. Milky Way 0: band - off 0, `uMwGain` 0. Sun 0: 0 saturated pixels (the moon still 194). Moonlight 0: the gibbous adds 0, the sun still 267. Earthshine 0: the dark part 0, the lit limb 220. Stars and Planets 0: no POINTS call (1 otherwise) |
+  | each slider at 200 | Stars: HIP 55642 103 -> 206 (2.00), Jupiter unmoved; Planets: Jupiter at night 0.04 68 -> 136 (2.00), the star unmoved; Milky Way: `uMwGain` 0.004934 / 0.009869 / 0.019737 at 50 / 100 / 200, the band 5.77 / 11.12 / 20.98; Sun: `uSunCol` (3, 2.85, 2.58) -> (6, 5.70, 5.16), the land at 17:00 92.85 / 112.52 / 139.89; Moonlight: `uMoonK` 1.2 -> 2.4, `uMoonCol` 2x, the land at the full-moon midnight 14.12 / 17.92 / 24.69; Earthshine: `uMoonES` 0.03704 -> 0.07409, the dark part 34.05 / 60.97 / 99.92. Every GPU pair exactly 2x (powers of two are exact in float32) |
+
+- **Decision not in the plan: a planet under 128.** Jupiter at 22:00 adds 235 (its point is far past white: `vI` up to 2.5
+  times `uStarK` 7.2), and there is no planet under 128 up that night, so the planet half of the row forces `SKY.night` to 0.04
+  for its two frames (the pass's gain carries the night linearly, as the "stars fade with the night" row uses): 68 at 100%. The
+  star half uses iota Leonis (HIP 55642, mag 4), 103 at 100% at the suite's scale.
+- **Decision not in the plan: the per-slider measures.** Stars and Planets on the vertex's own projection (STARS.on minus off,
+  as the Polaris rows); Milky Way on the Milky Way row's two aims with the stars off; Sun on the sun row's saturated disc and,
+  for 200, the land at 17:00 (its light); Moonlight on the gibbous zoomed (its disc) and, for 200, the land at the full-moon
+  midnight (its light and ambient); Earthshine on the dark part of the May 20 crescent zoomed, "well inside" as the by-day row
+  defines it (under 0.85 radii and 0.3 radii past the terminator). Each 0 check also confirms one neighbour stays (Jupiter when
+  Stars is 0, the moon when the Sun is 0, and so on), so a slider wired to its neighbour is caught there too.
+- **Restated (named), not added: "a radio station selector heads the sound section".** It found the section as
+  `#settings h3:nth-of-type(4)`, and the SKY h3 is a new fourth; it now finds the h3 whose text is SOUND (same claim).
+- **Break checks** (scratch copies, the suite run against each alone):
+
+  | break | row that went red | value |
+  | - | - | - |
+  | the planets slider wired to the stars (`uPlanetK = stars/100`) | each slider at 0 (Stars: Jupiter 0, wants 60) and each at 200 (Stars: Jupiter 25 -> 51 moved; Planets: 25 -> 25) | 126 / 2 |
+  | an old save reading 0 (every missing `sky` reads 0, a fresh page too) | saved and restored (the old save 0 everywhere), and 18 older rows whose first visit is now a sky of nothing | 109 / 19 |
+  | an old save reading 0, narrowly (only a stored object without `sky`) | saved and restored alone (old: all six 0) | 127 / 1 |
+  | the earthshine slider wired to moonlight (`moonES * moon/100`) | each slider at 0 (Earthshine: the dark part 60.97, wants at most 1) and each at 200 (`uMoonES` unmoved, the dark part 60.97 three times) | 126 / 2 |
+  | the Milky Way slider ignored (`uMwGain` without `mw/100`) | each slider at 0 (Milky Way: band - off 11.12, gain 0.00987) and each at 200 (gain the same at 50 / 100 / 200) | 126 / 2 |
+
+- **Expected 128, measured 128** (123 + 5), all green. `check-inline-js` GREEN; `gates.sh games/driving-simulator/index.html`:
+  **GATES: GREEN** (smoke, games-sync, negtest scan, the suite 128/0), run alone. The badge is not stamped (step 7 does).
+- **For step 6's break list:** the four above (planets to stars, old save 0, earthshine to moonlight, Milky Way ignored) land on
+  the rows named; "each slider wired to the wrong term" for Sun and Moonlight is not yet run (Sun to the moon's light would show
+  on the 0 row's Sun / Moonlight checks, untested). The DS-4 checks list's note "If DS-6 has landed, add its Earthshine slider row
+  here" (`.claude/driving-simulator.md`) is for step 6's docs pass.
 
 ### Step 6 - break list, frame cost, docs
 

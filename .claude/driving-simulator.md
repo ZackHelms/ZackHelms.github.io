@@ -63,6 +63,10 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | `MOON_AMB = 1.0` (DS-4) | The moonlit share of the night sky's ambient: `SKY.ambSky += MOON_AMB * MOON_RGB * SKY.moonLight`, so a full moon high adds about [0.035, 0.046, 0.078] to the moonless [0.0025, 0.0035, 0.008] | Tuned on the suite's row (the land from 30 m, two frames 30 deg down): 1.0 gives 1.80x the moonless night and 0.41 of dusk; 1.4 gave 0.45 of dusk, 0 gave 1.29x. Measured on frames of the ground, not the chase view, whose headlit road and night sky do not change with the moon (and whose mean moved 18-36 between runs of the same page) |
 | `MOON_DIM = 0.6` (DS-4) | A bright moon dims the star pass's gain (`uStarK`) and the Milky Way's (`uMwGain`) by `1 - 0.6 * moonPhaseFactor * clamp(moon altitude / 5 deg, 0, 1)`: 0.47 under the full moon of May 31 | The plan's default |
 | Earthshine by night only (DS-4) | `SKY.moonES = ES_GAIN * earthshineFraction(phase angle) * SKY.night`; the lit disc itself is still never times the night | Decided by the arc's overseer on the CD's behalf (dssky step 4): step 3 found the dark part of the moon lighter than the blue by day (13 levels on the May 11 moon), and real earthshine is invisible by day |
+| The sky sliders' uniforms (DS-6) | `VS_STARS` takes `uStarsK` (the Stars slider), `uPlanetK` (Planets) and the int `uNStars` (`STARS.n`), and multiplies a vertex's `vI` by `gl_VertexID >= uNStars ? uPlanetK : uStarsK`; `uStarK` (the pass's gain, night and moon dimming) is unchanged and shared. Still one POINTS draw, skipped when both sliders are 0 | The plan named `uPlanetK` and `uNStars` only; a separate stars factor keeps Planets at 100 when Stars is at 0 |
+| Moonlight takes the earthshine with it (DS-6) | The Moonlight slider scales `uMoonK`, which multiplies the kit's whole disc (`zmhMoonDisc`, lit part and earthshine alike), plus `SKY.moonCol` (the glow round the moon and its light) and the moonlit ambient share. Earthshine scales `SKY.moonES` only, so it is the dark part *relative to* the lit part: Moonlight 0 takes the whole moon, earthshine included | The plan's table puts the disc under Moonlight and `ES_GAIN` under Earthshine; separating the lit part from the earthshine would mean calling the kit's disc twice or editing the generated block |
+| What the sliders leave alone (DS-6) | Sun scales `SKY.sunCol`, so its disc, aureole, broad lobe, the haze toward it in the fog, hills and reflections (`skyBase()`), and its light; the blue day sky, the sunset tint and the exposure do not move, so at 0 the day stays blue with no sun in it. A bright moon dims the stars by its phase and height whatever Moonlight is set to | The plan's "the sun's disc, aureole and broad lobe and its light"; the dimming row is about the real moon, not the slider |
+| A sky slider's stored value (DS-6) | A saved value that is not a number from 0 to 200 reads 100, as a missing one does. The panel shows no percentage beside the slider, as the volume rows show none | The merge as `vols` has it, with a guard; labels only on the panel (discovery over instruction) |
 | Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
@@ -732,6 +736,17 @@ measured contribution within 10%; the settings round-trip a reload; an old save
 reads 100% everywhere; the sky's day pixels are byte-identical at 100% to
 before. **Files:** `index.html` (the settings markup, `SETTINGS`, the gains'
 uniforms), the suite, this file.
+
+**Built (dssky step 5, 2026-11-02).** `SETTINGS.sky = { stars, planets, mw, sun, moon, earthshine }`, each 0-200, 100 by
+default, merged on load as `vols` is (an old save reads 100 everywhere; a value that is not a number 0-200 reads 100), in
+`drivingSimulator.settings.v1`. A `<h3>SKY</h3>` after TIME, its rows built from `SKY_KEYS` into `#sky-rows` the way `chan-rows`
+is (`input.skyk`, `data-k`, ids `sky-<key>`), labelled Stars, Planets, Milky Way, Sun, Moonlight, Earthshine. An `input` saves,
+and for Sun, Moonlight and Earthshine runs `updateSky()`; `renderScene()` reads the rest each frame. What each scales: Stars and
+Planets, `uStarsK` / `uPlanetK` in `VS_STARS` (picked by `gl_VertexID >= uNStars`), the POINTS draw skipped when both are 0;
+Milky Way, `uMwGain`; Sun, `SKY.sunCol`; Moonlight, `uMoonK`, `SKY.moonCol` and the moonlit ambient; Earthshine, `SKY.moonES`.
+Every factor is the slider over 100 multiplied on last, so at 100 the frame is byte-identical to the page before (a suite row).
+Five rows (the SKY section at 320 px; saved and restored, old saves 100; each slider at 0; each at 200; byte-identical at 100).
+The Earthshine row is drawn from the start (DS-4 landed first). See the "Assumed, not decided" rows marked DS-6.
 
 ### DS-7. No column of light under a rising or setting sun or moon (bug)
 
