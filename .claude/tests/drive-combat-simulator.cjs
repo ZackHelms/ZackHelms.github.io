@@ -17,8 +17,9 @@
  * pausing the duel, the victory and defeat flows and the saved ladder, and the
  * graphics styles (the select, saving and validating the pick, a skin is paint
  * with real frames drawn between the ticks, toon's bands, toon's ink round the
- * fighters and the courtyard and none in realistic, every element drawn in every
- * style with no GL error).
+ * fighters and the courtyard and none in realistic, neon dark and lit in its
+ * palette, you green and them red, no shadow pass in neon, every element drawn
+ * in every style with no GL error).
  *
  *   .claude/scripts/gates.sh games/combat-simulator/index.html
  *
@@ -358,7 +359,7 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
   // snapped), because the rAF loop keeps drawing between evaluates
   const SKEY = 'combatSimulator.settings.v1';
   const offered = await page.evaluate(() => [...document.querySelectorAll('#style-sel option')].map(o => o.value));
-  ok('the style select offers exactly realistic, toon, in that order', JSON.stringify(offered) === JSON.stringify(['realistic', 'toon']), offered);
+  ok('the style select offers exactly realistic, toon, neon, in that order', JSON.stringify(offered) === JSON.stringify(['realistic', 'toon', 'neon']), offered);
   const pick = await page.evaluate(KEY => {
     __CS.setPaused(true); __CS.setStyle('realistic');
     const F0 = __CS.F, t0 = F0.t;
@@ -463,6 +464,85 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     ink.on.opp - ink.off.opp >= 300 && ink.on.tN > 0 && ink.on.torso <= ink.on.tN * 0.25, { on: ink.on, off: ink.off });
   ok('toon inks round the courtyard: near-black outside both fighters rises with the ink on', ink.on.yard - ink.off.yard >= 1500, { on: ink.on.yard, off: ink.off.yard });
   ok('realistic is untouched by the ink: its frames with FX.ink on and off are byte-identical', ink.same && ink.rOn.yard === ink.rOff.yard, { same: ink.same, rOn: ink.rOn, rOff: ink.rOff });
+  // neon is dark and its light is the palette: one frozen frame per style of the ink rows' scene; mean
+  // luminance, and of the brightest 2% of pixels the share within 25 deg of hue of green, red, blue,
+  // purple or gold, or near-white (the blade, stars)
+  const neonLit = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0;
+    const hueOf = (r, g, b) => { const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); if (!d) return -1;
+      const h = 60 * (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4); return h; };
+    const N = __CS.NEON, hues = ['green', 'red', 'blue', 'purple', 'gold'].map(k => hueOf(N[k][0], N[k][1], N[k][2]));
+    const out = { hues: hues.map(h => +h.toFixed(1)) };
+    for (const s of __CS.STYLES) {
+      __CS.setStyle(s);
+      const d = __CS.pixels().d, n = d.length / 4, hist = new Array(256).fill(0), L = new Uint8Array(n);
+      let sum = 0;
+      for (let j = 0; j < n; j++) { const l = 0.299 * d[j * 4] + 0.587 * d[j * 4 + 1] + 0.114 * d[j * 4 + 2]; sum += l; L[j] = Math.round(l); hist[L[j]]++; }
+      let need = Math.ceil(n * 0.02), thr = 255; for (; thr > 0; thr--) { need -= hist[thr]; if (need <= 0) break; }
+      let top = 0, pal = 0, white = 0;
+      for (let j = 0; j < n; j++) { if (L[j] < thr) continue; top++;
+        const r = d[j * 4], g = d[j * 4 + 1], b = d[j * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        if (mx >= 180 && (mx - mn) / mx < 0.25) { white++; pal++; continue; }
+        const h = hueOf(r, g, b); if (h >= 0 && hues.some(q => Math.min(Math.abs(h - q), 360 - Math.abs(h - q)) <= 25)) pal++; }
+      out[s] = { mean: +(sum / n / 255).toFixed(4), thr, top, white, onPalette: +(pal / top).toFixed(3) };
+    }
+    __CS.setStyle('realistic');
+    return out;
+  });
+  console.log('     neon light: ' + JSON.stringify(neonLit));
+  // measured at 844x390 (rank 1): neon mean 0.084 with 99.2% of its brightest 2% on the palette (realistic 0.73, toon 0.76)
+  ok('neon is dark and its light is the palette: mean luminance under 0.12, and 85% of the brightest 2% within 25 deg of a palette hue or near-white',
+    neonLit.neon && neonLit.neon.mean < 0.12 && neonLit.neon.onPalette >= 0.85, neonLit);
+  // you are green, they are red: each fighter drawn alone (FX.only) beside a frame with neither, in ONE
+  // evaluate; a fighter's pixels are those that differ inside its box, and the mean colour of the brightest
+  // 10% of them must be its own colour by 1.5x over both other channels
+  const sides = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0; __CS.setStyle('neon');
+    const W = innerWidth, H = innerHeight;
+    const boxOf = (f, r, top) => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const dx of [-r, r]) for (const dz of [-r, r]) for (const y of [0, top]) { const q = project([f.x + dx, y, f.z + dz], W, H); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      return [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1)]; };
+    const frame = who => { __CS.FX.only = who; return __CS.pixels(); };
+    let res;
+    try {
+      const none = frame('none'), out = {};
+      for (const who of ['p', 'e']) {
+        const fr = frame(who), d = fr.d, w = fr.w, h = fr.h, k = w / W, b = boxOf(F[who], 0.6, 2.0), px = [];
+        for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) {
+          const x = gx / k, y = (h - 1 - gy) / k, i = (gy * w + gx) * 4;
+          if (x < b[0] || x >= b[2] || y < b[1] || y >= b[3]) continue;
+          if (d[i] === none.d[i] && d[i + 1] === none.d[i + 1] && d[i + 2] === none.d[i + 2]) continue;
+          px.push([d[i], d[i + 1], d[i + 2], 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]]);
+        }
+        px.sort((u, v) => v[3] - u[3]);
+        const top = px.slice(0, Math.max(1, Math.ceil(px.length * 0.1))), m = [0, 1, 2].map(c => top.reduce((a, q) => a + q[c], 0) / top.length);
+        out[who] = { n: px.length, mean: m.map(v => Math.round(v)) };
+      }
+      res = out;
+    } finally { __CS.FX.only = null; __CS.setStyle('realistic'); }
+    return res;
+  });
+  console.log('     neon sides: ' + JSON.stringify(sides));
+  // measured: you [63, 244, 34] (green 3.9x red), them [245, 59, 92] (red 2.7x blue)
+  const domi = (m, c) => [0, 1, 2].every(o => o === c || m[c] > 1.5 * m[o]);
+  ok('in neon you are green and they are red: the brightest tenth of each fighter\'s own pixels is its colour by 1.5x',
+    sides.p.n > 200 && sides.e.n > 200 && domi(sides.p.mean, 1) && domi(sides.e.mean, 0), sides);
+  // neon has no sun shadows: count the draws made into the shadow map's framebuffer during one draw() per style
+  const shadowDraws = await page.evaluate(() => {
+    const g = document.getElementById('gl').getContext('webgl2'), names = ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced', 'bindFramebuffer'];
+    const keep = {}, own = {}; for (const k of names) { keep[k] = g[k]; own[k] = Object.prototype.hasOwnProperty.call(g, k); }
+    let cur = null, n = 0; const out = {};
+    g.bindFramebuffer = (t, fb) => { cur = fb; return keep.bindFramebuffer.call(g, t, fb); };
+    for (const k of names.slice(0, 4)) g[k] = (...a) => { if (cur && cur === __CS.SHADOW.fb) n++; return keep[k].apply(g, a); };
+    try { for (const s of __CS.STYLES) { __CS.setStyle(s); n = 0; cur = null; __CS.draw(); out[s] = n; } }
+    finally { for (const k of names) { if (own[k]) g[k] = keep[k]; else delete g[k]; } __CS.setStyle('realistic'); }
+    return out;
+  });
+  ok('neon draws no shadow pass: nothing goes into the shadow map in neon, two draws in realistic and toon', shadowDraws.neon === 0 && shadowDraws.realistic === 2 && shadowDraws.toon === 2, shadowDraws);
   // every element at once in every style: a power wind-up and its ring, a trail, sparks; no GL error
   const all = await page.evaluate(() => {
     __CS.setPaused(true); __CS.setStyle('realistic'); __CS.startDuel(4, 31); __CS.tick(1 / 60, 125);
