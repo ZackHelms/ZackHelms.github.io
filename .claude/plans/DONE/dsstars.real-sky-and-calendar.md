@@ -1,10 +1,10 @@
 # dsstars - Driving Simulator: the real sky over Raleigh, NC (zmh-sky), and a calendar that runs a day per game day (DS-1)
 
-**Status:** PARTIALLY IMPLEMENTED - step 1 of 5 done (2026-11-01), on branch
-`claude/brave-sagan-odwmrd`, not on `main`. **Revised 2026-11-02 for zmh-sky:** steps 2-5 were
-rewritten around zmhstudio's new sky kit, so the catalogue download that stopped the first run
-(the proxy refused `cdsarc.cds.unistra.fr`) is gone. The first run's record:
-`dsstars.real-sky-and-calendar.follow-up.md`.
+**Status:** IMPLEMENTED 2026-11-02 - steps 1-5, branch `claude/brave-sagan-odwmrd` (step 1
+2026-11-01; steps 2-4 2881a5b..0679012 by the oversee run of 2026-11-02, then the ship commit),
+landed on `main` as one commit. Steps 2-5 were rewritten on 2026-11-02 around zmhstudio's new sky
+kit, so the catalogue download that stopped the first run (the proxy refused
+`cdsarc.cds.unistra.fr`) is gone. The runs' record: `dsstars.real-sky-and-calendar.follow-up.md`.
 **Requested:** 2026-11-01, the CD (third message of the day, verbatim):
 
 > Oh yeah, fix the star field rotation. It looks like i am at the earths rotational north pole and
@@ -478,10 +478,10 @@ The CD's standing preferences:
 |---|---|---|
 | 0 | The CD's words, the catalogue answer and the spec corrections recorded (this file) | DONE 2026-11-01 |
 | 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | DONE 2026-11-01 |
-| 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows | |
-| 3 | The star pass with planets, `ridgeY()`, the Milky Way, hash stars deleted; star, planet, Milky Way and pixel rows | |
-| 4 | Break list run whole, frame cost, docs | |
-| 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
+| 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows || DONE 2026-11-02 |
+| 3 | The star pass with planets, `ridgeY()`, the Milky Way, hash stars deleted; star, planet, Milky Way and pixel rows | DONE 2026-11-02 |
+| 4 | Break list run whole, frame cost, docs | DONE 2026-11-02 |
+| 5 | Ship: badge, gates, land on `main`, Pages, report to the CD || DONE 2026-11-02 |
 
 (Step 2 was the BSC5 download until 2026-11-02; it was blocked on 2026-11-01 because the host was
 refused, and the revision replaced it.)
@@ -663,6 +663,39 @@ For steps 2-4:
      - Venus's magnitude is below -3.5 and Jupiter's below -1.5.
 - Suite 86 -> 90.
 
+#### Step 2 results
+
+Done 2026-11-02 (oversee run, worktree branch `worktree-oversee+dsstars`, from d47bc1d). zmhstudio at 7b9c40e.
+- **Splice:** `ZMH-SKY=games/driving-simulator/index.html bytes=98547 stars=1627`. A second splice left
+  the page byte-identical (same sha256). The page is now 296,690 B.
+- **Licence and notes:** `games/driving-simulator/LICENSE-d3-celestial.txt` copied from the kit; the new
+  THE ROAD paragraph is `<p id="sky-notes">`, with the attribution line verbatim and the link. The
+  licence holder's name is only in that paragraph, the licence file and the generated block.
+- **Bodies:** `OBS_SKY`; `updateSky()` calls `skyAt()` once and sets `sun`, `decl`, `eot`
+  (`equationOfTimeMin`), `solarNoon` (step 1's formula), the topocentric `moon`, `moonPhase`, `lst`,
+  `starM` (`Float32Array(9)`, row-major) and `planets` (`{id, mag, valid, enu, altDeg, azDeg}`, the
+  naked-eye five). `solar()` and `celestial()` are deleted; the hook drops `solar` and adds `OBS_SKY`,
+  `ZMH_SKY`, `SKY_DATA`. The hash stars and `uStarRot` are untouched (step 3).
+- **Suite:** 90 passed (section "3c", 4 rows). No step-1 row was restated and none moved.
+- The kit at 22:00 EDT May 5: sun -20.876 / 310.515; moon -23.134 / 109.092; Venus mag -3.89 at
+  4.34 / 296.16; Jupiter -2.00 at 33.49 / 274.94. Mean-phase sun-moon angles: 175.1 (full, May 1),
+  5.5 (new, May 16), 174.2 (full, May 31).
+- Scratch breaks on copies: the moon as the anti-sun turned the moon row red; the longitude's sign
+  flipped turned the sun, moon and planet rows (and step 1's sun rows) red.
+- **Choices beyond the plan** (step 4 adds them to the assumed table):
+  - The sky-block row never types the licence holder's name: it captures it from the block header and
+    checks it matches the licence file and `#sky-notes`.
+  - The licence file is checked beside the checkout's page, not a `DS_PAGE` copy (copies live in scratch).
+  - CSS `#settings a{color:var(--blue);overflow-wrap:anywhere}`, so the link reads and wraps at 320 px.
+  - The moon row also checks `SKY.moonPhase.illuminatedFraction` against `2026-05-06T02Z/geo/moon`
+    within 0.01 (not asked for).
+- **Gates:** the implementer's three gate runs were red on one sound row each (which one varied:
+  engine/radio loudness, the engine slider, the four stations within 25%) while it ran broken copies
+  in parallel at load average 3-4. Its control, the step-1 page under the step-1 suite, failed the
+  stations row the same way. Re-run by the overseer on a quiet machine: `GATES: GREEN`, 90 passed.
+  That machine load causes it is a hypothesis, not traced; the sound rows measure loudness over
+  wall-clock time.
+
 ### Step 3 - the stars, the planets and the Milky Way in the sky
 
 - The star pass, the planets' vertices, `ridgeY()` and the Milky Way, as in "Design". Then delete
@@ -715,6 +748,136 @@ For steps 2-4:
 - Also rerun the existing day/night pixel rows. The sky's day pixels must not move with `ridgeY()`
   or the Milky Way branch (the refactor is exact).
 - Suite 90 -> 103.
+
+#### Step 3 results
+
+Done 2026-11-02 (oversee run, worktree branch `worktree-oversee+dsstars`, from 2881a5b). zmhstudio at 7b9c40e.
+
+**Found and fixed: the sky was drawn mirrored (traced 2026-11-02).** The plan (and step 2) said the kit's ENU
+`[east, up, north]` is the page's x, y, z with no remap. It is not. `M4.look` is an OpenGL lookAt
+(`s = cross3(f, up)`, `cross3` the ordinary cross product), so facing +z the screen's right is -x: the page's
+world is right-handed as drawn, and ENU is left-handed (the kit's convention table: "a host frame that is
+right-handed (x east, y up, z south) flips one axis ... map it explicitly"). Confirmed on screen before the fix:
+at 07:12 on May 5, facing world azimuth 60 (yaw 60 deg), the sun at azimuth 77 drew 15-17 deg to the LEFT of
+centre (scratch shot); in the real sky it is 17 deg to the right. With stars that means every constellation
+backwards and the sky turning the wrong way about Polaris. The fix is one map at the GPU boundary:
+`enuToWorld(v) = [v[0], v[1], -v[2]]`, so the page's world is (east, up, SOUTH). `SKY.sun`, `.moon`, `.planets`
+and `.starM` stay ENU exactly as the kit gives them (every step-1 and step-2 row unchanged); the GPU gets
+`SKY.sunW`, `SKY.moonW` (sky shader, world light, shadow direction) and `SKY.starW` = W * `starM` (row 3
+negated; the star pass and the Milky Way). The Jupiter pixel row and the Milky Way row both go red without it
+(below). The day sky's sun glow and the world's light direction move to the mirrored place as a result; the
+world has no compass, so nothing else depends on it.
+
+Built:
+- **`GLSL_COMMON`:** `uStarRot` and the hash-star block deleted; `float ridgeY(float az, float mtn)` added (the
+  old inline expression, verbatim). `grep uStarRot` / the hash's `step(0.985` find nothing left; the setter in
+  `setFrameUniforms()` is gone. Stars are gone from the world's fog and paint reflections too (intended).
+- **`FS_SKY`:** `ridge = ridgeY(az, uMtn)`; zmh-sky's `MILKY_WAY_GLSL` and `MILKY_WAY_RGB` (inlined from
+  `ZMH_SKY.MILKY_WAY_RGB` at compile); `if (uNight > 0.0 && uMwGain > 0.0 && d.y >= ridge) c += uMwGain *
+  zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y)` before the hills and
+  the tonemap. `uMwGain` is `MW.on ? MW_GAIN : 0`, so `MW.on = false` skips the branch.
+- **`VS_STARS` / `FS_STARS`, `PRG.stars`:** the kit's law (gamma 0.5 on flux about Sirius -1.46, 0.2 mag per
+  Kasten-Young air mass, 1-4 px times `uPx`), intensity clamped at 2.5, faded over the first 2 deg
+  (`smoothstep(0, 2, alt)`), below the horizon or `aMag > 50` moved out of clip; `FS_STARS` includes
+  `GLSL_COMMON` and discards below `ridgeY(atan(d.z, d.x), 1.0)`. Output `vColor * vI * profile * uStarK`, alpha 0,
+  `uStarK = STAR_GAIN * SKY.exposure * SKY.night`.
+- **The VAO (`initStars()`, called in `initGL()`):** 7 floats a vertex (J2000 unit vector, magnitude, `bvToRGB`
+  colour), 1,627 stars then the five planets in `PLANET_IDS` order (`mer, ven, mar, jup, sat`), `DYNAMIC_DRAW`.
+  `STARS = { n: 1627, count: 1632, on, planets, data, vao, buf }`.
+- **The planets:** `writePlanets()` at the end of `updateSky()` puts `mat3MulVec(mat3Transpose(SKY.starM),
+  p.enu)` and the magnitude (99 when not `valid`) into `STARS.data`, and `bufferSubData`s the 35 floats once
+  `STARS.buf` exists. Colours as the plan (Mercury and Venus white, Mars 1.0/0.62/0.42, Jupiter 1.0/0.95/0.85,
+  Saturn 1.0/0.9/0.7).
+- **The draw** in `renderScene()` right after the sky draw (depth test and depth mask still off), skipped when
+  `SKY.night <= 0` or `!STARS.on`: `uniformMatrix3fv(uStarM, true, SKY.starW)`, the world `vp`, `uPx = RSCALE`
+  (a new `let`, set to `sc` in `resize()`) or 1 in the mirror, `blendFunc(ONE, ONE)`, one
+  `drawArrays(POINTS, 0, STARS.count)`, then blend off. PERF counts the call; `triCount` gives 0 for POINTS.
+- **Hook:** `STARS, MW, starDir, STAR_GAIN, MW_GAIN, enuToWorld`. `starDir(i)` is
+  `mat3MulVec(SKY.starM, vertex i's J2000 vector)` (ENU, before the world flip). `SKY` gains `sunW, moonW, starW`.
+
+Gains (both assumed; step 4 adds them to the assumed table):
+- **`STAR_GAIN = 3.2`.** Chosen by reading pixels through the page's own `renderScene()` at 22:00 on May 5. At
+  1.6 (the first guess) Spica (mag 0.97, 36.8 deg up) peaked at rgb 94/117/203, luminance 118: not white. At 3.2
+  it peaks at 172/216/255 (luminance 209; it is a blue star) and Arcturus (-0.05) saturates; Jupiter (-2.0, at
+  the 2.5 clamp) is a white 2x2 core at 255.
+- **`MW_GAIN = 0.012`**, the kit's `MILKY_WAY_PEAK` (the kit's demo uses 1.2 x that with a night exposure of 2;
+  the page's night exposure is 1.8). On the band at 02:30 EDT on May 6 (35 deg up, azimuth 51.5, Cygnus) a 15x15
+  patch reads luminance 32.8 against 19.5 off the band: faint, with the Great Rift's lane visible in a 30 m-high
+  view. Not tuned further.
+
+The view for the Jupiter pixel row: no in-game camera reaches 33.5 deg up (chase tops out near 19 deg, the
+orbit view is clamped above the ground, the cockpit roof covers a look-up). The row draws one frame with the
+page's own `renderScene()` from 30 m above the car, a 0.8 rad camera aimed 8 deg in azimuth to the side of the
+suite's own Jupiter (so the point is about 160 px off centre and a left-right mirror lands it on the wrong side),
+and reads the pixels straight back. The Milky Way row uses the same camera aimed at each patch.
+
+Suite: **90 -> 103** (13 rows: 7 in a new section "3d", 6 in a new "8b" after the day/night pixel rows). No row
+restated. `gates.sh games/driving-simulator/index.html` run alone (load about 1): SMOKE, GAMES-SYNC,
+NEGTEST-SCAN GREEN, `DRIVING SIMULATOR DRIVE: 103 passed, 0 failed`, `GATES: GREEN`; no sound row went red. The day/night rows rerun green (noon mean 144, midnight 21.5). Measured, 22:00 EDT May 5 unless said:
+- LST equals the suite's own Meeus 12.4 to under 1e-6 deg at six times; 204.407 at the midnight that starts
+  May 5; across the midnight step (23:59:30 + one 0.1 s step at 144 s/day) +0.250684 deg page vs +0.250684 own.
+- The suite's own precessed pole of date through `SKY.starM`: altitude 35.7796, azimuth 0; the J2000 pole
+  0.146 deg from it.
+- Polaris over 24 hours inside the bounds, within 0.05 of the suite's own every hour. The nine stars' angles to the
+  pole vary by at most 0.0004 deg over the day. Dubhe's lowest is 7.4 deg; Arcturus -35.1 to 73.2.
+- The eight table stars vs astronomy-engine: |dAlt| <= 0.0014, dAz <= 0.0023 on sky; vs the suite's own
+  precession at most 0.016 (Betelgeuse; SIMBAD vs the catalogue's own J2000 place).
+- Arcturus 51.96 -> 63.14 deg and Betelgeuse 7.43 -> -4.64 over the hour.
+- POINTS draws: chase 1 per frame, cockpit 1 main per frame plus 1 into the mirror FBO on each even frame,
+  count 1632, first 0; none at noon.
+- Planet vertices through `starM` vs `SKY.planets[].enu`: at most 4.2e-8. Jupiter: contrast 235 at (404, 168),
+  projected (403.9, 167.3); with `STARS.on = false` 0.
+- Isolated bright pixels (top 20% of the chase frame, at least 6.4 deg up, so above the ridge's 4.2 deg max) at
+  midnight, contrast >= 40: 13 / 12 / 13 / 10 at headings 0 / 90 / 180 / 270; with `STARS.on = false` none at
+  >= 30 (largest 6); at noon none at >= 30 (largest 7). The noon frame through the aimed camera is byte-identical
+  with `MW.on` true and false (three aims, 714,132 pixels).
+- The Milky Way row: the suite's own band point b = -0.02 deg at azimuth 51.5, the off patch b = +25.2 at
+  azimuth 2.1 (exactly 40 deg of arc along the 35 deg almucantar), the moon 85.5 and 118.1 deg away; patches
+  32.79 vs 19.46 with `MW.on`, 19.46 vs 19.46 without.
+
+The detector: a peak is a pixel no dimmer than its 8 neighbours that beats the mean of the 7x7 ring around it,
+and the ring must be flat (24 pixels within 8 levels). Without the flat-ring condition the noon frames held
+26-129 "peaks" (leaf highlights and lit windows against the sky) and the midnight frames up to 108 with the stars
+off, so the rows could not tell stars from the world; with it, both are 0.
+
+**The sky's pixels are unchanged by the refactor (checked before the world flip went in).** Scratch check: the
+page with the flip switched off, against step 2's page, 15 day views (noon, 09:00, 17:30; five directions incl.
+the horizon and 0.9 rad up), rendered by `renderScene()` directly with the clock and wind pinned. The sky pass
+alone: byte-identical in all 15. Whole frames: byte-identical in the common load state; both pages also produce
+an occasional different world on some loads (2 of 8 loads differed, one of each page),
+which is the world's own load-time state at the moment the suite pauses (hypothesis, not traced), not the change.
+
+Profile change beyond the plan (assumed): the kit's point profile, `exp(-4 r^2)` to the point's edge, is a Gaussian
+of sigma = radius / sqrt(8), under 0.4 px for a 1-2 px star, and the fragment runs at the pixel centre: a faint
+star came out at about a fifth of its law or was discarded (measured: 1-2 peaks at contrast >= 20 per view at
+first). The page floors sigma at 0.5 framebuffer px and rasterises the point at least 6 sigma (3 px) wide; the
+centre keeps the law's value. From about 2.8 px up the profile is exactly the kit's.
+
+Rows that can fail (scratch breaks on copies, each run alone, the suite in full):
+- the star pass not drawn: 4 rows red (one draw, Jupiter, star pixels at midnight, and the STARS.on-false row,
+  whose `mid` half needs the stars);
+- the planet vertices given `p.enu` as their J2000 direction: the planets row red (vertex error 0.5-1.3, Jupiter's
+  pixel contrast 0);
+- the Milky Way in world coordinates (`zmhMilkyWay(d)`): the Milky Way row red (19.46 vs 19.46 on the band);
+- the world flip removed: the planets row red (Jupiter's pixel contrast 0) and the Milky Way row red.
+
+Choices beyond the plan (step 4 adds them to the assumed table):
+- The world frame is (east, up, south): `enuToWorld`, `SKY.sunW / moonW / starW` (above). The plan's "no remap" was wrong.
+- The star profile's sigma floor (above).
+- The 2-deg fade is `smoothstep(0, 2, alt)`; `aMag > 50` (the planets' 99) is moved out of clip in the vertex
+  shader, so an invalid planet makes no fragments.
+- `uMwGain > 0.0` joins `uNight > 0.0` in the Milky Way's branch, so `MW.on = false` costs nothing; the band is
+  also skipped below the ridge (the hills replace those pixels anyway).
+- The star pass writes alpha 0 (the canvas is `alpha: false`; the mirror target is RGBA8).
+- The suite reaches `renderScene()`, `gl` and `frameNo` as page globals (as it does `ROAD_KIT`), not through the
+  hook; it types its own (east, up, south) map and its own OpenGL-convention projection.
+- Row 1's midnight step calls `updateSky()` after `advanceClock()`, as `tick()` does (`advanceClock()` alone does
+  not refresh `SKY.lst`).
+- Row 8 also asserts no POINTS draw at noon; row 13 also asserts the patches are 40 deg apart and over 50 deg from
+  the moon (the waning moon sits on the galactic core, azimuth 149, at 02:30).
+
+Surprising: the mirror (above); and the kit's own 1-4 px profile is too narrow to sample at pixel centres for the
+faint stars (worth a note to zmhstudio: its demo draws stars at 2-6 CSS px, which hides it).
 
 ### Step 4 - negative tests, frame cost, docs
 
@@ -779,6 +942,81 @@ For steps 2-4:
   - `CLAUDE.md`: the Driving Simulator row gains the calendar, the zmh-sky block ("spliced by the
     kit's CLI, never hand-edited"), one sun from `skyAt()` and the star matrix convention.
 
+#### Step 4 results
+
+Done 2026-11-02 (oversee run, worktree branch `worktree-oversee+dsstars`, from ed140fa). The container
+restarted once mid-step; every batch had already finished and its log was on disk, so nothing was re-run for that.
+
+**The break list:** `.claude/tests/negtests/driving-simulator.json`, 25 breaks. Each carries a `row` field naming the
+row meant to see it. GLSL breaks put the marker in `${"" /* @negtest */}`, JS inside the template literal, so it is
+outside any string. Run on copies with `negtest-copies.py --jobs 2 --freeze ...` in `--only` pairs: a solo suite took
+5:12 the first time (2:38 on the fresh container), and a pair 6-7 minutes, so batches of three would not fit in 9.
+- **Caught by the row meant for them (20):** the date not stepping, the wrap to the middle date, EST all year, no
+  fall-back, the date not saved, `julianDate()` ignoring `dst` (step 1's six); latitude 90 and the longitude's sign
+  (the observer's two); the star pass's matrix without transpose (Jupiter's pixel), the stars through
+  `s.horizonMatrix` (the 22:00 table, the pole of date, Polaris), the placeholder moon (the moon row), the planet
+  vertices given `p.enu` and the planets frozen at boot in JS (the planets row); the star pass not drawn, its draw gate
+  open by day (the draw row's "none by day"), stars not faded by day (`stars-not-faded`, both the gate and the gain:
+  the noon pixel row and the draw row), a hash star back in `skyCol()` (the STARS.on-false row); the Milky Way in world
+  coordinates (the Milky Way row) and not faded by day (the noon byte-identical row); the stars' world flip removed
+  (Jupiter's pixel).
+- **Missed at first, each now caught by a new row (5 new rows, 103 -> 108):**
+  - `mw-no-transpose` (the sky shader's star matrix without transpose): the one-crossing Milky Way row passed. Traced
+    with the kit's own `galacticFromJ2000`: the wrong frame puts that row's band patch at b = -6.0 (still on the band)
+    and its off patch at b = +33. New row **"the Milky Way all round the sky"**: at 02:30 EDT on May 16 (the new moon,
+    the moon down) the 35-deg almucantar read every 10 deg through four aimed frames; the 4 patches the suite's own
+    plane puts within 4 deg of it (30.0-40.1) all beat the 17 more than 25 deg off (max 19.5); with `MW.on` false all 36
+    within 0.02. Surveyed first with the kit: this moment also rejects the world-coordinates and no-flip frames.
+  - `planets-frozen-gpu` (the planets' `bufferSubData` skipped after boot): Jupiter moves under a pixel between 13:00 and
+    22:00, so no pixel row can see it. New row **"the planets' vertices on the GPU follow the date"**: the 35 floats
+    read back with `getBufferSubData` after a step to May 20 equal `STARS.data`, land on `SKY.planets[i].enu` through
+    `starM` (error 8e-8), and Venus's moved 18.0 deg since May 5.
+  - `no-ridge-test` (the star pass's ridge discard removed): no row looked below 6.4 deg. New row **"a star behind the
+    distant hills is hidden"**: Capella (SIMBAD J2000, precessed by the suite) at 00:30 EDT on May 6 is 1.99 deg up in the
+    NNW, past the 2-deg fade and 1.3 deg under the skyline (the ridge formula evaluated in a scratch script only, never
+    in the suite); its pixel reads 30 with the stars on and off. With the break it reads 105. Control: at 21:00 on May 5
+    (30.8 deg up) the same aim reads 255 against 63.
+  - `stars-twilight` (`uStarK` without the night, an extra break of this step): it only shows while 0 < night < 1. New row
+    **"the stars fade with the night"**: what Polaris adds to its pixel at `SKY.night` 0.5 is 90 of 179 at 1 (0.50);
+    with the break 179 of 179.
+  - `no-world-flip-sun` (`enuToWorld` the identity): caught only by the one-crossing Milky Way row's "equal with
+    MW.on false" half, through the mirrored moon's glow landing near one patch. New row **"the sun is drawn where it
+    is"**: at 17:00 on May 5, aimed 8 deg to the side of the suite's own sun, the saturated disc (146 px) is centred
+    0.1 px from where it projects; with the break it is centred 60 px away.
+- The 19 breaks run before the new rows were run against the 103-row suite; adding rows cannot un-catch them. The
+  five misses and `stars-not-faded` were re-run whole against the 108-row suite: all caught.
+- **The sound and perf rows under load** (`--jobs 2`): the engine/radio level row, the engine slider row, the four
+  stations row and the perf block's row (FPS 0) went red in most broken copies, whatever the break. No verdict above
+  rests on them. Hypothesis, not traced: they measure over wall-clock time and the two SwiftShader suites starve them.
+
+**Frame cost** (night, 22:00 on May 5). Per frame, paused, 844x390, SwiftShader, read off `PERF.calls` / `PERF.tris`:
+
+| | stars + Milky Way | stars only | both off |
+|---|---|---|---|
+| chase: calls | 74 | 74 | 73 |
+| cockpit: calls | 132 | 132 | 130 |
+| triangles (chase / cockpit) | 187,151 / 282,584 | same | same |
+| `renderFrame()` CPU, median ms (chase) | 0.3 | 0.2 | 0.2 |
+
+So +1 call (+2 with the mirror), triangles unchanged, the Milky Way adds no call. `frame-budget.cjs ... swiftshader=1`
+(390x844, dpr 3, the default): median 883.4 / 900.0 / 883.3 ms, equal within noise. SwiftShader has no GPU timer and
+software-renders everything, so these say how the renderer behaves with no GPU at all, not a phone's frame rate. No
+gross cost; no escalation.
+
+**Docs:**
+- `.claude/driving-simulator.md`: header 108 checks; DS-1 marked built, with the ENU correction in its item 4; 14
+  assumed rows (the observer and `heightM`, the season dates, the start date, the date steps, DST, the mag-5 cut,
+  `STAR_GAIN`, `MW_GAIN`, the planet colours and the clamp, the star profile, the fade, the world frame, the Date row,
+  the link CSS) and the old Sun row marked superseded; Architecture: the sky kit block and its command, the calendar,
+  the sky (one sun, the star matrix convention, the world frame), the star pass, the Milky Way, the hash stars gone;
+  Testing: the 31 sky rows, the oracles with record ids, the break list, the load flake; Measured: the frame cost.
+- `.claude/tests/README.md`: the suite's row (108 checks, the sky rows, the break list line, the flake).
+- `games/CLAUDE.md`: the entry (~4,100 lines, the sky, `ZMH-SKY` beside `KITS` as generated, 108 checks).
+- `CLAUDE.md`: the Driving Simulator row gains the calendar, the zmh-sky block, one sun, the star matrix and the
+  world flip.
+
+**Suite: 108** (103 + 5 new rows, all from the break list). `gates.sh games/driving-simulator/index.html` run alone: SMOKE, GAMES-SYNC, NEGTEST-SCAN GREEN, `DRIVING SIMULATOR DRIVE: 108 passed, 0 failed`, `GATES: GREEN`; no sound row went red.
+
 ### Step 5 - ship
 
 - Run `.claude/scripts/stamp-badge.sh games/driving-simulator/index.html`, then read the stamp back
@@ -805,6 +1043,13 @@ For steps 2-4:
   - the assumed rows most worth a look: the start date, the DST jump, `STAR_GAIN`, `MW_GAIN`, the
     magnitude cut;
   - the re-sweep command.
+
+#### Step 5 results
+
+Done 2026-11-02 by the overseer (the procedure, so no separate implementer). Badge
+`build 2026-11-02 12:27 UTC`; `check-inline-js` and `gates.sh` GREEN after the stamp (suite 108).
+`origin/main` had not moved since 98f6092, so no merge was needed. Landed with `land-on-main.sh`
+(dry run first); the landed SHA and the Pages result are in the follow-up and the CD's report.
 
 ## Gotchas / bindings
 

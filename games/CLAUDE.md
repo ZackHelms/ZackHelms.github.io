@@ -1132,7 +1132,7 @@ icon is `animation-rigs/icon.svg` via the same CSS override Phasic uses (the car
 keeps 🩻 for the sync check). Suite: `.claude/tests/drive-animation-rigs.cjs`.
 Detailed context: `.claude/animation-rigs.md`.
 
-### DRIVING SIMULATOR (`driving-simulator/index.html`, ~2,700 lines)
+### DRIVING SIMULATOR (`driving-simulator/index.html`, ~4,100 lines)
 An endless two-way US road driven in **WebGL2** (CD commission 2026-11-01, placed after
 Animation Rigs on the hub; open MIT). Free drive: no score, no fail state. Three views
 from the car button top right: **cockpit** (dashboard, an instrument cluster drawn to a
@@ -1149,8 +1149,16 @@ the accelerator. The settings pause the game and hold a season (spring; the othe
 backlog DS-3), a radio station selector (four stations), a volume slider per sound, and performance stats (pure green FPS at the top and
 a block of frame, CPU, GPU, draw-call and triangle numbers, on by default). The car's proportions, the traffic's, the paint mix and every road
 dimension come from zmh-3d's `road-spec/v1` kit; houses, shops, offices and trees from
-its town kit, spliced in by `build-kits.mjs` (never hand-edit the `KITS` block). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (78 checks). Detailed context:
+its town kit, spliced in by `build-kits.mjs` (never hand-edit the `KITS` block). The sky is
+the real sky over Raleigh, NC (DS-1): a calendar that steps a day each game midnight (Tue
+May 5, 2026 on a first visit, saved, on Raleigh's daylight-saving clock), the sun, the
+moon, the planets and 1,627 stars to mag 5 from zmh-sky, and the Milky Way faint behind
+them. The kit sits in a second generated block, `ZMH-SKY`, right after `KITS`, spliced by
+the kit's own CLI (never hand-edit it either; the command is in the context file). One sun
+from `skyAt()`; the star matrix is the kit's (J2000 to ENU, precession included,
+row-major, uploaded with transpose); the page's world is (east, up, south), so the GPU
+gets every body through `enuToWorld`. Suite:
+`.claude/tests/drive-driving-simulator.cjs` (108 checks). Detailed context:
 `.claude/driving-simulator.md`.
 ---
 
