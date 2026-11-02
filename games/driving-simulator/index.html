@@ -2168,7 +2168,7 @@ if (gl) {
 const MAXL = 16;
 const GLSL_COMMON = `
 uniform vec3 uSunDir, uMoonDir, uSunCol, uMoonCol, uCamWrap;
-uniform float uDay, uNight, uStarRot;
+uniform float uDay, uNight;
 float h21(vec2 p){ p = mod(p, 4096.0); return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
   return mix(mix(h21(i), h21(i+vec2(1,0)), u.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), u.x), u.y); }
@@ -2188,18 +2188,11 @@ vec3 skyCol(vec3 d){
   c += uSunCol * (smoothstep(0.99985, 0.99993, cs) * 30.0 + pow(max(cs, 0.0), 10.0) * 0.18 + pow(max(cs, 0.0), 120.0) * 0.6) * step(-0.06, sy);
   float cm = dot(d, uMoonDir);
   c += vec3(0.8, 0.85, 0.95) * smoothstep(0.99975, 0.99985, cm) * 1.2 * uNight + uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6;
-  if (uNight > 0.0 && d.y > 0.0) {
-    vec3 sd = d;
-    float ca = cos(uStarRot), sa = sin(uStarRot);
-    sd.xz = mat2(ca, -sa, sa, ca) * sd.xz;
-    vec2 g = vec2(atan(sd.z, sd.x) * 160.0, asin(clamp(sd.y, -1.0, 1.0)) * 160.0);
-    vec2 cell = floor(g); vec2 f = fract(g) - 0.5;
-    float h = h21(cell * 1.37 + 3.1);
-    float star = step(0.985, h) * smoothstep(0.12, 0.0, length(f)) * (0.4 + 2.0 * h21(cell + 9.1));
-    c += vec3(0.9, 0.92, 1.0) * star * uNight * smoothstep(0.0, 0.15, d.y);
-  }
   return c;
 }
+// The distant hills' skyline: a ridge at infinity, d.y of its top at world azimuth atan(d.z, d.x). The sky
+// draws the hills below it (FS_SKY) and the star pass discards below it (FS_STARS): the hills are not geometry.
+float ridgeY(float az, float mtn){ return 0.025 + 0.03 * (sin(az * 3.0 + 1.3) * 0.5 + 0.5) * mtn + 0.012 * sin(az * 11.0 + 0.4) + 0.006 * sin(az * 37.0); }
 vec3 tonemap(vec3 x){ x *= 1.0; vec3 a = x * (2.51 * x + 0.03), b = x * (2.43 * x + 0.59) + 0.14; return pow(clamp(a / b, 0.0, 1.0), vec3(1.0 / 2.2)); }
 `;
 const VS_WORLD = `#version 300 es
@@ -2372,19 +2365,67 @@ const FS_SKY = `#version 300 es
 precision highp float;
 ${GLSL_COMMON}
 uniform mat4 uInvVP; uniform float uExposure; uniform float uMtn;
+uniform mat3 uStarM; uniform float uMwGain;
+${ZMH_SKY_GLSL.MILKY_WAY_GLSL}
+const vec3 MILKY_WAY_RGB = vec3(${ZMH_SKY.MILKY_WAY_RGB.map(v => v.toFixed(6)).join(', ')});
 in vec2 vP; out vec4 frag;
 void main(){
   vec4 a = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(a.xyz / a.w);
   vec3 c = skyCol(d);
   // distant hills: a ridge at infinity, hazed toward the horizon colour
   float az = atan(d.z, d.x);
-  float ridge = 0.025 + 0.03 * (sin(az * 3.0 + 1.3) * 0.5 + 0.5) * uMtn + 0.012 * sin(az * 11.0 + 0.4) + 0.006 * sin(az * 37.0);
+  float ridge = ridgeY(az, uMtn);
+  // the Milky Way (zmh-sky's band, J2000): only at night, so the day sky costs nothing and keeps its pixels.
+  // uStarM is the world star matrix (J2000 -> world, orthogonal), so its transpose takes d back to J2000.
+  if (uNight > 0.0 && uMwGain > 0.0 && d.y >= ridge) c += uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y);
   if (d.y < ridge) {
     vec3 hz = skyCol(normalize(vec3(d.x, 0.02, d.z)));
     vec3 hill = mix(vec3(0.02, 0.035, 0.03) * (0.2 + uDay * 2.0), hz, 0.62);
     c = mix(hill, hz, smoothstep(ridge, ridge - 0.04, d.y) * 0.3);
   }
   frag = vec4(tonemap(c * uExposure), 1.0);
+}`;
+// The star pass: zmh-sky's STAR_VERTEX / STAR_FRAGMENT ported to this page's frame and draw state, with the
+// kit's starAppearance law and constants (intensity 10^(-0.4 * 0.5 * (m + 1.46)), Sirius = 1; extinction
+// 0.2 mag per Kasten-Young air mass; 1-4 px). One gl.POINTS vertex per star (J2000 unit vector, magnitude,
+// linear colour), the five planets last. uStarM is J2000 -> world; the eye is at the origin, so a star at
+// 1000 m sits inside the far plane (2400) and the depth test is off, as for the sky. It draws after the
+// sky's tonemap, additively, so its values stay small: uStarK = STAR_GAIN * exposure * night.
+// The page's one variation on the profile: the kit's Gaussian (sigma = radius / sqrt(8), so exp(-4 r^2) out
+// to the point's edge) is sub-pixel for a 1-2 px star, and the fragment runs at pixel centres, so a faint
+// star came out at a fifth of its law or not at all. Sigma is floored at 0.5 px and the point rasterised at
+// least 3 px wide: the centre keeps the law's intensity; from about 2.8 px up the profile is exactly the kit's.
+const VS_STARS = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aDir; layout(location=1) in float aMag; layout(location=2) in vec3 aColor;
+uniform mat3 uStarM; uniform mat4 uVP; uniform float uPx;
+out vec3 vDir, vColor; out float vI, vSize, vSig;
+const float STAR_GAMMA = 0.5, STAR_MAG_REF = -1.46, EXT_K = 0.2, I_MAX = 2.5;
+float airmass(float h){ h = clamp(h, 0.0, 90.0); return 1.0 / (sin(radians(h)) + 0.50572 * pow(h + 6.07995, -1.6364)); }
+void main(){
+  vec3 w = uStarM * aDir;
+  vDir = w; vColor = aColor;
+  if (w.y < 0.0 || aMag > 50.0) { vI = 0.0; gl_PointSize = 0.0; gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
+  float alt = degrees(asin(clamp(w.y, -1.0, 1.0)));
+  float I = pow(10.0, -0.4 * STAR_GAMMA * (aMag + EXT_K * airmass(alt) - STAR_MAG_REF));
+  float sz = mix(1.0, 4.0, min(1.0, I)) * uPx;
+  vSig = max(sz * 0.5 / sqrt(8.0), 0.5); vSize = max(sz, 6.0 * vSig);
+  gl_PointSize = vSize;
+  vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt);
+  gl_Position = uVP * vec4(w * 1000.0, 1.0);
+}`;
+const FS_STARS = `#version 300 es
+precision highp float;
+${GLSL_COMMON}
+uniform float uStarK;
+in vec3 vDir, vColor; in float vI, vSize, vSig; out vec4 frag;
+void main(){
+  if (vI <= 0.0) discard;
+  vec3 d = normalize(vDir);
+  if (d.y < ridgeY(atan(d.z, d.x), 1.0)) discard;     // behind the distant hills
+  vec2 p = (gl_PointCoord - 0.5) * vSize; float r2 = dot(p, p);     // framebuffer pixels from the centre
+  if (r2 > 0.25 * vSize * vSize) discard;
+  frag = vec4(vColor * (vI * exp(-0.5 * r2 / (vSig * vSig)) * uStarK), 0.0);
 }`;
 const VS_GLOW = `#version 300 es
 precision highp float;
@@ -2481,7 +2522,9 @@ function initGL() {
   PRG = {
     world: compile(VS_WORLD, FS_WORLD, 'world'), shadow: compile(VS_SHADOW, FS_SHADOW, 'shadow'),
     sky: compile(VS_SKY, FS_SKY, 'sky'), glow: compile(VS_GLOW, FS_GLOW, 'glow'), blob: compile(VS_BLOB, FS_BLOB, 'blob'),
+    stars: compile(VS_STARS, FS_STARS, 'stars'),
   };
+  initStars();
   TEX.signs = texFromCanvas(makeSignAtlas(), true);
   TEX.gauge = texFromCanvas(gaugeCv, false);
   makeShadow([1024, 2048, 2048][SETTINGS.gfx] || 2048);
@@ -2906,6 +2949,7 @@ function updateChunks(budget) {
 // re-derived by the rule (utcOffset) only at boot, a date step and the time-of-day slider.
 const SKY = { hour: 13, mjd: SETTINGS.date, dst: true, decl: 0, eot: 0, solarNoon: 13,
   sun: [0, 1, 0], moon: [0, -1, 0], moonPhase: null, lst: 0, starM: new Float32Array(9), planets: [],
+  sunW: [0, 1, 0], moonW: [0, -1, 0], starW: new Float32Array(9),
   sunCol: [0, 0, 0], moonCol: [0, 0, 0], day: 1, night: 0, ambSky: [0, 0, 0], ambGnd: [0, 0, 0], exposure: 1, lights: false };
 // The observer: Raleigh, NC, in degrees (east positive). Every body in the sky comes from the zmh-sky
 // block (ZMH_SKY.skyAt, once per updateSky()): one sun for the light, the sun disc and the moon. No
@@ -2916,6 +2960,49 @@ const RAD = Math.PI / 180;
 // The kit's observer: lonEastDeg is east-positive (so Raleigh's is negative); heightM 0 as the kit's own
 // Raleigh (Raleigh is about 100 m up, which moves the moon's parallax by far under 0.001 deg).
 const OBS_SKY = { latDeg: OBS.lat, lonEastDeg: OBS.lon, heightM: 0 };
+// The world frame. The renderer is right-handed (M4.look: facing +z, +x is on the screen's left), so the
+// world is (east, up, SOUTH); zmh-sky's ENU [east, up, north] is left-handed (determinant -1, the kit's
+// convention table), and fed in as it is it draws the sky mirrored: the constellations backwards and the sky
+// turning the wrong way about Polaris. SKY.sun, .moon, .planets and .starM stay ENU, exactly as the kit gives
+// them; the GPU gets them through W = diag(1, 1, -1): SKY.sunW, SKY.moonW and SKY.starW = W * starM.
+const enuToWorld = v => [v[0], v[1], -v[2]];
+// The stars and planets: one gl.POINTS pass (VS_STARS / FS_STARS). A vertex is 7 floats: the J2000 unit
+// vector, the magnitude and the linear colour (zmh-sky's bvToRGB; no B-V gives white). The 1,627 stars of
+// the ZMH-SKY block come first, then the five naked-eye planets in PLANET_IDS order, rewritten by updateSky()
+// as the sky moves (a planet outside the kit's 1800-2050 elements gets magnitude 99 and draws nothing).
+// STAR_GAIN scales the pass after the tonemap (a magnitude-1 star reads white); MW_GAIN is the Milky Way's
+// linear scale before it (the kit's MILKY_WAY_PEAK: faint, as Raleigh's sky is). Both assumed.
+const STAR_GAIN = 3.2, MW_GAIN = 0.012;
+const PLANET_IDS = ['mer', 'ven', 'mar', 'jup', 'sat'];
+const PLANET_RGB = { mer: [1, 1, 1], ven: [1, 1, 1], mar: [1.0, 0.62, 0.42], jup: [1.0, 0.95, 0.85], sat: [1.0, 0.9, 0.7] };
+const STARS = (() => {
+  const S = SKY_DATA.stars, I = k => S.fields.indexOf(k), n = S.rows.length, data = new Float32Array((n + 5) * 7);
+  S.rows.forEach((r, i) => data.set([...ZMH_SKY.unitFromRaDec(r[I('ra')], r[I('dec')]), r[I('mag')], ...ZMH_SKY.bvToRGB(r[I('bv')])], i * 7));
+  PLANET_IDS.forEach((id, k) => data.set([0, 0, 1, 99, ...PLANET_RGB[id]], (n + k) * 7));
+  return { n, count: n + 5, on: true, planets: PLANET_IDS, data, vao: null, buf: null };
+})();
+const MW = { on: true };
+function initStars() {
+  STARS.vao = gl.createVertexArray(); gl.bindVertexArray(STARS.vao);
+  STARS.buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, STARS.buf);
+  gl.bufferData(gl.ARRAY_BUFFER, STARS.data, gl.DYNAMIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 28, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 28, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 28, 16);
+  gl.bindVertexArray(null);
+}
+// The planets' vertices: each planet's direction of date (ENU) taken back to J2000 through the same matrix,
+// so the shader's star matrix lands it exactly on p.enu.
+function writePlanets() {
+  const T = ZMH_SKY.mat3Transpose(SKY.starM);
+  PLANET_IDS.forEach((id, k) => {
+    const p = SKY.planets.find(q => q.id === id);
+    STARS.data.set(p ? [...ZMH_SKY.mat3MulVec(T, p.enu), p.valid ? p.mag : 99] : [0, 0, 1, 99], (STARS.n + k) * 7);
+  });
+  if (STARS.buf) { gl.bindBuffer(gl.ARRAY_BUFFER, STARS.buf); gl.bufferSubData(gl.ARRAY_BUFFER, STARS.n * 28, STARS.data, STARS.n * 7, 35); }
+}
+// Vertex i's direction (ENU), as the GPU turns it (before the world flip).
+const starDir = i => ZMH_SKY.mat3MulVec(SKY.starM, Array.from(STARS.data.subarray(i * 7, i * 7 + 3)));
 // The Julian date (UT) of the game's date and clock. Doubles carry it to well under a second; never pass it to GLSL.
 function julianDate() { return 2400000.5 + SKY.mjd + (SKY.hour - (SKY.dst ? -4 : -5)) / 24; }
 function updateSky() {
@@ -2933,6 +3020,9 @@ function updateSky() {
   SKY.lst = s.lstDeg;
   SKY.starM.set(s.starMatrix);
   SKY.planets = s.planets.filter(p => p.nakedEye).map(p => ({ id: p.id, mag: p.mag, valid: p.valid, enu: p.enu, altDeg: p.altDeg, azDeg: p.azDeg }));
+  SKY.sunW = enuToWorld(SKY.sun); SKY.moonW = enuToWorld(SKY.moon);
+  SKY.starW.set(SKY.starM); for (let k = 6; k < 9; k++) SKY.starW[k] = -SKY.starW[k];
+  writePlanets();
   const e = SKY.sun[1];
   SKY.day = smooth(-0.16, 0.28, e);
   SKY.night = 1 - smooth(-0.2, 0.03, e);
@@ -3092,10 +3182,9 @@ function drawWorld(prog, eye, fwd, opt) {
 }
 function setFrameUniforms(prog, eye) {
   const U = prog.U;
-  gl.uniform3fv(U.uSunDir, SKY.sun); gl.uniform3fv(U.uMoonDir, SKY.moon);
+  gl.uniform3fv(U.uSunDir, SKY.sunW); gl.uniform3fv(U.uMoonDir, SKY.moonW);
   gl.uniform3fv(U.uSunCol, SKY.sunCol); gl.uniform3fv(U.uMoonCol, SKY.moonCol);
   gl.uniform1f(U.uDay, SKY.day); gl.uniform1f(U.uNight, SKY.night);
-  gl.uniform1f(U.uStarRot, SKY.hour / 24 * TAU);
   gl.uniform3f(U.uCamWrap, eye[0] - Math.floor(eye[0] / 4096) * 4096, eye[1], eye[2] - Math.floor(eye[2] / 4096) * 4096);
   if (U.uExposure) gl.uniform1f(U.uExposure, SKY.exposure);
 }
@@ -3154,7 +3243,7 @@ function glowList(eye, recs) {
 }
 function renderShadow(recs) {
   const ctr = [CAM.eye[0] + CAM.fwd[0] * 35, PLAYER.y, CAM.eye[2] + CAM.fwd[2] * 35];
-  const L = SKY.sun[1] > 0.05 ? SKY.sun : SKY.moon;
+  const L = SKY.sun[1] > 0.05 ? SKY.sunW : SKY.moonW;
   const size = 75;
   // a light-space view around a texel-snapped centre (camera-relative)
   const view = M4.look([0, 0, 0], [-L[0], -L[1], -L[2]], Math.abs(L[1]) > 0.98 ? [0, 0, 1] : [0, 1, 0]);
@@ -3185,7 +3274,20 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   const sk = PRG.sky; gl.useProgram(sk.p); setFrameUniforms(sk, eye);
   gl.uniformMatrix4fv(sk.U.uInvVP, false, M4.invert(vp));
   gl.uniform1f(sk.U.uMtn, 1);
+  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN : 0);
   gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3);
+  // stars and planets: after the sky, before the world (which covers them); additive, then blend off.
+  // The kit's matrices are row-major, hence transpose = true. uPx: the main pass's render scale, 1 in the mirror.
+  if (SKY.night > 0 && STARS.on && STARS.vao) {
+    const sp = PRG.stars; gl.useProgram(sp.p);
+    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);
+    gl.uniformMatrix4fv(sp.U.uVP, false, vp);
+    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);
+    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
+    gl.bindVertexArray(STARS.vao); gl.drawArrays(gl.POINTS, 0, STARS.count);
+    gl.disable(gl.BLEND); gl.bindVertexArray(null);
+  }
   gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
   // world
   const wp = PRG.world; gl.useProgram(wp.p); setFrameUniforms(wp, eye);
@@ -3826,11 +3928,13 @@ for (const el of document.querySelectorAll('input.chan')) {
 $('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4; $('tod-val').textContent = clockText(); updateSky(); if (booted) drawGauges(); });
 
 // ---------------------------------------------------------------- boot + loop
+let RSCALE = 1;   // the main pass's render scale (framebuffer pixels per CSS pixel); the star pass sizes points by it
 function resize() {
   const g = GFX[SETTINGS.gfx] || GFX[1];
   DPR = Math.min(devicePixelRatio || 1, 2);
   HW = innerWidth; HH = innerHeight;
   const sc = Math.min(DPR * g.scale, 1.75);
+  RSCALE = sc;
   glc.width = Math.round(HW * sc); glc.height = Math.round(HH * sc);
   hud.width = Math.round(HW * DPR); hud.height = Math.round(HH * DPR);
   layoutUI();
@@ -3953,7 +4057,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { STARS, MW, starDir, STAR_GAIN, MW_GAIN, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

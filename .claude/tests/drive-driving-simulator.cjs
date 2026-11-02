@@ -66,6 +66,32 @@ const SIMBAD = { Polaris: [11767, '02 31 49.09', '+89 15 50.8'], Regulus: [49669
   Spica: [65474, '13 25 11.579', '-11 09 40.75'], Dubhe: [54061, '11 03 43.672', '+61 45 03.72'], Vega: [91262, '18 36 56.336', '+38 47 01.28'],
   Betelgeuse: [27989, '05 55 10.305', '+07 24 25.43'], Sirius: [32349, '06 45 08.917', '-16 42 58.02'], Rigel: [24436, '05 14 32.272', '-08 12 05.90'] };
 const unitRD = (ra, dec) => [Math.cos(dec * DR) * Math.cos(ra * DR), Math.cos(dec * DR) * Math.sin(ra * DR), Math.sin(dec * DR)];
+// Meeus 21.2-21.4: IAU 1976 precession of a J2000 RA/Dec (degrees) to the mean equator of date (TT = UT)
+function precess(ra, dec, jd) {
+  const t = (jd - 2451545) / 36525, as = DR / 3600;
+  const zeta = (2306.2181 * t + 0.30188 * t * t + 0.017998 * t ** 3) * as, z = (2306.2181 * t + 1.09468 * t * t + 0.018203 * t ** 3) * as;
+  const th = (2004.3109 * t - 0.42665 * t * t - 0.041833 * t ** 3) * as, a0 = ra * DR + zeta, d0 = dec * DR;
+  const A = Math.cos(d0) * Math.sin(a0), B = Math.cos(th) * Math.cos(d0) * Math.cos(a0) - Math.sin(th) * Math.sin(d0), C = Math.sin(th) * Math.cos(d0) * Math.cos(a0) + Math.cos(th) * Math.sin(d0);
+  return { ra: (((Math.atan2(A, B) + z) / DR) % 360 + 360) % 360, dec: Math.asin(Math.max(-1, Math.min(1, C))) / DR };
+}
+const raDecOf = v => ({ ra: ((Math.atan2(v[1], v[0]) / DR) % 360 + 360) % 360, dec: Math.asin(Math.max(-1, Math.min(1, v[2]))) / DR });
+// the precession as a matrix (J2000 -> of date, rows), by its action on the three axes; a rotation, so its transpose goes back
+function precM(jd) { const c = [[1, 0, 0], [0, 1, 0], [0, 0, 1]].map(v => { const r = raDecOf(v), q = precess(r.ra, r.dec, jd); return unitRD(q.ra, q.dec); });
+  return [[c[0][0], c[1][0], c[2][0]], [c[0][1], c[1][1], c[2][1]], [c[0][2], c[1][2], c[2][2]]]; }
+const mulT = (M, v) => [0, 1, 2].map(i => M[0][i] * v[0] + M[1][i] * v[1] + M[2][i] * v[2]);   // transpose(M) * v
+const mul3 = (M, v) => M.map(r => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);                    // a page row-major flat 9 too, via rows3
+const rows3 = m => [[m[0], m[1], m[2]], [m[3], m[4], m[5]], [m[6], m[7], m[8]]];
+// a SIMBAD J2000 star, precessed by the suite, at Raleigh through its own GMST: { alt, az, v }
+const ownStar = (name, jd) => { const [, ra, dec] = SIMBAD[name], q = precess(hms(ra), dms(dec), jd); return ownAltAz(q.ra, q.dec, jd); };
+// an ENU direction back to J2000 through the suite's own GMST and precession (for the galactic latitude)
+function enuToJ2000(v, jd) { const la = RAL.lat * DR, sd = Math.sin(la) * v[1] + Math.cos(la) * v[2], cdc = Math.cos(la) * v[1] - Math.sin(la) * v[2];
+  const H = Math.atan2(-v[0], cdc) / DR, dec = Math.asin(Math.max(-1, Math.min(1, sd))) / DR, ra = gmst(jd) + RAL.lon - H;
+  return mulT(precM(jd), unitRD(ra, dec)); }
+const GAL_POLE = unitRD(192.85948, 27.12825);   // the IAU galactic north pole, J2000
+const galB = vJ => Math.asin(Math.max(-1, Math.min(1, vJ[0] * GAL_POLE[0] + vJ[1] * GAL_POLE[1] + vJ[2] * GAL_POLE[2]))) / DR;
+const enuOf = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
+// The page's world frame is (east, up, SOUTH): its renderer is right-handed (an OpenGL lookAt), so ENU's north is world -z.
+const enuToWorldOwn = v => [v[0], v[1], -v[2]];
 // Meeus 49.1: the MEAN new (integer k) and full (k + 0.5) moons, JDE; delta-T (about 70 s) ignored
 function meanPhase(k) { const T = k / 1236.85; return 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T - 0.000000150 * T * T * T + 0.00000000073 * T * T * T * T; }
 // astronomy-engine 2.1.19 (zmh-sky vectors/golden.v1.json, never shipped): the oracle's values at 2026-05-06 02:00 UT
@@ -75,6 +101,9 @@ const AE = {
   moonIllum: 0.835373145,                             // record 2026-05-06T02Z/geo/moon, moonIllumFraction
   ven: { ra: 72.973356438, dec: 23.639460993, mag: -3.885724 },   // record 2026-05-06T02Z/geo/ven (geocentric, true equator of date)
   jup: { ra: 111.326408898, dec: 22.388555784, mag: -1.998412 },  // record 2026-05-06T02Z/geo/jup
+  // the eight stars of the plan's 22:00 table, alt / az: records 2026-05-06T02Z/raleigh/hip<N>
+  stars: { Regulus: [58.382346645, 226.504116082], Arcturus: [51.957838582, 105.537348892], Spica: [36.757145909, 147.113228099], Dubhe: [63.557205467, 350.414652531],
+    Vega: [12.234204709, 50.64338272], Betelgeuse: [7.428322881, 273.807102779], Sirius: [2.821716365, 246.980207024], Polaris: [35.386323342, 359.402707464] },
 };
 
 (async () => {
@@ -361,6 +390,57 @@ const AE = {
     sky.planets.length === 5 && sky.planets.map(p => p.id).sort().join() === 'jup,mar,mer,sat,ven' && sky.planets.every(p => p.valid === true)
     && plCmp.every(c => Math.abs(c.dAlt) < 0.3 && c.dAz < 0.3 && c.dEnu < 0.3 && c.dFields < 1e-6) && (pl.ven || {}).mag < -3.5 && (pl.jup || {}).mag < -1.5,
     { ids: sky.planets.map(p => p.id), plCmp });
+
+  // ---- 3d. the stars: sidereal time, the pole of date, the stars' places and motion ----
+  // The page's star directions are __DS.starDir(i): the vertex's J2000 vector through SKY.starM, as the GPU is given it.
+  const HIP = Object.fromEntries(Object.entries(SIMBAD).map(([n, [hip]]) => [n, hip]));
+  const LSTT = [[MAY5, 0], [MAY5, 4.5], [MAY5, 9.25], [MAY5, 13], [MAY5, 18.75], [MAY5, 22]];
+  const st3 = await page.evaluate(([MAY5, HIP, LSTT]) => {
+    const D = window.__DS, o = {}, idx = Object.fromEntries(Object.entries(HIP).map(([n, h]) => [n, D.SKY_DATA.stars.rows.findIndex(r => r[0] === h)]));
+    const at = (mjd, h) => { D.SKY.hour = h; D.setDate(mjd); };
+    o.lst = LSTT.map(([m, h]) => { at(m, h); return D.SKY.lst; });
+    at(MAY5, 0); o.lst0 = D.SKY.lst;
+    // across a midnight date step: 23:59:30 plus one 0.1 s step at cycle 144 (1 game minute)
+    at(MAY5, 23 + 59.5 / 60); const l0 = D.SKY.lst; D.SETTINGS.cycle = 144; D.advanceClock(0.1); D.updateSky();   // as tick() does
+    o.step = { l0, l1: D.SKY.lst, mjd: D.SKY.mjd, hour: D.SKY.hour };
+    at(MAY5, 22); o.starM = Array.from(D.SKY.starM); o.idx = idx;
+    o.at22 = Object.fromEntries(Object.entries(idx).map(([n, i]) => [n, D.starDir(i)]));
+    at(MAY5, 23); o.at23 = { Arcturus: D.starDir(idx.Arcturus), Betelgeuse: D.starDir(idx.Betelgeuse) };
+    o.day = []; for (let q = 0; q < 96; q++) { at(MAY5, q / 4); o.day.push({ h: q / 4, starM: Array.from(D.SKY.starM), dirs: Object.fromEntries(Object.entries(idx).map(([n, i]) => [n, D.starDir(i)])) }); }
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return o;
+  }, [MAY5, HIP, LSTT]);
+  const lstOwn = LSTT.map(([m, h]) => ((gmst(jdOf(m, h, -4)) + RAL.lon) % 360 + 360) % 360);
+  const lstD = st3.lst.map((v, k) => Math.abs(((v - lstOwn[k] + 540) % 360) - 180));
+  const stepOwn = 360.98564736629 * (((st3.step.mjd + st3.step.hour / 24) - (MAY5 + (23 + 59.5 / 60) / 24))), stepPage = ((st3.step.l1 - st3.step.l0) % 360 + 360) % 360;
+  ok('LST is the suite\'s own Meeus 12.4 within 0.01 deg at six times; 204.4 at the local midnight that starts May 5; across a midnight date step it moves only by the step\'s own sidereal advance',
+    lstD.every(d => d < 0.01) && Math.abs(st3.lst0 - 204.41) < 0.05 && st3.step.mjd === MAY5 + 1 && st3.step.hour < 0.1 && Math.abs(stepPage - stepOwn) < 0.01,
+    { lstD, lst0: st3.lst0, step: st3.step, stepPage, stepOwn });
+  const JD22s = jdOf(MAY5, 22, -4), P22 = precM(JD22s), poleJ = mulT(P22, [0, 0, 1]), M22 = rows3(st3.starM);
+  const poleNow = [0, Math.sin(RAL.lat * DR), Math.cos(RAL.lat * DR)];   // due north at altitude = latitude
+  const poleEnu = mul3(M22, poleJ), j2000Enu = mul3(M22, [0, 0, 1]);
+  ok('the pole of date: the suite\'s own precessed pole through SKY.starM is due north at altitude 35.78 deg (within 0.01); the J2000 pole lands 0.10-0.20 deg from it (the matrix precesses)',
+    angDeg(poleEnu, poleNow) < 0.01 && angDeg(j2000Enu, poleNow) > 0.10 && angDeg(j2000Enu, poleNow) < 0.20,
+    { pole: altAzOf(poleEnu), off: angDeg(poleEnu, poleNow), j2000: angDeg(j2000Enu, poleNow) });
+  const polaris = st3.day.filter((r, q) => q % 4 === 0).map(r => { const a = altAzOf(r.dirs.Polaris), own = ownStar('Polaris', jdOf(MAY5, r.h, -4));
+    return { h: r.h, alt: a.alt, az: a.az, dAlt: Math.abs(a.alt - own.alt), dSky: angDeg(r.dirs.Polaris, own.v) }; });
+  ok('Polaris at each of 24 hours: altitude 35.1-36.5 deg, azimuth within 0.8 deg of north, and within 0.05 deg of the suite\'s own precessed alt/az',
+    polaris.length === 24 && polaris.every(r => r.alt > 35.1 && r.alt < 36.5 && Math.abs(((r.az + 180) % 360) - 180) < 0.8 && r.dAlt < 0.05 && r.dSky < 0.05),
+    polaris.filter(r => !(r.alt > 35.1 && r.alt < 36.5 && Math.abs(((r.az + 180) % 360) - 180) < 0.8 && r.dAlt < 0.05 && r.dSky < 0.05)).slice(0, 4));
+  const circ = Object.keys(HIP).map(n => { const a = st3.day.map(r => angDeg(r.dirs[n], poleNow)); return { n, spread: Math.max(...a) - Math.min(...a) }; });
+  ok('each of the nine stars circles the pole of date: its angle to the pole stays the same within 0.05 deg over 24 game hours',
+    circ.length === 9 && circ.every(c => c.spread < 0.05), circ);
+  const dubheMin = Math.min(...st3.day.map(r => r.dirs.Dubhe[1])), arc = st3.day.map(r => r.dirs.Arcturus[1]);
+  ok('Dubhe stays above the horizon all day; Arcturus is below it at some hour and above it at another',
+    dubheMin > 0 && arc.some(y => y < 0) && arc.some(y => y > 0), { dubheMinAlt: Math.asin(dubheMin) / DR, arcturus: [Math.min(...arc), Math.max(...arc)].map(y => Math.asin(y) / DR) });
+  const tab = Object.entries(AE.stars).map(([n, [alt, az]]) => { const a = altAzOf(st3.at22[n]), own = ownStar(n, JD22s);
+    return { n, dAlt: +(a.alt - alt).toFixed(4), dAz: +dAz(a.az, az, alt).toFixed(4), dOwn: +angDeg(st3.at22[n], own.v).toFixed(4) }; });
+  ok('the 22:00 sky: the eight stars of the table within 0.05 deg of astronomy-engine (records 2026-05-06T02Z/raleigh/hip<N>) and of the suite\'s own precessed alt/az',
+    tab.length === 8 && tab.every(r => Math.abs(r.dAlt) < 0.05 && r.dAz < 0.05 && r.dOwn < 0.05), tab);
+  const alt = v => Math.asin(v[1]) / DR;
+  const mv = { arcturus: [alt(st3.at22.Arcturus), alt(st3.at23.Arcturus)], betelgeuse: [alt(st3.at22.Betelgeuse), alt(st3.at23.Betelgeuse)], arcAz: altAzOf(st3.at22.Arcturus).az, betAz: altAzOf(st3.at22.Betelgeuse).az };
+  ok('stars move west: over one game hour Arcturus (east) climbs and Betelgeuse (west) sinks',
+    mv.arcAz > 45 && mv.arcAz < 135 && mv.betAz > 225 && mv.betAz < 315 && mv.arcturus[1] > mv.arcturus[0] + 5 && mv.betelgeuse[1] < mv.betelgeuse[0] - 5, mv);
 
   // ---- 4. the car: acceleration, braking, steering, reverse ----
   const car = await page.evaluate(() => {
@@ -658,6 +738,124 @@ const AE = {
   const night = await lum();
   ok('the frame is a real picture (many distinct colours)', day.distinct > 40, day);
   ok('midnight is much darker than noon', night.mean < day.mean * 0.45, [day.mean, night.mean]);
+
+  // ---- 8b. the star pass: one draw, the planets where they are, star pixels by night only, the Milky Way ----
+  // Pixel helpers run in the page. `peaks` counts isolated bright pixels in the top `frac` of the frame: a pixel no
+  // dimmer than its 8 neighbours, inside a flat 7x7 ring (its 24 pixels within 8 levels of each other, so a leaf or
+  // a lit window against the sky does not count), whose luminance beats the ring's mean by `t` (8-bit levels).
+  // `aimed` draws one frame through the page's own renderScene() from 30 m above the car (over the trees) with a
+  // 0.8 rad camera aimed at a world direction (turned `offAz` deg in azimuth), and projects a world direction
+  // with the suite's own OpenGL-convention camera: the pixel row for Jupiter and the Milky Way patches use it.
+  await page.evaluate(() => {
+    const W = window;
+    W.__dsPx = () => { const c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height, px = new Uint8Array(w * h * 4);
+      g.readPixels(0, 0, w, h, g.RGBA, g.UNSIGNED_BYTE, px); return { w, h, px, L: (x, y) => { const i = (y * w + x) * 4; return px[i] * 0.2126 + px[i + 1] * 0.7152 + px[i + 2] * 0.0722; } }; };
+    W.__dsContrast = (F, x, y) => { const v = F.L(x, y); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && F.L(x + dx, y + dy) > v) return -1;
+      let ring = 0, lo = 1e9, hi = -1e9; for (let d = -3; d <= 3; d++) for (const q of [F.L(x + d, y - 3), F.L(x + d, y + 3), F.L(x - 3, y + d), F.L(x + 3, y + d)]) { ring += q; lo = Math.min(lo, q); hi = Math.max(hi, q); }
+      return hi - lo > 8 ? -1 : v - ring / 28; };
+    W.__dsPeaks = (F, frac, t) => { let n = 0; for (let y = Math.floor(F.h * (1 - frac)) + 3; y < F.h - 3; y++) for (let x = 3; x < F.w - 3; x++) if (W.__dsContrast(F, x, y) >= t) n++; return n; };
+    W.__dsAimed = (aimW, offAz, dirsW) => {
+      const D = W.__DS, c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height;
+      const az = Math.atan2(aimW[0], aimW[2]) + offAz * Math.PI / 180, el = Math.asin(aimW[1]), fov = 0.8, up = [0, 1, 0];
+      const f = [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
+      g.bindFramebuffer(g.FRAMEBUFFER, null); g.viewport(0, 0, w, h); g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT);
+      renderScene([D.PLAYER.x, D.PLAYER.y + 30, D.PLAYER.z], f, up, fov, 0.2, w, h, { propDist: 560, shadows: false, hidePlayer: false }, []);
+      const F = W.__dsPx();
+      const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      const s0 = cr(f, up), sl = Math.hypot(...s0), sv = s0.map(v => v / sl), u = cr(sv, f), t = Math.tan(fov / 2);
+      F.at = (dirsW || []).map(d => ({ x: (dt(d, sv) / dt(d, f) / (t * w / h) * 0.5 + 0.5) * w - 0.5, y: (dt(d, u) / dt(d, f) / t * 0.5 + 0.5) * h - 0.5 }));
+      return F;
+    };
+  });
+  const yaw8b = await page.evaluate(() => window.__DS.PLAYER.yaw);
+  // row: one POINTS draw per pass, recorded by wrapping gl.drawArrays
+  const draws = await page.evaluate(async () => {
+    const D = window.__DS, g = document.getElementById('gl').getContext('webgl2'), rec = [], orig = g.drawArrays;
+    const run = async (n) => { rec.length = 0; for (let k = 0; k < n; k++) await new Promise(r => requestAnimationFrame(r)); return rec.slice(); };
+    g.drawArrays = function (mode, first, count) { if (mode === g.POINTS) rec.push({ f: frameNo, fb: g.getParameter(g.FRAMEBUFFER_BINDING) === null ? 'main' : 'fbo', first, count }); return orig.apply(this, arguments); };
+    D.setPaused(true); D.SETTINGS.cycle = 0; D.SKY.hour = 22; D.setDate(D.SKY.mjd); const mirror = D.SETTINGS.mirror; D.SETTINGS.mirror = 1;
+    D.CAM.mode = 1; D.CAM.chase = null; await run(2); const chase = await run(3);
+    D.CAM.mode = 0; await run(2); const cockpit = await run(4);
+    D.SKY.hour = 12; D.updateSky(); const noon = await run(3);
+    g.drawArrays = orig; D.SETTINGS.mirror = mirror; D.CAM.mode = 1;
+    return { n: D.STARS.n, count: D.STARS.count, chase, cockpit, noon };
+  });
+  const byFrame = list => { const m = {}; for (const r of list) (m[r.f] = m[r.f] || []).push(r); return Object.entries(m).map(([f, l]) => ({ f: +f, main: l.filter(r => r.fb === 'main').length, fbo: l.filter(r => r.fb === 'fbo').length })); };
+  const chF = byFrame(draws.chase), coF = byFrame(draws.cockpit), allDraws = draws.chase.concat(draws.cockpit);
+  ok('one POINTS draw per pass with STARS.n + 5 vertices: one in the main pass, one more in the mirror pass in the cockpit view; none by day',
+    draws.n >= 1500 && draws.count === draws.n + 5 && allDraws.length > 0 && allDraws.every(r => r.first === 0 && r.count === draws.n + 5)
+    && chF.length >= 2 && chF.every(r => r.main === 1 && r.fbo === 0) && coF.length >= 3 && coF.every(r => r.main === 1 && r.fbo === (r.f % 2 === 0 ? 1 : 0)) && coF.some(r => r.fbo === 1)
+    && draws.noon.length === 0, { n: draws.n, count: draws.count, chF, coF, noon: draws.noon.length, sample: allDraws[0] });
+  // row: the planets are drawn where they are
+  const jupOwnW = enuToWorldOwn(ownAltAz(AE.jup.ra, AE.jup.dec, JD22).v);
+  const jp = await page.evaluate(([MAY5, jw]) => {
+    const D = window.__DS, W = window; D.SKY.hour = 22; D.setDate(MAY5);
+    const verts = D.STARS.planets.map((id, k) => ({ id, d: D.starDir(D.STARS.n + k), enu: (D.SKY.planets.find(p => p.id === id) || {}).enu }));
+    const look = () => { const F = W.__dsAimed(jw, 8, [jw]), a = F.at[0]; let best = { c: -1 };
+      for (let y = Math.round(a.y) - 3; y <= Math.round(a.y) + 3; y++) for (let x = Math.round(a.x) - 3; x <= Math.round(a.x) + 3; x++) { const c = W.__dsContrast(F, x, y); if (c > best.c) best = { c: Math.round(c), x, y, L: Math.round(F.L(x, y)) }; }
+      return { at: { x: +a.x.toFixed(1), y: +a.y.toFixed(1) }, w: F.w, best }; };
+    const on = look(); D.STARS.on = false; const off = look(); D.STARS.on = true;
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return { verts, on, off };
+  }, [MAY5, jupOwnW]);
+  const vErr = jp.verts.map(v => v.enu ? Math.max(...v.d.map((x, i) => Math.abs(x - v.enu[i]))) : 1);
+  ok('the planets are drawn where they are: the five planet vertices through SKY.starM equal SKY.planets[i].enu within 1e-4; Jupiter (from 30 m above the car, aimed 8 deg to its side) is a bright local maximum within 3 px of where the suite\'s own Jupiter projects, and is gone with STARS.on false',
+    jp.verts.map(v => v.id).join() === 'mer,ven,mar,jup,sat' && vErr.every(e => e < 1e-4)
+    && Math.abs(jp.on.at.x - jp.on.w / 2) > 40 && jp.on.best.c >= 100 && jp.off.best.c < 10, { vErr, on: jp.on, off: jp.off });
+  // rows: star pixels at midnight, none at noon, none with the pass switched off
+  const chaseSky = async (hour, starsOn) => page.evaluate(async ([hour, starsOn, MAY5]) => {
+    const D = window.__DS, W = window, out = [];
+    D.SETTINGS.cycle = 0; D.SKY.hour = hour; D.setDate(MAY5); D.STARS.on = starsOn; D.CAM.mode = 1;
+    for (const deg of [0, 90, 180, 270]) {
+      D.PLAYER.yaw = deg * Math.PI / 180; D.CAM.chase = null;
+      for (let k = 0; k < 4; k++) await new Promise(r => requestAnimationFrame(r));
+      const F = await new Promise(r => requestAnimationFrame(() => r(W.__dsPx())));
+      // the lowest elevation in the counted band (the top 20% of rows), from the camera: must be above the ridge (<= 4.2 deg)
+      const f = D.CAM.fwd, up = [0, 1, 0], cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      const s0 = cr(f, up), sl = Math.hypot(...s0), sv = s0.map(v => v / sl), u = cr(sv, f), t = Math.tan(D.CAM.fov / 2), yN = 0.6;
+      let minEl = 90; for (const xN of [-1, 0, 1]) { const d = [0, 1, 2].map(i => f[i] + xN * t * F.w / F.h * sv[i] + yN * t * u[i]); minEl = Math.min(minEl, Math.asin(d[1] / Math.hypot(...d)) * 180 / Math.PI); }
+      out.push({ deg, n40: W.__dsPeaks(F, 0.2, 40), n30: W.__dsPeaks(F, 0.2, 30), minEl: +minEl.toFixed(1) });
+    }
+    D.STARS.on = true;
+    return out;
+  }, [hour, starsOn, MAY5]);
+  const mid = await chaseSky(0, true), midOff = await chaseSky(0, false), noonSky = await chaseSky(12, true);
+  // the noon sky through the same aimed camera, the Milky Way on and off: byte-identical
+  const noonMw = await page.evaluate(MAY5 => {
+    const D = window.__DS, W = window; D.SKY.hour = 12; D.setDate(MAY5); let same = true, nPx = 0;
+    for (const aim of [[0.6, 0.5, 0.62], [-0.7, 0.3, -0.64], [0, 0.95, 0.31]]) {
+      const l = Math.hypot(...aim), a = aim.map(v => v / l);
+      D.MW.on = true; const A = W.__dsAimed(a, 0).px.slice(); D.MW.on = false; const B = W.__dsAimed(a, 0).px; D.MW.on = true;
+      nPx += A.length / 4; for (let i = 0; i < A.length; i++) if (A[i] !== B[i]) { same = false; break; }
+    }
+    return { same, nPx, night: D.SKY.night };
+  }, MAY5);
+  ok('star pixels at midnight: at four headings (chase view) the sky above the ridge holds isolated pixels clearly brighter than their neighbours',
+    mid.every(r => r.n40 >= 4 && r.minEl > 5), mid);
+  ok('no star pixels at noon at the same four headings, and the Milky Way term adds nothing by day (the noon sky byte-identical with MW.on true and false)',
+    noonSky.every(r => r.n30 === 0) && noonMw.same && noonMw.nPx > 100000 && noonMw.night === 0, { noonSky, noonMw });
+  ok('with STARS.on false at midnight the same regions hold no isolated bright pixels: skyCol() has no stars of its own left',
+    midOff.every(r => r.n30 === 0) && mid.every(r => r.n40 >= 4), { midOff, mid: mid.map(r => r.n40) });
+  // row: the Milky Way where the suite's own galactic plane says it is, at 02:30 EDT on May 6 (May 5-6's night)
+  const MAY6 = MAY5 + 1, JDmw = jdOf(MAY6, 2.5, -4), ALT = 35;
+  const bAt = az => galB(enuToJ2000(enuOf(ALT, az), JDmw));
+  let bandAz = 30; for (let az = 30; az <= 120; az += 0.5) if (Math.abs(bAt(az)) < Math.abs(bAt(bandAz))) bandAz = az;
+  const dAzOff = 2 * Math.asin(Math.sin(20 * DR) / Math.cos(ALT * DR)) / DR;   // 40 deg of arc along the almucantar
+  const offAz = [bandAz - dAzOff, bandAz + dAzOff].sort((a, b) => Math.abs(bAt(b)) - Math.abs(bAt(a)))[0];
+  const mwq = await page.evaluate(([MAY6, aimsW]) => {
+    const D = window.__DS, W = window; D.SKY.hour = 2.5; D.setDate(MAY6); D.STARS.on = false;
+    const patch = aim => { const F = W.__dsAimed(aim, 0, [aim]), a = F.at[0]; let s = 0, n = 0;
+      for (let y = Math.round(a.y) - 7; y <= Math.round(a.y) + 7; y++) for (let x = Math.round(a.x) - 7; x <= Math.round(a.x) + 7; x++) { s += F.L(x, y); n++; } return +(s / n).toFixed(2); };
+    D.MW.on = true; const on = aimsW.map(patch); D.MW.on = false; const off = aimsW.map(patch); D.MW.on = true; D.STARS.on = true;
+    const moon = D.SKY.moon.slice(); D.SKY.hour = 6.25; D.setDate(D.SKY.mjd - 1);
+    return { on, off, moon };
+  }, [MAY6, [enuToWorldOwn(enuOf(ALT, bandAz)), enuToWorldOwn(enuOf(ALT, offAz))]]);
+  const mwInfo = { bandAz, bBand: +bAt(bandAz).toFixed(2), offAz: +offAz.toFixed(1), bOff: +bAt(offAz).toFixed(1), arc: +angDeg(enuOf(ALT, bandAz), enuOf(ALT, offAz)).toFixed(2),
+    moonSep: [angDeg(mwq.moon, enuOf(ALT, bandAz)), angDeg(mwq.moon, enuOf(ALT, offAz))].map(v => +v.toFixed(1)), on: mwq.on, off: mwq.off };
+  ok('the Milky Way where the suite\'s own galactic plane says it is: at 02:30 EDT on May 6, a patch on the band 35 deg up in the east beats one 40 deg off it by a clear margin with MW.on true; with MW.on false the two are equal',
+    Math.abs(mwInfo.bBand) < 2 && Math.abs(mwInfo.bOff) > 20 && Math.abs(mwInfo.arc - 40) < 0.5 && mwInfo.moonSep.every(v => v > 50)
+    && mwq.on[0] - mwq.on[1] >= 6 && Math.abs(mwq.off[0] - mwq.off[1]) <= 1, mwInfo);
+  await page.evaluate(y => { const D = window.__DS; D.PLAYER.yaw = y; D.CAM.chase = null; }, yaw8b);
 
   // ---- 9. sound: one volume per sound, the radio's stations, measured off the analysers ----
   const lv = async (keys, secs = 2) => page.evaluate(async ([keys, secs]) => { const S = window.__DS.SND, acc = {}; for (const k of keys) acc[k] = 0; const n = secs * 20;
