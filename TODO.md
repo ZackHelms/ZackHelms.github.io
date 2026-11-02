@@ -61,11 +61,13 @@ in `.claude/<game>.md`.
 - [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,
   2026-11-01: "All three with selector in settings menu. Default to realistic webgl. Its a
   lot so put items in backlog in a combat simulator section"). Backlog items CS-1 and CS-2,
-  planned as one six-step arc. **CS-1** is a `Graphics style` select at the top of
-  PICTURE in the settings (realistic, the default, and toon), saved and applied live.
-  Toon is cel-shaded in three bands with ink outlines by an inverted-hull pass, a
-  saturated flat palette and a flat gradient sky. CS-1 lands on `main` on its own at step 3.
-  **CS-2** is neon: the site's Neon Arcade palette in 3D (glowing flagstone joints, emissive
+  planned as one six-step arc. **CS-1 shipped 2026-11-02** (steps 1-3, badge
+  `build 2026-11-02 22:04 UTC`): a `Graphics style` select at the top of PICTURE in the
+  settings (realistic, the default, and toon), saved and applied live; toon is cel-shaded in
+  three bands with ink outlines by an inverted-hull pass, a saturated flat palette and a
+  flat gradient sky. Play it and say whether the look is right (the band levels, the ink
+  width and the star sparks are the implementer's picks, listed in
+  `.claude/combat-simulator.md` § Assumed). **CS-2 is still open (steps 4-6)** and is neon: the site's Neon Arcade palette in 3D (glowing flagstone joints, emissive
   edges on walls and torii, fighters as dark bodies with green and red rims, a white-hot
   blade, stronger trails, a cheap bloom), the third option in the select. A style is
   paint: the engine never reads it. Spec and checks: `.claude/combat-simulator.md`

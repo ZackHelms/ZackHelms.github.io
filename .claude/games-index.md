@@ -30,7 +30,7 @@ local-2p.
 | TAAS | `taas/` | management-sim | tap | run-based | resource-allocation, systems-simulation, scale-ladder, skill-teaching | solo | `.claude/taas.md` |
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Driving Simulator | `driving-simulator/` | driving-sim | steering-wheel, pedal-hold, multi-touch-chord, orbit-drag | open-sandbox | vehicle-physics, simulated-agents, procedural-generation, real-time-3d, day-night-cycle | solo | `.claude/driving-simulator.md` |
-| Combat Simulator | `combat-simulator/` | melee-duel | virtual-joystick, tap, multi-touch-chord | level-campaign | parry-timing, iframe-dodge, combo-chains, real-time-3d, inverse-kinematics | vs-ai | `.claude/combat-simulator.md` |
+| Combat Simulator | `combat-simulator/` | melee-duel | virtual-joystick, tap, multi-touch-chord | level-campaign | parry-timing, iframe-dodge, combo-chains, real-time-3d, inverse-kinematics, art-styles | vs-ai | `.claude/combat-simulator.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -418,7 +418,8 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   orientation-neutral, and neon-tactics/neon-recall pass the phone between
   turns. A fifth local-2p title would now want `co-op`, which is still empty.
 - **`art-styles`** (neon-clash first, then turret-builder and star-surge, all
-  2026-08-23) is a player-selectable art direction — a second cel-shaded skin
+  2026-08-23; combat-simulator joined 2026-11-02 as the first **WebGL** page with styles,
+  realistic and toon, neon to follow) is a player-selectable art direction — a second cel-shaded skin
   over the same simulation, behind a settings cogwheel (`toon` defaults in
   neon-clash and turret-builder; star-surge grew to five styles — including a
   pre-rendered `sprite` mode that bakes the 3D art into sprite frames — and now
@@ -436,7 +437,10 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   sim never reads it), `glow()` goes no-op rather than branching at every call
   site, each part is shaded about its OWN centre, the shade wedge counter-rotates
   out of the live transform so the sun stays fixed in screen space, and scenery
-  is seeded once rather than re-rolled per frame.
+  is seeded once rather than re-rolled per frame. Combat Simulator's styles are on a different
+  road from all of those: one program set per style compiled lazily from the same shader
+  sources under a `#define STYLE`, and toon's ink by inverted hulls that discard by normal
+  (`.claude/combat-simulator.md` § Graphics styles).
 - **`area-of-effect`** (neon-clash, added later the same day with the fireball
   card) is also new. Plenty of games here blow several things up at once, but
   this is the first where the *player aims the blast* — a placed circle whose

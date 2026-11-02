@@ -277,7 +277,7 @@ Tools:
 |---|---|---|
 | 1 | Selector, styles, toon shading, hooks | DONE 2026-11-02 |
 | 2 | Toon ink | DONE 2026-11-02 |
-| 3 | CS-1 docs, land, Pages | open |
+| 3 | CS-1 docs, land, Pages | DONE 2026-11-02 (docs and badge; landing by the overseer) |
 | 4 | Neon look | open |
 | 5 | Bloom | open |
 | 6 | Docs final, break lists, land, Pages | open |
@@ -703,6 +703,32 @@ row 1 has the torso-fill ceiling.
 - The ink is drawn flat in display space (no tonemap, no fog), so a far pine's outline is as
   dark as a near one's.
 - The ink writes depth, so the additive effects depth-test against it like any other geometry.
+
+### Step 3 results
+
+Docs only: the `ENGINE` block and the page's code did not change, and only the badge line of
+`games/combat-simulator/index.html` did (the `GAMES[]` facet and the badge in
+`games/index.html`).
+
+**Files changed:** `.claude/combat-simulator.md` (a new "Graphics styles" section; 14 assumed
+rows; Backlog CS-1 marked shipped 2026-11-02 and CS-2 marked open; Tests: 74 checks, the 13
+style rows named, both break lists with counts; the header and Architecture lines),
+`.claude/tests/README.md` (the `drive-combat-simulator.cjs` row), `.claude/games-index.md`
+(Combat Simulator gains `art-styles`; the `art-styles` paragraph names it as the first WebGL
+page with styles; there is no facet-count line to update), `games/index.html` (the COMBAT
+SIMULATOR `GAMES[]` entry's `mech` gains `art-styles`; badge), `games/CLAUDE.md` and root
+`CLAUDE.md` ("a Graphics style selector: realistic, toon"; the inventory's 74 checks and
+19 + 14 breaks), `TODO.md` (the entry says CS-1 shipped, CS-2 open), `DONE.md` (a CS-1 line),
+`games/combat-simulator/index.html` (badge line only), and this plan.
+
+**Counts, read from the code:** suite 74 (61 + 10 + 3), of which 13 are style rows (the
+engine row in part 1); break lists 19 (`combat-simulator.json`) and 14
+(`combat-simulator-styles.json`: 9 from step 1, 5 from step 2).
+
+**Badges:** `games/combat-simulator/index.html` `build 2026-11-02 22:04 UTC`;
+`games/index.html` `build 2026-11-02 22:04 UTC` (both read back from the files).
+
+Landing on main done by the overseer.
 
 ## Handoff
 
