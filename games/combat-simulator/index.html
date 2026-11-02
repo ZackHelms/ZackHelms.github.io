@@ -776,6 +776,41 @@ uniform mat4 uVP; out vec4 vC;
 void main(){ vC = aC; gl_Position = uVP * vec4(aP, 1.0); }`;
 const FS_FLAT = `#version 300 es
 precision mediump float; in vec4 vC; out vec4 o; void main(){ o = vec4(vC.rgb * vC.a, vC.a); }`;
+// ink outlines (toon): inverted hulls. Each vertex is pushed out by a width that is constant on
+// screen (uInk x its distance from the eye), and every fragment whose outward normal faces the
+// eye is DISCARDED, which leaves the far shell: hidden behind the body except in a thin band at
+// its silhouette. Discard by normal, not gl.cullFace: culling is off in this renderer, the
+// winding was never checked, and VS_LIMB's frame (u, ax, v) is left-handed, so the capsules'
+// outward faces may wind either way. Discarding is winding-independent.
+const VS_INK_WORLD = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aNor; layout(location=4) in vec3 aExt;
+uniform mat4 uVP; uniform vec3 uEye; uniform float uInk;
+out vec3 vW, vN;
+void main(){ vec3 w = aPos + aExt * (uInk * length(uEye - aPos)); vW = w; vN = aNor; gl_Position = uVP * vec4(w, 1.0); }`;
+const VS_INK_LIMB = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aDir; layout(location=1) in float aEnd;
+layout(location=2) in vec3 iA; layout(location=3) in vec3 iB; layout(location=4) in vec2 iR;
+uniform mat4 uVP; uniform vec3 uEye; uniform float uInk;
+out vec3 vW, vN;
+void main(){
+  vec3 ax = iB - iA; float L = length(ax); ax = L > 1e-5 ? ax / L : vec3(0.0, 1.0, 0.0);
+  vec3 t = abs(ax.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+  vec3 u = normalize(cross(t, ax)), v = cross(ax, u);
+  vec3 n = u * aDir.x + ax * aDir.y + v * aDir.z;
+  vec3 s = mix(iA, iB, aEnd) + n * mix(iR.x, iR.y, aEnd);
+  vec3 w = s + n * (uInk * length(uEye - s));
+  vW = w; vN = n; gl_Position = uVP * vec4(w, 1.0);
+}`;
+const FS_INK = `#version 300 es
+precision highp float;
+uniform vec3 uEye, uInkCol;
+in vec3 vW, vN; out vec4 frag;
+void main(){
+  if (dot(vN, uEye - vW) > 0.0) discard;
+  frag = vec4(uInkCol, 1.0);
+}`;
 
 function compile(vs, fs, name) {
   const mk = (type, src) => {
@@ -798,8 +833,10 @@ function withStyle(src, n) {
   if (src.indexOf(head) !== 0) throw new Error('withStyle: no "#version 300 es" first line to put STYLE after');
   return head + '#define STYLE ' + n + '\n' + src.slice(head.length);
 }
+// the styles that draw ink, its width in CSS px and its colour (step 4 adds neon's)
+const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } };
 // one program set per style, compiled the first time the style is drawn; the shadow and flat
-// programs do not depend on the style and are shared (PRG)
+// programs do not depend on the style and are shared (PRG); the ink pair only for a style in INK
 const PROGS = {};
 function progsFor(look) {
   if (PROGS[look]) return PROGS[look];
@@ -810,37 +847,45 @@ function progsFor(look) {
     world: compile(S(VS_WORLD), S(FS_WORLD), 'world/' + look), limb: compile(S(VS_LIMB), S(FS_LIMB), 'limb/' + look),
     sky: compile(S(VS_SKY), S(FS_SKY), 'sky/' + look), glow: compile(S(VS_GLOW), S(FS_GLOW), 'glow/' + look),
     shWorld: PRG.shWorld, shLimb: PRG.shLimb, flat: PRG.flat,
+    ...(INK[look] ? { inkWorld: compile(S(VS_INK_WORLD), S(FS_INK), 'ink-world/' + look), inkLimb: compile(S(VS_INK_LIMB), S(FS_INK), 'ink-limb/' + look) } : {}),
   });
 }
 
 // ---------------------------------------------------------------- the arena: a stone floor in a walled courtyard
-// mesh builder: 10 floats a vertex (pos, normal, colour, material)
+// mesh builder: 13 floats a vertex (pos, normal, colour, material, ink extrusion). The extrusion
+// is the way a vertex moves for one unit of ink width, a function of the corner alone so the
+// pushed-out shell stays closed; 0 (the ground) grows no shell
+const NOEXT = [0, 0, 0];
 function MB() { return { v: [], i: [], n: 0 }; }
-function vert(mb, p, nr, c, m) { mb.v.push(p[0], p[1], p[2], nr[0], nr[1], nr[2], c[0], c[1], c[2], m); return mb.n++; }
-function quad(mb, a, b, c, d, col, m) {
-  const nr = v3.norm(v3.cross(v3.sub(b, a), v3.sub(d, a)));
-  const i0 = vert(mb, a, nr, col, m), i1 = vert(mb, b, nr, col, m), i2 = vert(mb, c, nr, col, m), i3 = vert(mb, d, nr, col, m);
+function vert(mb, p, nr, c, m, e) { e = e || NOEXT; mb.v.push(p[0], p[1], p[2], nr[0], nr[1], nr[2], c[0], c[1], c[2], m, e[0], e[1], e[2]); return mb.n++; }
+function quad(mb, a, b, c, d, col, m, ex) {
+  const nr = v3.norm(v3.cross(v3.sub(b, a), v3.sub(d, a))), E = ex || [];
+  const i0 = vert(mb, a, nr, col, m, E[0]), i1 = vert(mb, b, nr, col, m, E[1]), i2 = vert(mb, c, nr, col, m, E[2]), i3 = vert(mb, d, nr, col, m, E[3]);
   mb.i.push(i0, i1, i2, i0, i2, i3);
 }
-// an oriented box: centre, half sizes, yaw about Y
+// an oriented box: centre, half sizes, yaw about Y; a corner's ink extrusion is sx X + sy Y + sz Z
+// in the box's own axes, so every face moves out by exactly one unit
+const BOXC = [[-1, -1, -1], [1, -1, -1], [1, -1, 1], [-1, -1, 1], [-1, 1, -1], [1, 1, -1], [1, 1, 1], [-1, 1, 1]];
 function box(mb, cx, cy, cz, hx, hy, hz, yaw, col, m) {
   const c = Math.cos(yaw), s = Math.sin(yaw);
   const P = (x, y, z) => [cx + x * c + z * s, cy + y, cz - x * s + z * c];
-  const p = [P(-hx, -hy, -hz), P(hx, -hy, -hz), P(hx, -hy, hz), P(-hx, -hy, hz), P(-hx, hy, -hz), P(hx, hy, -hz), P(hx, hy, hz), P(-hx, hy, hz)];
-  quad(mb, p[4], p[7], p[6], p[5], col, m); quad(mb, p[0], p[1], p[2], p[3], col, m);
-  quad(mb, p[3], p[2], p[6], p[7], col, m); quad(mb, p[1], p[0], p[4], p[5], col, m);
-  quad(mb, p[2], p[1], p[5], p[6], col, m); quad(mb, p[0], p[3], p[7], p[4], col, m);
+  const p = BOXC.map(q => P(q[0] * hx, q[1] * hy, q[2] * hz)), e = BOXC.map(q => [q[0] * c + q[2] * s, q[1], -q[0] * s + q[2] * c]);
+  const Q = (i, j, k, l) => quad(mb, p[i], p[j], p[k], p[l], col, m, [e[i], e[j], e[k], e[l]]);
+  Q(4, 7, 6, 5); Q(0, 1, 2, 3);
+  Q(3, 2, 6, 7); Q(1, 0, 4, 5);
+  Q(2, 1, 5, 6); Q(0, 3, 7, 4);
 }
 function cyl(mb, cx, cz, y0, y1, r0, r1, seg, col, m, cap) {
   const base = mb.n;
   for (let k = 0; k <= seg; k++) {
     const a = k / seg * TAU, c = Math.cos(a), s = Math.sin(a);
     const slope = (r0 - r1) / (y1 - y0), nr = v3.norm([c, slope, s]);
-    vert(mb, [cx + c * r0, y0, cz + s * r0], nr, col, m); vert(mb, [cx + c * r1, y1, cz + s * r1], nr, col, m);
+    // ink: out along the radius, and down off the bottom ring / up off the top one
+    vert(mb, [cx + c * r0, y0, cz + s * r0], nr, col, m, [c, -1, s]); vert(mb, [cx + c * r1, y1, cz + s * r1], nr, col, m, [c, 1, s]);
   }
   for (let k = 0; k < seg; k++) { const a = base + k * 2; mb.i.push(a, a + 1, a + 3, a, a + 3, a + 2); }
-  if (cap && r1 > 0) { const ctr = vert(mb, [cx, y1, cz], [0, 1, 0], col, m), b2 = mb.n;
-    for (let k = 0; k <= seg; k++) { const a = k / seg * TAU; vert(mb, [cx + Math.cos(a) * r1, y1, cz + Math.sin(a) * r1], [0, 1, 0], col, m); }
+  if (cap && r1 > 0) { const ctr = vert(mb, [cx, y1, cz], [0, 1, 0], col, m, [0, 1, 0]), b2 = mb.n;
+    for (let k = 0; k <= seg; k++) { const a = k / seg * TAU, c = Math.cos(a), s = Math.sin(a); vert(mb, [cx + c * r1, y1, cz + s * r1], [0, 1, 0], col, m, [c, 1, s]); }
     for (let k = 0; k < seg; k++) mb.i.push(ctr, b2 + k + 1, b2 + k); }
 }
 function annulus(mb, r0, r1, y, seg, col, m) {
@@ -952,10 +997,11 @@ function initGL() {
   const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
   const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(mb.v), gl.STATIC_DRAW);
   const ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(mb.i), gl.STATIC_DRAW);
-  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 40, 0);
-  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 40, 12);
-  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 40, 24);
-  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 40, 36);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 52, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 3, gl.FLOAT, false, 52, 12);
+  gl.enableVertexAttribArray(2); gl.vertexAttribPointer(2, 3, gl.FLOAT, false, 52, 24);
+  gl.enableVertexAttribArray(3); gl.vertexAttribPointer(3, 1, gl.FLOAT, false, 52, 36);
+  gl.enableVertexAttribArray(4); gl.vertexAttribPointer(4, 3, gl.FLOAT, false, 52, 40);     // aExt: the ink shell
   ARENA_MESH = { vao, count: mb.i.length };
   // limbs
   const cb = capsuleBase();
@@ -1463,8 +1509,13 @@ function setCommon(prog, shVP) {
   if (U.uShadow) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, SHADOW.tex); gl.uniform1i(U.uShadow, 0); }
   if (U.uShVP) gl.uniformMatrix4fv(U.uShVP, false, shVP);
 }
-// test-only switches for passes a later style adds (toon's ink, neon's bloom); render() does not read them yet
+// test-only switches for passes a style adds, so a row can toggle one in the live page: toon's
+// ink (read by render()) and neon's bloom (not read yet)
 const FX = { ink: true, bloom: true };
+function inkSet(K, ink, w) {
+  gl.useProgram(K.p); gl.uniformMatrix4fv(K.U.uVP, false, CAM.VP); gl.uniform3fv(K.U.uEye, CAM.E);
+  gl.uniform1f(K.U.uInk, w); gl.uniform3fv(K.U.uInkCol, ink.col);
+}
 const FLATV = [];
 function flatTri(a, b, c, ca, cb, cc) { FLATV.push(a[0], a[1], a[2], ca[0], ca[1], ca[2], ca[3], b[0], b[1], b[2], cb[0], cb[1], cb[2], cb[3], c[0], c[1], c[2], cc[0], cc[1], cc[2], cc[3]); }
 function flatRing(cx, cz, r0, r1, col, seg) {
@@ -1512,6 +1563,9 @@ function render(W, H, dpr) {
   gl.uniformMatrix4fv(P.world.U.uVP, false, CAM.VP); gl.uniform3fv(P.world.U.uEye, CAM.E);
   gl.uniform1f(P.world.U.uFog, 0.012 + 0.01 * SKY.night); gl.uniform1f(P.world.U.uTime, APP.time);
   gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0);
+  // ink round the courtyard: the arena's far shell, pushed out along aExt by inkPx on screen
+  const ink = FX.ink && INK[look], inkW = ink ? ink.px * 2 * Math.tan(CAM.fov / 2) / (ph / dpr) : 0;
+  if (ink) { inkSet(P.inkWorld, ink, inkW); gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0); }
   // fighters (drawn per fighter so the blade can glow in its owner's colour)
   gl.useProgram(P.limb.p); setCommon(P.limb, shVP);
   gl.uniformMatrix4fv(P.limb.U.uVP, false, CAM.VP); gl.uniform3fv(P.limb.U.uEye, CAM.E); gl.uniform1f(P.limb.U.uTime, APP.time);
@@ -1524,6 +1578,8 @@ function render(W, H, dpr) {
     gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, half);
   }
   for (const loc of [2, 3, 4, 5]) gl.vertexAttribPointer(loc, [3, 3, 2, 4][loc - 2], gl.FLOAT, false, 48, [0, 12, 24, 32][loc - 2]);
+  // ink round both fighters: one instanced draw of every capsule's far shell, radius + inkPx on screen
+  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }
   // additive: trails, power rings, sparks (toon's trail is a solid white crescent drawn over, not added)
   gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.depthMask(false);
   FLATV.length = 0;

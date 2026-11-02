@@ -52,5 +52,35 @@
   "file": "games/combat-simulator/index.html",
   "old": "styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; saveSettings(); });",
   "new": "styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; saveSettings(); startDuel(SAVE.rank); }); /* @negtest */"
+ },
+ {
+  "name": "ink-off-fighters",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "ink-off-arena",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (ink) { inkSet(P.inkWorld, ink, inkW); gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0); }",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "ink-in-realistic",
+  "file": "games/combat-simulator/index.html",
+  "old": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } };",
+  "new": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] }, realistic: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } }; /* @negtest */"
+ },
+ {
+  "name": "ink-ext-zero",
+  "file": "games/combat-simulator/index.html",
+  "old": "c[0], c[1], c[2], m, e[0], e[1], e[2]); return mb.n++; }",
+  "new": "c[0], c[1], c[2], m, 0, 0, 0); return mb.n++; } /* @negtest */"
+ },
+ {
+  "name": "ink-cull-not-discard",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
+  "new": "  if (ink) { const fs = FS_INK.replace('if (dot(vN, uEye - vW) > 0.0) discard;', ''); if (fs === FS_INK) throw new Error('no discard to take out'); const K = (render.nd = render.nd || compile(withStyle(VS_INK_LIMB, 1), withStyle(fs, 1), 'ink-limb-culled')); gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT); inkSet(K, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); gl.cullFace(gl.BACK); gl.disable(gl.CULL_FACE); } /* @negtest */"
  }
 ]

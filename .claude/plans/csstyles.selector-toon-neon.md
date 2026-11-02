@@ -276,7 +276,7 @@ Tools:
 | Step | What | Status |
 |---|---|---|
 | 1 | Selector, styles, toon shading, hooks | DONE 2026-11-02 |
-| 2 | Toon ink | open |
+| 2 | Toon ink | DONE 2026-11-02 |
 | 3 | CS-1 docs, land, Pages | open |
 | 4 | Neon look | open |
 | 5 | Bloom | open |
@@ -598,6 +598,111 @@ run in five chunks, alone on the box):
   in toon).
 - **Sparks**: the plan's star; the colour is clamped to 1 and scaled by life, with no 2x
   over-bright.
+
+### Step 2 results
+
+Built on `ade4d81`. The ENGINE span is byte-identical (md5 of `ENGINE:BEGIN..END`
+`db0815e8...` before and after). `gates.sh games/combat-simulator/index.html`, run alone, is
+GREEN, and the suite is **71 + 3 = 74 passed, 0 failed**, with no extra rows.
+
+**The realistic frame did not change.** Step 1's procedure (`startDuel(3, 4242)`, 125 ticks of
+1/60, 240 ticks of 1/120 with `press('atk')` every 30, sparks cleared, `APP.time = 100`, one
+frozen `pixels()` at 844x390, sha256) gives `2ddf4aa3cb07bfa35de7a863a0a2bb9630fcba19f0f7206702a04321935729be`
+on the edited page, with `FX.ink` true and with it false: the same hash as step 1. Toon with
+`FX.ink` false gives `de186cd2...`, which is exactly the unedited page's toon frame (so
+the 13-float vertex changed nothing but the new pass); toon with ink gives `e10f0c03...`.
+Shadows still fall: the realistic hash covers the shadow pass, which reads the same VAO.
+
+**How it is built:**
+- The arena vertex is 13 floats (stride 52). `vert(mb, p, nr, c, m, e)` takes the ink
+  extrusion `e` (default `NOEXT`, `[0, 0, 0]`), and `initGL()` has five pointers. `aExt` is
+  location 4, at offset 40.
+- `box()` walks a `BOXC` sign table. A corner's `e` is `sx X + sy Y + sz Z` in the box's own
+  axes, and `quad()` takes four extrusions. The corners' positions are computed exactly as
+  before, so the vertex order and values are bit-identical.
+- `cyl()`: a side vertex is `[c, -1, s]` on the bottom ring and `[c, 1, s]` on the top ring.
+  The cap centre is `[0, 1, 0]` and the cap ring `[c, 1, s]`.
+- The floor disc and both annuli stay 0.
+- `VS_INK_WORLD` moves `aPos + aExt * uInk * |uEye - aPos|`. `VS_INK_LIMB` is `VS_LIMB`'s frame
+  with the vertex pushed out along `n` by `uInk * |uEye - s|`. `FS_INK` discards where
+  `dot(vN, uEye - vW) > 0` and writes `uInkCol` flat (no tonemap).
+- `INK = { toon: { px: 1.5, col: #0d0b10 } }` beside `progsFor()`. `progsFor()` compiles
+  `inkWorld` and `inkLimb` (under the style's `STYLE`) only for a style in `INK`. `render()`
+  computes `const ink = FX.ink && INK[look]` and
+  `inkW = ink.px * 2 * tan(CAM.fov / 2) / (ph / dpr)`.
+- There are two passes, both through `inkSet()`: the arena hull straight after the arena
+  draw, and one instanced draw of all `nCaps` capsules after the fighters' colour draws (once
+  the attribute offsets are reset). Step 4 extends both by adding `neon` to `INK`, plus a
+  per-fighter colour.
+
+**The 3 rows** (part 2). One evaluate runs `startDuel(1, 99)` with `F.p` at z -1.5 and `F.e` at
+z 1.5, both free and sparks cleared. It renders toon with ink on and off and realistic with ink
+on and off, and counts near-black pixels (every channel < 30) in three regions:
+- the opponent's box: the projected AABB 0.6 m round it, 2 m tall;
+- outside both fighters' wide boxes (1.3 m, 2.4 m), which is the courtyard alone;
+- the 12 x 40 px torso box of step 1's row 9.
+
+Measured on the unbroken page at 844x390:
+
+| frame | opponent box | courtyard | torso box (of 480) |
+|---|---|---|---|
+| toon, ink on | 734 | 3,334 | 27 |
+| toon, ink off | 186 | 0 | 0 |
+| realistic, on = off | 198 | 0 | 0 |
+| toon on, rank 5 / rank 10 (beside the row) | 814 / 1,633 | 3,334 / 3,612 | 30 / 158 |
+
+1. **Ink round a fighter**: the opponent box rises by `>= 300` (measured +548; +114 of that is
+   the courtyard's own ink behind the opponent, which is what is left with the fighter pass
+   removed). Also, the torso box is at most 25% near-black with ink on (measured 5.6%: the ink
+   is a rim, not a fill). The second clause is the one that catches the culled hull.
+2. **Ink round the courtyard**: the courtyard rises by `>= 1500` (measured +3,334).
+3. **Realistic is untouched by the ink**: realistic's full frames with `FX.ink` true and false
+   are byte-identical.
+
+Step 1's row 9 still passes with ink on: toon has 13 levels on the torso, against 14 without
+ink and 37 for realistic.
+
+**Breaks** (appended to `.claude/tests/negtests/combat-simulator-styles.json`; 5 of 5 caught by
+their own rows, none by a crash; run in three foreground chunks, alone on the box):
+
+| break | caught by | measured |
+|---|---|---|
+| `ink-off-fighters` (the fighter pass deleted) | row 1 | opponent box 300 vs 186: +114 < 300 |
+| `ink-off-arena` (the arena pass deleted) | row 2 | courtyard 0 vs 0 |
+| `ink-in-realistic` (`INK` gains a `realistic` entry) | row 3 | frames differ; courtyard 3,334 in realistic |
+| `ink-ext-zero` (`vert()` writes 0, 0, 0 for every `ext`) | row 2 | courtyard 0: the shell collapses onto the mesh and is discarded or hidden |
+| `ink-cull-not-discard` (the limb pass compiles `FS_INK` without the discard and draws under `gl.cullFace(gl.FRONT)`) | row 1, by its fill clause | torso 475 of 480 near-black; opponent box 4,760 |
+
+All 14 anchors in the list match exactly once on the final page, and every `new` carries
+`/* @negtest */`. None of step 1's 9 anchors was touched by this step. Row 9's picture
+changed, though, so I re-ran `style-toon-unbanded` (still caught by row 9: 37 / 32) and
+`style-needs-reload` (still caught, by rows 4, 9 and now row 1).
+
+**The cull evidence: the derivation holds.** With front faces culled and the discard taken
+out, the fighter came out **covered in black**: 99% of the torso box, and more than six times
+the ink-on count in the opponent's box. That is "the wrong way round" (more black, not less).
+So the capsules' outward faces reach the rasteriser wound clockwise, which is what a
+left-handed `(u, ax, v)` frame in `VS_LIMB` predicts. `gl.cullFace(gl.BACK)` would therefore
+be the culling that keeps the far shell. Discarding by normal stays the design, because it
+does not depend on winding. A rise-only row 1 would have **passed** this break, which is why
+row 1 has the torso-fill ceiling.
+
+**Draw calls per frame** (`PERF.calls` for one `draw()`, the rank-4 scene of step 1's row 10):
+- Idle: 6 in realistic, 8 in toon (the two ink passes).
+- With a trail, a power ring and sparks: 8 in realistic, 11 in toon (9 with `FX.ink` off).
+
+**Assumed look choices, for step 3 to write into `.claude/combat-simulator.md`:**
+- Ink is the plan's `#0d0b10` at the plan's 1.5 CSS px, with the same width on the blade. At
+  the duel's distance the blade is narrower than its two ink edges, so in toon it reads as a
+  dark line with a light core.
+- The arena's overlapping wall boxes (each is `hl + 0.02` long) draw a short vertical ink line
+  at every segment joint, so the wall reads as panels. I kept these rather than special-casing
+  them.
+- The open bottom of a pine's foliage cone shows the shell's bottom ring as a dark band
+  where the camera sees under it. I kept this as the rim's own line.
+- The ink is drawn flat in display space (no tonemap, no fog), so a far pine's outline is as
+  dark as a near one's.
+- The ink writes depth, so the additive effects depth-test against it like any other geometry.
 
 ## Handoff
 

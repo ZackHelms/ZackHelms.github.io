@@ -16,8 +16,9 @@
  * layout at seven sizes, the power button's ring closing at 10, the settings
  * pausing the duel, the victory and defeat flows and the saved ladder, and the
  * graphics styles (the select, saving and validating the pick, a skin is paint
- * with real frames drawn between the ticks, toon's bands, every element drawn
- * in every style with no GL error).
+ * with real frames drawn between the ticks, toon's bands, toon's ink round the
+ * fighters and the courtyard and none in realistic, every element drawn in every
+ * style with no GL error).
  *
  *   .claude/scripts/gates.sh games/combat-simulator/index.html
  *
@@ -422,6 +423,46 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
   });
   console.log('     torso luminance levels: ' + JSON.stringify(bands));
   ok('toon is banded: at most half the luminance levels of realistic on the opponent\'s torso', bands.realistic >= 20 && bands.toon * 2 <= bands.realistic, bands);
+  // toon's ink: FX.ink on and off on ONE frozen frame, near-black pixels (every channel < 30) counted
+  // in the opponent's box (0.6 m round it, 2 m tall), outside both fighters' wide boxes (1.3 m, 2.4 m:
+  // the courtyard alone), and in the 12 x 40 px box on its torso (the ink is a rim, never a fill)
+  const ink = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0;
+    const W = innerWidth, H = innerHeight;
+    const boxOf = (f, r, top) => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const dx of [-r, r]) for (const dz of [-r, r]) for (const y of [0, top]) { const q = project([f.x + dx, y, f.z + dz], W, H); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      return [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1)]; };
+    const one = (style, on) => {
+      __CS.setStyle(style); __CS.FX.ink = on;
+      const px = __CS.pixels(), d = px.d, w = px.w, h = px.h, k = w / W;     // rows bottom-up, device px
+      const be = boxOf(F.e, 0.6, 2.0), bp = boxOf(F.p, 1.3, 2.4), bo = boxOf(F.e, 1.3, 2.4);
+      const c = project([F.e.x, 1.25, F.e.z], W, H), tb = [Math.round(c.x - 6), Math.round(c.y - 20), Math.round(c.x + 6), Math.round(c.y + 20)];
+      const inB = (b, x, y) => x >= b[0] && x < b[2] && y >= b[1] && y < b[3];
+      let opp = 0, yard = 0, torso = 0, tN = 0;
+      for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) {
+        const x = gx / k, y = (h - 1 - gy) / k, i = (gy * w + gx) * 4, dark = d[i] < 30 && d[i + 1] < 30 && d[i + 2] < 30;
+        if (inB(tb, x, y)) { tN++; if (dark) torso++; }
+        if (!dark) continue;
+        if (inB(be, x, y)) opp++;
+        if (!inB(bp, x, y) && !inB(bo, x, y)) yard++;
+      }
+      return { opp, yard, torso, tN, d };
+    };
+    const on = one('toon', true), off = one('toon', false), rOn = one('realistic', true), rOff = one('realistic', false);
+    let same = rOn.d.length === rOff.d.length; for (let i = 0; same && i < rOn.d.length; i++) if (rOn.d[i] !== rOff.d[i]) same = false;
+    __CS.FX.ink = true; __CS.setStyle('realistic');
+    const strip = r => ({ opp: r.opp, yard: r.yard, torso: r.torso, tN: r.tN });
+    return { on: strip(on), off: strip(off), rOn: strip(rOn), rOff: strip(rOff), same };
+  });
+  console.log('     ink: ' + JSON.stringify(ink));
+  // measured at 844x390 (rank 1): fighter +548 (+114 of it the courtyard's ink behind), courtyard +3334,
+  // torso 27 of 480 dark; with the hull culled instead of discarded, the torso went 475 of 480
+  ok('toon inks round a fighter: near-black on the opponent rises with the ink on, and stays a rim, not a fill',
+    ink.on.opp - ink.off.opp >= 300 && ink.on.tN > 0 && ink.on.torso <= ink.on.tN * 0.25, { on: ink.on, off: ink.off });
+  ok('toon inks round the courtyard: near-black outside both fighters rises with the ink on', ink.on.yard - ink.off.yard >= 1500, { on: ink.on.yard, off: ink.off.yard });
+  ok('realistic is untouched by the ink: its frames with FX.ink on and off are byte-identical', ink.same && ink.rOn.yard === ink.rOff.yard, { same: ink.same, rOn: ink.rOn, rOff: ink.rOff });
   // every element at once in every style: a power wind-up and its ring, a trail, sparks; no GL error
   const all = await page.evaluate(() => {
     __CS.setPaused(true); __CS.setStyle('realistic'); __CS.startDuel(4, 31); __CS.tick(1 / 60, 125);
