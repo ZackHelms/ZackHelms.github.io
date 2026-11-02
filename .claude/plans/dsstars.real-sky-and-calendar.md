@@ -478,7 +478,7 @@ The CD's standing preferences:
 |---|---|---|
 | 0 | The CD's words, the catalogue answer and the spec corrections recorded (this file) | DONE 2026-11-01 |
 | 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | DONE 2026-11-01 |
-| 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows | |
+| 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows || DONE 2026-11-02 |
 | 3 | The star pass with planets, `ridgeY()`, the Milky Way, hash stars deleted; star, planet, Milky Way and pixel rows | |
 | 4 | Break list run whole, frame cost, docs | |
 | 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
@@ -662,6 +662,39 @@ For steps 2-4:
        Raleigh's position. The Table 1 elements are good to about 0.1 deg.
      - Venus's magnitude is below -3.5 and Jupiter's below -1.5.
 - Suite 86 -> 90.
+
+#### Step 2 results
+
+Done 2026-11-02 (oversee run, worktree branch `worktree-oversee+dsstars`, from d47bc1d). zmhstudio at 7b9c40e.
+- **Splice:** `ZMH-SKY=games/driving-simulator/index.html bytes=98547 stars=1627`. A second splice left
+  the page byte-identical (same sha256). The page is now 296,690 B.
+- **Licence and notes:** `games/driving-simulator/LICENSE-d3-celestial.txt` copied from the kit; the new
+  THE ROAD paragraph is `<p id="sky-notes">`, with the attribution line verbatim and the link. The
+  licence holder's name is only in that paragraph, the licence file and the generated block.
+- **Bodies:** `OBS_SKY`; `updateSky()` calls `skyAt()` once and sets `sun`, `decl`, `eot`
+  (`equationOfTimeMin`), `solarNoon` (step 1's formula), the topocentric `moon`, `moonPhase`, `lst`,
+  `starM` (`Float32Array(9)`, row-major) and `planets` (`{id, mag, valid, enu, altDeg, azDeg}`, the
+  naked-eye five). `solar()` and `celestial()` are deleted; the hook drops `solar` and adds `OBS_SKY`,
+  `ZMH_SKY`, `SKY_DATA`. The hash stars and `uStarRot` are untouched (step 3).
+- **Suite:** 90 passed (section "3c", 4 rows). No step-1 row was restated and none moved.
+- The kit at 22:00 EDT May 5: sun -20.876 / 310.515; moon -23.134 / 109.092; Venus mag -3.89 at
+  4.34 / 296.16; Jupiter -2.00 at 33.49 / 274.94. Mean-phase sun-moon angles: 175.1 (full, May 1),
+  5.5 (new, May 16), 174.2 (full, May 31).
+- Scratch breaks on copies: the moon as the anti-sun turned the moon row red; the longitude's sign
+  flipped turned the sun, moon and planet rows (and step 1's sun rows) red.
+- **Choices beyond the plan** (step 4 adds them to the assumed table):
+  - The sky-block row never types the licence holder's name: it captures it from the block header and
+    checks it matches the licence file and `#sky-notes`.
+  - The licence file is checked beside the checkout's page, not a `DS_PAGE` copy (copies live in scratch).
+  - CSS `#settings a{color:var(--blue);overflow-wrap:anywhere}`, so the link reads and wraps at 320 px.
+  - The moon row also checks `SKY.moonPhase.illuminatedFraction` against `2026-05-06T02Z/geo/moon`
+    within 0.01 (not asked for).
+- **Gates:** the implementer's three gate runs were red on one sound row each (which one varied:
+  engine/radio loudness, the engine slider, the four stations within 25%) while it ran broken copies
+  in parallel at load average 3-4. Its control, the step-1 page under the step-1 suite, failed the
+  stations row the same way. Re-run by the overseer on a quiet machine: `GATES: GREEN`, 90 passed.
+  That machine load causes it is a hypothesis, not traced; the sound rows measure loudness over
+  wall-clock time.
 
 ### Step 3 - the stars, the planets and the Milky Way in the sky
 

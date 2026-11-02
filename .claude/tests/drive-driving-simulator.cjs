@@ -16,6 +16,7 @@
  */
 const { chromium } = require('playwright-core');
 const path = require('path');
+const fs = require('fs');
 // DS_PAGE: a copy to test instead (negtest-copies.py); the default is this checkout's page,
 // so a worktree tests its own branch and never the primary checkout.
 const COPY = !!process.env.DS_PAGE;
@@ -50,6 +51,31 @@ function ownRiseSet(mjd, off) {
 }
 function ownNoon(mjd, off) { let t = 12; for (let i = 0; i < 6; i++) t -= ownSun(jdOf(mjd, t, off)).ha / 15 / 1.0027379; return t; }
 const angDeg = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]))) / DR;
+// any body from its RA/Dec of date (degrees) at Raleigh, through the suite's own GMST: { alt, az, v: [east, up, north] }
+function ownAltAz(ra, dec, jd) {
+  const H = (gmst(jd) + RAL.lon - ra) * DR, d = dec * DR, la = RAL.lat * DR;
+  const v = [-Math.cos(d) * Math.sin(H), Math.sin(la) * Math.sin(d) + Math.cos(la) * Math.cos(d) * Math.cos(H), Math.sin(d) * Math.cos(la) - Math.cos(d) * Math.sin(la) * Math.cos(H)];
+  return { alt: Math.asin(v[1]) / DR, az: ((Math.atan2(v[0], v[2]) / DR) % 360 + 360) % 360, v };
+}
+const altAzOf = v => ({ alt: Math.asin(Math.max(-1, Math.min(1, v[1]))) / DR, az: ((Math.atan2(v[0], v[2]) / DR) % 360 + 360) % 360 });
+const dAz = (a, b, alt) => Math.abs(((a - b + 540) % 360) - 180) * Math.cos(alt * DR);   // on-sky separation along the almucantar
+// SIMBAD J2000 (ICRS) positions, typed in sexagesimal: RA h m s, Dec d ' "
+const hms = t => { const [h, m, x] = t.split(' ').map(Number); return (h + m / 60 + x / 3600) * 15; };
+const dms = t => { const g = t[0] === '-' ? -1 : 1, [d, m, x] = t.replace(/^[+-]/, '').split(' ').map(Number); return g * (d + m / 60 + x / 3600); };
+const SIMBAD = { Polaris: [11767, '02 31 49.09', '+89 15 50.8'], Regulus: [49669, '10 08 22.311', '+11 58 01.95'], Arcturus: [69673, '14 15 39.672', '+19 10 56.67'],
+  Spica: [65474, '13 25 11.579', '-11 09 40.75'], Dubhe: [54061, '11 03 43.672', '+61 45 03.72'], Vega: [91262, '18 36 56.336', '+38 47 01.28'],
+  Betelgeuse: [27989, '05 55 10.305', '+07 24 25.43'], Sirius: [32349, '06 45 08.917', '-16 42 58.02'], Rigel: [24436, '05 14 32.272', '-08 12 05.90'] };
+const unitRD = (ra, dec) => [Math.cos(dec * DR) * Math.cos(ra * DR), Math.cos(dec * DR) * Math.sin(ra * DR), Math.sin(dec * DR)];
+// Meeus 49.1: the MEAN new (integer k) and full (k + 0.5) moons, JDE; delta-T (about 70 s) ignored
+function meanPhase(k) { const T = k / 1236.85; return 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T - 0.000000150 * T * T * T + 0.00000000073 * T * T * T * T; }
+// astronomy-engine 2.1.19 (zmh-sky vectors/golden.v1.json, never shipped): the oracle's values at 2026-05-06 02:00 UT
+const AE = {
+  sun: { alt: -20.881657475, az: 310.517712321 },     // record 2026-05-06T02Z/raleigh/sun
+  moon: { alt: -23.14562993, az: 109.087015027 },     // record 2026-05-06T02Z/raleigh/moon (topocentric)
+  moonIllum: 0.835373145,                             // record 2026-05-06T02Z/geo/moon, moonIllumFraction
+  ven: { ra: 72.973356438, dec: 23.639460993, mag: -3.885724 },   // record 2026-05-06T02Z/geo/ven (geocentric, true equator of date)
+  jup: { ra: 111.326408898, dec: 22.388555784, mag: -1.998412 },  // record 2026-05-06T02Z/geo/jup
+};
 
 (async () => {
   const browser = await chromium.launch({
@@ -271,6 +297,70 @@ const angDeg = (a, b) => Math.acos(Math.max(-1, Math.min(1, a[0] * b[0] + a[1] *
     dateUI.before.shown === 'Tue May 5' && dateUI.before.shown === dateUI.before.want && dateUI.before.section === 'TIME' && dateUI.before.settings
     && dateUI.after.mjd === MAY5 + 1 && dateUI.after.shown === 'Wed May 6' && dateUI.after.shown === dateUI.after.want
     && dateUI.slide.hour === 10 && dateUI.slide.mjd === MAY5 + 1 && dateUI.slide.shown === 'Wed May 6' && dateUI.slide.clock === '10:00 AM', dateUI);
+
+  // ---- 3c. the sky from zmh-sky: the spliced block, one sun, the moon in its real place, the planets ----
+  // The fixed moment is May 5, 2026 at 22:00 EDT = 2026-05-06 02:00 UT, the kit's golden instant.
+  const pageFile = COPY ? process.env.DS_PAGE : path.join(process.cwd(), 'games', 'driving-simulator', 'index.html');
+  // the licence ships beside the game, never beside a copy under test (copies live in a scratch dir)
+  const licFile = path.join(process.cwd(), 'games', 'driving-simulator', 'LICENSE-d3-celestial.txt');
+  const src = fs.readFileSync(pageFile, 'utf8');
+  const bi = src.indexOf('/*ZMH-SKY:BEGIN*/'), head = bi < 0 ? '' : src.slice(bi, src.indexOf('\n', src.indexOf('\n', src.indexOf('\n', bi) + 1) + 1));
+  const ATTR = /Star data: XHIP \(Anderson & Francis 2012\) via d3-celestial, \(c\) 2015 ([^,;]+), BSD-3-Clause; constellation lines after the IAU figures, modified by [^;]+; planet elements: JPL \(Standish\), Table 1\./;
+  const attr = head.match(ATTR), lic = fs.existsSync(licFile) ? fs.readFileSync(licFile, 'utf8') : '';
+  const licHolder = (lic.match(/^Copyright \(c\) 2015, (.+)$/m) || [])[1];
+  const want = Object.fromEntries(Object.entries(SIMBAD).map(([n, [hip, ra, dec]]) => [hip, { n, ra: hms(ra), dec: dms(dec) }]));
+  const blk = await page.evaluate(hips => {
+    const D = window.__DS, S = D.SKY_DATA.stars, F = S.fields, R = S.rows, I = k => F.indexOf(k);
+    const notes = document.getElementById('sky-notes'), a = notes && notes.querySelector('a');
+    return { fields: F.join(), n: R.length, maxMag: Math.max(...R.map(r => r[I('mag')])),
+      raBad: R.filter(r => !(r[I('ra')] >= 0 && r[I('ra')] < 360)).length, decBad: R.filter(r => !(r[I('dec')] >= -90 && r[I('dec')] <= 90)).length,
+      named: hips.map(h => { const r = R.find(r => r[I('hip')] === h); return r ? { hip: h, ra: r[I('ra')], dec: r[I('dec')] } : { hip: h, missing: true }; }),
+      notes: notes ? notes.textContent : null, href: a ? a.getAttribute('href') : null, inSettings: !!(notes && notes.closest('#settings')),
+      lib: typeof D.ZMH_SKY.skyAt === 'function' && typeof ZMH_SKY_GLSL === 'object' };
+  }, Object.keys(want).map(Number));
+  const starOff = blk.named.map(r => r.missing ? { hip: r.hip, missing: true } : { hip: r.hip, name: want[r.hip].n, off: angDeg(unitRD(r.ra, r.dec), unitRD(want[r.hip].ra, want[r.hip].dec)) });
+  ok('the zmh-sky block: its header names zmh-sky and carries the attribution; 1,500-1,750 stars to mag 5, RA in [0, 360), Dec in [-90, 90]; the nine named stars by HIP within 0.01 deg of SIMBAD; the notes carry the attribution and link the licence beside the game',
+    /GENERATED by zmh-sky/.test(head) && !!attr && blk.lib && blk.fields === 'hip,ra,dec,mag,bv' && blk.n >= 1500 && blk.n <= 1750 && blk.maxMag <= 5.0 && blk.raBad === 0 && blk.decBad === 0
+    && starOff.length === 9 && starOff.every(r => !r.missing && r.off < 0.01)
+    && blk.inSettings && blk.notes !== null && blk.notes.includes(attr[0]) && blk.href === 'LICENSE-d3-celestial.txt' && /Redistribution and use/.test(lic) && licHolder === attr[1],
+    { header: !!attr, n: blk.n, maxMag: blk.maxMag, raBad: blk.raBad, decBad: blk.decBad, starOff, notes: blk.notes && blk.notes.slice(0, 60), href: blk.href, lic: lic.length, holderMatch: !!attr && licHolder === attr[1] });
+  const JD22 = jdOf(MAY5, 22, -4);
+  const phases = []; for (let k = 300; k <= 340; k += 0.5) { const jd = meanPhase(k); if (jd - 2400000.5 >= MJD(2026, 5, 1) && jd - 2400000.5 < MJD(2026, 6, 1)) phases.push({ k, jd, full: k % 1 !== 0 }); }
+  // a JD to the page's date and EDT clock (all of May is EDT)
+  const atJD = phases.map(p => { const loc = p.jd - 2400000.5 - 4 / 24, mjd = Math.floor(loc); return { ...p, mjd, hour: (loc - mjd) * 24 }; });
+  const sky = await page.evaluate(([MAY5, JD22, atJD]) => {
+    const D = window.__DS, o = {};
+    const ang = (a, b) => { const c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+      return Math.atan2(Math.hypot(c[0], c[1], c[2]), a[0] * b[0] + a[1] * b[1] + a[2] * b[2]) * 180 / Math.PI; };
+    D.SKY.hour = 22; D.setDate(MAY5);
+    const ref = D.ZMH_SKY.skyAt(JD22, D.OBS_SKY, D.SKY_DATA.planets);
+    o.obs = D.OBS_SKY; o.sun = D.SKY.sun.slice(); o.sunVsKit = ang(D.SKY.sun, ref.sun.enu); o.moon = D.SKY.moon.slice(); o.moonPhase = D.SKY.moonPhase;
+    o.planets = D.SKY.planets.map(p => ({ id: p.id, mag: p.mag, valid: p.valid, enu: p.enu.slice(), altDeg: p.altDeg, azDeg: p.azDeg }));
+    o.hookSolar = 'solar' in D;
+    o.anchors = atJD.map(a => { D.SKY.hour = a.hour; D.setDate(a.mjd); return { k: a.k, full: a.full, mjd: a.mjd, hour: a.hour, dst: D.SKY.dst, sep: ang(D.SKY.sun, D.SKY.moon) }; });
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    o.restored = { mjd: D.SKY.mjd, hour: D.SKY.hour };
+    return o;
+  }, [MAY5, JD22, atJD]);
+  const sunAA = altAzOf(sky.sun);
+  ok('one sun, the kit\'s: SKY.sun is skyAt(julianDate()).sun.enu (under 1e-6 deg) and within 0.05 deg of astronomy-engine at 22:00 EDT on May 5 (-20.882 / 310.518); no solar() or celestial() left',
+    sky.sunVsKit < 1e-6 && Math.abs(sunAA.alt - AE.sun.alt) < 0.05 && dAz(sunAA.az, AE.sun.az, AE.sun.alt) < 0.05
+    && !sky.hookSolar && !/function solar\(|function celestial\(/.test(src) && sky.obs.latDeg === RAL.lat && sky.obs.lonEastDeg === RAL.lon && sky.obs.heightM === 0,
+    { sunVsKit: sky.sunVsKit, sun: sunAA, ae: AE.sun, hookSolar: sky.hookSolar, obs: sky.obs });
+  const moonAA = altAzOf(sky.moon), full = sky.anchors.filter(a => a.full), nw = sky.anchors.filter(a => !a.full);
+  ok('the moon in its real place: topocentric within 0.3 deg of astronomy-engine at 22:00 EDT on May 5 (-23.146 / 109.087), its lit fraction kept; at the Meeus mean full moons of May 2026 it is within 15 deg of opposite the sun, at the mean new moon within 15 deg of it',
+    Math.abs(moonAA.alt - AE.moon.alt) < 0.3 && dAz(moonAA.az, AE.moon.az, AE.moon.alt) < 0.3
+    && !!sky.moonPhase && Math.abs(sky.moonPhase.illuminatedFraction - AE.moonIllum) < 0.01 && typeof sky.moonPhase.waxing === 'boolean'
+    && full.length === 2 && nw.length === 1 && sky.anchors.every(a => a.dst === true) && full.every(a => Math.abs(a.sep - 180) < 15) && nw.every(a => a.sep < 15)
+    && sky.restored.mjd === MAY5 && sky.restored.hour === 6.25,
+    { moon: moonAA, ae: AE.moon, phase: sky.moonPhase, anchors: sky.anchors });
+  const pl = Object.fromEntries(sky.planets.map(p => [p.id, p]));
+  const plCmp = ['ven', 'jup'].map(id => { const o = ownAltAz(AE[id].ra, AE[id].dec, JD22), p = pl[id] || {}, e = p.enu ? altAzOf(p.enu) : {};
+    return { id, dAlt: p.altDeg - o.alt, dAz: dAz(p.azDeg, o.az, o.alt), dEnu: p.enu ? angDeg(p.enu, o.v) : null, dFields: p.enu ? Math.abs(e.alt - p.altDeg) + dAz(e.az, p.azDeg, e.alt) : null, mag: p.mag, own: o.alt.toFixed(2) + '/' + o.az.toFixed(2) }; });
+  ok('the planets: exactly Mercury, Venus, Mars, Jupiter and Saturn, all valid; Venus and Jupiter within 0.3 deg of the suite\'s own alt/az from astronomy-engine\'s RA/Dec at 22:00 EDT on May 5; Venus brighter than -3.5, Jupiter than -1.5',
+    sky.planets.length === 5 && sky.planets.map(p => p.id).sort().join() === 'jup,mar,mer,sat,ven' && sky.planets.every(p => p.valid === true)
+    && plCmp.every(c => Math.abs(c.dAlt) < 0.3 && c.dAz < 0.3 && c.dEnu < 0.3 && c.dFields < 1e-6) && (pl.ven || {}).mag < -3.5 && (pl.jup || {}).mag < -1.5,
+    { ids: sky.planets.map(p => p.id), plCmp });
 
   // ---- 4. the car: acceleration, braking, steering, reverse ----
   const car = await page.evaluate(() => {
