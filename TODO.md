@@ -12,17 +12,9 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **The sky arc: no column under a low sun or moon, brighter stars, the sun and
-  the moon as they really look, and a slider for each thing in the sky** (DS-7, DS-5, DS-4, DS-6;
-  one seven-step arc, all four edit the same shaders). DS-7 and DS-5 land on `main` on their own
-  at step 2.
-  - **DS-7, bug** (the CD, 2026-11-02, with screenshots: "Sun rise, sun set, moon rise, and moon
-    set all show a vertical smearing at the horizon"). Traced in the code: the fog, the distant
-    hills and paint reflections sample the sky with the elevation clamped to 1.15 deg, and that
-    sky includes the sun and moon discs. Fix: the discs only on the real view ray.
-  - **DS-5** (the CD, 2026-11-02: "in game the stars are too dim, increase brightness"). Measure
-    five reference stars at the phone's render scale first (the cause is not traced), then raise
-    them so Polaris reads white and a mag-4 star is plainly visible.
+- [driving-sim] **The sky arc, second half: the sun and the moon as they really look, and a
+  slider for each thing in the sky** (DS-4, DS-6; steps 3-7 of the seven-step arc). In progress:
+  its first half (DS-7, DS-5) landed 2026-11-02, see `DONE.md`.
   - **DS-4** (the CD, 2026-11-01: "Moon realism: yes, add this (and sun position) to the backlog
     for driving sim"). The moon's phase with the kit's lit-sphere disc (bright limb toward the sun),
     earthshine and soft maria; both bodies refracted and at their real sizes; moonlight by phase;

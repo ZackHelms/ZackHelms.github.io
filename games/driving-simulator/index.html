@@ -53,7 +53,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-02 12:27 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-02 17:17 UTC</div>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
@@ -2172,7 +2172,15 @@ uniform float uDay, uNight;
 float h21(vec2 p){ p = mod(p, 4096.0); return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
   return mix(mix(h21(i), h21(i+vec2(1,0)), u.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), u.x), u.y); }
-vec3 skyCol(vec3 d){
+// The sky along d, in two parts (DS-7). The base: the gradient, the sunset tint, the sun's broad lobe and the moon's glow, which
+// colour the haze toward a body; the fog, the distant hills and paint reflections take it alone (skyBase). The bodies: the sun's
+// disc and aureole (about 6 deg wide at half height, so in the haze it would still paint a band) and the moon's disc, which belong
+// only on a real view ray: the sky pass takes skyView() = base + bodies, and its hills replace it below the ridge, so a body behind
+// them stays hidden. The fog and the hills sample the sky with the elevation clamped near 1.15 deg, so while the one old skyCol()
+// held the discs, a body near that height drew a column down everything at its azimuth. Both are skySum(), the old skyCol()'s one
+// sum in its old order with the bodies' terms weighted 0 or 1 (x * 1 = x, x + 0 = x exactly): skyView() is the old sky bit for
+// bit, skyBase() exactly the base. Two functions added after the fact (base + bodies) change the rounding of some pixels.
+vec3 skySum(vec3 d, float bodies){
   float sy = uSunDir.y;
   float up = clamp(d.y, -0.2, 1.0);
   vec3 zen = mix(vec3(0.0015, 0.0025, 0.009), vec3(0.05, 0.15, 0.50), uDay);
@@ -2185,11 +2193,13 @@ vec3 skyCol(vec3 d){
   vec3 c = mix(hor, zen, pow(max(up, 0.0), 0.5));
   if (d.y < 0.0) c = mix(hor, hor * 0.35, smoothstep(0.0, -0.2, d.y));
   float cs = dot(d, uSunDir);
-  c += uSunCol * (smoothstep(0.99985, 0.99993, cs) * 30.0 + pow(max(cs, 0.0), 10.0) * 0.18 + pow(max(cs, 0.0), 120.0) * 0.6) * step(-0.06, sy);
+  c += uSunCol * (smoothstep(0.99985, 0.99993, cs) * 30.0 * bodies + pow(max(cs, 0.0), 10.0) * 0.18 + pow(max(cs, 0.0), 120.0) * 0.6 * bodies) * step(-0.06, sy);
   float cm = dot(d, uMoonDir);
-  c += vec3(0.8, 0.85, 0.95) * smoothstep(0.99975, 0.99985, cm) * 1.2 * uNight + uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6;
+  c += vec3(0.8, 0.85, 0.95) * smoothstep(0.99975, 0.99985, cm) * 1.2 * uNight * bodies + uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6;
   return c;
 }
+vec3 skyBase(vec3 d){ return skySum(d, 0.0); }
+vec3 skyView(vec3 d){ return skySum(d, 1.0); }
 // The distant hills' skyline: a ridge at infinity, d.y of its top at world azimuth atan(d.z, d.x). The sky
 // draws the hills below it (FS_SKY) and the star pass discards below it (FS_STARS): the hills are not geometry.
 float ridgeY(float az, float mtn){ return 0.025 + 0.03 * (sin(az * 3.0 + 1.3) * 0.5 + 0.5) * mtn + 0.012 * sin(az * 11.0 + 0.4) + 0.006 * sin(az * 37.0); }
@@ -2340,7 +2350,7 @@ void main(){
   if (refl > 0.0) {
     vec3 R = reflect(-V, N);
     float fr = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
-    vec3 env = skyCol(normalize(vec3(R.x, max(R.y, -0.05), R.z)));
+    vec3 env = skyBase(normalize(vec3(R.x, max(R.y, -0.05), R.z)));
     if (R.y < 0.0) env = mix(env, uAmbGnd * 0.6, smoothstep(0.0, -0.3, R.y));
     float k = refl * fr;
     if (m == 11) k *= 0.55; if (m == 12) { k *= 0.75; col += alb * env * 0.12; }
@@ -2348,7 +2358,7 @@ void main(){
   }
   float dist = length(vW);
   float fogK = 1.0 - exp(-dist * uFog);
-  vec3 fc = skyCol(normalize(vec3(-V.x, max(-V.y, 0.0) * 0.4 + 0.02, -V.z)));
+  vec3 fc = skyBase(normalize(vec3(-V.x, max(-V.y, 0.0) * 0.4 + 0.02, -V.z)));
   col = mix(col, fc, fogK);
   frag = vec4(tonemap(col * uExposure), 1.0);
 }`;
@@ -2371,15 +2381,15 @@ const vec3 MILKY_WAY_RGB = vec3(${ZMH_SKY.MILKY_WAY_RGB.map(v => v.toFixed(6)).j
 in vec2 vP; out vec4 frag;
 void main(){
   vec4 a = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(a.xyz / a.w);
-  vec3 c = skyCol(d);
-  // distant hills: a ridge at infinity, hazed toward the horizon colour
+  vec3 c = skyView(d);           // the sky with the sun and moon discs: the view ray only (the hills below replace it under the ridge)
+  // distant hills: a ridge at infinity, hazed toward the horizon colour (skyBase: no disc in the haze)
   float az = atan(d.z, d.x);
   float ridge = ridgeY(az, uMtn);
   // the Milky Way (zmh-sky's band, J2000): only at night, so the day sky costs nothing and keeps its pixels.
   // uStarM is the world star matrix (J2000 -> world, orthogonal), so its transpose takes d back to J2000.
   if (uNight > 0.0 && uMwGain > 0.0 && d.y >= ridge) c += uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y);
   if (d.y < ridge) {
-    vec3 hz = skyCol(normalize(vec3(d.x, 0.02, d.z)));
+    vec3 hz = skyBase(normalize(vec3(d.x, 0.02, d.z)));
     vec3 hill = mix(vec3(0.02, 0.035, 0.03) * (0.2 + uDay * 2.0), hz, 0.62);
     c = mix(hill, hz, smoothstep(ridge, ridge - 0.04, d.y) * 0.3);
   }
@@ -2395,6 +2405,9 @@ void main(){
 // to the point's edge) is sub-pixel for a 1-2 px star, and the fragment runs at pixel centres, so a faint
 // star came out at a fifth of its law or not at all. Sigma is floored at 0.5 px and the point rasterised at
 // least 3 px wide: the centre keeps the law's intensity; from about 2.8 px up the profile is exactly the kit's.
+// The floor is half a CSS pixel (0.5 * uPx), and never under half a framebuffer pixel (DS-5): at the phone's
+// render scale 1.7 a 0.5-framebuffer-px sigma was a third of a CSS pixel, so a star's brightest pixel fell to
+// 37% of its centre whenever the centre sat on a pixel corner (Polaris adding 86 there against 230 on a centre).
 const VS_STARS = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aDir; layout(location=1) in float aMag; layout(location=2) in vec3 aColor;
@@ -2409,7 +2422,7 @@ void main(){
   float alt = degrees(asin(clamp(w.y, -1.0, 1.0)));
   float I = pow(10.0, -0.4 * STAR_GAMMA * (aMag + EXT_K * airmass(alt) - STAR_MAG_REF));
   float sz = mix(1.0, 4.0, min(1.0, I)) * uPx;
-  vSig = max(sz * 0.5 / sqrt(8.0), 0.5); vSize = max(sz, 6.0 * vSig);
+  vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0)); vSize = max(sz, 6.0 * vSig);
   gl_PointSize = vSize;
   vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt);
   gl_Position = uVP * vec4(w * 1000.0, 1.0);
@@ -2970,9 +2983,10 @@ const enuToWorld = v => [v[0], v[1], -v[2]];
 // vector, the magnitude and the linear colour (zmh-sky's bvToRGB; no B-V gives white). The 1,627 stars of
 // the ZMH-SKY block come first, then the five naked-eye planets in PLANET_IDS order, rewritten by updateSky()
 // as the sky moves (a planet outside the kit's 1800-2050 elements gets magnitude 99 and draws nothing).
-// STAR_GAIN scales the pass after the tonemap (a magnitude-1 star reads white); MW_GAIN is the Milky Way's
+// STAR_GAIN scales the pass after the tonemap (a magnitude-1 star reads white; 4.0 since DS-5, so that at the phone's
+// render scale Polaris adds 200 and a magnitude-4 star 60 at every sub-pixel phase); MW_GAIN is the Milky Way's
 // linear scale before it (the kit's MILKY_WAY_PEAK: faint, as Raleigh's sky is). Both assumed.
-const STAR_GAIN = 3.2, MW_GAIN = 0.012;
+const STAR_GAIN = 4.0, MW_GAIN = 0.012;
 const PLANET_IDS = ['mer', 'ven', 'mar', 'jup', 'sat'];
 const PLANET_RGB = { mer: [1, 1, 1], ven: [1, 1, 1], mar: [1.0, 0.62, 0.42], jup: [1.0, 0.95, 0.85], sat: [1.0, 0.9, 0.7] };
 const STARS = (() => {

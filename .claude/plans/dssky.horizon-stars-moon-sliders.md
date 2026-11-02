@@ -311,7 +311,7 @@ Tools:
 
 ## Steps
 
-### Step 1 - DS-7: no column under a low sun or moon
+### Step 1 - DS-7: no column under a low sun or moon (DONE 2026-11-02)
 
 - **First, the repro row, on today's page.** Add the row below and run it before touching the
   shaders. It must FAIL on today's page; record the measured ratios in the Results. (If it passes,
@@ -334,7 +334,73 @@ Tools:
   (`:920`) and the four star-pixel rows also stay green.
 - The repro row now passes, and all 108 earlier rows stay green. Suite 108 + 2 = 110.
 
-### Step 2 - DS-5: brighter stars; land DS-7 and DS-5
+#### Results (step 1)
+
+Worktree branch `worktree-oversee+dssky`, from `bbf3d0e` (the page's shaders as on `e43a233`).
+
+- **The times, by bisection on the page's own `SKY`** (40 halvings of `SKY.hour` through `setDate()`):
+  the sun at 1.0 deg setting on May 5 at **19.9203 h (19:55:13 EDT)**, azimuth 289.70; the moon at
+  1.0 deg rising on May 6 at **0.3287 h (00:19:43 EDT)**, azimuth 126.79. Both match the plan's
+  kit-computed 19:55 and 00:20.
+- **The repro row, on today's page, FAILED** as the traced cause predicted. The ratio is the body's
+  strip against the dimmer of the two side strips (the strictest reading of "either side"); rows
+  from 4 px under the horizon to the bottom, 155 rows; 8-bit luminance.
+
+  | | sun: body / left / right | sun ratio | moon: body / left / right | moon ratio |
+  | - | - | - | - | - |
+  | before, the suite | 245.98 / 129.70 / 125.77 | **1.956** | 195.89 / 18.91 / 17.46 | **11.217** |
+  | before, a scratch run (another car position) | 246.63 / 119.85 / 119.65 | 2.061 | 196.23 / 19.03 / 18.79 | 10.443 |
+  | after, the suite | 118.46 / 125.63 / 120.24 | **0.985** | 19.70 / 18.94 / 17.49 | **1.126** |
+  | break check: a copy with only the fog back on `skyView()` | 223.31 / 127.38 / 124.34 | 1.796 (FAIL) | 171.25 / 18.89 / (cut off in the log) | over 9 (FAIL) |
+
+  The sun's case came out just under 2x, not "far above" it: the sides are bright too (the sunset
+  tint and the broad lobe in the haze toward the sun). The moon's column is 10-11x, because the
+  night ground is so dark. Fixing only the fog (hills and reflections still on `skyView()`) is
+  enough for the row to see the difference, so the row bites on the fog line alone.
+- **The sky above the ridge, recorded before the split** (by the row's own code, run once from a
+  scratch script and once inside the suite, where the car stood elsewhere: the same values both
+  times, so the frames hold sky only). Five frames from `__dsAimed` (30 m above the car, 0.8 rad),
+  each with its lowest corner over 5 deg up: mean 8-bit luminance and the FNV-1a hash of the
+  RGBA bytes.
+
+  | frame | aim | lowest corner | mean | hash |
+  | - | - | - | - | - |
+  | `noon` | 12:00 May 5, 32 deg up, azimuth 200 | 6.9 deg | 169.486 | `ce2df9fc` |
+  | `noonSun` | 12:00 May 5, at the sun (65 deg up) | 30.8 deg | 182.519 | `5963df34` |
+  | `sun17` | 17:00 May 5, at the sun (36 deg up) | 9.9 deg | 193.474 | `a0571206` |
+  | `night22` | 22:00 May 5, 32 deg up, azimuth 200 | 6.9 deg | 22.208 | `16a94f02` |
+  | `moon4` | 04:00 May 6, toward the moon (25 deg up), aimed 32 deg up | 6.9 deg | 34.476 | `45be3111` |
+
+  After the split all five means are equal (difference 0.000) and **all five hashes are equal**.
+  The row requires every mean within 0.5 and every hash equal: the plan's default asked for the
+  12:00 hash only, but the 12:00 frame in the plan's sense has no body in it, so it could not
+  see the sum's rounding (see the next point); the two sun frames and the moon frame can.
+- **Decision not in the plan: one sum with the bodies weighted 0 or 1, not two functions added.**
+  The first build was the plan's literal shape, `skyBase(d)` plus a separate `skyBodies(d)` added
+  in `FS_SKY` above the ridge. It cured the column (sun 1.02, moon 1.09 in the scratch run) but
+  changed the bits: `noon` hashed `23875c83` and `sun17` `58c0bcea`, with every mean equal to
+  three decimals (float re-association: the sun's terms had been one `uSunCol * (disc + lobe +
+  aureole)`). So the shipped shape is `skySum(d, bodies)`, the old `skyCol()`'s one expression in
+  its old order with the sun disc, the aureole and the moon disc each times `bodies`
+  (`x * 1 = x`, `x + 0 = x` exactly); `skyBase(d) = skySum(d, 0.0)` (fog, hills, paint
+  reflections) and `skyView(d) = skySum(d, 1.0)` (the sky pass's own ray). "Only above the ridge"
+  holds because the hills already replace `c` under the ridge, so a body behind them stays
+  hidden, exactly as before. There is no `skyBodies()` function at step 1: it would be
+  `skyView - skyBase`. Step 3 rewrites the bodies with sky-pass-only uniforms (`uSunDisc`,
+  `uMoonDisc`, radii) and will change the sky above the ridge anyway, so it can split them into
+  their own `skyBodies()` in `FS_SKY` then.
+- **Decision not in the plan: aimed frames, not the chase view, for the unchanged row.** The sky
+  pass's pixels depend only on the view direction and the time (the eye moves nothing in it), so
+  an aimed camera at fixed world directions gives a hash that cannot move with the car's place or
+  the chase camera's lag, as long as no geometry is in the frame (checked by the lowest corner).
+- **Suite total: 110** (108 + 2), all green; no row restated. The sun row ("the sun is drawn where it
+  is") and the four star-pixel rows stayed green unchanged.
+- `check-inline-js` GREEN; `gates.sh games/driving-simulator/index.html`: **GATES: GREEN** (smoke,
+  games-sync, negtest scan, the suite 110/0), run alone. The badge is not stamped (step 2 does).
+- For step 6's break list: "the disc back in the fog" is caught by the repro row (shown above);
+  "the disc in the hills" and "bodies below the ridge" are untested here.
+
+### Step 2 - DS-5: brighter stars; land DS-7 and DS-5 (DONE 2026-11-02)
 
 - **Measure** (Design, DS-5) in a second context, record the table in `.claude/driving-simulator.md`
   § Backlog DS-5 and in this Results section. Copy the `__dsPx` / `__dsAimed` helpers into the
@@ -351,6 +417,70 @@ Tools:
   with the session's trailers. Verify the Pages run (two checks). Move the DS-7 and DS-5 halves of
   the TODO entry to `DONE.md` with the badge string; the entry keeps DS-4 and DS-6.
 - Then merge `origin/main` into the arc's branch.
+
+#### Results (step 2)
+
+Worktree branch `worktree-oversee+dssky`, on `2fb91c0` (step 1). **Measure, raise and rows: DONE
+2026-11-02. Landing: overseer** (badge, gates after the stamp, `land-on-main.sh`, Pages, TODO/DONE).
+
+- **Measured before any change** in a second browser context: 844x390 CSS px at
+  `deviceScaleFactor` 3, which gave DPR 2, **RSCALE 1.7** and a 1435x663 framebuffer, at 22:00 EDT on
+  May 5, with `SKY.night` 1 and `SKY.exposure` 1.8. The camera stood 30 m above the car (0.8 rad), aimed by
+  Newton on the suite's own projection so that the star's centre lands exactly at (717 + o, 331 + o)
+  for o = 0, 1/4, 1/2 and 3/4 of a pixel along the diagonal (1/2 is the pixel corner). Each figure is
+  what the star adds at its brightest pixel (STARS on minus off, 8-bit luminance). The fifth star is
+  Megrez (HIP 59774, V 3.32) and the magnitude-4 star iota Leonis (HIP 55642, V 4.00), both from
+  `SKY_DATA`. The patch is 200x100 CSS px (340x170 framebuffer) round Polaris, counting stars at 40 or more.
+
+  | star (min over the four phases) | before (3.2, floor 0.5 fb px) | floor 0.5 CSS px, 3.2 | after (floor 0.5 CSS px, 4.0) |
+  | - | - | - | - |
+  | Arcturus | 236 | 238 | 239 |
+  | Vega (12 deg up) | 164 | 223 | 229 |
+  | Regulus | 94 | 165 | 201 |
+  | **Polaris** | **86** (230 / 182 / 86 / 182) | 166 | **207** (236 / 236 / 207 / 236) |
+  | Megrez (3.32) | 39 | 76 | 95 |
+  | **iota Leo (4.00)** | **37** (100 / 78 / 37 / 78) | 71 | **88** (125 / 115 / 88 / 115) |
+  | patch, stars at 40+ | 3 | 7 | 9 |
+
+  The full per-phase table is in `.claude/driving-simulator.md` § Backlog DS-5. The targets were not
+  met before, so the escalation trigger did not fire. **The cause, traced to pixels:** the sub-pixel
+  phase first, then the gain. The 0.5-framebuffer-px sigma floor is 0.29 CSS px at RSCALE 1.7, so a
+  faint star on a pixel corner kept only 37% of its centre value (Polaris 230 on a centre, 86 on a corner).
+- **Levers, in the plan's order:** (1) `vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0))`.
+  This moved Polaris's worst phase from 86 to 166 and iota Leo's from 37 to 71, so the mag-4 target
+  was met and Polaris's was not. (2) `STAR_GAIN` from 3.2 to 4.0 (200 / 166 x 3.2 = 3.86, rounded up).
+  The kit's law, the 2.5 clamp (Venus) and `MW_GAIN` are unchanged.
+- **Decision not in the plan: the floor is `0.5 * max(uPx, 1.0)`, not `0.5 * uPx`.** Below RSCALE 1
+  (the suite's own context, 0.85, and the low graphics setting), `0.5 * uPx` falls under half a
+  framebuffer pixel, which is the sub-pixel case DS-1's floor exists to stop. Measured with
+  `0.5 * uPx` at RSCALE 0.85, Polaris at a pixel corner dropped from 86 to 59. The mirror pass
+  (`uPx = 1`) is unchanged either way. The row is in the "Assumed, not decided" table, beside one for
+  `STAR_GAIN = 4.0`.
+- **Rows (in the second context, which is closed after them):** "at the phone's render scale (RSCALE 1.7)
+  Polaris adds at least 200 and a magnitude-4 star (iota Leonis, HIP 55642) at least 60 at every
+  sub-pixel phase"; "at the phone's render scale the 200x100 CSS px patch round Polaris holds at least
+  7 stars that add 40 or more" (9 measured, less 20%, floored). Polaris comes from the suite's own
+  SIMBAD and precession (`ownStar`). For iota Leo, the J2000 RA/Dec and magnitude are read from the kit's
+  catalogue data and turned to alt/az by the suite's own `precess()` and `ownAltAz()`. The suite's
+  values matched the scratch measurement to the unit.
+- **The rows bite:** run against copies, the step-1 page turns both red (Polaris 86, iota Leo 37,
+  patch 3). The new gain with the floor back at 0.5 framebuffer px turns the phase row red (Polaris
+  108, iota Leo 46 at the corner), and so does the new floor with the gain back at 3.2 (Polaris 166).
+  The patch row catches only the step-1 page: with either lever alone the patch already holds 7 or
+  more. For step 6's break list: "the star floor back to 0.5" and "`STAR_GAIN` halved" both land on the
+  phase row.
+- **Restated: "the sky above the ridge is unchanged by the split"** (step 1's row). Its 22:00 and
+  04:00 frames held the stars, so this step's brighter stars changed their hashes (`a3451048`,
+  `ecb17b0b`; means +0.011 and +0.019). It now takes all five frames with `STARS.on` false. The
+  stars-off values were recorded on the same pre-split page (`bbf3d0e`): night22 22.164 `4eb245a1`,
+  moon4 34.395 `6e7d7372`. On that page the stars-on values reproduced step 1's recorded ones exactly,
+  and the step-1 and step-2 pages give the same stars-off values. The three daytime frames are unchanged, because
+  the star pass does not draw by day. No other row was tied to 3.2 or the 0.5 px floor: the Jupiter
+  row, the four star-pixel rows and "the stars fade with the night" stayed green unchanged.
+- **Suite total: 112** (110 + 2), all green.
+- **Landing (overseer):** badge stamped `build 2026-11-02 17:17 UTC`, `check-inline-js` and
+  `gates.sh` GREEN after the stamp (112/0); DS-7 and DS-5 moved from `TODO.md` to `DONE.md`; landed on
+  `main` with `land-on-main.sh`; `origin/main` then merged back into the arc's branch.
 
 ### Step 3 - DS-4a: the sun and the moon as they look
 
