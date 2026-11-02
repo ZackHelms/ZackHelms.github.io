@@ -53,6 +53,12 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | The Date row (DS-1) | `#date-val` on its own row (`#date-row`, "Date") under the time-of-day slider, at every width | Inside the Time-of-day row it pushed the clock past the row's edge at 320 px |
 | Star sigma floor (DS-5) | `max(sz * 0.5 / sqrt(8), 0.5 * max(uPx, 1))`: half a CSS pixel, and never under half a framebuffer pixel. The mirror pass (`uPx = 1`) and the suite's own scale-1 context (RSCALE 0.85) keep 0.5 framebuffer px | The plan's lever 1 is `0.5 * uPx`; below RSCALE 1 that is under half a framebuffer pixel, the sub-pixel case the DS-1 floor was there to stop (measured at RSCALE 0.85 with `0.5 * uPx`: Polaris 59 at a pixel corner, against 86 before) |
 | `STAR_GAIN = 4.0` (DS-5) | Raised from 3.2, after the CSS-px floor | The floor alone left Polaris at 166 at a pixel corner on the phone; 200 / 166 x 3.2 = 3.86, rounded up to 4.0 (Polaris 207, iota Leo 88 at their worst phase). The kit's law, the 2.5 clamp and `MW_GAIN` are unchanged |
+| Two directions per body (DS-4) | The light, the shadows, the moon's terminator and the broad glows use the geometric `SKY.sun` / `SKY.moon`; only the drawn discs use `SKY.sunDiscW` / `SKY.moonDiscW`, each lifted in its own vertical plane by the kit's `refractionDeg(true altitude)` | The plan's design: refraction is how a body looks, not where its light comes from. The kit's Bennett/Saemundsson formula gives 0.483 deg at a true 0 and 0.618 at -0.833, so at the almanac's rise and set the upper limb stands 0.050 deg up |
+| Real sizes, no minimum (DS-4) | The sun's radius 0.265 deg; the moon's `asin(1737.4 km / topoDistanceKm)`, 0.244-0.278 deg at 22:00 over spring 2026. No minimum size in pixels: the sun is about 4.5 px across at the suite's 0.8 rad, about 3.6 CSS px in the chase view | Chosen in the plan; the CD can ask for a minimum if they read too small |
+| The sun disc's edge (DS-4) | `1 - smoothstep(r, r + one pixel's angle, length(d - s))`, the pixel from `fwidth(d)`, times 30 as before; the aureole `pow(cs, 120) * 0.6` about the drawn disc | The chord `length(d - s)`, not `acos(dot)`: `acos` near 1 resolves about 0.02 deg in floats, a tenth of the disc |
+| `MOON_K = 1.2` (DS-4) | The moon disc's level before the tonemap (the old disc's 1.2), never times `uNight`: by day it is added light over the blue | The plan's default |
+| `ES_GAIN = 600` (DS-4) | Earthshine on the dark part is `600 * earthshineFraction(phase angle)`: 0.049 at new, 0.037 at a quarter-lit crescent | The plan's default (a thin crescent's dark part at about 5% of its lit limb, linear). Measured after the tonemap: the dark part of the May 20 crescent at night adds 43 levels to its pixels against 169 for the lit limb, and by day it lightens the dark part of the disc against the blue too. Worth the CD's look |
+| The maria (DS-4) | The page's own: four soft patches at fixed points on the face, roughly Imbrium, Serenitatis-Tranquillitatis, Procellarum and Nubium, edges roughened by `vn()` at low frequency, at most 25% off the disc's shade (`MARE_DARK`), in a frame built from the drawn moon and the celestial pole of date (exactly (0, sin lat, cos lat) in ENU, `SKY.poleW`), so the face turns with the sky through a night; libration ignored | The plan asked for 3-4 patches from `vn()`. Patches that come from `vn()`'s hash alone vary in number with a GPU's `sin()` precision (the hash is `fract(sin(x) * 43758)` at arguments in the thousands): a first try gave one patch in SwiftShader. On the night disc, near saturation at exposure 1.8, they read faintly |
 | Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
@@ -571,6 +577,18 @@ the kit supplies nearly all of it.
 sun discs, the moonlight and exposure terms, the star pass's and Milky Way's
 fade, a test hook), the suite, and this file. The `ZMH-SKY` block already
 carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
+
+**Built (dssky step 3, 2026-11-02): DS-4a**, items 1-5 and 7 (the moonlight, item 6, and
+the stars dimmed by the moon, item 8, are step 4). `updateSky()` adds the drawn discs'
+directions `SKY.sunDiscW` / `SKY.moonDiscW` (refracted), `SKY.sunR`, `SKY.moonR`, `SKY.moonES`
+and `SKY.poleW`; `GLSL_COMMON` keeps only `skyBase()` (bit for bit the DS-7 base);
+`FS_SKY` adds `skyBodies()`: the sun disc and aureole about `uSunDisc`, the kit's
+`zmhMoonDisc()` (its gate kept, the geometric sun) with the earthshine and the page's
+maria, times `uMoonK`. The hook carries `__DS.MOON_K` and `__DS.ES_GAIN`. Eight rows (the sun
+through the day, refraction, the sizes, the phase, the cycle, the bright limb, the moon by day,
+no stray pixels), two restated ("the sun is drawn where it is" at a 0.2 rad field of view, and
+the sky above the ridge, now "away from the bodies"); the suite at 120. Measured values and
+the break checks: the plan's step 3 Results.
 
 ### The CD's first playtest of the real sky (2026-11-02), verbatim
 

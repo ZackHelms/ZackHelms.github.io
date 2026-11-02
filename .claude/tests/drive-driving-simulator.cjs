@@ -94,6 +94,26 @@ const enuOf = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt
 const enuToWorldOwn = v => [v[0], v[1], -v[2]];
 // Meeus 49.1: the MEAN new (integer k) and full (k + 0.5) moons, JDE; delta-T (about 70 s) ignored
 function meanPhase(k) { const T = k / 1236.85; return 2451550.09766 + 29.530588861 * k + 0.00015437 * T * T - 0.000000150 * T * T * T + 0.00000000073 * T * T * T * T; }
+// Meeus 49 (Astronomical Algorithms, 2nd ed., ch. 49, the corrections for the quarters and W): the TRUE first (k + 0.25) and
+// last (k + 0.75) quarter, JDE. The mean quarter is up to about 0.7 day off the true one (-0.62801 sin M' alone), which is
+// 0.07 of lit fraction, so a quarter's 0.5 +/- 0.05 is checked at the true hour. The planetary arguments (under 0.0004 day) are left out.
+function quarterJD(k) {
+  const T = k / 1236.85, E = 1 - 0.002516 * T - 0.0000074 * T * T, r = x => x * DR, s = Math.sin, c = Math.cos;
+  const M = r(2.5534 + 29.10535670 * k - 0.0000014 * T * T - 0.00000011 * T ** 3);
+  const Mp = r(201.5643 + 385.81693528 * k + 0.0107582 * T * T + 0.00001238 * T ** 3 - 0.000000058 * T ** 4);
+  const F = r(160.7108 + 390.67050284 * k - 0.0016118 * T * T - 0.00000227 * T ** 3 + 0.000000011 * T ** 4);
+  const Om = r(124.7746 - 1.56375588 * k + 0.0020672 * T * T + 0.00000215 * T ** 3);
+  const d = -0.62801 * s(Mp) + 0.17172 * E * s(M) - 0.01183 * E * s(Mp + M) + 0.00862 * s(2 * Mp) + 0.00804 * s(2 * F) + 0.00454 * E * s(Mp - M)
+    + 0.00204 * E * E * s(2 * M) - 0.00180 * s(Mp - 2 * F) - 0.00070 * s(Mp + 2 * F) - 0.00040 * s(3 * Mp) - 0.00034 * E * s(2 * Mp - M)
+    + 0.00032 * E * s(M + 2 * F) + 0.00032 * E * s(M - 2 * F) - 0.00028 * E * E * s(Mp + 2 * M) + 0.00027 * E * s(2 * Mp + M) - 0.00017 * s(Om);
+  const W = 0.00306 - 0.00038 * E * c(M) + 0.00026 * c(Mp) - 0.00002 * c(Mp - M) + 0.00002 * c(Mp + M) + 0.00002 * c(2 * F);
+  return meanPhase(k) + d + (Math.abs(k % 1 - 0.25) < 1e-9 ? W : -W);
+}
+// Saemundsson's refraction (Sky & Telescope 72, 70, 1986; Meeus, Astronomical Algorithms, 2nd ed., eq. 16.4), in degrees, from
+// the TRUE altitude h in degrees: R = 1.02 / tan(h + 10.3 / (h + 5.11)) arcminutes. 0.483 deg at h = 0, 0.618 at -0.833.
+const saem = h => 1.02 / Math.tan((h + 10.3 / (h + 5.11)) * DR) / 60;
+// a body's apparent ENU direction: lifted by saem() in its own vertical plane (the suite's own, for the drawn sun)
+const liftOwn = v => { const hl = Math.hypot(v[0], v[2]), a = Math.asin(v[1]) + saem(Math.asin(v[1]) / DR) * DR; return [v[0] / hl * Math.cos(a), Math.sin(a), v[2] / hl * Math.cos(a)]; };
 // astronomy-engine 2.1.19 (zmh-sky vectors/golden.v1.json, never shipped): the oracle's values at 2026-05-06 02:00 UT
 const AE = {
   sun: { alt: -20.881657475, az: 310.517712321 },     // record 2026-05-06T02Z/raleigh/sun
@@ -745,7 +765,8 @@ const AE = {
   // a lit window against the sky does not count), whose luminance beats the ring's mean by `t` (8-bit levels).
   // `aimed` draws one frame through the page's own renderScene() from 30 m above the car (over the trees) with a
   // 0.8 rad camera aimed at a world direction (turned `offAz` deg in azimuth), and projects a world direction
-  // with the suite's own OpenGL-convention camera: the pixel row for Jupiter and the Milky Way patches use it.
+  // with the suite's own OpenGL-convention camera: the pixel row for Jupiter and the Milky Way patches use it. An optional
+  // fourth argument narrows the field of view (radians, vertical), so a row can zoom on the sun or the moon (DS-4).
   await page.evaluate(() => {
     const W = window;
     W.__dsPx = () => { const c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height, px = new Uint8Array(w * h * 4);
@@ -754,9 +775,9 @@ const AE = {
       let ring = 0, lo = 1e9, hi = -1e9; for (let d = -3; d <= 3; d++) for (const q of [F.L(x + d, y - 3), F.L(x + d, y + 3), F.L(x - 3, y + d), F.L(x + 3, y + d)]) { ring += q; lo = Math.min(lo, q); hi = Math.max(hi, q); }
       return hi - lo > 8 ? -1 : v - ring / 28; };
     W.__dsPeaks = (F, frac, t) => { let n = 0; for (let y = Math.floor(F.h * (1 - frac)) + 3; y < F.h - 3; y++) for (let x = 3; x < F.w - 3; x++) if (W.__dsContrast(F, x, y) >= t) n++; return n; };
-    W.__dsAimed = (aimW, offAz, dirsW) => {
+    W.__dsAimed = (aimW, offAz, dirsW, fovArg) => {
       const D = W.__DS, c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height;
-      const az = Math.atan2(aimW[0], aimW[2]) + offAz * Math.PI / 180, el = Math.asin(aimW[1]), fov = 0.8, up = [0, 1, 0];
+      const az = Math.atan2(aimW[0], aimW[2]) + offAz * Math.PI / 180, el = Math.asin(aimW[1]), fov = fovArg || 0.8, up = [0, 1, 0];
       const f = [Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el)];
       g.bindFramebuffer(g.FRAMEBUFFER, null); g.viewport(0, 0, w, h); g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT);
       renderScene([D.PLAYER.x, D.PLAYER.y + 30, D.PLAYER.z], f, up, fov, 0.2, w, h, { propDist: 560, shadows: false, hidePlayer: false }, []);
@@ -764,6 +785,9 @@ const AE = {
       const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
       const s0 = cr(f, up), sl = Math.hypot(...s0), sv = s0.map(v => v / sl), u = cr(sv, f), t = Math.tan(fov / 2);
       F.at = (dirsW || []).map(d => ({ x: (dt(d, sv) / dt(d, f) / (t * w / h) * 0.5 + 0.5) * w - 0.5, y: (dt(d, u) / dt(d, f) / t * 0.5 + 0.5) * h - 0.5 }));
+      // the world direction through pixel (x, y), for rows that need the angle from a body at every pixel
+      F.dir = (x, y) => { const xn = ((x + 0.5) / w * 2 - 1) * t * w / h, yn = ((y + 0.5) / h * 2 - 1) * t, d = [0, 1, 2].map(i => f[i] + xn * sv[i] + yn * u[i]), l = Math.hypot(...d); return d.map(v => v / l); };
+      F.fov = fov; F.pxPerRad = h / 2 / t;
       return F;
     };
   });
@@ -909,15 +933,18 @@ const AE = {
   // row: the sun is drawn where it is. At 17:00 EDT on May 5, aimed 8 deg to the side of the suite's own sun (through its own
   // (east, up, south) map), the sun's saturated disc is centred within 4 px of where that sun projects. A world without the
   // ENU-to-world flip puts it at azimuth 180 - az, 10 deg away.
-  const sunW17 = enuToWorldOwn(ownSun(jdOf(MAY5, 17, -4)).v);
+  // Restated at dssky step 3 (DS-4): the disc is now its real 0.53 deg, about 4.5 px across at the 0.8 rad field of view, where
+  // the row wanted 20 saturated pixels. It looks through a 0.2 rad field (34 px a degree, the disc about 18 px across, 8 deg still
+  // well inside the frame), and the place it is checked against is the suite's own sun lifted by its own refraction (saem()).
+  const sunW17 = enuToWorldOwn(liftOwn(ownSun(jdOf(MAY5, 17, -4)).v));
   const sunPx = await page.evaluate(([MAY5, sw]) => {
     const D = window.__DS, W = window; D.SKY.hour = 17; D.setDate(MAY5);
-    const F = W.__dsAimed(sw, 8, [sw]), a = F.at[0]; let sx = 0, sy = 0, n = 0;
+    const F = W.__dsAimed(sw, 8, [sw], 0.2), a = F.at[0]; let sx = 0, sy = 0, n = 0;
     for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const i = (y * F.w + x) * 4; if (F.px[i] >= 250 && F.px[i + 1] >= 250 && F.px[i + 2] >= 240) { sx += x; sy += y; n++; } }
     D.SKY.hour = 6.25; D.setDate(MAY5);
     return { at: { x: +a.x.toFixed(1), y: +a.y.toFixed(1) }, n, c: n ? { x: +(sx / n).toFixed(1), y: +(sy / n).toFixed(1) } : null, w: F.w };
   }, [MAY5, sunW17]);
-  ok('the sun is drawn where it is: at 17:00 EDT on May 5, aimed 8 deg to its side, the sun\'s saturated disc is centred within 4 px of where the suite\'s own sun projects',
+  ok('the sun is drawn where it is: at 17:00 EDT on May 5, aimed 8 deg to its side through a 0.2 rad field of view, the sun\'s saturated disc is centred within 4 px of where the suite\'s own sun, refracted, projects',
     sunPx.n >= 20 && !!sunPx.c && Math.hypot(sunPx.c.x - sunPx.at.x, sunPx.c.y - sunPx.at.y) < 4 && Math.abs(sunPx.at.x - sunPx.w / 2) > 40, sunPx);
   // row: the stars fade with the night. At 22:00 on May 5, aimed at Polaris as the Jupiter row is, what the star adds to its pixel
   // with SKY.night forced to 0.5 is 0.3-0.75 of what it adds at 1 (the pass's gain carries the night, so dusk stars are faint).
@@ -972,6 +999,14 @@ const AE = {
   // own, after the sky's) and the row is about the sky pass. The stars-off values were recorded the same way on the same
   // pre-split page (bbf3d0e) on 2026-11-02, where its stars-on values reproduced the ones recorded at step 1 exactly; by day the
   // star pass does not draw, so the three daytime values are the step-1 ones unchanged.
+  // Restated again at dssky step 3 (DS-4), which redraws the bodies by design: the sun disc at its real size, its aureole about the
+  // refracted disc, the moon from the kit's lit sphere, all in skyBodies(), added to skyBase() in the sky pass. The claim is now
+  // "the sky away from the bodies is unchanged": every frame's mean within 0.5 of the pre-split record; night22, the one frame
+  // with no body and no aureole in it, still hashes as before the split (the base is bit for bit the old one); the four frames
+  // that hold a disc or the aureole hash as recorded on this step's page (SKY_STEP3, 2026-11-02, by this row's own code), so a
+  // later change to them shows here. Measured on this step's page: means -0.000, -0.003, -0.003, 0.000 and -0.144 (moon4: the
+  // old moon disc was 1.0-1.3 deg across and uniformly lit; the new one is 0.49 deg and 82% lit).
+  const SKY_STEP3 = { noon: 'f74f5560', noonSun: '0174b859', sun17: '6379ab21', night22: '4eb245a1', moon4: '63e2c7c4' };
   const SKY_BEFORE = { noon: [169.486, 'ce2df9fc'], noonSun: [182.519, '5963df34'], sun17: [193.474, 'a0571206'], night22: [22.164, '4eb245a1'], moon4: [34.395, '6e7d7372'] };
   const skyNow = await page.evaluate(MAY5 => {
     const D = window.__DS, W = window, DR = Math.PI / 180, altOf = v => Math.asin(v[1]) / DR;
@@ -990,9 +1025,165 @@ const AE = {
     D.SKY.hour = 6.25; D.setDate(MAY5);
     return out;
   }, MAY5);
-  const skyDiff = Object.keys(SKY_BEFORE).map(k => ({ k, low: skyNow[k].low, dMean: +(skyNow[k].mean - SKY_BEFORE[k][0]).toFixed(3), hash: skyNow[k].hash, same: skyNow[k].hash === SKY_BEFORE[k][1] }));
-  ok('the sky above the ridge is unchanged by the split: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon), the star pass off, match their recorded means within 0.5 and their hashes',
-    skyDiff.every(r => r.low > 5 && Math.abs(r.dMean) <= 0.5 && r.same), skyDiff);
+  const skyDiff = Object.keys(SKY_BEFORE).map(k => ({ k, low: skyNow[k].low, dMean: +(skyNow[k].mean - SKY_BEFORE[k][0]).toFixed(3), hash: skyNow[k].hash, same: skyNow[k].hash === SKY_STEP3[k] }));
+  ok('the sky above the ridge away from the bodies is unchanged: five frames above the ridge (12:00 twice, 17:00 at the sun, 22:00, 04:00 at the moon), the star pass off, match their pre-split means within 0.5; 22:00 (no body in it) its pre-split hash, the four with a body their step-3 hashes',
+    skyDiff.every(r => r.low > 5 && Math.abs(r.dMean) <= 0.5 && r.same) && SKY_STEP3.night22 === SKY_BEFORE.night22[1], skyDiff);
+  // ---- 8b2. the sun and the moon as they look (DS-4, dssky step 3) ----
+  // The light stays geometric (SKY.sun, SKY.moon); the discs are drawn at SKY.sunDiscW / SKY.moonDiscW, lifted by refraction, at
+  // their real sizes (SKY.sunR, SKY.moonR), the moon from the kit's lit sphere with its earthshine (SKY.moonES) and the page's maria.
+  // The suite's oracles are its own: the Almanac sun (ownSun), Saemundsson's refraction (saem), Meeus 49's mean and true phases,
+  // and astronomy-engine's lit fraction typed in (AE). Times for the pixel rows are found on the page's own SKY by bisection
+  // (`when` below), not typed in. A "moon off" frame moves SKY.moonDiscW to the opposite point (under the horizon), which takes
+  // the disc away and leaves everything else: the moon's broad glow and its light follow the geometric SKY.moonW.
+  await page.evaluate(() => {
+    const W = window, D = W.__DS, DR = Math.PI / 180;
+    W.__dsAlt = (body, mjd, h) => { D.SKY.hour = h; D.setDate(mjd); return Math.asin(D.SKY[body][1]) / DR; };
+    // the hour in [lo, hi] at which `body` (a SKY field) is at `alt` deg; null if it does not cross there
+    W.__dsWhen = (body, mjd, lo, hi, alt) => { let a = W.__dsAlt(body, mjd, lo) - alt; if (a * (W.__dsAlt(body, mjd, hi) - alt) > 0) return null;
+      for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2, v = W.__dsAlt(body, mjd, m) - alt; if (v * a > 0) { lo = m; a = v; } else hi = m; } W.__dsAlt(body, mjd, (lo + hi) / 2); return (lo + hi) / 2; };
+    // the moon on and off through the same aimed camera; L(x, y) of the difference
+    W.__dsMoonPair = (aim, offAz, dirs, fov) => { const A = W.__dsAimed(aim, offAz, dirs, fov), keep = D.SKY.moonDiscW;
+      D.SKY.moonDiscW = keep.map(v => -v); const B = W.__dsAimed(aim, offAz, dirs, fov); D.SKY.moonDiscW = keep;
+      A.diff = (x, y) => A.L(x, y) - B.L(x, y); A.off = B; return A; };
+  });
+  // row: the sun through the day, against the suite's own sun (the geometric place the light uses)
+  const fiveT = []; for (const mjd of [MAR20, MAY5, JUN20]) for (const h of [6.5, 9, null, 17, 19.5]) fiveT.push({ mjd, h: h === null ? ownNoon(mjd, -4) : h });
+  const sun5 = await page.evaluate(([ts, MAY5]) => { const D = window.__DS;
+    const out = ts.map(t => { D.SKY.hour = t.h; D.setDate(t.mjd); return { ...t, dst: D.SKY.dst, sun: D.SKY.sun.slice() }; });
+    D.SKY.hour = 6.25; D.setDate(MAY5); return out; }, [fiveT, MAY5]);
+  const sun5c = sun5.map(r => { const o = altAzOf(ownSun(jdOf(r.mjd, r.h, -4)).v), a = altAzOf(r.sun);
+    return { mjd: r.mjd, h: +r.h.toFixed(3), dst: r.dst, alt: +a.alt.toFixed(2), dAlt: +(a.alt - o.alt).toFixed(4), dAz: +dAz(a.az, o.az, o.alt).toFixed(4) }; });
+  ok('the sun through the day: at 06:30, 09:00, solar noon, 17:00 and 19:30 EDT on Mar 20, May 5 and Jun 20 the page\'s sun is within 0.2 deg of the suite\'s own in altitude and in azimuth (on the sky)',
+    sun5c.length === 15 && sun5c.every(c => c.dst === true && Math.abs(c.dAlt) < 0.2 && c.dAz < 0.2), sun5c);
+  // row: refraction lifts the drawn discs only. At the hours (by bisection) when the page's geometric sun (setting, May 5) and moon
+  // (rising, May 6) are at true altitudes 0, 1 and 10 deg, the drawn disc's altitude minus the geometric one equals the suite's
+  // own Saemundsson value within 0.01 deg, in the same azimuth; and at the suite's own sunrise and sunset on May 5 (geometric centre
+  // -0.833) the drawn upper limb (altitude + SKY.sunR) is at the horizon. The almanac's -0.833 is 34' of refraction at APPARENT
+  // altitude 0 plus 16' of radius; Saemundsson at TRUE -0.833 is 0.618, so the limb sits 0.050 deg up: the plan's "within 0.05 of
+  // 0" is that expected value itself, so the row asks for the suite's own 0.050 within 0.02 (and so within 0.07 of 0).
+  const ownEv5 = ownRiseSet(MAY5, -4);
+  const refr = await page.evaluate(([MAY5, evs]) => { const D = window.__DS, W = window, DR = Math.PI / 180, out = [];
+    const azOf = v => Math.atan2(v[0], v[2]) / DR, wToEnu = v => [v[0], v[1], -v[2]];
+    for (const [body, mjd, lo, hi] of [['sun', MAY5, 17, 20.5], ['moon', MAY5 + 1, 0, 4]]) for (const t of [0, 1, 10]) {
+      const h = W.__dsWhen(body, mjd, lo, hi, t); if (h === null) { out.push({ body, t, h: null }); continue; }
+      const g = D.SKY[body], dsk = wToEnu(D.SKY[body + 'DiscW']);
+      out.push({ body, t, h: +h.toFixed(4), geo: Math.asin(g[1]) / DR, drawn: Math.asin(dsk[1]) / DR, dAz: Math.abs(((azOf(g) - azOf(dsk)) + 540) % 360 - 180) });
+    }
+    const limb = evs.map(e => { D.SKY.hour = e.h; D.setDate(MAY5); return { h: +e.h.toFixed(4), up: e.up, geo: Math.asin(D.SKY.sun[1]) / DR, limb: Math.asin(D.SKY.sunDiscW[1]) / DR + D.SKY.sunR / DR }; });
+    D.SKY.hour = 6.25; D.setDate(MAY5); return { out, limb }; }, [MAY5, ownEv5]);
+  const refrC = refr.out.map(r => r.h === null ? r : { ...r, lift: +(r.drawn - r.geo).toFixed(5), want: +saem(r.geo).toFixed(5), err: +Math.abs(r.drawn - r.geo - saem(r.geo)).toFixed(5) });
+  const limbWant = -0.833 + saem(-0.833) + 0.265;
+  ok('refraction lifts the drawn discs only: at true altitudes 0, 1 and 10 deg the drawn sun and moon stand Saemundsson\'s refraction above their geometric place (0.483, 0.362, 0.090 deg) within 0.01 deg, in the same azimuth; at the suite\'s own sunrise and sunset the drawn upper limb is at the horizon (0.050 deg up, within 0.02)',
+    refrC.length === 6 && refrC.every(r => r.h !== null && Math.abs(r.geo - r.t) < 1e-3 && r.err < 0.01 && r.dAz < 1e-6)
+    && refr.limb.length === 2 && refr.limb.every(l => Math.abs(l.limb - limbWant) < 0.02 && Math.abs(l.limb) < 0.07), { refrC, limb: refr.limb, limbWant: +limbWant.toFixed(4) });
+  // row: the real sizes. The drawn sun at 17:00 EDT on May 5 (36 deg up), aimed at its disc through a 2-deg field of view (195 px a
+  // degree): the white disc's pixels (all three channels 254 or more; the aureole round it stays under) give its diameter as
+  // 2 sqrt(n / pi) / (px a degree), 0.53 deg within 20%. The moon: SKY.moonR is asin(1737.4 km / the kit's topocentric distance) at
+  // 22:00 EDT every day from Mar 20 to Jun 20, and lies in 0.24-0.28 deg (0.49-0.56 across); SKY.sunR is 0.265 deg.
+  const MOON_D = []; for (let m = MAR20; m <= JUN20; m++) MOON_D.push({ m, jd: jdOf(m, 22, -4) });
+  const sizes = await page.evaluate(([MAY5, days]) => { const D = window.__DS, W = window, DR = Math.PI / 180;
+    D.SKY.hour = 17; D.setDate(MAY5); const fov = 2 * DR, F = W.__dsAimed(D.SKY.sunDiscW, 0, [D.SKY.sunDiscW], fov); let n = 0, sx = 0, sy = 0, edge = 0;
+    for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const i = (y * F.w + x) * 4; if (F.px[i] >= 254 && F.px[i + 1] >= 254 && F.px[i + 2] >= 254) { n++; sx += x; sy += y; } }
+    const pxDeg = F.pxPerRad * DR, sun = { n, pxDeg: +pxDeg.toFixed(2), diam: +(2 * Math.sqrt(n / Math.PI) / pxDeg).toFixed(4), c: n ? [+(sx / n - F.at[0].x).toFixed(2), +(sy / n - F.at[0].y).toFixed(2)] : null, sunR: D.SKY.sunR / DR };
+    const moon = days.map(d => { D.SKY.hour = 22; D.setDate(d.m); const k = D.ZMH_SKY.skyAt(d.jd, D.OBS_SKY, null).moon.topoDistanceKm;
+      return { m: d.m, r: D.SKY.moonR / DR, want: Math.asin(1737.4 / k) / DR }; });
+    D.SKY.hour = 6.25; D.setDate(MAY5); return { sun, moon }; }, [MAY5, MOON_D]);
+  const mr = sizes.moon.map(d => d.r), mErr = Math.max(...sizes.moon.map(d => Math.abs(d.r - d.want)));
+  ok('the sun and the moon at their real sizes: the drawn sun is 0.53 deg across within 20% (white pixels at a 2-deg field of view), SKY.sunR 0.265 deg; SKY.moonR is asin(1737.4 / the moon\'s distance) and lies in 0.24-0.28 deg every day Mar 20 - Jun 20',
+    Math.abs(sizes.sun.diam / 0.53 - 1) <= 0.2 && !!sizes.sun.c && Math.hypot(...sizes.sun.c) < 2 && Math.abs(sizes.sun.sunR - 0.265) < 1e-9
+    && sizes.moon.length === JUN20 - MAR20 + 1 && mErr < 1e-9 && Math.min(...mr) >= 0.24 && Math.max(...mr) <= 0.28,
+    { sun: sizes.sun, moonMin: +Math.min(...mr).toFixed(4), moonMax: +Math.max(...mr).toFixed(4), mErr });
+  // row: the phase. The page's lit fraction (SKY.moonPhase, the kit's) at the Meeus 49 mean full moons of May 1 and May 31 (k 325.5,
+  // 326.5) and the mean new moon of May 16 (k 326), and at the TRUE last quarter of May 9 (k 325.75, quarterJD: the mean one is
+  // 17 h early, where the fraction is 0.57); and astronomy-engine's 0.835 at 2026-05-06 02:00 UT (22:00 EDT May 5).
+  const phT = [['full May 1', meanPhase(325.5)], ['new May 16', meanPhase(326)], ['full May 31', meanPhase(326.5)], ['last quarter May 9', quarterJD(325.75)], ['AE', JD22]]
+    .map(([n, jd]) => { const loc = jd - 2400000.5 - 4 / 24, mjd = Math.floor(loc); return { n, mjd, h: (loc - mjd) * 24 }; });
+  const ph = await page.evaluate(([ts, MAY5]) => { const D = window.__DS;
+    const out = ts.map(t => { D.SKY.hour = t.h; D.setDate(t.mjd); return { ...t, f: D.SKY.moonPhase.illuminatedFraction }; });
+    D.SKY.hour = 6.25; D.setDate(MAY5); return out; }, [phT, MAY5]);
+  const phF = Object.fromEntries(ph.map(p => [p.n, +p.f.toFixed(4)]));
+  ok('the moon\'s phase: lit over 0.97 at the full moons of May 1 and May 31, under 0.03 at the new moon of May 16 (Meeus mean phases), 0.5 +/- 0.05 at the last quarter of May 9 (Meeus 49\'s true quarter), and astronomy-engine\'s 0.835 at 2026-05-06 02:00 UT within 0.005',
+    ph.length === 5 && phF['full May 1'] > 0.97 && phF['full May 31'] > 0.97 && phF['new May 16'] < 0.03 && Math.abs(phF['last quarter May 9'] - 0.5) <= 0.05
+    && Math.abs(phF.AE - AE.moonIllum) <= 0.005 && ph[0].mjd === MJD(2026, 5, 1) && ph[1].mjd === MJD(2026, 5, 16) && ph[2].mjd === MJD(2026, 5, 31) && ph[3].mjd === MJD(2026, 5, 9), ph);
+  // row: the cycle. Over 30 game days from May 1 (22:00 EDT each day, May 1-30, the date stepped by setDate) the lit fraction runs full -> new
+  // -> full once: it falls to one minimum under 0.03 and rises back, never turning anywhere else, waning before and waxing after.
+  // And the moon rises a mean 30-70 min later each day: each day's rise (the page's topocentric centre crossing 0 deg upward, found
+  // by bisection on a quarter-hour scan) over May 1-30, the mean interval between rises less 24 h.
+  const cyc = await page.evaluate(MAY1 => { const D = window.__DS, DR = Math.PI / 180, fr = [], rises = [];
+    for (let d = 0; d < 30; d++) { D.SKY.hour = 22; D.setDate(MAY1 + d); fr.push({ f: D.SKY.moonPhase.illuminatedFraction, w: D.SKY.moonPhase.waxing }); }
+    const alt = h => { D.SKY.hour = h; D.updateSky(); return Math.asin(D.SKY.moon[1]) / DR; };
+    for (let d = 0; d < 30; d++) { D.SKY.hour = 0; D.setDate(MAY1 + d); let p = alt(0);
+      for (let q = 1; q <= 96; q++) { const h1 = q / 4, a = alt(h1); if (p < 0 && a >= 0) { let lo = h1 - 0.25, hi = h1;
+          for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (alt(m) < 0) lo = m; else hi = m; } rises.push(MAY1 + d + (lo + hi) / 48); }
+        p = a; } }
+    D.SKY.hour = 6.25; D.setDate(MAY1 + 4); return { fr, rises }; }, MJD(2026, 5, 1));
+  const f = cyc.fr.map(r => r.f), iMin = f.indexOf(Math.min(...f));
+  const turns = f.slice(1, -1).filter((v, i) => (v - f[i]) * (f[i + 2] - v) < 0).length;
+  const delay = cyc.rises.length > 1 ? ((cyc.rises[cyc.rises.length - 1] - cyc.rises[0]) / (cyc.rises.length - 1) - 1) * 1440 : null;
+  const cycInfo = { first: +f[0].toFixed(3), min: +f[iMin].toFixed(4), minDay: iMin + 1, last: +f[29].toFixed(3), turns, rises: cyc.rises.length, delayMin: delay && +delay.toFixed(1),
+    waneOk: cyc.fr.slice(0, iMin).every(r => !r.w), waxOk: cyc.fr.slice(iMin + 1).every(r => r.w) };
+  ok('the moon\'s cycle: over 30 game days from May 1 the lit fraction runs full -> new -> full once (one turn, a minimum under 0.03 near May 16, waning before it and waxing after), and the moon rises a mean 30-70 min later each day',
+    cyc.fr.length === 30 && f[0] > 0.95 && f[29] > 0.95 && f[iMin] < 0.03 && iMin >= 13 && iMin <= 17 && turns === 1 && cycInfo.waneOk && cycInfo.waxOk
+    && cyc.rises.length >= 27 && delay >= 30 && delay <= 70, cycInfo);
+  // row: the bright limb faces the sun, at three phases, and the disc's lit share is its phase. Zoomed on the drawn moon (a 1.5-deg
+  // field of view, about 260 px a degree) at a waning gibbous (May 6, moon 22 deg up, rising, night), a last quarter (May 10, 30 deg
+  // up, rising, dawn) and a waxing crescent (May 20, 30 deg up, setting, night); hours by bisection. The lit pixels are those the moon
+  // adds (moon on minus off) at over half the most it adds; the line from the disc's centre to their centroid points within 15 deg
+  // of the sun's direction on the screen (the suite's own sun, as the tangent of the great circle from the moon toward it); their
+  // count over pi r^2 (r from SKY.moonR) is the page's lit fraction within 0.08; and on the crescent at night the dark part shows
+  // the earthshine: the disc's unlit pixels inside 0.8 r add 8 or more.
+  const limbT = [['gibbous', MAY5 + 1, 2, 4.5, 22], ['quarter', MAY5 + 5, 5, 6.5, 30], ['crescent', MAY5 + 15, 21, 23, 30]];
+  const limb = [];
+  for (const [n, mjd, lo, hi, alt] of limbT) {
+    const r = await page.evaluate(([mjd, lo, hi, alt]) => { const D = window.__DS, W = window, DR = Math.PI / 180;
+      const h = W.__dsWhen('moon', mjd, lo, hi, alt); if (h === null) return null;
+      return { h, m: D.SKY.moonDiscW.slice(), R: D.SKY.moonR, frac: D.SKY.moonPhase.illuminatedFraction, sunUp: Math.asin(D.SKY.sun[1]) / DR, night: D.SKY.night }; }, [mjd, lo, hi, alt]);
+    if (!r) { limb.push({ n, missing: true }); continue; }
+    const m = r.m, sW = enuToWorldOwn(ownSun(jdOf(mjd, r.h, -4)).v), dm = sW[0] * m[0] + sW[1] * m[1] + sW[2] * m[2];
+    const tg = [0, 1, 2].map(i => sW[i] - m[i] * dm), tl = Math.hypot(...tg), pt = [0, 1, 2].map(i => m[i] + 1e-4 * tg[i] / tl);
+    const px = await page.evaluate(([m, pt, R, MAY5]) => { const W = window, D = window.__DS, fov = 1.5 * Math.PI / 180;
+      const F = W.__dsMoonPair(m, 0, [m, pt], fov), c = F.at[0], rp = Math.tan(R) * F.pxPerRad; let mx = 0;
+      for (let y = Math.floor(c.y - rp - 2); y <= c.y + rp + 2; y++) for (let x = Math.floor(c.x - rp - 2); x <= c.x + rp + 2; x++) mx = Math.max(mx, F.diff(x, y));
+      let n = 0, sx = 0, sy = 0, es = 0, ne = 0;
+      for (let y = Math.floor(c.y - rp - 2); y <= c.y + rp + 2; y++) for (let x = Math.floor(c.x - rp - 2); x <= c.x + rp + 2; x++) { const v = F.diff(x, y);
+        if (v > mx / 2) { n++; sx += x; sy += y; } else if (Math.hypot(x - c.x, y - c.y) < 0.8 * rp) { es += v; ne++; } }
+      const lit = [sx / n - c.x, sy / n - c.y], sun = [F.at[1].x - c.x, F.at[1].y - c.y];
+      const ang = Math.abs(((Math.atan2(lit[1], lit[0]) - Math.atan2(sun[1], sun[0])) / Math.PI * 180 + 540) % 360 - 180);
+      D.SKY.hour = 6.25; D.setDate(MAY5);
+      return { rp: +rp.toFixed(1), max: Math.round(mx), lit: n, share: +(n / (Math.PI * rp * rp)).toFixed(3), ang: +ang.toFixed(2), es: ne ? +(es / ne).toFixed(1) : null }; }, [m, pt, r.R, MAY5]);
+    limb.push({ n, h: +r.h.toFixed(3), frac: +r.frac.toFixed(3), sunUp: +r.sunUp.toFixed(1), night: +r.night.toFixed(2), ...px });
+  }
+  ok('the bright limb faces the sun: zoomed on a waning gibbous, a last quarter and a waxing crescent, the lit pixels\' centroid lies off the disc\'s centre toward the sun\'s direction within 15 deg, their share of the disc is the lit fraction within 0.08, and the crescent\'s dark part shows earthshine at night',
+    limb.length === 3 && limb.every(l => !l.missing && l.ang <= 15 && Math.abs(l.share - l.frac) <= 0.08 && l.max >= 40)
+    && limb[2].night > 0.95 && limb[2].es >= 8, limb);
+  // row: the moon by day, as added light over the blue. On May 11 at the hour the sun reaches 30 deg (by bisection; the moon about 45
+  // deg up, a third lit), aimed at the moon through a 0.1 rad field: the brightest of the disc's pixels beats the mean of the sky on
+  // a ring 2 deg from the moon by 20 or more.
+  const byDay = await page.evaluate(MAY11 => { const D = window.__DS, W = window, DR = Math.PI / 180;
+    const h = W.__dsWhen('sun', MAY11, 7.5, 10, 30); if (h === null) return null;
+    const m = D.SKY.moonDiscW, F = W.__dsAimed(m, 0, [m], 0.1), c = F.at[0], rp = Math.tan(D.SKY.moonR) * F.pxPerRad, r2 = Math.tan(2 * DR) * F.pxPerRad; let disc = 0, ring = 0, nr = 0;
+    for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const d = Math.hypot(x - c.x, y - c.y), v = F.L(x, y);
+      if (d < rp - 1) disc = Math.max(disc, v); else if (Math.abs(d - r2) < 2) { ring += v; nr++; } }
+    const o = { h: +h.toFixed(3), sunUp: +(Math.asin(D.SKY.sun[1]) / DR).toFixed(1), moonUp: +(Math.asin(D.SKY.moon[1]) / DR).toFixed(1), day: +D.SKY.day.toFixed(2), night: +D.SKY.night.toFixed(3),
+      frac: +D.SKY.moonPhase.illuminatedFraction.toFixed(2), disc: Math.round(disc), ring: +(ring / nr).toFixed(1), nr };
+    D.SKY.hour = 6.25; D.setDate(MAY11 - 6); return o; }, MAY5 + 6);
+  ok('the moon by day: on May 11 with the sun 30 deg up and the moon over 20 deg, its disc is brighter than the blue sky 2 deg off it (by 20 levels or more), drawn as added light, not by the night',
+    !!byDay && byDay.sunUp > 20 && byDay.moonUp > 20 && byDay.night === 0 && byDay.nr > 100 && byDay.disc >= byDay.ring + 20, byDay);
+  // row: no stray pixels from the moon disc. At the gibbous hour above (night), two 0.8 rad frames: aimed at the moon, and aimed at
+  // the point 90 deg from it toward the zenith, where the kit once leaked a dashed great circle; in both, moon on minus off is
+  // nowhere more than 1 level at a pixel over 2 moon radii from the drawn moon (each pixel's own ray), and the first frame does hold
+  // the moon.
+  const stray = await page.evaluate(([MAY6]) => { const D = window.__DS, W = window, DR = Math.PI / 180;
+    const h = W.__dsWhen('moon', MAY6, 2, 4.5, 22); if (h === null) return null;
+    const m = D.SKY.moonDiscW, R = D.SKY.moonR, up = [0, 1, 0], k = m[1], z = [0, 1, 2].map(i => up[i] - m[i] * k), zl = Math.hypot(...z), far = z.map(v => v / zl);
+    const look = aim => { const F = W.__dsMoonPair(aim, 0, [], 0.8); let out = 0, maxOut = 0, inside = 0;
+      for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) { const v = Math.abs(F.diff(x, y)); if (v < 0.5) continue; const d = F.dir(x, y);
+        const a = Math.acos(Math.min(1, d[0] * m[0] + d[1] * m[1] + d[2] * m[2])); if (a > 2 * R) { out++; maxOut = Math.max(maxOut, v); } else inside++; }
+      return { out, maxOut: +maxOut.toFixed(1), inside }; };
+    const o = { h: +h.toFixed(3), at: look(m), far: look(far), sep: +(Math.acos(far[0] * m[0] + far[1] * m[1] + far[2] * m[2]) / DR).toFixed(2) };
+    D.SKY.hour = 6.25; D.setDate(MAY6 - 1); return o; }, [MAY5 + 1]);
+  ok('no stray pixels from the moon disc: aimed at the moon and at the point 90 deg from it, the moon adds nothing (1 level at most) to any pixel over 2 radii from its disc, and the first frame holds the disc',
+    !!stray && Math.abs(stray.sep - 90) < 0.01 && stray.at.inside >= 4 && stray.at.maxOut <= 1 && stray.far.maxOut <= 1 && stray.far.inside === 0, stray);
   await page.evaluate(y => { const D = window.__DS; D.PLAYER.yaw = y; D.CAM.chase = null; }, yaw8b);
 
   // ---- 8c. the stars at the phone's numbers (DS-5, dssky step 2) ----

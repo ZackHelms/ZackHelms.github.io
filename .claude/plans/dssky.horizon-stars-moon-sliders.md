@@ -482,7 +482,7 @@ Worktree branch `worktree-oversee+dssky`, on `2fb91c0` (step 1). **Measure, rais
   `gates.sh` GREEN after the stamp (112/0); DS-7 and DS-5 moved from `TODO.md` to `DONE.md`; landed on
   `main` with `land-on-main.sh`; `origin/main` then merged back into the arc's branch.
 
-### Step 3 - DS-4a: the sun and the moon as they look
+### Step 3 - DS-4a: the sun and the moon as they look (DONE 2026-11-02)
 
 - `updateSky()`: `SKY.sunDiscW`, `SKY.moonDiscW` (refracted), `SKY.sunR`, `SKY.moonR`,
   `SKY.moonES` (the earthshine). Uniforms into the sky pass only.
@@ -514,6 +514,86 @@ Worktree branch `worktree-oversee+dssky`, on `2fb91c0` (step 1). **Measure, rais
     (the kit's gate kept);
   - restate "the sun is drawn where it is" (`:920`) for the real-sized disc.
 - Expected total: 112 + 8 = 120 (state the real total; a restated row does not add one).
+
+#### Results (step 3)
+
+Worktree branch `worktree-oversee+dssky`, on `e02063d` (steps 1-2, landed on `main` as `cec3b2f` and merged back).
+
+- **Built.** `updateSky()`: `SKY.sunDiscW`, `SKY.moonDiscW` (`enuToWorld(refracted(v))`: the ENU direction lifted in its own
+  vertical plane by `ZMH_SKY.refractionDeg` of its true altitude), `SKY.sunR` (0.265 deg), `SKY.moonR`
+  (`asin(1737.4 / topoDistanceKm)`), `SKY.moonES` (`ES_GAIN * earthshineFraction(phaseAngleDeg)`, `ES_GAIN = 600`) and
+  `SKY.poleW`. `SKY.sun`, `SKY.moon`, `uSunDir`, `uMoonDir` and every light term stay geometric. New uniforms `uSunDisc`,
+  `uMoonDisc`, `uPoleW`, `uSunR`, `uMoonR`, `uMoonES`, `uMoonK` (`MOON_K = 1.2`) in the sky pass only. `GLSL_COMMON` keeps
+  `skyBase()` alone (step 1's `skySum` / `skyView` are gone); `FS_SKY` brings in `MOON_DISC_GLSL` beside `MILKY_WAY_GLSL` and
+  has `skyBodies(d)`: the sun disc (`1 - smoothstep(uSunR, uSunR + pixel, length(d - uSunDisc))`, the pixel from
+  `fwidth(d)`) times 30 plus the aureole `pow(cs, 120) * 0.6` about `uSunDisc`, gated by `step(-0.06, uSunDir.y)` as before; the
+  kit's `zmhMoonDisc(d, uMoonDisc, uSunDir, uMoonR, uMoonES)` with its gate, times the maria and `uMoonK`, never `uNight`.
+  `c = skyBase(d) + skyBodies(d)` in main's uniform control flow, before any branch; the hills still replace `c` under the
+  ridge. The hook: `__DS.MOON_K`, `__DS.ES_GAIN`, and the `SKY` fields above. `__dsAimed(aimW, offAz, dirsW, fov)` in the
+  suite takes an optional field of view, and its frame gains `dir(x, y)` (a pixel's world ray) and `pxPerRad`.
+- **Rows (eight new), with what they measured on this page:**
+
+  | row | measured |
+  | - | - |
+  | the sun through the day (06:30, 09:00, solar noon, 17:00, 19:30 EDT on Mar 20, May 5, Jun 20) vs the suite's own sun, 0.2 deg | worst 0.0036 deg in altitude, 0.0038 on the sky in azimuth |
+  | refraction on the drawn discs (sun setting May 5, moon rising May 6, at true 0, 1, 10 deg by bisection) vs Saemundsson, 0.01 deg; the upper limb at the suite's rise and set | lifts 0.48303 / 0.36240 / 0.09013 deg for both bodies, error under 1e-5, azimuth unchanged; limb 0.0512 (rise 06:18) and 0.0516 (set 20:05) against the suite's 0.0502 |
+  | the sizes: the sun at a 2-deg field (166 px a degree), all channels 254+; the moon every day Mar 20 - Jun 20 at 22:00 | sun 6,448 px, 0.546 deg across (+3%), centred within 0.01 px; moon 0.2437-0.2776 deg, equal to `asin(1737.4 / d)` exactly |
+  | the phase (Meeus mean full May 1 and May 31, mean new May 16, TRUE last quarter May 9; astronomy-engine at 02:00 UT May 6) | 0.9984, 0.9981, 0.0029, 0.5013; 0.83548 against 0.83537 |
+  | the cycle (May 1-30 at 22:00; moonrise by bisection) | 0.997 -> 0.0029 on May 16 -> 0.997, one turn, waning then waxing; 29 rises, a mean 51.2 min later each day |
+  | the bright limb (1.5-deg field; gibbous May 6 03:11, quarter May 10 05:38, crescent May 20 21:59) | angle to the suite's own sun 0.00 / 0.04 / 0.17 deg; lit share 0.815 / 0.438 / 0.240 against 0.820 / 0.449 / 0.247; the crescent's dark part at night adds 43.1 |
+  | the moon by day (May 11, the sun at 30 deg at 08:49, the moon 46 deg up, a third lit, 0.1 rad field) | brightest disc pixel 237 against 141.8 on the ring 2 deg off |
+  | no stray pixels (0.8 rad, aimed at the moon and 90 deg from it) | 0 pixels over 1 level beyond 2 radii in both; 16 inside in the first |
+
+- **Restated (named), not added:**
+  - **"the sun is drawn where it is"**: the real-sized disc is about 4.5 px across at the 0.8 rad field, under the row's 20 saturated
+    pixels; it now looks through a 0.2 rad field (267 pixels, centred 0.1 px from the target) and checks against the suite's own
+    sun lifted by its own `saem()`.
+  - **"the sky above the ridge is unchanged by the split"**, now **"... away from the bodies is unchanged"**: the bodies change
+    by design, so the five frames (stars off) must match their pre-split means within 0.5 (measured -0.000, -0.003, -0.003,
+    0.000, -0.144); `night22`, the one frame with no body and no aureole in it, still has its pre-split hash `4eb245a1` (the base is
+    bit for bit the old one); the four frames with a disc or the aureole are pinned to hashes recorded on this step's page
+    (`noon f74f5560`, `noonSun 0174b859`, `sun17 6379ab21`, `moon4 63e2c7c4`), with this reason in the row's comment. `noon`
+    has no disc but sees the aureole: the sun is 10 deg above the frame's top.
+- **Two tolerances, traced and restated, not widened:**
+  - **The last quarter is checked at Meeus 49's TRUE hour, not the mean one.** At the mean last quarter of May 9 (04:29 UT) the
+    kit gives 0.570, outside 0.5 +/- 0.05; Meeus 49's periodic correction for quarters alone is up to -0.628 sin M' days, and here
+    the true quarter is 16.7 h later (21:13 UT), where the kit gives 0.5013. The suite types in Meeus 49's quarter terms and W
+    (`quarterJD()`). The same terms put the kit at 0.5013 at every quarter from Nov 2025 to Oct 2026 (a scratch check), so the
+    terms and the kit agree; the full and new moons stay at the mean phase, where they pass with room (0.998, 0.003).
+  - **The upper limb at rise and set is 0.050 deg up, not 0.** The plan's own correction line works it out:
+    -0.833 + 0.618 + 0.265 = 0.050. A bound of 0.05 round 0 is the expected value itself, so the row asks for the suite's own
+    0.050 within 0.02 (measured 0.0512, 0.0516), and so within 0.07 of 0.
+- **Break checks** (six scratch copies, the suite run against each alone; each landed on its own row):
+
+  | break | row that went red | value |
+  | - | - | - |
+  | no refraction on the discs | refraction | lift 0 against 0.483 |
+  | the sun negated in `zmhMoonDisc` | the bright limb | angle 179.9 deg; lit share 0.18 for a 0.82 moon |
+  | the moon times `uNight` | the moon by day | disc 142 against the sky's 141.8 |
+  | earthshine 0 | the bright limb | the crescent's dark part 1.2 (wants 8) |
+  | refraction on the light (`SKY.sun` refracted) | the sun through the day, one sun the kit's, refraction | 0.646 deg at 06:30 Mar 20 |
+  | the sun 0.8 deg in radius | the sizes | 1.62 deg across |
+
+  The sky-away-from-the-bodies row also went red under every break but the uNight one (it pins the hashes): a second catch,
+  never counted as the row named. With no refraction its `noon` hash read `23875c83`, the hash step 1 recorded for its first
+  two-function build: the aureole about the geometric sun.
+- **Decisions not in the plan:**
+  - **The maria sit at four fixed points on the face** (roughly Imbrium, Serenitatis-Tranquillitatis, Procellarum, Nubium) and
+    `vn()` only roughens their edges. The plan's "3-4 patches from `vn()`" was built first: one patch came out in SwiftShader,
+    and their number would hang on a GPU's `sin()` precision (`h21` is `fract(sin(x) * 43758)` at arguments in the thousands),
+    so a phone could show a different count from the suite's.
+  - **The pole of date is (0, sin lat, cos lat) in ENU, exactly** (`SKY.poleW`), not `SKY.starW` times the J2000 pole, which is
+    0.14 deg off it by precession and a matrix product a frame.
+  - **The sun disc's angle is the chord `length(d - s)`**, not `acos(dot)`, which resolves about 0.02 deg in floats.
+  - **`MOON_K` is a uniform (`uMoonK`)**, so step 5's Moonlight slider scales a uniform rather than a constant in the shader.
+  - All are in `.claude/driving-simulator.md`'s "Assumed, not decided" table, with `ES_GAIN`, `MOON_K`, no minimum disc size and
+    the two directions per body.
+- **For the playtest and step 4:** the earthshine is strong after the tonemap (the May 20 crescent's dark part adds 43 levels
+  against the lit limb's 169, and by day the dark part of the disc is lighter than the blue around it), and on the night disc
+  the maria read faintly (the disc sits near saturation at exposure 1.8). Both are dials (`ES_GAIN`, `MARE_DARK`), left at the
+  plan's values for the CD's look. "midnight is much darker than noon" stayed green unchanged (step 4 moves the moonlight).
+- **Suite total: 120** (112 + 8), all green. `check-inline-js` GREEN; `gates.sh games/driving-simulator/index.html`: **GATES: GREEN**
+  (smoke, games-sync, negtest scan, the suite 120/0), run alone. The badge is not stamped (step 7 does).
 
 ### Step 4 - DS-4b: moonlight by phase; a bright moon dims the stars
 
