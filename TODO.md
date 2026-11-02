@@ -46,6 +46,26 @@ in `.claude/<game>.md`.
     Plan-shaped. Spec, the phase anchors (full moons 2026-05-01 and
     05-31, new 05-16) and the checks: `.claude/driving-simulator.md` § Backlog, DS-4.
 
+- [driving-sim] **No column of light under a rising or setting sun or moon** (bug; the
+  CD, 2026-11-02, with screenshots: "Sun rise, sun set, moon rise, and moon set all show a
+  vertical smearing at the horizon"). Traced in the code: the fog, the distant hills and
+  paint reflections sample the sky with the elevation clamped to 1.15 deg, and that sky
+  includes the sun and moon discs, so a body within about a degree of that height paints a
+  column down everything at its azimuth. Since the game shipped. Fix: the discs only on the
+  real view ray. Plan-shaped. Spec: `.claude/driving-simulator.md` § Backlog, DS-7.
+
+- [driving-sim] **Brighter stars** (the CD, 2026-11-02: "in game the stars are too dim,
+  increase brightness"). Measure five reference stars at the iPhone viewport first (the
+  cause is not traced: the gain, or points sized in framebuffer pixels on a 2x screen),
+  then raise the default so Polaris reads white and a mag-4 star is plainly visible.
+  Plan-shaped. Spec: `.claude/driving-simulator.md` § Backlog, DS-5.
+
+- [driving-sim] **A slider for each thing in the sky** (the CD, 2026-11-02: "sliders in
+  the settings menu for each celestial object (stars, milky way, sun, moon (sunshine), moon
+  (earthshine), any others i missed)"). A SKY section with Stars, Planets, Milky Way, Sun,
+  Moonlight and (with DS-4) Earthshine, 0-200%, saved. After DS-5. Plan-shaped. Spec:
+  `.claude/driving-simulator.md` § Backlog, DS-6.
+
 - [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,
   2026-11-01: "All three with selector in settings menu. Default to realistic webgl. Its a
   lot so put items in backlog in a combat simulator section"). Backlog items CS-1 and CS-2,
