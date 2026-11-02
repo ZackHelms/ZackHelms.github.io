@@ -400,7 +400,7 @@ Worktree branch `worktree-oversee+dssky`, from `bbf3d0e` (the page's shaders as 
 - For step 6's break list: "the disc back in the fog" is caught by the repro row (shown above);
   "the disc in the hills" and "bodies below the ridge" are untested here.
 
-### Step 2 - DS-5: brighter stars; land DS-7 and DS-5
+### Step 2 - DS-5: brighter stars; land DS-7 and DS-5 (DONE 2026-11-02)
 
 - **Measure** (Design, DS-5) in a second context, record the table in `.claude/driving-simulator.md`
   § Backlog DS-5 and in this Results section. Copy the `__dsPx` / `__dsAimed` helpers into the
@@ -478,6 +478,9 @@ Worktree branch `worktree-oversee+dssky`, on `2fb91c0` (step 1). **Measure, rais
   the star pass does not draw by day. No other row was tied to 3.2 or the 0.5 px floor: the Jupiter
   row, the four star-pixel rows and "the stars fade with the night" stayed green unchanged.
 - **Suite total: 112** (110 + 2), all green.
+- **Landing (overseer):** badge stamped `build 2026-11-02 17:17 UTC`, `check-inline-js` and
+  `gates.sh` GREEN after the stamp (112/0); DS-7 and DS-5 moved from `TODO.md` to `DONE.md`; landed on
+  `main` with `land-on-main.sh`; `origin/main` then merged back into the arc's branch.
 
 ### Step 3 - DS-4a: the sun and the moon as they look
 
