@@ -15,23 +15,25 @@ in `.claude/<game>.md`.
 - [driving-sim] **A real star field: the sky from Raleigh, NC, in spring** (the CD,
   2026-11-01: "fix the star field rotation. It looks like i am at the earths rotational
   north pole and star field spins around like a spinning top"). Cause traced:
-  `skyCol()` turns hash-grid stars about the zenith (`uStarRot = hour/24*TAU`). Build
-  real catalogue stars (BSC5 to about mag 5) turned about the celestial pole at
-  latitude 35.78 N by true sidereal time, drawn in one `gl.POINTS` pass. It also
-  brings a **calendar that advances a day per game day** (the CD's choice,
-  2026-11-01), running through the selected season's dates and starting on May 5,
-  2026, with the sun's clock taken from the date (May 5: sunrise 06:18, sunset
-  20:05 EDT). Spec, the worked star positions the checks use, and the files:
-  `.claude/driving-simulator.md` § Backlog, DS-1. *Decided 2026-11-01: the proxy
-  refuses the catalogue's host, and the CD will allow `cdsarc.cds.unistra.fr` in the
-  environment's network settings (the run stops at its catalogue step if it is still
-  refused).* DS-2 to DS-4 below wait for this one: they share its files, and DS-3 and
-  DS-4 build on its calendar.
-  **Step 1 of 5 done, waiting on the host (2026-11-01).** The calendar and the sun
-  from the date are built and green on branch `claude/brave-sagan-odwmrd` (not on
-  `main`). The run stopped at step 2 because the proxy still refused
-  `cdsarc.cds.unistra.fr`. Once it is allowed (Network access, Allowed domains, then a
-  new session), run:
+  `skyCol()` turns hash-grid stars about the zenith (`uStarRot = hour/24*TAU`).
+  - **The fix uses zmhstudio's zmh-sky kit** (revised 2026-11-02, at the CD's request).
+    Its 1,627 real stars to magnitude 5 turn about the celestial pole of date (35.78 deg
+    up in the north) by the kit's star matrix, with precession. They are drawn in one
+    `gl.POINTS` pass, and the kit's CLI splices them in as a `ZMH-SKY` block. Nothing
+    is downloaded.
+  - **Also in it, the CD's choice 2026-11-02:** the five naked-eye planets (Venus and
+    Jupiter in the west on the first night), the moon in its real place (its phase and
+    light stay DS-4), and the Milky Way band.
+  - **It brings a calendar that advances a day per game day** (the CD's choice,
+    2026-11-01). The calendar starts on May 5, 2026, and the sun comes from the date
+    (May 5: sunrise 06:18, sunset 20:05 EDT).
+  - Spec, the star positions the checks use (now precessed, from astronomy-engine) and
+    the files: `.claude/driving-simulator.md` § Backlog, DS-1. DS-2 to DS-4 below wait
+    for this one: they share its files, and DS-3 and DS-4 build on its calendar.
+
+  **Step 1 of 5 done (2026-11-01); the plan is revised and ready (2026-11-02).** The
+  calendar and the sun from the date are built and green on branch
+  `claude/brave-sagan-odwmrd`, not on `main`. Steps 2-5 now use zmh-sky. Run:
   `/zmh-producer:oversee-implementation .claude/plans/dsstars.real-sky-and-calendar.md`
   The plan's Resume section says to start from that branch, not from `main`.
 
@@ -47,23 +49,25 @@ in `.claude/<game>.md`.
 - [driving-sim] **Summer, autumn and winter become selectable** in the Season
   dropdown. The dropdown shipped 2026-11-01 with spring selected and the other three
   greyed out, as asked ("other seasons are visible but not selectable (yet)"). Each
-  season becomes Raleigh at its date: the sun and stars (from DS-1's table), the
+  season becomes Raleigh at its date: the sun, moon, planets and stars (zmh-sky, from DS-1's dates), the
   broadleaf trees (deeper green, autumn colours, bare in winter; conifers unchanged),
   grass from fresh green to dormant straw, insects and birds; switching rebuilds the
   chunks in place. **After DS-1.** Plan-shaped; its defaults were chosen and can be
   overruled at plan review. Spec and checks: `.claude/driving-simulator.md` § Backlog,
   DS-3.
 
-- [driving-sim] **The sun and the moon where they really are** (the CD, 2026-11-01:
+- [driving-sim] **The sun and the moon as they really look** (the CD, 2026-11-01:
   "Moon realism: yes, add this (and sun position) to the backlog for driving sim").
-  The moon is placed by a truncated lunar theory (Meeus ch. 47) for DS-1's date and
-  clock, with parallax and refraction; its phase is shaded as a sphere lit from the
-  sun, so the bright limb faces the sun; moonlight scales with the phase; and it is
-  seen by day. The sun is checked across the whole day, refracted at the horizon,
-  and both discs are their real size (0.53 deg). Today the moon is kept opposite the
-  sun (near full every night) and drawn with no phase. **After DS-1.** Plan-shaped.
-  Spec, the anchors (full moons 2026-05-01 and 05-31, new 05-16) and the checks:
-  `.claude/driving-simulator.md` § Backlog, DS-4.
+  - **Where they are comes with DS-1** (revised 2026-11-02): zmh-sky's `skyAt()` gives
+    both, the moon topocentric. Today the moon is kept opposite the sun (near full
+    every night) and drawn with no phase.
+  - **This item is how they look and light.** Its phase uses the kit's lit-sphere moon
+    disc, so the bright limb faces the sun, with earthshine and soft maria. Both bodies
+    are refracted at the horizon (`refractionDeg`) and drawn at their real sizes (0.53
+    deg). Moonlight scales with the kit's `moonIlluminanceLux`. The moon is seen by
+    day, and a bright moon dims the stars and the Milky Way.
+  - **After DS-1.** Plan-shaped. Spec, the phase anchors (full moons 2026-05-01 and
+    05-31, new 05-16) and the checks: `.claude/driving-simulator.md` § Backlog, DS-4.
 
 - [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,
   2026-11-01: "All three with selector in settings menu. Default to realistic webgl. Its a

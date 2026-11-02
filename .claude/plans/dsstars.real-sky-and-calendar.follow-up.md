@@ -6,6 +6,10 @@ first escalation trigger. Nothing of the game reached `main`.
 
 ## Blocked - needs you
 
+**Resolved 2026-11-02, no action needed:** the CD shipped zmhstudio's `zmh-sky` kit, which carries
+its own star catalogue, and the plan was revised to use it, so nothing is downloaded and the host
+below no longer matters. The record of the block is kept as it was:
+
 - **The catalogue host is still refused.** `https://cdsarc.cds.unistra.fr/ftp/V/50/ReadMe` was tried
   once at 19:05 UTC (in a container 3 minutes old, so started after your "Allow the host" answer)
   and once at 20:17 UTC. Both times the agent proxy answered 403 to CONNECT. Its status page listed

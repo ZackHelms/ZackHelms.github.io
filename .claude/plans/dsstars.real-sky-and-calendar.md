@@ -1,8 +1,9 @@
-# dsstars - Driving Simulator: the real sky over Raleigh, NC, and a calendar that runs a day per game day (DS-1)
+# dsstars - Driving Simulator: the real sky over Raleigh, NC (zmh-sky), and a calendar that runs a day per game day (DS-1)
 
-**Status:** PARTIALLY IMPLEMENTED 2026-11-01 - step 1 of 5 done, on branch `claude/brave-sagan-odwmrd`
-(not on `main`). Stopped at step 2: the agent proxy still refuses `cdsarc.cds.unistra.fr` (CONNECT
-403 at 19:05 and 20:17 UTC, in a container started after the CD's answer). Details and what to do:
+**Status:** PARTIALLY IMPLEMENTED - step 1 of 5 done (2026-11-01), on branch
+`claude/brave-sagan-odwmrd`, not on `main`. **Revised 2026-11-02 for zmh-sky:** steps 2-5 were
+rewritten around zmhstudio's new sky kit, so the catalogue download that stopped the first run
+(the proxy refused `cdsarc.cds.unistra.fr`) is gone. The first run's record:
 `dsstars.real-sky-and-calendar.follow-up.md`.
 **Requested:** 2026-11-01, the CD (third message of the day, verbatim):
 
@@ -13,16 +14,38 @@
 Asked the same day whether the in-game date should advance a day per game day or stay one fixed
 date per season, the CD chose **"A day per game day"**. Asked during this plan's drafting how the
 run should get the star catalogue (this container's proxy refuses the hosts that serve it), the CD
-chose **"Allow the host"**: they add `cdsarc.cds.unistra.fr` to the environment's allowed domains.
+chose **"Allow the host"**. That answer no longer matters: nothing is downloaded now.
 
-**Scope:** `games/driving-simulator/index.html` (settings, the sun and sky section, the GLSL sky,
-`renderScene()`, the settings UI, the clock, the test hook), a new
-`games/driving-simulator/build-stars.mjs` and the catalogue source it reads, the suite
-`.claude/tests/drive-driving-simulator.cjs`, a new break list
+**The revision (2026-11-02), the CD verbatim:**
+
+> I just created a zmh-sky plugin. "git pull zmhstudio" then load the new zmh-sky plugin and update
+> the backlog and plan(s) accordingly since this new plugin should streamline the sky work.
+
+Asked what the star work should draw besides the stars, the CD chose all three offered: **the
+planets, the moon in its real place, and the Milky Way band**. The moon's phase, size and light
+stay in DS-4.
+
+**What the revision changed:**
+
+| Was (2026-11-01) | Now (zmh-sky) |
+|---|---|
+| BSC5 downloaded from CDS, packed by a new `build-stars.mjs` | the kit's `sky-data/v1` stars (XHIP via d3-celestial, BSD-3), 1,627 to mag 5, spliced as a `ZMH-SKY` block by the kit's CLI |
+| the page's own NOAA `solar()` (step 1) and `celestial()` | the sun and the moon from `ZMH_SKY.skyAt()`: one sun for everything |
+| a hand-built sky matrix, precession ignored | the kit's J2000 star matrix, **precession applied** |
+| the spec's 22:00 star table (unprecessed, up to 0.33 deg off) | astronomy-engine's values from the kit's golden vectors |
+| the plan's own magnitude and colour laws | the kit's `starAppearance` law and `bvToRGB` |
+| stars only; planets, moon and Milky Way out of scope | planets as points in the star pass, the moon at its real place, the Milky Way band in the sky shader |
+| step 2 stops if the host is refused | step 2 stops only if zmhstudio cannot be reached |
+
+**Scope:** `games/driving-simulator/index.html` (the `ZMH-SKY` block, the sun and sky section, the
+GLSL sky, `renderScene()`, the THE ROAD notes, the test hook; step 1 already did the settings, the
+clock and the calendar), `games/driving-simulator/LICENSE-d3-celestial.txt` (copied from the kit),
+the suite `.claude/tests/drive-driving-simulator.cjs`, a new break list
 `.claude/tests/negtests/driving-simulator.json`, and the docs `.claude/driving-simulator.md`,
 `.claude/tests/README.md`, `games/CLAUDE.md`, `CLAUDE.md`. Source TODO entry: `TODO.md` § Now,
-the first `[driving-sim]` item. Full spec: `.claude/driving-simulator.md` § Backlog, DS-1 (read it
-whole; this plan settles what it leaves open, and the sweep that drafted it corrected some of its numbers).
+the first `[driving-sim]` item. Full spec: `.claude/driving-simulator.md` § Backlog, DS-1 (revised
+2026-11-02 to match). The kit: zmhstudio `plugins/zmh-sky/` (README, and the skill
+`skills/sky-pipeline/SKILL.md`, which every step reads first).
 
 > CD note: this template exists to make plans executable by
 > `/zmh-producer:oversee-implementation` (zmh-producer plugin, configured via
@@ -32,48 +55,79 @@ whole; this plan settles what it leaves open, and the sweep that drafted it corr
 
 ## Goal
 
-At night the stars over the road are the real stars, about 1,600 of them to magnitude 5 from the
-Yale Bright Star Catalogue. They turn about the celestial pole, which stands due north 35.78 deg up,
-and the angle comes from true sidereal time. The game keeps a date. It starts on Tue May 5, 2026 at
-1 pm, steps a day each time the clock passes midnight, and wraps from Jun 20 back to Mar 20. The sun
-rises and sets for that date in Raleigh. The date shows in the settings, is saved between visits,
-and follows the US daylight-saving rule. The hash-grid stars and `uStarRot` are gone.
+At night the stars over the road are the real stars: the 1,627 to magnitude 5 in zmh-sky's
+catalogue, with the naked-eye planets among them and the Milky Way's band behind them. On the first
+night, Venus is low in the west after sunset and Jupiter higher up in the west. They all turn about
+the celestial pole of date, due north 35.78 deg up, by true sidereal time. The moon is where it
+really is, though it still looks and lights as it does today until DS-4. The game keeps a date
+(step 1, built): Tue May 5, 2026 at 1 pm on a first visit, a day on at each midnight, Jun 20
+wrapping to Mar 20, saved, on Raleigh's daylight-saving clock. The sun rises and sets for that date
+in Raleigh. The hash-grid stars and `uStarRot` are gone.
 
 ## Context
 
 The cause is traced (`.claude/driving-simulator.md` § Backlog, DS-1). `skyCol()` turns its star
-lookup about the world's vertical axis (`index.html:1208-1217`), and `setFrameUniforms()` sets
-`uStarRot = SKY.hour / 24 * TAU` (`index.html:2097`). A sky turning about the zenith is the sky at
-the North Pole. The stars themselves are a hash over (azimuth, elevation) cells, so they have no
-constellations.
+lookup about the world's vertical axis, and `setFrameUniforms()` sets
+`uStarRot = SKY.hour / 24 * TAU`. A sky turning about the zenith is the sky at the North Pole. The
+stars themselves are a hash over (azimuth, elevation) cells, so they have no constellations. The
+kit's skill names this exact bug as its first trap ("the zenith spin").
 
-DS-3 (the other seasons) and DS-4 (the sun and moon) both build on this plan's calendar, observer
-and sidereal rotation. Its contracts (the names under "Design") are what those plans will cite. DS-2
-(traffic sound) shares the page, the suite and the context file, so plan-gen deferred all three.
-Re-sweep with `/zmh-producer:backlog-plan-gen driving-sim` once this lands.
+DS-3 (the other seasons) and DS-4 (the sun and moon's looks) both build on this plan's calendar,
+observer and kit wiring. The names under "Design" are what those plans will cite. DS-2 (traffic
+sound) shares the page, the suite and the context file, so plan-gen deferred all three. Re-sweep
+with `/zmh-producer:backlog-plan-gen driving-sim` once this lands.
 
-## Corrections to the spec, found while drafting (2026-11-01, recomputed twice)
+## Corrections to the spec (2026-11-01, and again 2026-11-02 with precession)
 
-Recomputed here with two independent methods: NOAA's Meeus-based solar calculator, and the
-Astronomical Almanac's low-precision sun with Meeus 12.4 sidereal time. The two agree within 0.011 deg.
+First recomputed 2026-11-01 with two independent methods: NOAA's Meeus-based solar calculator, and
+the Astronomical Almanac's low-precision sun with Meeus 12.4 sidereal time. The two agree within
+0.011 deg. Recomputed 2026-11-02 with the kit (`skyAt`), with an independent IAU 1976 precession
+(Meeus 21.2-21.3, written for the check), and against astronomy-engine's values in the kit's golden
+vectors. All three agree within 0.01 deg.
 
 - **May 5, 2026 (local noon):** declination **+16.4 deg** (the spec said +16.0); equation of time
-  +3.3 min; solar noon 13:11; sunrise 06:18-06:19; sunset **20:05 EDT** (the spec said 20:03). The
-  noon altitude is 70.6 deg. The sweep that drafted this plan corrected the spec and the
-  `TODO.md` entry. The suite never copies these numbers anyway; it computes its own.
-- **Polaris does not stay inside 35.0-35.6 deg.** At J2000 it is 0.74 deg from the pole, so over a
-  day its altitude runs 35.04-36.52 deg and its azimuth 359.09-0.91 deg. The row below uses
-  altitude 35.0-36.6 and azimuth within 1.0 deg of north, and checks each hour against the suite's
-  own alt/az within 0.5 deg. At 22:00 it is 35.2 / 359.4, as the spec says.
-- The equinox noon altitude is 90 - 35.78 + 0 = **54.2** deg, not 53.7. DS-4's text, DS-4's sun
-  table (recomputed with +16.4 deg) and DS-3's declinations were also off by 0.3-0.4 deg. The same
-  sweep corrected all of them in `.claude/driving-simulator.md`.
-- Confirmed unchanged: LST at the local midnight that starts May 5 is 204.4 deg; at 22:00 EDT it is
-  11.69 h. All seven stars in the 22:00 table are within 0.5 deg (Regulus 58.3/227.2, Arcturus
-  52.3/105.6, Spica 37.0/147.4, Dubhe 63.4/350.1, Vega 12.4/50.8, Betelgeuse 7.1/274.0, Sirius
-  2.6/247.2). Dec +54.2 deg is the circumpolar limit.
+  +3.3 min; solar noon 13:11; sunrise 06:18; sunset **20:05 EDT** (the spec said 20:03). The noon
+  altitude is 70.6 deg. Step 1 measured 06:18:09 and 20:04:52 on the page and 06:18:10 and
+  20:04:51 in the suite. The kit's sun gives declination +16.387 and EoT +3.31 min.
+- **The equinox noon altitude** is 90 - 35.78 + 0 = **54.2** deg, not 53.7. DS-4's text, DS-4's
+  sun table and DS-3's declinations were also off by 0.3-0.4 deg, and have been corrected in
+  `.claude/driving-simulator.md`.
+- **LST, unchanged:** 204.41 deg at the local midnight that starts May 5, and 11.687 h at 22:00 EDT.
+- **The spec's 22:00 star table was wrong, traced 2026-11-02.** It took J2000 RA/Dec without
+  precessing them to 2026, and so did this plan's first draft, which called it "confirmed". The
+  zmhsky run found this (its follow-up, with the table), and this revision reproduced both numbers:
+  - Unprecessed, it matches the old table within 0.04 deg.
+  - With precession it moves up to 0.33 deg in altitude. Refraction does not explain the gap.
+
+  The correct table, for May 5, 2026 at 22:00 EDT (2026-05-06 02:00 UT), uses astronomy-engine's
+  values from zmh-sky `vectors/golden.v1.json`, records `2026-05-06T02Z/raleigh/hip<N>`. The kit
+  and the independent precession both match them within 0.01:
+
+  | Star (HIP) | Altitude | Azimuth | Old table |
+  |---|---|---|---|
+  | Regulus (49669) | 58.382 | 226.504 | 58.3 / 227 |
+  | Arcturus (69673) | 51.958 | 105.537 | 52.3 / 106 |
+  | Spica (65474) | 36.757 | 147.113 | 37.0 / 147 |
+  | Dubhe (54061) | 63.557 | 350.415 | 63.4 / 350 |
+  | Vega (91262) | 12.234 | 50.643 | 12.4 / 51 |
+  | Betelgeuse (27989) | 7.428 | 273.807 | 7.1 / 274 |
+  | Sirius (32349) | 2.822 | 246.980 | 2.6 / 247 |
+  | Polaris (11767) | 35.386 | 359.403 | 35.2 / 359.4 |
+
+- **Polaris, precessed:** over May 5 its altitude runs 35.15-36.41 deg, and its azimuth stays within
+  0.77 deg of north. The first draft's 35.04-36.52 was the unprecessed figure.
+- **The J2000 pole is not the pole of date.** In 2026 it sits 0.15 deg from it: through the kit's
+  star matrix it lands at altitude 35.926 deg, not 35.78. The pole the sky turns about is the
+  **pole of date**.
+- **The planets and the moon at 22:00 EDT on May 5** (kit, matching astronomy-engine):
+  - Venus: magnitude -3.9, altitude 4.3 deg, azimuth 296 (low in the west-north-west).
+  - Jupiter: -2.0, altitude 33.5, azimuth 275 (west).
+  - Mercury, Mars and Saturn are below the horizon.
+  - The moon is waning gibbous (84% lit), below the horizon at -23.1 / 109, rising later.
 
 ## Design (decision defaults: the overseer decides by these and logs, it does not ask)
+
+The observer, the date, the seasons, the clock, the UTC offset, the Julian date and "Settings and save" were built in step 1, and its Results give the real names. Their line numbers below are the 2026-11-01 ones, kept as history.
 
 **Observer.** `const OBS = { lat: 35.7796, lon: -78.6382 }` (degrees, east positive). It replaces
 `LAT` (`index.html:1923`); update the comment above it (`index.html:1921-1922`).
@@ -119,118 +173,169 @@ of March to 02:00 on the first Sunday of November (2026: Mar 8 and Nov 1; 2027: 
 **Julian date.** `jd = 2400000.5 + SKY.mjd + (SKY.hour - off) / 24`, with `off` = -4 or -5.
 JavaScript numbers are doubles, so precision is fine. Never pass a JD to GLSL.
 
-**The sun from the date** (replaces `DECL` and `SOLAR_NOON`, `index.html:1923-1934`).
-- `updateSky()` computes `{ decl, eot }` by the NOAA solar calculator (kernel below) for the current
-  JD.
-- It sets `SKY.decl` (degrees) and `SKY.solarNoon = (720 - 4 * OBS.lon - eot) / 60 + off` (local
-  clock hours).
-- `celestial(hour, decl)` keeps its body with `SKY.solarNoon` and `OBS.lat` in place of the
-  constants, and `SKY.sun = celestial(H, SKY.decl)`.
-- **The moon keeps today's rule** on the new numbers, `celestial(H + 12.8, -SKY.decl * 0.6)`. DS-4
-  replaces it; do not improve it here.
-- No refraction here either (DS-4 adds it). Sunrise and sunset are when the geometric centre is at
-  -0.833 deg.
+**The sun from the date.** Step 1 built this with the NOAA `solar()` kernel and `celestial()`.
+Step 2 replaces both with the kit (below). The suite's sun rows from step 1 test the result, not the
+formula, so they carry over unchanged.
 
-```js
-// NOAA solar calculator (Meeus-based). jd: Julian date (UT). Returns degrees and minutes.
-// Verified while drafting: 0.011 deg from an independent low-precision sun over 5 dates x 48 times.
-function solar(jd) {
-  const T = (jd - 2451545) / 36525, R = Math.PI / 180;
-  const L0 = (280.46646 + T * (36000.76983 + T * 0.0003032)) % 360;
-  const M = 357.52911 + T * (35999.05029 - 0.0001537 * T);
-  const e = 0.016708634 - T * (0.000042037 + 0.0000001267 * T);
-  const C = Math.sin(M * R) * (1.914602 - T * (0.004817 + 0.000014 * T)) + Math.sin(2 * M * R) * (0.019993 - 0.000101 * T) + Math.sin(3 * M * R) * 0.000289;
-  const om = 125.04 - 1934.136 * T;
-  const lam = L0 + C - 0.00569 - 0.00478 * Math.sin(om * R);
-  const eps = 23 + (26 + (21.448 - T * (46.815 + T * (0.00059 - T * 0.001813))) / 60) / 60 + 0.00256 * Math.cos(om * R);
-  const decl = Math.asin(Math.sin(eps * R) * Math.sin(lam * R)) / R;
-  const y = Math.tan(eps / 2 * R) ** 2, l = L0 * R, m = M * R;
-  const eot = 4 / R * (y * Math.sin(2 * l) - 2 * e * Math.sin(m) + 4 * e * y * Math.sin(m) * Math.cos(2 * l) - 0.5 * y * y * Math.sin(4 * l) - 1.25 * e * e * Math.sin(2 * m));
-  return { decl, eot };
-}
-```
+**Line anchors** for the rest of this section, read 2026-11-02 on the branch (step 1 plus its
+comment fix). Re-grep before editing:
 
-**Sidereal time** (Meeus 12.4). `gmst = 280.46061837 + 360.98564736629 * (jd - 2451545) + 0.000387933 * T*T
-- T*T*T / 38710000`, mod 360. Then `SKY.lst = gmst + OBS.lon`, in degrees, mod 360, set in
-`updateSky()`. Because the date steps at midnight, LST runs on smoothly through midnight; it jumps
-only at the season's wrap and (by an hour's worth) nowhere else.
+| Lines | What |
+|---|---|
+| 105-107 | the THE ROAD notes (107 is the kits line) |
+| 116 | `/*KITS:END*/` |
+| 1229-1237 | `PERF`'s draw wrapper |
+| 1239 | `GLSL_COMMON` |
+| 1241 | `uStarRot` |
+| 1261-1271 | the hash stars |
+| 1441-1457 | `FS_SKY`, with the ridge at 1450-1456 |
+| 1550 | `initGL()` |
+| 1977 | `SKY` |
+| 1982 | `OBS` |
+| 1986-1999 | `solar()` |
+| 2001 | `julianDate()` |
+| 2003-2009 | `celestial()` |
+| 2010 | `updateSky()` |
+| 2179 | the `uStarRot` setter |
+| 2260 | `renderScene()`, with the sky draw at 2266 |
+| 2347 | the mirror's `renderScene()` call |
+| 2914 | `sc` in `resize()` |
+| 3037 | `window.__DS` |
 
-**The sky matrix** (catalogue to sky; verified while drafting against the spherical alt/az formula
-to 0.01 deg, pole at (0, sin lat, cos lat)).
-- Equatorial unit vectors take x to the equinox and z to the north celestial pole; the sky takes x
-  east, y up, z north (`celestial()`'s axes).
-- With `c = cos LST`, `s = sin LST`, `cp = cos lat`, `sp = sin lat`, the rows are:
-  - east = `-s*x + c*y`
-  - up = `cp*c*x + cp*s*y + sp*z`
-  - north = `-sp*c*x - sp*s*y + cp*z`
-- Column-major for `uniformMatrix3fv(loc, false, m)`:
-  `[-s, cp*c, -sp*c,  c, cp*s, -sp*s,  0, sp, cp]`.
-- Keep it in `SKY.starM` (a `Float32Array(9)`), set in `updateSky()`.
-- `starDir(hr)` in JS multiplies the same nine numbers. The suite tests what the GPU draws, so there
-  is no second formula in the page.
+**zmh-sky in the page (step 2).**
+- **Where the kit is.** It lives in zmhstudio, `plugins/zmh-sky/`. A remote session has the sibling
+  clone at `/home/user/zmhstudio`. Without one, `add_repo ZackHelms/zmhstudio` (read) and clone it.
+  Record the zmhstudio commit in the Results (shipped at `7b9c40e`, 2026-11-02).
+- **Read the skill first:** `skills/sky-pipeline/SKILL.md`, its Conventions and Traps. It loads as
+  `zmh-sky:sky-pipeline` once the plugin is installed: `enabledPlugins` in `.claude/settings.json`
+  names it, and `/load-plugins` installs it in a multi-repo session.
+- **The markers.** Put `/*ZMH-SKY:BEGIN*/` and `/*ZMH-SKY:END*/` on their own lines right after
+  `/*KITS:END*/` (the first script).
+- **The splice,** from the repo root:
+  `node <zmhstudio>/plugins/zmh-sky/cli/zmh-sky.mjs splice --page games/driving-simulator/index.html --mag 5 --parts stars,planets,glsl`
+  - It prints `ZMH-SKY=<page> bytes=<n> stars=<n>`. Expect 1,627 stars and about 98.5 KB (the same
+    cut measured 98,548 B with `emit` on 2026-11-02).
+  - The block defines `ZMH_SKY` (the whole library), `SKY_DATA` (`stars: { fields: ['hip', 'ra',
+    'dec', 'mag', 'bv'], rows }` and `planets`) and `ZMH_SKY_GLSL` (`STAR_VERTEX`, `STAR_FRAGMENT`,
+    `MOON_DISC_GLSL`, `MILKY_WAY_GLSL`).
+  - The constellation lines are left out: the game draws no figures, and they would add 20 KB.
+- **The block is generated, never hand-edited,** like KITS: to change it, splice again. The splice
+  is idempotent, and a second run must leave the page byte-identical. Check that, and say so in the
+  Results.
+- **Attribution (BSD-3; the kit's `data/SOURCES.md`).**
+  - Copy `plugins/zmh-sky/data/LICENSE-d3-celestial.txt` to
+    `games/driving-simulator/LICENSE-d3-celestial.txt`.
+  - Add a THE ROAD paragraph after the kits line (index.html:107). It says the sky (sun, moon,
+    planets and stars) is zmh-sky's, computed for Raleigh and the game's date. It gives the kit's
+    attribution line verbatim, "Star data: XHIP (Anderson & Francis 2012) via d3-celestial, (c) 2015
+    Olaf Frohn, BSD-3-Clause; constellation lines after the IAU figures, modified by O. Frohn;
+    planet elements: JPL (Standish), Table 1.", and links `LICENSE-d3-celestial.txt`.
+  - Use Olaf Frohn's name nowhere else (clause 3).
+  - XHIP's own upstream terms are unverified (the kit's follow-up). That is the kit's open item, not
+    a stop condition here.
 
-**The catalogue: BSC5, VizieR V/50** (`https://cdsarc.cds.unistra.fr/ftp/V/50/`: `ReadMe` and
-`catalog.gz`).
-- `build-stars.mjs` (dependency-free, node's `fs` and `zlib` only, the `build-kits.mjs` pattern)
-  reads the catalogue and keeps records with a J2000 position and `Vmag <= 5.0`. It writes the block
-  between `/*STARS:BEGIN*/` and `/*STARS:END*/`, placed right after `/*KITS:END*/`
-  (`index.html:113`).
-- **Take the byte offsets from the ReadMe's byte-by-byte table**, never from memory. They are
-  expected to be: HR 1-4, RA J2000 76-83 (h, m, s), Dec J2000 84-90 (sign, d, m, s), Vmag 103-107,
-  B-V 110-114. Some records have blank positions; skip those.
-- Block format:
-  - a header line naming the script, the source (BSC5, Hoffleit and Warren 1991, VizieR V/50), the
-    magnitude cut and the count;
-  - one flat JSON integer array `const STARS_RAW = [...]`, five per star: HR, RA x 1000 (degrees),
-    Dec x 1000 (degrees), V x 100, and B-V x 100 (a missing B-V packed as 0, which reads as white).
-- About 1,600 stars and roughly 40 KB. The script prints the count, and the header records it.
-- Commit the downloaded `catalog.gz` and `ReadMe` under `games/driving-simulator/data/bsc5/` (about
-  120 KB together), so the block can be rebuilt with no network.
-- Precession from J2000 to 2026 (about 0.36 deg) is ignored. Say so in the header and in a comment
-  at `starDir()`.
-- **Terms:** read the ReadMe and CDS's terms of use (`https://cds.unistra.fr/`, its conditions of
-  use) in the run. Record the source and the acknowledgement they ask for in three places: the block
-  header, the settings' THE ROAD notes (a line such as "The stars are the Yale Bright Star
-  Catalogue's, from CDS's VizieR service") and `.claude/driving-simulator.md`.
-  - If the terms forbid redistribution in a public repo, stop and report to the CD (escalation below).
-  - If the terms cannot be read in the container, record "terms not read; assumed: free use with
-    acknowledgement" as an assumed row.
+**The bodies from the kit (step 2).**
+- `const OBS_SKY = { latDeg: OBS.lat, lonEastDeg: OBS.lon, heightM: 0 }`.
+  - `heightM` 0 matches the kit's own Raleigh observer. Raleigh is about 100 m up, which moves the
+    moon's parallax by far less than 0.001 deg (assumed).
+  - `lonEastDeg` is east-positive, so Raleigh is negative.
+- `updateSky()` calls `const s = ZMH_SKY.skyAt(julianDate(), OBS_SKY, SKY_DATA.planets)` once, then
+  sets:
+  - `SKY.sun = s.sun.enu`. The kit's ENU `[east, up, north]` is the page's x, y, z (`celestial()`'s
+    axes), so there is no remap.
+  - `SKY.decl = s.sun.decDeg`, `SKY.eot = ZMH_SKY.equationOfTimeMin(jd)`, and `SKY.solarNoon` as
+    step 1 does.
+  - `SKY.moon = s.moon.enu`, the topocentric moon (the skill's trap: never the geocentric `moon()`
+    for anything drawn). Also keep
+    `SKY.moonPhase = { phaseAngleDeg, illuminatedFraction, waxing, moonAgeFraction }` from `s.moon`
+    for DS-4; nothing in DS-1 reads it.
+  - `SKY.lst = s.lstDeg`, and `SKY.starM.set(s.starMatrix)` into a `Float32Array(9)`, row-major as
+    the kit returns it.
+  - `SKY.planets`: from `s.planets`, the ones with `nakedEye`, kept as `{ id, mag, valid, enu,
+    altDeg, azDeg }`. Those are Mercury, Venus, Mars, Jupiter and Saturn; check the kit's
+    `NAKED_EYE` table.
+- **Delete `solar()` and `celestial()`.** Their only callers are in `updateSky()`. `julianDate()`
+  stays the one Julian date.
+- **The moon's look stays.** Moonlight (`SKY.moonCol`) keeps its altitude rule, now on the real
+  moon, and `skyCol()`'s moon disc keeps its look; DS-4 changes both. The placeholder was up every
+  night; the real moon is down on many nights. That is the real sky.
+- **One sun** (the skill's trap). The light, the sun disc and, in DS-4, the moon's terminator all use
+  `s.sun`. Nothing else in the page computes a sun.
 
-**The star pass** (one draw per `renderScene()`, so the mirror gets it too).
-- Program `PRG.stars`, compiled in `initGL()` (`index.html:1497-1502`); its fragment shader
-  includes `${GLSL_COMMON}`. The VAO is built once from `STARS_RAW`: per vertex, the equatorial unit
-  vector (3 floats), an RGB colour and a size (4 floats), all precomputed on the CPU.
-- Drawn right after the sky (`index.html:2182-2187`), still with the depth test off and
-  `depthMask(false)`:
+**The star matrix.**
+- `s.starMatrix` is the kit's `equatorialJ2000ToHorizonMatrix(jd, obs)`: J2000 to ENU, **precession
+  included**, row-major, with determinant -1 (ENU is left-handed, as the kit notes).
+- Upload it with `gl.uniformMatrix3fv(loc, true, SKY.starM)`. The `true` (transpose) matters:
+  WebGL2 allows it, and the kit's matrices are row-major.
+- Never compose a matrix from the hour and the latitude (the zenith-spin trap), and never turn the
+  stars on the CPU.
+- The matrix is orthogonal, so `transpose(uStarM) * d` takes a world direction back to J2000. The
+  Milky Way and the planets use that.
+- `starDir(i)` in JS is `ZMH_SKY.mat3MulVec(SKY.starM, unit_i)`, so the suite tests what the GPU is
+  given.
+
+**The star pass (step 3)**, one draw per `renderScene()`, so the mirror gets it too.
+- **The program** is `PRG.stars`, compiled in `initGL()`: the page's own `VS_STARS`/`FS_STARS`,
+  ported from `ZMH_SKY_GLSL.STAR_VERTEX`/`STAR_FRAGMENT`. It keeps the same law and constants, in
+  the page's frame and draw state. Its fragment shader includes `${GLSL_COMMON}`.
+- **The VAO** is built once. Each star vertex carries its J2000 unit vector
+  (`ZMH_SKY.unitFromRaDec(ra, dec)`), its magnitude, and its linear colour
+  (`ZMH_SKY.bvToRGB(bv)`; a null `bv` gives white). Five planet vertices follow (below).
+- **The draw** goes right after the sky (index.html:2266):
+  - the depth test off and `depthMask(false)`, as for the sky;
   - additive blend `ONE, ONE`, then blend off;
-  - `gl.drawArrays(gl.POINTS, 0, STARS.n)`;
+  - `gl.drawArrays(gl.POINTS, 0, STARS.n + 5)`;
   - skipped when `SKY.night <= 0` or `STARS.on === false`.
-- Vertex shader: `gl_Position = uVP * vec4(uStarM * aE * 1000.0, 1.0)`, using the same `vp` as the
-  world (the far plane is 2400). The star's sky direction is passed to the fragment shader.
+- **The vertex shader:** `vec3 enu = uStarM * aDir; gl_Position = uVP * vec4(enu * 1000.0, 1.0)`,
+  with the world's `vp` (far plane 2400, camera-relative, so the eye is at the origin). The depth
+  test is off, so the kit's `xyww` / `depthFunc(LEQUAL)` note does not apply here. Pass `enu` to the
+  fragment shader.
+- **The look,** the kit's `starAppearance` law:
+  - intensity `10^(-0.4 * 0.5 * (m - (-1.46)))`: gamma 0.5 on flux, Sirius = 1;
+  - extinction `m += 0.2 * airmass(alt)`, with the kit's Kasten-Young air mass;
+  - size `mix(1.0, 4.0, min(1.0, I)) * uPx`, the kit's 1-4 px. `uPx` is the main pass's render scale
+    (`sc` in `resize()`; keep it in a variable) and 1 in the mirror;
+  - a fade over the first 2 deg of altitude, nothing below the horizon;
+  - times `SKY.night`, `uExposure` and one page constant `STAR_GAIN` (assumed). Start where a
+    magnitude-1 star reads clearly white after the tonemap, and record the value.
+  - The pass draws after `tonemap()`, so keep the values small.
+  - Planets brighter than Sirius go over 1. Clamp the intensity at 2.5 (assumed), so Venus is a
+    bright point, not a flare.
 - **The ridge must hide stars.** The distant hills are drawn inside the sky shader
-  (`index.html:1397-1403`), not as geometry, so the world's depth test cannot cover a star behind
-  them. Move the ridge height into `float ridgeY(float az, float mtn)` in `GLSL_COMMON`. `FS_SKY`
-  calls `ridgeY(az, uMtn)`, and the star fragment shader discards below `ridgeY(atan(d.z, d.x), 1.0)`.
-  The sky's pixels must stay byte-identical, which a day-pixel row confirms.
-- **Brightness and size.** `I = 10^(-0.4 * (V - 1.0))`, clamped to 0.03-1.6. Size in pixels is
-  `clamp(1.0 + (4.5 - V) * 0.45, 1.0, 3.2) * uPx`. `uPx` is the main pass's render scale (`sc` in
-  `resize()`, `index.html:2830`; keep it in a variable), and 1 in the mirror pass.
-- **Colour from B-V.** Blend linearly between five stops, then mix halfway to white (the eye sees
-  most stars as white). Stops: -0.3 (0.62, 0.72, 1.00), 0.0 (0.80, 0.85, 1.00), 0.6 (1.00, 0.96,
-  0.90), 1.0 (1.00, 0.85, 0.70), 1.6 (1.00, 0.70, 0.45).
-- **Fade.**
-  - Multiply by `SKY.night`.
-  - Extinction of 0.2 mag per airmass, with Kasten-Young airmass
-    `X = 1 / (sin(alt) + 0.50572 * (alt_deg + 6.07995)^-1.6364)`. Clamp alt at 0 in the formula; the
-    discard handles below.
-  - Fade in over the first 2 deg of altitude.
-  - The fragment draws a round point (`gl_PointCoord`, a soft edge) at `I * fade * uExposure` in
-    linear light. The pass draws after `tonemap()`, so keep values small: a magnitude-1 star should
-    read clearly white, and a magnitude-5 star should be barely visible on a dark phone.
-- **Delete** the hash-star block (`index.html:1208-1217`), `uStarRot` (`index.html:1188`) and its
-  setter (`index.html:2097`). Nothing else reads them; confirm with a grep.
-- `PERF`'s draw wrapper (`index.html:1176-1184`) already counts the call. `triCount` returns 0 for
-  POINTS, so triangles do not move.
+  (index.html:1450-1456), not as geometry, so the world's depth test cannot cover a star behind
+  them.
+  - Move the ridge height into `float ridgeY(float az, float mtn)` in `GLSL_COMMON`. `FS_SKY` calls
+    `ridgeY(az, uMtn)`, and `FS_STARS` discards below `ridgeY(atan(enu.z, enu.x), 1.0)`.
+  - The sky's pixels must stay byte-identical; a day-pixel row confirms it.
+- **Delete** the hash-star block (index.html:1261-1271), `uStarRot` (1241) and its setter (2179).
+  Nothing else reads them; confirm with a grep.
+- **PERF:** the draw wrapper already counts the call. `triCount` returns 0 for POINTS, so the
+  triangle count does not move.
+
+**The planets (step 3).**
+- The last five vertices of the star buffer are Mercury, Venus, Mars, Jupiter and Saturn. Uranus,
+  Neptune and Pluto are never drawn.
+- `updateSky()` rewrites them with `bufferSubData` once the GL is up:
+  - direction = `ZMH_SKY.mat3MulVec(ZMH_SKY.mat3Transpose(SKY.starM), p.enu)`. This goes back
+    through the same matrix, so the shader's `uStarM` lands it exactly on `p.enu`;
+  - the kit's magnitude;
+  - a fixed colour each (assumed): Mercury and Venus white, Mars (1.0, 0.62, 0.42), Jupiter (1.0,
+    0.95, 0.85), Saturn (1.0, 0.9, 0.7);
+  - a planet that is not `valid` (outside 1800-2050) gets magnitude 99, which draws nothing.
+- The same law applies, so a planet is a star's point, only brighter.
+
+**The Milky Way (step 3).**
+- `FS_SKY` takes `ZMH_SKY_GLSL.MILKY_WAY_GLSL` and the `uStarM` uniform. Put it in `FS_SKY`, not
+  `GLSL_COMMON`, so the fog and the paint reflections stay without it.
+- Above the ridge, and only when `uNight > 0.0` (a branch, so the day sky costs nothing and keeps
+  its pixels byte-identical), it adds to `c` before `tonemap()`:
+  `MW_GAIN * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y)`.
+- `MILKY_WAY_RGB` comes from `ZMH_SKY.MILKY_WAY_RGB`, passed as a uniform or inlined at compile.
+- `MW_GAIN` is one page constant (assumed). Start from the kit's scale, so the band is faint:
+  Raleigh's sky is light-polluted, and the CD chose the band knowing that.
+- `MW.on` switches it, for the tests and the frame cost.
+- It costs a galactic transform on every night sky pixel; the snippet returns early off the band.
+  Step 4 measures it.
 
 **Settings and save.**
 - `SETTINGS.date` holds the MJD, written by `saveSettings()` whenever the date steps (once a game
@@ -245,76 +350,91 @@ to 0.01 deg, pole at (0, sin lat, cos lat)).
   slider and say which in the Results.
 - The time-of-day slider (`index.html:2823`) moves the hour only, never the date.
 
-**Test hook** (`window.__DS`, `index.html:2929`): add `OBS`, `SEASON_DATES`, `mjdOf`, `civilOf`,
-`dateText`, `utcOffset`, `solar`, `STARS` (`{ n, hr, on }` plus the raw array) and `starDir`. The
-existing `SKY` export already carries `mjd`, `dst`, `decl`, `solarNoon`, `lst` and `starM`.
+**Test hook** (`window.__DS`, index.html:3037).
+- Step 1 added `OBS, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, solar, setDate`.
+- Step 2 drops `solar` and adds `ZMH_SKY`, `SKY_DATA` and `OBS_SKY`.
+- Step 3 adds `STARS` (`{ n, on }` and the VAO's vertex count), `MW` (`{ on }`), `starDir` and
+  `STAR_GAIN`.
+- The `SKY` export already carries `mjd, dst, decl, eot, solarNoon`, and gains `lst, starM, planets,
+  moonPhase`.
 
 ## Implementation guidance (for the overseer)
 
 Profile: **balanced** (assumed: this repo has no task-scoping skill, `.claude/zmh/producer.md`
-§ Plans). One task per arc step; each is one session's work and one commit on `ds-stars`.
+§ Plans). One task per arc step; each is one session's work and one commit on the arc's branch.
+Step 1 is done.
 
 | # | Task | Category | Model | Effort | Rationale |
 | - | ---- | -------- | ----- | ------ | --------- |
-| 1 | Suite reads `DS_PAGE`; the calendar, DST, the sun from the date, the date in TIME and saved; restate the sun row; calendar rows | cross-system | opus | high | clock, sky, settings and UI at once; DST state that must not loop; restating a row honestly |
-| 2 | The catalogue: download V/50, read its terms, `build-stars.mjs`, the generated block; catalogue rows | content-pipeline | sonnet | high | a parser over a documented fixed-width format with exact offsets from the ReadMe; one external dependency that may block (escalation) |
-| 3 | Sidereal time, the sky matrix, the star pass, `ridgeY()`, delete the hash stars; star and pixel rows | rendering | opus | high | GL state in a shared render path (mirror included), shader edits that must leave the sky's pixels unchanged, pixel rows that must discriminate |
-| 4 | Break list and negative tests; frame cost; docs (spec numbers confirmed) | eval+docs | opus | high | each break must land on its own row; any MISSED needs a row written or an equivalence argued; docs read from the code |
+| 1 | (done 2026-11-01) the calendar, DST, the sun from the date, the date in TIME and saved | cross-system | opus | high | - |
+| 2 | Splice zmh-sky; licence and notes; the sun, moon, planets, LST and star matrix from `skyAt()`; delete `solar()`/`celestial()`; the kit and body rows | cross-system | opus | high | swaps the sun under rows that must stay green; four frames to keep straight (ENU, J2000, of date, topocentric); an independent oracle for every row |
+| 3 | The star pass with the planets, `ridgeY()`, the Milky Way; delete the hash stars; the star, planet, Milky Way and pixel rows | rendering | opus | high | GL state in a shared render path (the mirror too), shader edits that must leave the sky's day pixels unchanged, pixel rows that must discriminate |
+| 4 | Break list and negative tests; frame cost; docs | eval+docs | opus | high | each break must land on its own row; any MISSED needs a row or an equivalence argued; docs read from the code |
 | 5 | Ship: badge, gates, land on `main`, Pages, report | ship | sonnet | medium | the documented procedure, exact commands below |
 
-- **Ordering / dependencies:** strictly 1 -> 2 -> 3 -> 4 -> 5 (all touch `index.html` and the
-  suite). Parallel-safe: none. Step 3 needs step 2's block. **If step 2 is blocked** (the
-  escalation below), step 1's commit stands on the branch and the run stops; nothing may stand in
-  for the catalogue.
-- **Files owned per task:** 1: the settings block, the sun-and-sky section, the clock, the settings
-  UI and hook in `index.html`, plus the suite; 2: `build-stars.mjs`, `data/bsc5/`, the STARS block,
-  the THE ROAD notes line, the suite; 3: `GLSL_COMMON`, `FS_SKY`, a new `VS_STARS`/`FS_STARS`,
-  `initGL()`, `setFrameUniforms()`, `renderScene()`, `resize()`, the hook, the suite; 4: the break
-  list, the four docs; 5: the badge line and the plan's move to `DONE/`.
+- **Ordering:** strictly 2 -> 3 -> 4 -> 5. Every step touches `index.html` and the suite, so nothing
+  runs in parallel. Step 3 needs step 2's block and `SKY.starM`.
+- **Files owned per task:**
+  - 2: the `ZMH-SKY` markers and block, the sun-and-sky section (`OBS_SKY`, `updateSky()`, the
+    deletions), the THE ROAD notes paragraph, `LICENSE-d3-celestial.txt`, the hook, the suite;
+  - 3: `GLSL_COMMON`, `FS_SKY`, the new `VS_STARS`/`FS_STARS`, `initGL()`, `setFrameUniforms()`,
+    `renderScene()`, `resize()`, `updateSky()`'s planet upload, the hook, the suite;
+  - 4: the break list and the four docs;
+  - 5: the badge line and the plan's move to `DONE/`.
 - **Validation per task:** `node .claude/scripts/check-inline-js.cjs games/driving-simulator/index.html`
-  after every edit to the page; `.claude/scripts/gates.sh games/driving-simulator/index.html` GREEN
-  at the end of every step (it smokes the page, runs this suite, checks the games sync and scans
-  for live breaks).
-- **Tier audit (required):** no step passes a haiku checklist. Step 2 is the most mechanical, but
-  its offsets come from a document read at run time and it carries the only external dependency
-  (sonnet, high). Steps 1, 3 and 4 each need judgment across the engine, the shader and the suite
-  (opus, high). Step 5 is the procedure, but it pushes to `main` and verifies a deploy (sonnet,
-  medium).
+  after every edit to the page, and `.claude/scripts/gates.sh games/driving-simulator/index.html`
+  GREEN at the end of every step. The gates smoke the page, run this suite, check the games sync
+  and scan for live breaks.
+- **Tier audit (required):** no step passes a haiku checklist.
+  - Steps 2, 3 and 4 each need judgment across the kit's frames, the shaders and the suite (opus,
+    high).
+  - Step 5 is the procedure, but it pushes to `main` and verifies a deploy (sonnet, medium).
 - **Decision defaults:** everything under "Design" above. Beyond it:
-  - Prefer the page's existing patterns: `celestial()`'s axes, `build-kits.mjs`'s marked block, the
-    sky's draw state.
-  - A choice not listed here goes into `.claude/driving-simulator.md`'s "Assumed, not decided"
-    table as a row, never silently.
-  - A suite row the new rules contradict is **restated** (same claim, the new rule) and named in
-    the Results. Never delete a row to go green.
-  - If a tolerance below proves too tight for SwiftShader's pixels, widen it only after tracing why,
-    and record the trace.
-- **Embedded-content QA:** the suite has 78 checks at d0bff6c. Expected after each step: step 1 +8
-  new (one restated in place) = 86; step 2 +2 = 88; step 3 +11 = 99. The invariant is that each
-  step grows the suite by exactly the rows it adds. State the real total in each step's Results; if
-  a step ends with a different row count, say why. Line numbers were read on d0bff6c; re-read before
-  editing (each step moves lines). The `solar()` kernel and the matrix were run and checked while
-  drafting (above).
+  - **The kit's way first:** its conventions, its law, its GLSL as the reference. A page-side
+    variation (the gain constants, the ridge, `uPx`) is a row in `.claude/driving-simulator.md`'s
+    "Assumed, not decided" table.
+  - Never patch the kit's code inside the page's block. A kit bug goes to zmhstudio as a report, and
+    the step stops if it blocks.
+  - A choice not listed here goes into that table as a row, never silently.
+  - **A suite row the new rules contradict is restated** (same claim, the new rule) and named in the
+    Results. Never delete a row to go green.
+  - If a tolerance proves too tight for SwiftShader's pixels, widen it only after tracing why, and
+    record the trace.
+- **The suite's oracles.** The suite never copies the page's or the kit's code. It checks against:
+  - its own formulas: the Almanac sun, Meeus 12.4 GMST, Meeus 21.2-21.3 precession, Meeus 49.1 mean
+    phases;
+  - standard J2000 star positions typed in sexagesimal (SIMBAD);
+  - astronomy-engine's numbers from zmh-sky's `vectors/golden.v1.json`, typed in with their record
+    ids as the source. astronomy-engine is an independent oracle that is never shipped, so its
+    values are fair to hard-code.
+- **Embedded-content QA.** The suite had 86 checks after step 1 (measured). Expected after each
+  step: 86 + 4 = 90 after step 2, and 90 + 13 = 103 after step 3. Each step grows the suite by
+  exactly the rows it adds; state the real total in each step's Results, and say why if it differs.
+  Line numbers were read on the branch on 2026-11-02; re-read before editing.
 - **Escalation triggers** (stop and report to the CD; do not work around):
-  - `cdsarc.cds.unistra.fr` is still refused at step 2. The CD chose to allow it; it may take a new
-    session. Try once, read `curl -sS "$HTTPS_PROXY/__agentproxy/status"`, and do not fetch the data
-    from any other host or package.
-  - The catalogue's terms forbid redistribution.
-  - The star pass costs more than a frame budget's worth on the perf block (step 4 measures).
+  - zmhstudio cannot be reached: no sibling clone, and `add_repo ZackHelms/zmhstudio` refused.
+    Never re-type the star data, and never fetch it from anywhere else.
+  - The splice fails, or a second splice changes the page. That is a kit bug, for zmhstudio.
+  - The star pass and the Milky Way cost more than a frame budget's worth on the perf block (step 4
+    measures).
   - Anything that would need a change to `drivingSimulator.settings.v1`'s key.
 - **Playtest** (after step 5):
-  - At night, look north: the Big Dipper (Dubhe high in the north at 22:00) and Polaris barely
-    moving. South-west: Regulus and Leo. East: Arcturus, then Vega rising in the north-east.
+  - About 21:00: Venus, very bright, low in the west-north-west (about 15 deg up; it sets about
+    22:30); Jupiter higher in the west.
+  - At 22:00, look north: the Big Dipper high in the north, and Polaris barely moving.
+  - South-west: Regulus and Leo. East: Arcturus, then Vega rising in the north-east.
   - Watch the sky turn about Polaris, not overhead.
-  - The date in the settings ("Tue May 5"), stepping a day after midnight.
-  - The sun setting a little after 8 pm.
-  - Is magnitude 5 too many stars, or too faint, on your phone? Size and brightness are each one
-    constant.
-- **Publish:** step 5 pushes `main`, which is the publish; verify the Pages run (producer config
-  § Publish). Steps 1-4 push the branch only.
-- **Commit strategy:** one conventional commit per step on `ds-stars`, scope `driving-simulator`,
-  ending "(dsstars step N)". Step 5 lands the branch on `main` as one commit with
-  `.claude/scripts/land-on-main.sh ds-stars <message-file>` (dry-run first).
+  - After midnight: the Milky Way faint in the east (Cygnus, then Sagittarius later).
+  - The moon rising late on May 5 (waning gibbous); its look is still the old disc until DS-4.
+  - The date in the settings ("Tue May 5"), stepping a day after midnight. The sun sets a little
+    after 8 pm.
+  - Too many stars or too faint on your phone? `STAR_GAIN` and `MW_GAIN` are each one constant, and
+    the magnitude cut is the splice's `--mag`.
+- **Publish:** step 5 pushes `main`, which is the publish. Verify the Pages run (producer config
+  § Publish). Steps 2-4 push the branch only.
+- **Commit strategy:** one conventional commit per step on the arc's branch, scope
+  `driving-simulator`, ending "(dsstars step N)". Step 5 lands the branch on `main` as one commit
+  with `.claude/scripts/land-on-main.sh <branch> <message-file>`, dry-run first.
 
 ## Resume here (a session told "run the next open step of this arc")
 
@@ -323,15 +443,17 @@ Profile: **balanced** (assumed: this repo has no task-scoping skill, `.claude/zm
    immediately before any push to `main`.
 2. Read this file in full, including every step's Results. Then read `.claude/driving-simulator.md`:
    § Backlog DS-1, § Architecture, § Testing, and the "Assumed, not decided" table.
-3. **Step 1 is on `origin/claude/brave-sagan-odwmrd`, not `ds-stars`** (the session that ran it could
-   push only to its own designated branch, and `main` must not get the game's half before step 5).
-   Start from that branch: a worktree cut from `main` (as an oversee run cuts one) merges
+3. **Step 1 is on `origin/claude/brave-sagan-odwmrd`** (the session that ran it could push only to its
+   own designated branch, and `main` must not get the game's half before step 5). Start from that
+   branch: a worktree cut from `main`, as an oversee run cuts one, merges
    `origin/claude/brave-sagan-odwmrd` in before anything else, then re-runs the gates (86 checks).
-   Read "ds-stars" below as the branch the arc lives on, and push to whatever branch your own
-   session may push to. Run the first step in the table below that
-   is not DONE, and only that one. Then tick it, append a Results section (append, never rewrite),
-   commit, push the branch (`git push -u origin ds-stars`), stop and report. **Never push to `main`
-   before step 5.**
+   That branch is "the arc's branch" below; push to whichever branch your own session may push to.
+4. **Have the kit:** a zmhstudio clone at `7b9c40e` or later (`/home/user/zmhstudio` in a remote
+   multi-repo session, else `add_repo ZackHelms/zmhstudio`), and the `zmh-sky:sky-pipeline` skill
+   (or read `plugins/zmh-sky/skills/sky-pipeline/SKILL.md` directly).
+5. Run the first step in the table below that is not DONE, and only that one. Then tick it, append a
+   Results section (append, never rewrite), commit, push the branch, stop and report. **Never push
+   to `main` before step 5.**
 
 Tools:
 - Gates: `.claude/scripts/gates.sh games/driving-simulator/index.html`. It finds `playwright-core`
@@ -350,16 +472,19 @@ The CD's standing preferences:
 - A cause reported to the CD must have been traced in code or data; otherwise call it a hypothesis.
 - Don't ask the CD about deleting remote branches.
 
-## Steps (one per session, then `/compact`; each ends: tick here, Results, commit to `ds-stars`, push the branch)
+## Steps (one per session, then `/compact`; each ends: tick here, Results, commit to the arc's branch, push the branch)
 
 | # | Step | Status |
 |---|---|---|
 | 0 | The CD's words, the catalogue answer and the spec corrections recorded (this file) | DONE 2026-11-01 |
 | 1 | `DS_PAGE`; calendar, DST, sun from the date, date in TIME and saved; restated sun row; calendar rows | DONE 2026-11-01 |
-| 2 | Catalogue: V/50 downloaded and its terms read, `build-stars.mjs`, the STARS block; catalogue rows | BLOCKED 2026-11-01: host refused |
-| 3 | Sidereal time, sky matrix, star pass, `ridgeY()`, hash stars deleted; star and pixel rows | |
+| 2 | zmh-sky spliced, licence and notes; the sun, moon, planets, LST and star matrix from the kit; kit and body rows | |
+| 3 | The star pass with planets, `ridgeY()`, the Milky Way, hash stars deleted; star, planet, Milky Way and pixel rows | |
 | 4 | Break list run whole, frame cost, docs | |
 | 5 | Ship: badge, gates, land on `main`, Pages, report to the CD | |
+
+(Step 2 was the BSC5 download until 2026-11-02; it was blocked on 2026-11-01 because the host was
+refused, and the revision replaced it.)
 
 ### Step 1 - the calendar and the sun from the date
 
@@ -493,178 +618,248 @@ For steps 2-4:
   2.4 min. Hypothesis, not traced: four SwiftShader suites on four cores slow each other well past 4x.
   Step 4 should budget for it (fewer jobs, or `--only` in batches).
 
-### Step 2 - the catalogue
+### Step 2 - zmh-sky in the page; the sun, the moon and the planets from it
 
-- Download `ReadMe` and `catalog.gz` from `https://cdsarc.cds.unistra.fr/ftp/V/50/` into a new
-  empty directory, then copy them into `games/driving-simulator/data/bsc5/`. **Blocked? Stop**
-  (escalation trigger): commit nothing for this step and report.
-- Read the ReadMe's byte-by-byte table and CDS's conditions of use; record what they say (Design,
-  "Terms").
-- Write `build-stars.mjs` beside `build-kits.mjs`. Its header gives the regeneration command
-  (`node build-stars.mjs data/bsc5/catalog.gz`). It parses by the ReadMe's offsets, cuts at
-  `V <= 5.0`, writes the block, and prints the count and the brightest five as a sanity line. Sirius
-  (HR 2491) must be first at about V = -1.46.
-- The THE ROAD notes line and its source, per "Terms".
-- New rows (2):
-  1. The catalogue holds 1,400-1,800 stars, every V <= 5.0, and RA and Dec in range. The nine named
-     HR numbers are present: 424 Polaris, 3982 Regulus, 5340 Arcturus, 5056 Spica, 4301 Dubhe,
-     7001 Vega, 2061 Betelgeuse, 2491 Sirius, 1713 Rigel. The header names `build-stars.mjs` and V/50.
-  2. Those nine sit at the suite's own J2000 positions within 0.01 deg. The suite has its own table
-     of their coordinates (the values in `.claude/driving-simulator.md` DS-1 for Polaris; standard
-     J2000 for the rest). This catches a packing scale, a sign or an hours-vs-degrees slip.
-- Suite 86 -> 88.
+- Start from step 1 (the Resume section, item 3). Then read the kit's skill and README.
+- **Splice** the block, check that it is idempotent, and add the licence file and the THE ROAD
+  paragraph (Design, "zmh-sky in the page").
+- **The bodies** from `skyAt()`, the star matrix into `SKY.starM`, `SKY.planets` and
+  `SKY.moonPhase`. Delete `solar()` and `celestial()`, and update the hook (Design, "The bodies from
+  the kit"). The stars still spin until step 3.
+- **Step 1's rows must stay green unchanged.** They test the sun against the suite's own, not the
+  page's formula. The noon-high / midnight-below rows and the "midnight much darker than noon" pixel
+  row must hold with the real moon too. If any row moves, trace why.
+- New rows (4). The fixed moment is **May 5, 2026 at 22:00 EDT** (`SKY.hour = 22; setDate(MAY5)`),
+  which is 2026-05-06 02:00 UT, the kit's golden instant. Restore 06:15 on May 5 afterwards, as the
+  calendar rows do.
+  1. **The sky block.**
+     - The header names zmh-sky and carries the attribution line.
+     - `SKY_DATA.stars` holds 1,500-1,750 rows (1,627 measured), every `mag <= 5.0`. Every RA is in
+       [0, 360): d3's -180..180 convention must never reach the page. Every Dec is in [-90, 90].
+     - The nine named stars are present by HIP: Polaris 11767, Regulus 49669, Arcturus 69673,
+       Spica 65474, Dubhe 54061, Vega 91262, Betelgeuse 27989, Sirius 32349, Rigel 24436.
+     - Each sits within 0.01 deg of the suite's own J2000 position: SIMBAD values typed in
+       sexagesimal, such as Sirius 06h45m08.92s -16 42' 58.0".
+     - The THE ROAD notes carry the attribution line and a link to `LICENSE-d3-celestial.txt`, which
+       exists beside the page.
+  2. **One sun, the kit's.**
+     - `SKY.sun` is `ZMH_SKY.skyAt(...).sun.enu` exactly (angle under 1e-6 deg).
+     - Its alt/az is within 0.05 deg of astronomy-engine's -20.882 / 310.518 (record
+       `2026-05-06T02Z/raleigh/sun`).
+  3. **The moon in its real place.**
+     - `SKY.moon`'s alt/az is within 0.3 deg of astronomy-engine's topocentric -23.146 / 109.087
+       (record `2026-05-06T02Z/raleigh/moon`).
+     - The anchors: the suite computes the Meeus 49.1 **mean** phase instants for May 2026 itself
+       (full near May 1 and May 31, new near May 16; all three are spring dates). At each, the
+       angle between `SKY.sun` and `SKY.moon` is within 15 deg of 180 at full and of 0 at new.
+       Mean phases are up to about 14 h off the true ones, the moon's latitude reaches 5 deg, and
+       parallax 1 deg; 15 deg covers all three. The placeholder moon fails the new-moon anchor.
+  4. **The planets.**
+     - `SKY.planets` holds exactly Mercury, Venus, Mars, Jupiter and Saturn, all `valid`.
+     - Venus and Jupiter are each within 0.3 deg of the suite's own alt/az. The suite turns
+       astronomy-engine's geocentric RA/Dec of date (Venus 72.973 / +23.639, Jupiter 111.326 /
+       +22.389; records `2026-05-06T02Z/geo/ven` and `.../geo/jup`) through its own GMST and
+       Raleigh's position. The Table 1 elements are good to about 0.1 deg.
+     - Venus's magnitude is below -3.5 and Jupiter's below -1.5.
+- Suite 86 -> 90.
 
-### Step 3 - the stars in the sky
+### Step 3 - the stars, the planets and the Milky Way in the sky
 
-- Sidereal time, the sky matrix and the star pass, as in "Design". Then `ridgeY()`, and delete the
-  hash stars and `uStarRot`.
-- New rows (11):
-  1. LST equals the suite's Meeus 12.4 within 0.01 deg at six times. At the local midnight that
-     starts May 5 it is 204.4 deg (within 0.05). Across a midnight date step, LST moves only by the
-     step's own sidereal advance.
-  2. The celestial pole, `SKY.starM` applied to (0, 0, 1), is due north at altitude 35.78 deg
-     (within 0.01).
-  3. Polaris: at each of 24 hours its altitude is 35.0-36.6 deg, its azimuth within 1.0 deg of
-     north, and both within 0.5 deg of the suite's alt/az.
-  4. Each of the nine stars keeps its angle to the pole within 0.05 deg over 24 game hours, so it
-     circles the pole and not the zenith.
-  5. Dubhe stays above the horizon all day; Arcturus is below it at some hour and above it at
+- The star pass, the planets' vertices, `ridgeY()` and the Milky Way, as in "Design". Then delete
+  the hash stars and `uStarRot`.
+- New rows (13). Unless a row says otherwise, the moment is May 5 at 22:00 EDT and the observer is
+  Raleigh.
+  1. **LST** equals the suite's own Meeus 12.4 within 0.01 deg at six times. At the local midnight
+     that starts May 5 it is 204.4 deg (within 0.05). Across a midnight date step it moves only by
+     the step's own sidereal advance.
+  2. **The pole of date.**
+     - The suite precesses the celestial pole of date back to J2000 with its own Meeus 21
+       precession. `SKY.starM` applied to that vector is due north at altitude 35.78 deg (within
+       0.01).
+     - `SKY.starM` applied to the J2000 pole (0, 0, 1) is 0.10-0.20 deg from it, which shows the
+       matrix precesses.
+  3. **Polaris:** at each of 24 hours its altitude is 35.1-36.5 deg and its azimuth within 0.8 deg
+     of north, and both are within 0.05 deg of the suite's own precessed alt/az.
+  4. **Each of the nine stars circles the pole of date:** its angle to the pole stays the same within
+     0.05 deg over 24 game hours.
+  5. Dubhe stays above the horizon all day. Arcturus is below it at some hour and above it at
      another.
-  6. The spring sky at 22:00 EDT on May 5: the seven stars of the spec's table within 0.5 deg of the
-     suite's own alt/az. One row; on failure it prints each star's deltas.
-  7. Stars move west: Arcturus (east at 22:00) climbs and Betelgeuse (west) sinks over one game hour.
-  8. One POINTS draw per pass with `STARS.n` vertices, recorded by wrapping `gl.drawArrays` for one
-     frame: one in the main pass, one more in the mirror pass in the cockpit view.
-  9. Pixels at midnight. At four headings (chase view, `PLAYER.yaw` 0, 90, 180 and 270 deg,
-     `CAM.chase = null`, a few frames), the sky above the ridge holds isolated pixels clearly above
-     their neighbours.
-  10. Pixels at noon: none.
-  11. With `STARS.on = false` at midnight, the same regions hold none. This is what proves `skyCol()`
-      has no stars of its own left.
-- Also rerun the existing day/night pixel rows (`suite:421-422`). The sky's day pixels must not move
-  with `ridgeY()` (the refactor is exact).
-- Suite 88 -> 99.
+  6. **The 22:00 sky:** all eight stars of the Corrections table are within 0.05 deg of
+     astronomy-engine's values (the record ids are the source) and of the suite's own precessed
+     alt/az. One row; on failure it prints each star's deltas.
+  7. **Stars move west:** over one game hour Arcturus (east) climbs and Betelgeuse (west) sinks.
+  8. **One POINTS draw per pass** with `STARS.n + 5` vertices, recorded by wrapping `gl.drawArrays`
+     for one frame: one in the main pass, and one more in the mirror pass in the cockpit view.
+  9. **The planets are drawn where they are.**
+     - The five planet vertices, turned by `SKY.starM`, equal `SKY.planets[i].enu` within 1e-4.
+     - Pixel check: pick a view that puts Jupiter (33.5 deg up in the west at 22:00) in frame, such
+       as the orbit view pitched up, and say which. The pixel where the suite's own Jupiter
+       direction projects (from step 2's RA/Dec, through the camera's `vp`) is within 3 px of a
+       local maximum clearly brighter than its neighbours. With `STARS.on = false` there is none.
+       Venus is only 4.3 deg up at 22:00, so the hills may hide it there.
+  10. **Star pixels at midnight.** At four headings (chase view, `PLAYER.yaw` 0, 90, 180 and 270 deg,
+      `CAM.chase = null`, a few frames), the sky above the ridge holds isolated pixels clearly
+      brighter than their neighbours.
+  11. **Pixels at noon:** none, and the Milky Way term adds nothing (the noon sky's pixels are
+      byte-identical with `MW.on` true and false).
+  12. With `STARS.on = false` at midnight, the regions in row 10 hold no isolated bright pixels. This
+      proves `skyCol()` has no stars of its own left. The Milky Way is smooth at that scale, so it
+      does not count.
+  13. **The Milky Way where the suite says it is.**
+      - Pick an hour on the night of May 5-6 when the suite's own galactic plane is well up in the
+        east, about 02:00-03:00 EDT. The suite uses its own galactic pole (RA 192.85948, Dec
+        27.12825, J2000, IAU) and its own precession.
+      - The mean luminance of a patch on the band, above the ridge, beats a patch 40 deg off it by a
+        clear margin with `MW.on` true.
+      - With `MW.on` false the two are equal within noise.
+- Also rerun the existing day/night pixel rows. The sky's day pixels must not move with `ridgeY()`
+  or the Milky Way branch (the refactor is exact).
+- Suite 90 -> 103.
 
 ### Step 4 - negative tests, frame cost, docs
 
-- Write `.claude/tests/negtests/driving-simulator.json` in `negtest-batch.py`'s format: `name`,
-  `file`, `old` (found exactly once), and `new` carrying the `@negtest` marker outside any string
-  literal. At least these breaks, each meant for its own row:
-  - the latitude 90 (the old bug's sky);
-  - LST without the longitude;
-  - the RA sign flipped (stars run east);
-  - the date not stepping at midnight;
-  - the wrap to the middle date instead of the first;
-  - EST all year;
-  - no fall-back;
-  - the date not saved;
-  - `DECL` 15 deg kept for the sun;
-  - the declination's sign flipped;
-  - the star pass not drawn;
-  - stars not faded by day;
-  - a hash star left in `skyCol()`;
-  - the magnitude cut at 6.5;
-  - RA read as hours, not degrees;
-  - the ridge test removed (and say which row sees it, or record why none can).
-- Run it whole with `negtest-copies.py` (Tools above). Every MISSED gets a row that sees it, or a
-  written argument that it is equivalent or dead code (the tests README's rules). Record the result
-  in `.claude/driving-simulator.md` § Testing.
-- Frame cost:
+- **Write `.claude/tests/negtests/driving-simulator.json`** in `negtest-batch.py`'s format: `name`,
+  `file`, `old` (found exactly once), and `new` with the `@negtest` marker outside any string
+  literal.
+- **The breaks.** At least these, each meant for its own row. Each says which row should see it.
+  - **Step 1's:**
+    - the date not stepping at midnight;
+    - the wrap to the middle date instead of the first;
+    - EST all year;
+    - no fall-back;
+    - the date not saved;
+    - `julianDate()` ignoring `SKY.dst` (an hour off).
+  - **The observer:**
+    - latitude 90, the old bug's sky (`OBS_SKY.latDeg = 90`);
+    - the longitude's sign flipped (`lonEastDeg: -OBS.lon`).
+  - **The kit wiring:**
+    - the star matrix uploaded without transpose;
+    - the stars through `s.horizonMatrix` (of date) instead of `s.starMatrix`, so precession is
+      skipped. The 0.05-deg table row must see it;
+    - the moon left on the placeholder rule;
+    - the planet vertices given `p.enu` as their J2000 direction;
+    - the planets frozen at boot.
+  - **The pass:**
+    - the star pass not drawn;
+    - stars not faded by day;
+    - a hash star left in `skyCol()`;
+    - the ridge test removed (say which row sees it, or record why none can).
+  - **The Milky Way:**
+    - in world coordinates (`zmhMilkyWay(d)` without `transpose(uStarM)`);
+    - not faded by day.
+- **Run it whole** with `negtest-copies.py` (Tools above), at `--jobs 2`, in `--only` batches of
+  about 3, each under about 9 minutes.
+  - Why: step 1 saw `--jobs 4` print nothing in 10 minutes. The cause is a hypothesis, not traced.
+  - Every MISSED gets a row that sees it, or a written argument that it is equivalent or dead code
+    (the tests README's rules).
+  - Record the result in `.claude/driving-simulator.md` § Testing.
+- **Frame cost.**
   - Run `node .claude/scripts/frame-budget.cjs games/driving-simulator/index.html swiftshader=1` at
-    night, with the stars on and then off through the hook (its header has the `eval`/`evalFile`
-    options). With `swiftshader=1` the number says how the renderer behaves with no GPU, not a
-    phone's frame rate; say so.
-  - Record the star pass's share on the perf block: calls +1, or +2 with the mirror; triangles
-    unchanged; the 3D CPU time on and off.
+    night three ways through the hook: stars and Milky Way on, stars only, and both off. The
+    script's header has the `eval`/`evalFile` options.
+  - With `swiftshader=1` the number says how the renderer behaves with no GPU, not a phone's frame
+    rate; say so.
+  - Record what the pass and the band add on the perf block: calls +1 (+2 with the mirror),
+    triangles unchanged, and the 3D CPU time in each run.
   - Escalate only on a gross cost.
-- Docs, every name and count read from the code:
+- **Docs,** every name and count read from the code:
   - `.claude/driving-simulator.md`:
-    - DS-1 marked built. Its numbers, DS-3's sun table and DS-4's sun table were already corrected
-      when this plan was drafted: confirm them against what the suite computes, and change only
-      what disagrees;
-    - the assumed table: the observer, the season dates, the start date, the DST handling, the
-      magnitude cut, the star look, precession ignored, and the terms row if assumed;
-    - Architecture (the calendar, the sky matrix, the star pass, the STARS block and its script);
-    - Testing (the new rows, the break list's result);
+    - DS-1 marked built; its spec was revised 2026-11-02, so confirm it against the code;
+    - the assumed table, from step 1's Results and this revision: the observer and `heightM`, the
+      season dates, the start date, the DST handling, the magnitude cut (the splice's `--mag 5`),
+      `STAR_GAIN`, the planet colours and the 2.5 clamp, `MW_GAIN`, and the Date row's place;
+    - Architecture: the calendar; the `ZMH-SKY` block and its regeneration command; one sun from
+      `skyAt()`; the star matrix convention (row-major, transpose on upload, det -1, J2000 to ENU
+      with precession); the star pass and its planet vertices; the Milky Way in `FS_SKY` only;
+    - Testing: the new rows, the oracles (with the golden record ids) and the break list's result;
     - the header count.
   - `.claude/tests/README.md`: the suite's row, its count, and the break-list line.
-  - `games/CLAUDE.md`: the DRIVING SIMULATOR entry, its count, and the STARS block named beside the
-    KITS block as generated.
-  - `CLAUDE.md`: the Driving Simulator row gains the calendar, the catalogue block ("generated by
-    `build-stars.mjs`, never hand-edited") and the sky matrix.
+  - `games/CLAUDE.md`: the DRIVING SIMULATOR entry, its count, and the `ZMH-SKY` block named beside
+    the KITS block as generated.
+  - `CLAUDE.md`: the Driving Simulator row gains the calendar, the zmh-sky block ("spliced by the
+    kit's CLI, never hand-edited"), one sun from `skyAt()` and the star matrix convention.
 
 ### Step 5 - ship
 
-- `.claude/scripts/stamp-badge.sh games/driving-simulator/index.html`, then read the stamp back out
-  of the file. `check-inline-js` and `gates.sh` must be GREEN after the stamp.
-- Move this plan to `.claude/plans/DONE/`, Status `IMPLEMENTED <date>` (the branch range), and
-  commit on `ds-stars`.
-- Land the branch:
-  - Run `git fetch origin main`, then `.claude/scripts/land-on-main.sh ds-stars <message-file> --dry-run`,
-    then without `--dry-run`. The message is `feat(driving-simulator): the real sky over Raleigh and a calendar (DS-1)`
-    with the session's trailers.
-  - If it reports `behind`, merge `origin/main` into `ds-stars`, re-run the gates, and check the
+- Run `.claude/scripts/stamp-badge.sh games/driving-simulator/index.html`, then read the stamp back
+  out of the file. `check-inline-js` and `gates.sh` must be GREEN after the stamp.
+- Move this plan and its follow-up to `.claude/plans/DONE/`, with Status `IMPLEMENTED <date>` (the
+  branch range), and commit on the arc's branch.
+- **Land the branch:**
+  - Run `git fetch origin main`, then `.claude/scripts/land-on-main.sh <branch> <message-file> --dry-run`,
+    then the same without `--dry-run`. The message is
+    `feat(driving-simulator): the real sky over Raleigh from zmh-sky, and a calendar (DS-1)`, with
+    the session's trailers.
+  - If it reports `behind`, merge `origin/main` into the branch, re-run the gates, and check the
     other session's files survived (CLAUDE.md § Git workflow).
-- Push the branch: `git push origin ds-stars`.
+- Push the branch to the branch your session may push to.
 - `TODO.md`: move the DS-1 entry to `DONE.md` with the badge string. DS-2 to DS-4 stay in `TODO.md`
-  § Now, re-sweepable (see Follow-ups).
-- Verify the "pages build and deployment" run for the landed SHA: `mcp__github__actions_list`,
-  `perPage: 1`, branch main, event dynamic. Match `head_sha` and read the jobs. Budget two checks,
+  § Now, ready to re-sweep (see Follow-ups).
+- **Verify** the "pages build and deployment" run for the landed SHA: `mcp__github__actions_list`,
+  `resource_id: '266280069'`, `perPage: 1`. Match `head_sha` and read the jobs. Budget two checks,
   then report.
-- Report to the CD:
+- **Report to the CD:**
   - the badge string;
-  - the star count and the catalogue's terms;
+  - the star count and the attribution;
   - the playtest list above;
-  - the assumed rows most worth a look: the start date, the DST jump, the star look, the
+  - the assumed rows most worth a look: the start date, the DST jump, `STAR_GAIN`, `MW_GAIN`, the
     magnitude cut;
   - the re-sweep command.
 
 ## Gotchas / bindings
 
-- **The suite's hard-coded page path** (`suite:17`) tests the primary checkout from a worktree.
-  Step 1 fixes it first; until then, a green suite in a worktree proves nothing.
-- **`SKY.day` is taken**: it is the daylight factor that half the renderer reads. The date is
+- **Start from step 1's branch,** not `main` (the Resume section, item 3). A worktree cut from `main`
+  has none of the calendar.
+- **The suite's page path** reads `DS_PAGE`, or the checkout's own page (step 1 fixed it). A green
+  suite tests the checkout it runs in.
+- **The kit's conventions** (the skill's table), all of which bite:
+  - matrices are flat **row-major**, so upload them with transpose = true;
+  - `[east, up, north]` is the page's x, y, z, so there is no remap;
+  - the star matrix has determinant -1, which is expected, not a bug;
+  - stars are **J2000** and go through `starMatrix`; the sun, the moon and the planets are **of
+    date** and come out as `enu`;
+  - the moon to draw is the **topocentric** one in `skyAt()`;
+  - `lonEastDeg` is east-positive;
+  - everything takes `jdUT`, and the kit treats TT as UT.
+- **The `ZMH-SKY` block is generated.** Re-splice it, never edit it. The zmhstudio path varies by
+  session, so find it, don't remember it.
+- **One sun.** After step 2 nothing in the page computes the sun but `skyAt()`.
+- **`SKY.day` is taken:** it is the daylight factor that half the renderer reads. The date is
   `SKY.mjd`.
-- **No `Date` in the sky code.** The device's time zone is not Raleigh's. MJD arithmetic only.
-  `Date.now()` stays where it already is, if anywhere.
+- **No `Date` in the sky code.** The device's time zone is not Raleigh's. Use MJD arithmetic and
+  `julianDate()`.
 - **The ridge is not geometry.** A star pass with the depth test off draws over the hills unless its
   fragment shader runs the same `ridgeY()`. The world drawn afterwards covers it correctly.
-- **The mirror calls `renderScene()` too** (`index.html:2265`, near 0.5, 320x96). The star pass runs
+- **The mirror calls `renderScene()` too** (index.html:2347, near 0.5, 320x96). The star pass runs
   there with `uPx = 1`. The mirror's colour target is already tonemapped
   (`.claude/notes/20261101-a-realistic-webgl2-scene-in-one-file.md`), and so is the star pass's
   output: add it as it is, with no second tonemap.
 - **Blend state leaks.** The glow and blob passes set their own blend state later in
-  `renderScene()`. Turn blend off after the star pass and leave depth state as the sky leaves it, or
-  the world draws blended.
+  `renderScene()`. Turn blend off after the star pass and leave the depth state as the sky leaves
+  it, or the world draws blended.
 - **`skyCol()` is also the world shader's fog and paint reflection** (`GLSL_COMMON` is in
-  `FS_WORLD`). Deleting the hash stars removes stars from reflections. That is intended; say so in
-  the docs.
-- **DST state loops if derived.** On the fall-back day, 01:30 is both EDT and EST. Keep `SKY.dst` as
-  state, flip it only in `advanceClock()`, and re-derive it only at boot, a date step and the slider.
-- **The clock rows are exact** (`suite:118-122`, tolerances 1e-6). The midnight loop must not
-  perturb the hour's arithmetic: subtract 24 exactly, never re-modulo a value that is already in
-  range.
-- **Settings coercion** (`index.html:236`) forces the season to spring at load. The DST rows set
-  `SETTINGS.season` through the hook after boot and must restore it, or later rows run in autumn.
-- **SwiftShader** renders slowly, and `gl_PointSize` above 1 is supported there. A pixel row that
-  needs a point bigger than 64 px is wrong anyway. Point sizes are in framebuffer pixels: multiply by
-  the render scale, or phones (scale up to 1.75) get pinpricks.
-- **Downloaded files are untrusted data.** Download into a new empty directory, keep the script
-  elsewhere, and pass paths as arguments (the environment's rule). The script reads text; it never
-  evaluates it.
-- **`negtest-copies.py`** needs the suite to honour `DS_PAGE` (step 1). Run the suite once on the
-  unbroken page first; never edit the page while a list runs. A row that "catches" unrelated breaks
-  is flaky until traced.
-- **Discovery over instruction** (`games/CLAUDE.md`): no new text on the play surface. The date
-  lives in the settings only.
-- Commits: explicit pathspecs (never `git add -A`), the session's Co-Authored-By / Claude-Session
-  trailers, no model id anywhere in the repo.
+  `FS_WORLD`).
+  - Deleting the hash stars removes stars from reflections. That is intended; say so in the docs.
+  - The Milky Way goes in `FS_SKY` only, for the same reason.
+- **DST is state.** On the fall-back day, 01:30 is both EDT and EST. Step 1 keeps `SKY.dst` as
+  state; leave it so.
+- **Settings coercion** forces the season to spring at load. Rows that set `SETTINGS.season` through
+  the hook must restore it, and restore the date with `setDate(MAY5)`.
+- **SwiftShader** renders slowly, and `gl_PointSize` above 1 works there. Point sizes are in
+  framebuffer pixels: multiply by the render scale, or phones (scale up to 1.75) get pinpricks.
+- **`negtest-copies.py`:** run the suite once on the unbroken page first, and never edit the page
+  while a list runs. A row that "catches" unrelated breaks is flaky until traced.
+- **Discovery over instruction** (`games/CLAUDE.md`): no new text on the play surface. The date and
+  the attribution live in the settings only.
+- **Commits:** explicit pathspecs (never `git add -A`), the session's Co-Authored-By /
+  Claude-Session trailers, and no model id anywhere in the repo.
 
 ## Validation
 
 Per step, as in the guidance table. End to end:
 - `gates.sh games/driving-simulator/index.html` GREEN on the stamped page, with the suite at its new
   count;
+- the splice idempotent;
 - the break list run whole, every miss explained;
 - the frame cost recorded;
 - the Pages run for the landed SHA concluded `success`.
@@ -673,12 +868,17 @@ The CD's playtest (above) is what no suite can do: whether the sky looks like Ra
 
 ## Follow-ups
 
-- **DS-2, DS-3, DS-4** (`TODO.md` § Now): re-sweep with `/zmh-producer:backlog-plan-gen driving-sim`
-  right after this lands. DS-3 and DS-4 cite this plan's `SEASON_DATES`, `SKY.mjd`, `utcOffset`,
-  `solar()`, `SKY.lst` and `SKY.starM`. DS-4 also replaces the moon's placeholder rule and adds
-  refraction; DS-4's "a bright moon dims the stars" fades this plan's star pass.
-- The Milky Way (out of scope in DS-1).
-- Precession to the date (0.36 deg) if a sharper sky is ever wanted.
+- **DS-2, DS-3 and DS-4** (`TODO.md` § Now): re-sweep with `/zmh-producer:backlog-plan-gen driving-sim`
+  right after this lands.
+  - DS-3 and DS-4 cite this plan's `SEASON_DATES`, `SKY.mjd`, `utcOffset`, `julianDate()`,
+    `OBS_SKY`, `SKY.starM` and the `ZMH-SKY` block.
+  - DS-4 is now small: refraction (`ZMH_SKY.refractionDeg`), real disc sizes, the phase disc (the
+    kit's `MOON_DISC_GLSL`, a lit sphere), moonlight (`moonIlluminanceLux`), earthshine, the moon by
+    day, and a bright moon dimming this plan's stars.
+- **Constellation figures:** the kit has them (`constellationSegments`, 20 KB more in the block). An
+  opt-in settings toggle would be a new item for the CD, not this plan.
+- **Sky brightness and twilight** are not in the kit's v1, so a light-polluted Raleigh sky is still
+  the page's own colours.
 
 ## Handoff
 
@@ -687,5 +887,4 @@ The CD's playtest (above) is what no suite can do: whether the sky looks like Ra
 /zmh-producer:oversee-implementation .claude/plans/dsstars.real-sky-and-calendar.md
 ```
 
-(Or one step per session: "Run the next open step of `.claude/plans/dsstars.real-sky-and-calendar.md`
-on branch `ds-stars`".)
+(Or one step per session: "Run the next open step of `.claude/plans/dsstars.real-sky-and-calendar.md`".)
