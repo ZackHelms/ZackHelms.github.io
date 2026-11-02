@@ -137,9 +137,22 @@ The season dropdown itself shipped the same day (`build 2026-11-01 15:55 UTC`): 
 disabled, `SETTINGS.season` saved, `SEASONS` and `SEASONS_OPEN` in the page, a
 suite row. The four items below are `TODO.md` § Now. Each is one plan. DS-3 and
 DS-4 need DS-1's calendar, so they go after it. **DS-1's plan:**
-`.claude/plans/dsstars.real-sky-and-calendar.md` (drafted 2026-11-01). DS-2 to DS-4
+`.claude/plans/dsstars.real-sky-and-calendar.md` (drafted 2026-11-01; step 1 built the
+same day on `claude/brave-sagan-odwmrd`; revised 2026-11-02 for zmh-sky). DS-2 to DS-4
 wait until it lands: all three share its files, and DS-3 and DS-4 cite its contracts
-(`SEASON_DATES`, `SKY.mjd`, `utcOffset`, `solar()`, `SKY.lst`, `SKY.starM`). Every step runs `gates.sh`, so a
+(`SEASON_DATES`, `SKY.mjd`, `utcOffset`, `julianDate()`, `OBS_SKY`, `SKY.starM`, and the
+`ZMH-SKY` block with its `ZMH_SKY.skyAt()`).
+
+**zmh-sky (2026-11-02).** The CD shipped zmhstudio's sky kit (`plugins/zmh-sky/`,
+skill `zmh-sky:sky-pipeline`) and asked for the sky work to use it: "update the backlog
+and plan(s) accordingly since this new plugin should streamline the sky work". The kit
+gives the sun, the topocentric moon with its phase, the planets, a J2000 star catalogue
+and the star matrix for any date and place, plus GLSL for star points, the moon's disc
+and the Milky Way. It is spliced into the page by its own CLI. Its numbers are graded
+against astronomy-engine. DS-1 and DS-4 below were rewritten to use it, and DS-3's sky
+comes with it.
+
+Every step runs `gates.sh`, so a
 step that moves the sun must restate the suite's sun row in that step (producer
 config § Plans, "plan the seams"). The defaults marked *chosen* were set when
 the item was written; the CD may overrule them at plan review, but they need no
@@ -177,12 +190,14 @@ zenith.
      the first Sunday of November, EST otherwise. Autumn's clock falls back an
      hour on Nov 1, 2026, as Raleigh's does.
    - The sun's declination, the equation of time and solar noon come from the
-     date, by NOAA's solar calculator (Meeus-based). For May 5 at local noon,
+     date. Step 1 built this with NOAA's solar calculator (Meeus-based). The
+     revised step 2 takes the sun from zmh-sky's `skyAt()` instead, one sun for
+     the light and, later, the moon's terminator. For May 5 at local noon,
      recomputed 2026-11-01 by two independent methods that agree within 0.011
-     deg (that calculator, and the Astronomical Almanac's low-precision sun
-     with Meeus 12.4 sidereal time): declination +16.4 deg, equation of time
-     +3.3 min, solar noon 13:11, sunrise 06:18-06:19, sunset 20:05 EDT. (The
-     first draft of this item said +16.0 deg and 20:03.)
+     deg, and by the kit (+16.387 deg, +3.31 min): declination +16.4 deg,
+     equation of time +3.3 min, solar noon 13:11, sunrise 06:18, sunset 20:05
+     EDT. Step 1 measured 06:18:09 and 20:04:52 on the page. (The first draft
+     of this item said +16.0 deg and 20:03.)
    - The suite recomputes these with its own copy of the formula; it never
      copies these numbers.
    - The suite's existing row ("the sun sets about 7:45 pm and rises about
@@ -190,76 +205,105 @@ zenith.
      computed times. The clock rows stay (144 s is still one game day); new
      rows: crossing midnight advances the date by exactly one, and the day
      after the season's last wraps to its first.
-3. **A real catalogue** of the stars the eye sees, to about magnitude 5.0
-   (about 1,600 stars). Each star has RA and Dec (J2000), V magnitude and B-V
-   colour. *Chosen* source: the Yale Bright Star Catalogue, 5th ed. (BSC5,
-   VizieR V/50).
-   - Check its terms before using it, and record the source (and any
-     attribution it asks for) here and in the settings' notes.
-   - A committed, dependency-free script packs it into a marked block in the
-     page (the `build-kits.mjs` pattern); nobody types star data by hand.
-   - This container's proxy may refuse the download. If it does, the plan stops
-     and asks the CD for the file; it does not invent star data.
-     *Decided 2026-11-01 (plan-gen interview): the proxy refused
-     `cdsarc.cds.unistra.fr` and `heasarc.gsfc.nasa.gov`; the CD chose to allow
-     `cdsarc.cds.unistra.fr` in the environment's network settings.*
-   - Precession from J2000 to 2026 (about 0.36 deg) may be ignored; say so in
-     the code.
-4. **One rotation from catalogue to sky.** Local sidereal time comes from the
-   true date and clock: the local time and the UTC offset give UT, the
-   standard GMST formula (Meeus, Astronomical Algorithms, 12.4) gives Greenwich
-   sidereal time, and adding the longitude gives LST.
+3. **A real catalogue, from zmh-sky** (revised 2026-11-02). The kit's
+   `sky-data/v1` stars (XHIP via d3-celestial, J2000, BSD-3-Clause), cut at
+   magnitude 5.0: **1,627 stars**, each with HIP number, RA, Dec, V magnitude
+   and B-V.
+   - The kit's CLI splices them into the page as a `ZMH-SKY` block, beside the
+     KITS block, along with the library (`ZMH_SKY`) and its GLSL:
+     `node <zmhstudio>/plugins/zmh-sky/cli/zmh-sky.mjs splice --page games/driving-simulator/index.html --mag 5 --parts stars,planets,glsl`.
+     Nobody types star data, and nobody edits the block by hand.
+   - **Attribution** (the kit's `data/SOURCES.md`). The settings' THE ROAD notes
+     show the kit's line verbatim, "Star data: XHIP (Anderson & Francis 2012) via
+     d3-celestial, (c) 2015 Olaf Frohn, BSD-3-Clause; constellation lines after
+     the IAU figures, modified by O. Frohn; planet elements: JPL (Standish),
+     Table 1.", and link `LICENSE-d3-celestial.txt`, which ships beside the
+     page.
+   - *Superseded:* the first choice was BSC5 from CDS (VizieR V/50), packed by a
+     new script. The proxy refused its host on 2026-11-01, even after the CD
+     chose to allow it, and the kit made the download unnecessary.
+4. **One rotation from catalogue to sky: the kit's star matrix.**
+   - `skyAt()` gives `starMatrix` (`equatorialJ2000ToHorizonMatrix`): J2000 to
+     the sky, sidereal time and **precession included**. It is row-major, so it
+     is uploaded with transpose. Never build the rotation from the hour and the
+     latitude: that is the zenith-spin bug, the kit's first trap.
+   - Local sidereal time is the kit's `lstDeg` (Meeus 12.4): 204.4 deg at the
+     local midnight that starts May 5, and 11.69 h at 22:00 EDT.
    - Because the date advances with the clock, LST runs on smoothly through
      midnight (the stars come back about 4 minutes earlier each night, as they
      do). It jumps only at the season's wrap.
-   - May 5, 2026 at local midnight: 204.4 deg. At 22:00 EDT that day: 11.69 h.
-   - Axes are those of `celestial()`: x east, y up, z north. The celestial
-     pole sits due north at an altitude equal to the latitude.
-   - Stars rise in the east and set in the west. Stars north of
-     dec +54.2 deg never set.
+   - Axes are those of `celestial()` and the kit's ENU: x east, y up, z north.
+     The celestial pole **of date** sits due north at an altitude equal to the
+     latitude. The J2000 pole is 0.15 deg from it in 2026.
+   - Stars rise in the east and set in the west. Stars north of dec +54.2 deg
+     never set.
 5. **Drawing.** One `gl.POINTS` draw right after the sky in `renderScene()`,
    so the mirror gets it too.
-   - Depth test off, like the sky; the world and the ridge cover it.
-   - Each vertex is a unit vector in equatorial coordinates; one matrix
-     uniform turns it into the sky.
-   - Size and brightness come from magnitude, and colour from B-V.
-   - Faded by `SKY.night`, and dimmed toward the horizon by airmass (about
-     0.2 mag per airmass).
+   - Depth test off, like the sky. The ridge (in the sky shader) hides the
+     stars behind it through a shared `ridgeY()`, and the world covers the rest.
+   - Each vertex is a J2000 unit vector, and the star matrix turns it into the
+     sky.
+   - Size, brightness and colour follow the kit's laws (`starAppearance`:
+     gamma 0.5 on flux, Sirius = 1, 1-4 px; `bvToRGB`), with extinction of
+     0.2 mag per airmass, faded by `SKY.night`, and one page gain.
+   - **The planets** (added 2026-11-02, the CD's choice) ride in the same draw as
+     five more points: Mercury, Venus, Mars, Jupiter and Saturn from `skyAt()`.
+     On May 5 at 22:00, Venus (-3.9) is low in the west-north-west and Jupiter
+     (-2.0) higher in the west.
+   - **The Milky Way** (added 2026-11-02, the CD's choice) is the kit's
+     procedural band, drawn in the sky shader at night only. It is faint, since
+     Raleigh's sky is light-polluted.
    - Delete the hash stars and `uStarRot`.
-   - Cost: one draw call and about 1,600 vertices; check it on the perf block.
-6. **Out of scope:** the moon (DS-4) and the Milky Way.
+   - Cost: one draw call, 1,632 vertices, and the band's per-pixel work; check
+     them on the perf block.
+6. **The moon in its real place** (added 2026-11-02, the CD's choice).
+   `skyAt()`'s topocentric moon replaces the placeholder that kept it opposite
+   the sun. Its phase, size and light stay in DS-4.
 
-**Checks.** Each is its own row and each is negative-tested.
+**Checks.** Each is its own row and each is negative-tested. The suite checks
+against its own formulas (Meeus GMST, IAU 1976 precession, Meeus 49 mean phases)
+and against astronomy-engine's numbers from the kit's golden vectors, never
+against the page's or the kit's code.
 
-- **Polaris** (RA 2h31m49s, Dec +89 15' 51'') is 0.74 deg from the pole at
-  J2000, so over a game day its altitude runs 35.04-36.52 deg and its azimuth
-  359.1-0.9 deg. The check: altitude 35.0-36.6 deg and azimuth within 1.0 deg of
-  north at every hour, each within 0.5 deg of the suite's own alt/az. Computed
-  for 22:00: 35.2 deg, 359.4 deg. (The first draft's 35.0-35.6 band was wrong;
-  corrected 2026-11-01.)
-- **Each star circles the pole, not the zenith.** Its angle to the pole stays
-  constant within 0.05 deg over 24 game hours. Dubhe (dec +61.75 deg) never
-  sets; Arcturus (dec +19.2 deg) rises and sets.
-- **The spring sky at 22:00 on May 5.** Each star is checked against the
-  suite's own alt/az formula, never the page's, to within 0.5 deg:
+- **Polaris** (HIP 11767, J2000 RA 2h31m49s, Dec +89 15' 51'') is 0.74 deg from
+  the J2000 pole. Precessed to 2026, over a game day its altitude runs
+  35.15-36.41 deg and its azimuth stays within 0.77 deg of north. The check:
+  altitude 35.1-36.5 deg and azimuth within 0.8 deg of north at every hour, each
+  within 0.05 deg of the suite's own precessed alt/az. At 22:00 it is 35.39 /
+  359.40. (The first draft's 35.0-35.6 band was wrong, and the 2026-11-01
+  correction's 35.04-36.52 left out precession.)
+- **Each star circles the pole of date, not the zenith.** Its angle to the pole
+  stays the same within 0.05 deg over 24 game hours. Dubhe (dec +61.75 deg)
+  never sets; Arcturus (dec +19.2 deg) rises and sets.
+- **The spring sky at 22:00 on May 5** (2026-05-06 02:00 UT). These are
+  astronomy-engine's values (zmh-sky `vectors/golden.v1.json`, records
+  `2026-05-06T02Z/raleigh/hip<N>`), checked within 0.05 deg. The first table here
+  took J2000 positions without precession and was up to 0.33 deg off; the zmhsky
+  run traced that, and the 2026-11-02 revision reproduced it.
 
   | Star | Altitude | Azimuth | Where |
   |---|---|---|---|
-  | Regulus | 58.3 | 227 | high, south-west |
-  | Arcturus | 52.3 | 106 | east |
-  | Spica | 37.0 | 147 | south-east |
-  | Dubhe | 63.4 | 350 | high, north |
-  | Vega | 12.4 | 51 | rising, north-east |
-  | Betelgeuse | 7.1 | 274 | setting, west |
-  | Sirius | 2.6 | 247 | on the south-west horizon |
+  | Regulus | 58.38 | 226.50 | high, south-west |
+  | Arcturus | 51.96 | 105.54 | east |
+  | Spica | 36.76 | 147.11 | south-east |
+  | Dubhe | 63.56 | 350.41 | high, north |
+  | Vega | 12.23 | 50.64 | rising, north-east |
+  | Betelgeuse | 7.43 | 273.81 | setting, west |
+  | Sirius | 2.82 | 246.98 | on the south-west horizon |
 
 - **Stars move west.** A star in the east climbs over one game hour.
+- **The sun, the moon and the planets** at the same moment, within 0.05 / 0.3 /
+  0.3 deg of astronomy-engine's. At the Meeus mean full and new moons of May
+  2026, the sun-moon angle is near 180 and near 0.
 - **Pixels.** At midnight the sky above the ridge holds star pixels whichever
-  way the camera looks; at noon it holds none.
+  way the camera looks. At noon it holds none. Jupiter's point is drawn where
+  the suite says it is. The Milky Way is brighter on the band than off it at
+  night, and absent by day.
 
-**Files:** `index.html` (the constants, `celestial()`, `updateSky()`,
-`setFrameUniforms()`, `skyCol()`, `renderScene()` and a star data block), a
-star build script beside `build-kits.mjs`, the suite, and this file.
+**Files:** `index.html` (the `ZMH-SKY` block, `updateSky()`, `setFrameUniforms()`,
+`skyCol()` and `FS_SKY`, `renderScene()`, the THE ROAD notes),
+`LICENSE-d3-celestial.txt` beside the page, the suite, and this file. Plan:
+`.claude/plans/dsstars.real-sky-and-calendar.md`.
 
 ### DS-2. Other cars make sound, in stereo, with real Doppler
 
@@ -346,7 +390,9 @@ option the CD may want later, not in this item: let the look follow the
 calendar within a season (leaf-out through late March and April, autumn colour
 peaking in late October, leaves down by December).
 
-- **Sun and stars come from DS-1's calendar.** On each season's middle date:
+- **Sun, moon, planets and stars come from DS-1's calendar** through zmh-sky's
+  `skyAt()`, which works for any date. So DS-3's sky needs no new astronomy: the
+  season's dates are the only input. On each season's middle date:
 
   | Season | Declination | Sunrise | Sunset | Clock | LST0 |
   |---|---|---|---|---|---|
@@ -357,7 +403,9 @@ peaking in late October, leaves down by December).
   These are NOAA computations for Aug 6, Nov 6 and Feb 4 (declination at local
   noon), recomputed 2026-11-01; the first draft's declinations were 0.3-0.4 deg
   off. Recompute them, don't copy them. A winter evening should then show Orion
-  high in the south.
+  high in the south. Star checks must precess, as DS-1's do. The kit's golden
+  vectors also hold astronomy-engine values for Raleigh on 2026-11-01, an autumn
+  date.
 - **Trees.** The broadleaf species (`oak-1`, `maple-1`, `birch-1`, `sapling-1`
   and the street trees `tree-1`..`tree-3`) change with the season. Conifers
   (`fir-1`, `pine-1`) do not change.
@@ -399,15 +447,17 @@ peaking in late October, leaves down by December).
 `buildChunk()` and the tree builders, `grassColor()`, the ambient functions),
 the suite, and this file.
 
-### DS-4. The sun and the moon where they really are
+### DS-4. The sun and the moon as they really look
 
-Comes after DS-1, which supplies the calendar, UT, sidereal time and the
-observer.
+Comes after DS-1. DS-1 already puts the sun and the moon where they really are,
+from zmh-sky's `skyAt()` (revised 2026-11-02; the CD chose to bring the moon's
+place into DS-1). DS-4 is what they look like and how they light the scene, and
+the kit supplies nearly all of it.
 
-**Today, traced 2026-11-01.**
+**Today, traced 2026-11-01** (before DS-1).
 - `updateSky()` sets `SKY.moon = celestial(H + 12.8, -DECL * 0.6)`. That keeps
   the moon roughly opposite the sun, so it is near full every night and never
-  in the day sky.
+  in the day sky. DS-1 replaces this with the real moon.
 - `skyCol()` draws the moon as an evenly lit disc with no phase, multiplied by
   `uNight`, so it vanishes by day.
 - Moonlight (`SKY.moonCol`) follows the moon's altitude only.
@@ -417,9 +467,8 @@ observer.
 
 **Build.**
 
-1. **The sun** uses DS-1's NOAA position for the date and clock, checked
-   through the whole day and not just at noon. May 5, computed here
-   2026-11-01:
+1. **The sun** is `skyAt().sun` after DS-1, checked through the whole day and
+   not just at noon. May 5, computed 2026-11-01:
 
    | Time (EDT) | Altitude | Azimuth |
    |---|---|---|
@@ -432,51 +481,52 @@ observer.
    (Recomputed 2026-11-01 with declination +16.4; the first draft used +16.0
    and was about 0.3 deg low.) Noon altitude is 90 - 35.78 + declination: 77.7
    deg at the June solstice and 54.2 deg at the March equinox.
-2. **Refraction.** Draw both bodies lifted by the standard refraction near the
-   horizon (Bennett's formula, about 34' at the horizon). Sunrise and sunset
-   then happen when the geometric centre is at -0.833 deg, as almanacs define
-   them.
+2. **Refraction.** Draw both bodies lifted by `ZMH_SKY.refractionDeg(alt)`
+   (Bennett's formula, about 34' at the horizon); the kit leaves it off by
+   default, so the host adds it. Sunrise and sunset then happen when the
+   geometric centre is at -0.833 deg, as almanacs define them.
 3. **Real sizes.** The sun's disc is 0.53 deg and the moon's 0.49-0.56 deg,
-   varying with its distance; a soft edge of a few pixels hides the aliasing.
-   *Chosen*. If they read too small on a phone, a minimum size in pixels is the
-   lever.
-4. **The moon's position** comes from a truncated lunar theory: the main
-   periodic terms of Meeus, Astronomical Algorithms, ch. 47 (about 20 for
-   longitude and 10 for latitude are plenty for 0.1-0.3 deg). Then convert
-   ecliptic to equatorial with the true obliquity, and to the observer's sky
-   through DS-1's sidereal rotation. Add topocentric parallax (up to about
-   1 deg near the horizon) and refraction.
-5. **Phase.** Shade the moon's disc as a sphere lit from the sun's direction:
-   per pixel, the disc's local normal dotted with the direction to the sun.
-   The terminator, the lit fraction and the crescent's tilt then all come out
-   right with no special cases, and the bright limb faces the sun.
-   - Faint earthshine on the dark part of a crescent (*chosen*).
+   varying with its distance (`skyAt().moon.topoDistanceKm`); a soft edge of a
+   few pixels hides the aliasing. *Chosen*. If they read too small on a phone, a
+   minimum size in pixels is the lever.
+4. **The moon's position** is done in DS-1 (`skyAt().moon`, the full Meeus ch.
+   47 series with topocentric parallax). Add refraction (item 2) only.
+5. **Phase.** Use the kit's `MOON_DISC_GLSL` (`zmhMoonDisc(viewDir, moonDir,
+   sunDir, angularRadius, earthshine)`). It draws a lit sphere shaded from
+   `skyAt().sun`, so the terminator, the lit fraction and the crescent's tilt all
+   come out right with no special cases, and the bright limb faces the sun.
+   - Keep its coverage gate. The kit found a dashed line 90 deg from the moon
+     without it.
+   - Pass the one sun from DS-1, never a second one.
+   - Faint earthshine on the dark part of a crescent: `earthshineFraction()`,
+     or a multiple of it (*chosen*).
    - A few soft, low-frequency darker patches (the maria), fixed to the face
-     the moon always turns toward Earth (*chosen*).
-6. **Moonlight.** `SKY.moonCol` and the night ambient scale with the lit
-   fraction as well as the moon's altitude. The exposure keeps a full-moon
-   night clearly brighter than a moonless one, and both clearly night.
-   Moon shadows are not in this item (the shadow map runs by day only).
+     the moon always turns toward Earth (*chosen*). The kit has none, so this is
+     the page's own.
+6. **Moonlight.** `SKY.moonCol` and the night ambient scale with the kit's
+   `moonIlluminanceLux(phaseAngleDeg, altDeg)` (or `moonPhaseFactor`) as well as
+   the moon's altitude. The exposure keeps a full-moon night clearly brighter than
+   a moonless one, and both clearly night. Moon shadows are not in this item
+   (the shadow map runs by day only).
 7. **The moon by day.** Draw it whenever it is above the horizon, as added
    light rather than multiplied by `uNight`, so it shows as a pale disc
    against a blue sky.
 8. **A bright moon dims the stars.** A faint glow round the moon grows with
-   the phase, and DS-1's star pass fades its faintest stars by the sky's
-   brightness, so a full moon washes them out (*chosen*).
+   the phase, and DS-1's star pass and Milky Way fade by the sky's brightness, so
+   a full moon washes out the faintest stars and the band (*chosen*).
 
 **Checks.** Each is its own row and each is negative-tested.
 
-- **Sun.** Altitude and azimuth match the suite's own NOAA implementation
-  within 0.2 deg at five times of day on three dates. Sunrise and sunset fall
-  within 2 min of its times.
-- **Moon position.** Altitude and azimuth match the suite's own lunar
-  implementation within 0.3 deg at several times.
-- **Moon anchors.** These are mean phases from Meeus ch. 49, each within a day.
-  - The sun-moon angle is within 6 deg of 180 at the full moons of
-    2026-05-01 and 2026-05-31, and within 6 deg of 0 at the new moon of
-    2026-05-16.
-  - The lit fraction is over 0.97 at full, under 0.03 at new, and 0.5 +/- 0.05
-    at the last quarter (about 2026-05-09).
+- **Sun.** Altitude and azimuth match the suite's own sun within 0.2 deg at five
+  times of day on three dates. Sunrise and sunset fall within 2 min of its
+  times, with refraction.
+- **Moon position and anchors** are DS-1's rows. Here, refraction: a body on the
+  horizon is drawn about 0.57 deg higher than its geometric place.
+- **Phase.** At the Meeus mean phases (ch. 49, each within a day), the lit
+  fraction is over 0.97 at full (2026-05-01, 2026-05-31) and under 0.03 at new
+  (2026-05-16), and 0.5 +/- 0.05 at the last quarter (about 2026-05-09).
+  astronomy-engine's 0.835 at 2026-05-06 02:00 UT (golden record
+  `2026-05-06T02Z/geo/moon`) is a fixed point.
 - **The cycle.** Over 30 game days the phase runs new to full to new once, and
   the moon rises on average about 50 min later each day (30-70 min).
 - **The bright limb faces the sun.** Through a test hook that draws the moon
@@ -488,10 +538,12 @@ observer.
   - A full-moon midnight is brighter than a new-moon midnight (mean luminance
     ratio over 1.5), and both are darker than dusk.
   - The drawn sun disc spans 0.53 deg at the current field of view, within 20%.
+  - No stray pixels away from the moon's disc (the kit's coverage gate kept).
 
-**Files:** `index.html` (`updateSky()`, `celestial()` or its replacement,
-`skyCol()`, the moonlight and exposure terms, the star pass's fade, a test
-hook), the suite, and this file.
+**Files:** `index.html` (`updateSky()`, `skyCol()` or the sky shader's moon and
+sun discs, the moonlight and exposure terms, the star pass's and Milky Way's
+fade, a test hook), the suite, and this file. The `ZMH-SKY` block already
+carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
 
 ## Follow-ups not yet done
 
