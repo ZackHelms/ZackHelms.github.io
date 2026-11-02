@@ -20,8 +20,8 @@
  {
   "name": "style-option-missing",
   "file": "games/combat-simulator/index.html",
-  "old": "<option value=\"toon\">toon</option></select></div>",
-  "new": "<!-- /* @negtest */ --></select></div>"
+  "old": "<option value=\"toon\">toon</option><option value=\"neon\">",
+  "new": "<!-- /* @negtest */ --><option value=\"neon\">"
  },
  {
   "name": "style-not-saved",
@@ -56,7 +56,7 @@
  {
   "name": "ink-off-fighters",
   "file": "games/combat-simulator/index.html",
-  "old": "  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
+  "old": "  if (ink && !ink.side) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
   "new": "  /* @negtest */"
  },
  {
@@ -68,8 +68,8 @@
  {
   "name": "ink-in-realistic",
   "file": "games/combat-simulator/index.html",
-  "old": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } };",
-  "new": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] }, realistic: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } }; /* @negtest */"
+  "old": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] }, neon: { px: 2, col: NEON.purple, side: SIDE } };",
+  "new": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] }, neon: { px: 2, col: NEON.purple, side: SIDE }, realistic: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } }; /* @negtest */"
  },
  {
   "name": "ink-ext-zero",
@@ -80,7 +80,37 @@
  {
   "name": "ink-cull-not-discard",
   "file": "games/combat-simulator/index.html",
-  "old": "  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
-  "new": "  if (ink) { const fs = FS_INK.replace('if (dot(vN, uEye - vW) > 0.0) discard;', ''); if (fs === FS_INK) throw new Error('no discard to take out'); const K = (render.nd = render.nd || compile(withStyle(VS_INK_LIMB, 1), withStyle(fs, 1), 'ink-limb-culled')); gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT); inkSet(K, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); gl.cullFace(gl.BACK); gl.disable(gl.CULL_FACE); } /* @negtest */"
+  "old": "  if (ink && !ink.side) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
+  "new": "  if (ink && !ink.side) { const fs = FS_INK.split('if (dot(vN, uEye - vW) > 0.0) discard;').join(''); if (fs === FS_INK) throw new Error('no discard to take out'); const K = (render.nd = render.nd || compile(withStyle(VS_INK_LIMB, 1), withStyle(fs, 1), 'ink-limb-culled')); gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT); inkSet(K, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); gl.cullFace(gl.BACK); gl.disable(gl.CULL_FACE); } /* @negtest */"
+ },
+ {
+  "name": "neon-tonemapped",
+  "file": "games/combat-simulator/index.html",
+  "old": "  frag = vec4(mix(col, N_BG, fogK), 1.0);",
+  "new": "  frag = vec4(tonemap(mix(col, N_BG, fogK) * uExposure), 1.0); /* @negtest */"
+ },
+ {
+  "name": "neon-rims-same",
+  "file": "games/combat-simulator/index.html",
+  "old": "    if (P.limb.U.uRim) gl.uniform3fv(P.limb.U.uRim, SIDE[who]);",
+  "new": "    if (P.limb.U.uRim) gl.uniform3fv(P.limb.U.uRim, SIDE.p); /* @negtest */"
+ },
+ {
+  "name": "neon-bright-arena",
+  "file": "games/combat-simulator/index.html",
+  "old": "  vec3 col = N_BG + vCol * 0.05 * (0.55 + 0.45 * max(dot(N, V), 0.0));",
+  "new": "  vec3 col = vCol * (0.55 + 0.45 * max(dot(N, V), 0.0)); /* @negtest */"
+ },
+ {
+  "name": "neon-option-missing",
+  "file": "games/combat-simulator/index.html",
+  "old": "<option value=\"neon\">neon</option></select></div>",
+  "new": "<!-- /* @negtest */ --></select></div>"
+ },
+ {
+  "name": "neon-shadows-on",
+  "file": "games/combat-simulator/index.html",
+  "old": "  SHADOWS_ON = look === 'neon' ? 0 : 1;",
+  "new": "  SHADOWS_ON = 1; /* @negtest */"
  }
 ]
