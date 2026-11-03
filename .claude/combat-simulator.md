@@ -309,6 +309,101 @@ the bloom.
   brightest pixels are in the palette hues; the player's rim reads green and the
   opponent's red.
 
+## Backlog (parry timing and strike kinds), specified for plan-gen
+
+The CD, 2026-11-03, verbatim: "fix the parry timing so that I (or enemy) can only parry
+prior to the opponents Sword making contact and dealing damage. Currently, I can parry
+successfully during a small time Window after opponent Sword makes contact and deals
+damage. This needs to be implemented in a way that will work for future attacks i might
+add that have different attack telegraph timing; for example, a quick strike or heavy
+strike could be added to my current “normal” strike, where quick strike does lower
+damage but has much shorter telegraph Window like a jab in boxing, and heavy strike deals
+more damage, but has a longer telegraph window. For testing purposes it makes sense to go
+ahead and add this (quick and heavy strike buttons) to the backlog either as a sibling
+feature or together with the parry timing debug & fix item."
+
+Taken as two siblings planned as one arc: CS-3 (the fix, and parry judged against each
+attack's own timing) lands first; CS-4 (quick and heavy strikes) builds on it and is the
+test of it.
+
+### CS-3 - a parry only counts before the blade lands
+
+**Open.**
+
+**Traced 2026-11-03** (engine lifted into node, the opponent chaining cuts at the player at
+ranks 1, 5 and 10, the player pressing parry 0.03-0.25 s after the first cut's `hit`
+event): the cut that dealt damage is never parried, since `tryHit()` resolves each swing
+once (`a.resolved`). What the trace showed is that the parry still **succeeds, against the
+next cut of the chain**, in every case but one (rank 10, pressed 0.25 s after the hit).
+Three rules add up to it:
+- a hit **flinches** the defender for 0.22 s (`RULES.flinch`), and a parry pressed then is
+  not dropped but **buffered** for 0.22 s (`RULES.buffer`, `f.buf`), so it fires the
+  moment the flinch ends, with nothing on screen to say so;
+- a queued chain cut **skips its recovery**, so the next cut swings about 0.10 s after
+  the last one's contact, and lands 0.25-0.37 s after it (0.25 at rank 10, 0.37 at
+  rank 1);
+- the parry's 0.24 s window (`RULES.parry.win`) opens when the parry starts, so a parry
+  started at the end of the flinch covers that next contact.
+
+So a parry pressed in answer to a cut that has already hurt you gets the "PARRY" and the
+stagger, before the cut it caught has even started its wind-up. Inferred, not confirmed by
+the CD: this is the "small window after contact" in the brief.
+
+To check in the same step (not traced): `tryHit()` runs on the first in-reach tick of
+the active window, at the start of the sweep pose, so damage may show before the blade
+visibly reaches the body. If it does, a parry pressed as the blade *looks* about to land
+is already late. Measure the blade-to-body distance at the `hit` event.
+
+- **The rule** (both fighters): a parry turns a cut aside only if it was raised before
+  that cut's contact and within `RULES.parry.win` of it. A parry pressed while flinching
+  or staggered is **dropped**, never buffered. The buffer stays for attack, dodge and
+  power.
+- **Built for more attack kinds**: every attack's timing (telegraph, which is its wind-up,
+  then active, then recovery), damage, reach, arc, whether it can be parried and whether
+  it flinches come from **one attack table**, and the parry is judged against the
+  attacker's own contact time. Adding an attack is then one row and adds no parry code.
+  The AI's answer (`aiIntent()`, which reads a swing once when it starts) schedules
+  against the same row's telegraph.
+- **Checks**: the engine probe above as a suite row. Pressed during the flinch after a
+  hit, no parry of any later cut. Pressed after the flinch and before the next cut's
+  contact, still a parry. A swing that dealt damage is never parried. The same holds with
+  the roles reversed (the opponent's parry). A parry is judged per attack row; the
+  shipped chain's parries and its measured ladder win rates are unchanged except where
+  they relied on the buffered parry (report any change rather than retune silently). Each
+  rule gets a negative test.
+
+### CS-4 - quick and heavy strikes
+
+**Open. Depends on CS-3.**
+
+Two new attack buttons beside the normal attack, each a row in CS-3's table:
+- **Quick strike**: a jab. Lower damage and a much shorter telegraph, so it is hard to
+  parry on reaction.
+- **Heavy strike**: more damage and a longer telegraph, so it is easy to read and parry.
+- The normal strike, its five-cut chain and the power attack stay as they are.
+- **The opponent throws them too**, so the parry can be tested against all three
+  telegraphs from both sides.
+
+Assumed until the plan-gen interview (the plan asks the CD; any of these can be overruled):
+- quick about 4-5 damage and about 0.08 s of wind-up, heavy about 18-20 damage and about
+  0.40 s of wind-up;
+- both can be parried and both flinch;
+- neither is in the chain, a single strike each, and neither pays combo energy;
+- the opponent's rank scales their wind-ups as it does the chain's (`windMul`);
+- keys U for quick and O for heavy;
+- the buttons sit in the bottom-right cluster without moving the four that are there.
+
+Open for the CD at plan time:
+1. Does the parry window stay 0.24 s for every kind, or scale with the telegraph?
+2. Is a quick strike meant to be parryable on reaction at all?
+3. Do quick and heavy break, continue or start the five-cut chain?
+
+- **Checks**: each kind's damage, telegraph and parry outcome off its table row; a quick
+  strike parried only by a parry raised before its contact; a heavy strike's longer
+  telegraph gives the opponent's mind time to answer at ranks where it cannot answer a
+  quick one; the new buttons inside the viewport and overlapping nothing at every swept
+  size; a style is still paint with the new swings on screen.
+
 ## Tests
 
 `.claude/tests/drive-combat-simulator.cjs`, 74 checks. Part 1 (node, the engine): the
