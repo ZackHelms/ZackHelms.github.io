@@ -324,11 +324,13 @@ feature or together with the parry timing debug & fix item."
 
 Taken as two siblings planned as one arc: CS-3 (the fix, and parry judged against each
 attack's own timing) lands first; CS-4 (quick and heavy strikes) builds on it and is the
-test of it.
+test of it. **Planned 2026-11-03:** `.claude/plans/csparry.parry-timing-strike-kinds.md`
+(one attack table `ATTACKS` built from `RULES.chain` and `RULES.power`, the parry judged
+against the attacker's row, CS-3 landing on its own at step 2).
 
 ### CS-3 - a parry only counts before the blade lands
 
-**Open.**
+**Open; planned (csparry steps 1-2).**
 
 **Traced 2026-11-03** (engine lifted into node, the opponent chaining cuts at the player at
 ranks 1, 5 and 10, the player pressing parry 0.03-0.25 s after the first cut's `hit`
@@ -374,7 +376,7 @@ is already late. Measure the blade-to-body distance at the `hit` event.
 
 ### CS-4 - quick and heavy strikes
 
-**Open. Depends on CS-3.**
+**Open; planned (csparry steps 3-5). Depends on CS-3.**
 
 Two new attack buttons beside the normal attack, each a row in CS-3's table:
 - **Quick strike**: a jab. Lower damage and a much shorter telegraph, so it is hard to
@@ -384,19 +386,20 @@ Two new attack buttons beside the normal attack, each a row in CS-3's table:
 - **The opponent throws them too**, so the parry can be tested against all three
   telegraphs from both sides.
 
-Assumed until the plan-gen interview (the plan asks the CD; any of these can be overruled):
-- quick about 4-5 damage and about 0.08 s of wind-up, heavy about 18-20 damage and about
-  0.40 s of wind-up;
-- both can be parried and both flinch;
-- neither is in the chain, a single strike each, and neither pays combo energy;
-- the opponent's rank scales their wind-ups as it does the chain's (`windMul`);
-- keys U for quick and O for heavy;
-- the buttons sit in the bottom-right cluster without moving the four that are there.
+**The CD's answers at plan time (2026-11-03):**
 
-Open for the CD at plan time:
-1. Does the parry window stay 0.24 s for every kind, or scale with the telegraph?
-2. Is a quick strike meant to be parryable on reaction at all?
-3. Do quick and heavy break, continue or start the five-cut chain?
+| Question | CD's answer |
+|---|---|
+| Does the parry window stay 0.24 s for every kind, or scale with the telegraph? | **Scale with the telegraph**: each kind's window is a share of its wind-up. Planned as 0.24 s times the kind's wind-up factor: quick 0.12 s, heavy 0.40 s (0.48 capped so a parry always ends with 0.10 s open); the normal chain keeps 0.24 s at every rank. |
+| Do quick and heavy break, continue or start the chain? | **Mix into the chain**: each counts as the chain's next cut and keeps the 3rd/5th-hit energy. |
+| Who throws them? | **You and the opponent**: the opponent mixes them in by rank. |
+
+Assumed in the plan (any can be overruled at plan review or after the playtest): quick 0.5x
+wind-up, 0.8x recovery, 0.6x damage; heavy 2.0x, 1.3x, 1.6x; the opponent's quick share
+rising from 5% at rank 1 to 30% at rank 10 and its heavy share falling from 25% to 15%; keys
+U and O; the two buttons on an outer arc round attack at 3.4 R (quick at 22.5 deg, heavy at
+67.5 deg), the four existing buttons unmoved; a short backswing for quick and a big one for
+heavy, and a higher or lower swing tell.
 
 - **Checks**: each kind's damage, telegraph and parry outcome off its table row; a quick
   strike parried only by a parry raised before its contact; a heavy strike's longer

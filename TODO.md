@@ -12,22 +12,19 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [combat-sim] **A parry only counts before the blade lands** (CS-3; the CD, 2026-11-03:
-  "I can parry successfully during a small time Window after opponent Sword makes contact
-  and deals damage"). Traced in the engine: the cut that hurt you is never parried, but a
-  parry pressed while flinching from it is buffered, fires when the flinch ends, and
-  catches the next chained cut before its wind-up has even started. Fix for both
-  fighters, and put every attack's telegraph, timing and parry rule in one table, so a
-  new attack kind adds one row and no parry code. Spec and checks:
-  `.claude/combat-simulator.md` § Backlog (parry timing and strike kinds), CS-3.
-  Plan-shaped, with CS-4: `/zmh-producer:backlog-plan-gen combat-sim`
-
-- [combat-sim] **Quick and heavy strikes** (CS-4, depends on CS-3; the CD, 2026-11-03: a
-  quick strike "like a jab in boxing" with less damage and a much shorter telegraph, and a
-  heavy strike with more damage and a longer telegraph). Two new buttons beside the
-  normal attack, which stays as it is. The opponent throws them too, so the CS-3 parry
-  rule can be tested against three telegraphs. The damage and timings are assumed (three
-  open questions are listed for the plan). Spec: same section, CS-4.
+- [combat-sim] **A parry only counts before the blade lands, then quick and heavy strikes**
+  (CS-3 and CS-4; the CD, 2026-11-03: "I can parry successfully during a small time Window
+  after opponent Sword makes contact and deals damage", and a quick strike "like a jab in
+  boxing" and a heavy strike with a longer telegraph, as buttons, for testing it). Traced in
+  the engine: the cut that hurt you is never parried, but a parry pressed while flinching
+  from it is buffered, fires when the flinch ends, and catches the next chained cut before
+  its wind-up has even started. One attack table for every strike, the parry judged against
+  the attacker's own row, for both fighters; CS-3 lands on its own at step 2 of 5.
+  *Decided 2026-11-03:* the parry window scales with each kind's telegraph; quick and heavy
+  mix into the five-cut chain; the opponent throws them too. Spec and checks:
+  `.claude/combat-simulator.md` section Backlog (parry timing and strike kinds), CS-3 and CS-4.
+  **Plan ready (2026-11-03)** - run:
+  `/zmh-producer:oversee-implementation .claude/plans/csparry.parry-timing-strike-kinds.md`
 
 - [driving-sim] **Summer, autumn and winter become selectable** in the Season
   dropdown. The dropdown shipped 2026-11-01 with spring selected and the other three
