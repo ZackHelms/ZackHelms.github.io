@@ -12,17 +12,6 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
-  2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly
-  (a little in left too is realistic), also doppler effect should be realistically
-  simulated"). A pool of 6 voices for the nearest cars (engine and tyre roar),
-  distance and air absorption, an equal-power pan clamped to plus or minus 0.8 (right
-  about 0.99, left about 0.16 abeam), a Doppler factor computed every frame
-  (c = 343 m/s), and an "Other cars" volume slider. The sky arc it waited on landed
-  2026-11-03. Spec and checks: `.claude/driving-simulator.md` § Backlog, DS-2.
-  **Plan ready (2026-11-02)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/dssound.traffic-stereo-doppler.md`
-
 - [driving-sim] **Summer, autumn and winter become selectable** in the Season
   dropdown. The dropdown shipped 2026-11-01 with spring selected and the other three
   greyed out, as asked ("other seasons are visible but not selectable (yet)"). Each
@@ -33,7 +22,7 @@ in `.claude/<game>.md`.
   *Not planned on 2026-11-02:* it shares the settings panel with DS-6 and the ambient sound with
   DS-2, and both plans are waiting to run; and its winter trees want the tree-expert look first
   (`.claude/driving-simulator.md` § Follow-ups). Re-sweep with
-  `/zmh-producer:backlog-plan-gen driving-sim` once the sky arc and DS-2 have landed. Spec and
+  `/zmh-producer:backlog-plan-gen driving-sim` now that the sky arc (2026-11-03) and DS-2 (2026-11-03) have both landed. Spec and
   checks: `.claude/driving-simulator.md` § Backlog, DS-3.
 
 - [combat-sim] **A Graphics style selector, the toon style and the neon style** (the CD,

@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (129 checks).
+`.claude/tests/drive-driving-simulator.cjs` (141 checks).
 
 ## The CD's brief (verbatim)
 
@@ -68,6 +68,14 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | What the sliders leave alone (DS-6) | Sun scales `SKY.sunCol`, so its disc, aureole, broad lobe, the haze toward it in the fog, hills and reflections (`skyBase()`), and its light; the blue day sky, the sunset tint and the exposure do not move, so at 0 the day stays blue with no sun in it. A bright moon dims the stars by its phase and height whatever Moonlight is set to | The plan's "the sun's disc, aureole and broad lobe and its light"; the dimming row is about the real moon, not the slider |
 | A sky slider's stored value (DS-6) | A saved value that is not a number from 0 to 200 reads 100, as a missing one does. The panel shows no percentage beside the slider, as the volume rows show none | The merge as `vols` has it, with a guard; labels only on the panel (discovery over instruction) |
 | Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
+| Kind factors (DS-2) | A voice's engine pitch times `KIND_PITCH`: `boxTruck` 0.7, `pickup` 0.85, `suv` 0.95, `sedan` and `minivan` 1.0, `hatchback` 1.15 | The plan's *chosen* values: lower for the big engines, higher for the small car |
+| The air curve (DS-2) | The voice's lowpass at `16000 * (3000 / 16000) ^ ((d - 5) / 145)` Hz, clamped to 3-16 kHz: 16 kHz at 5 m, 3 kHz at 150 m | The plan's *chosen* curve, a geometric fall between the two figures DS-2 names. Not measured against a reference: worth the CD's ears |
+| Reference distance (DS-2) | `TV_REF = 5` m: a voice's distance gain is `5 / max(d, 1)`, capped at 1 | The plan's choice; inside 5 m every car is at full level, so the level row's closest point (about 4.5 m from the chase camera) sits at the cap |
+| `TRAFFIC_GAIN = 0.75` (DS-2) | The voices' overall level, ahead of the distance gain | Tuned on the level row (dssound step 2): a car passing 4 m away at 25 m/s, oncoming, the player at a cruise in the next lane, held at five places round its closest approach; the peak `traffic` RMS against the `engine` RMS in the same 2 s windows. 0.7 gave 0.63x (chase) and 0.43x (cockpit); 0.75 gives about 0.68x and 0.45x, near the middle of the 0.5-1.0 and 0.25-0.6 bands, so the player's engine is never masked. The cruise throttle on that stretch was 0.035, so the engine was near its quietest |
+| Shift points and idle (DS-2) | A voice's gear: the player's `GEARS` and `FINAL`, up above 2600 rpm, down below 1300, idle 800 rpm; the gear is kept per voice and reset when the voice takes a new car (then the lowest gear under 2600) | A calm driver's shift points; the player's own box revs to 5600 before it shifts, which no cruising car does |
+| A voice's engine and tyres (DS-2) | Engine gain 0.08 (the player's is 0.05-0.12 with throttle); its lowpass at `500 + rpm * 0.12` Hz, Q 2.5; tyre roar band-passed at `380 + v * 6` Hz, Q 0.6, at `min(0.12, v * 0.004)`, as the player's. Doppler goes on the oscillators and the tyre source's `playbackRate`; the tyre band is not moved | The player's shapes with the throttle taken out (no car's throttle is known); the plan names `playbackRate` only |
+| Where a car sounds from (DS-2) | 0.5 m above its road position (`c.y + 0.5`), for its distance, bearing and Doppler | About the height of an engine and a tyre's contact patch averaged |
+| Fades (DS-2) | A voice whose car leaves the six fades with a 0.027 s time constant (about 80 ms) and is free 0.12 s later; a new car's pitches and pan are set at once (the voice is silent then) and its level rises with a 0.05 s constant; pitch and pan follow with 0.03 s, the air filter with 0.05 s, the tyres with 0.1 s | The plan's 80 ms; the rest the player's engine's constants |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
 
@@ -104,7 +112,7 @@ What was built, and the one cause that was traced:
   sample of it when let go (`SND.preview`). Esc closes the menu; the time-of-day
   slider redraws the sky while paused.
 - **A volume per sound** (`SETTINGS.vols`, `VOL_KEYS`): radio, ambient, engine,
-  tyres, wind, tyre squeal, crashes, horn, buttons; 0-100 with 100 the measured
+  tyres, other cars (DS-2), wind, tyre squeal, crashes, horn, buttons; 0-100 with 100 the measured
   mix and a squared taper (half way is a quarter). "All sound" (the old master)
   stays above them. An old save's `radio: 0` becomes `vols.music = 0`.
 - **Ambient**: there was no ambient sound to put a slider on, so one was built:
@@ -344,6 +352,10 @@ against the page's or the kit's code.
 `.claude/plans/DONE/dsstars.real-sky-and-calendar.md`.
 
 ### DS-2. Other cars make sound, in stereo, with real Doppler
+
+**Built (dssound steps 1-2, 2026-11-03).** As specified below; the choices beyond it are the
+"Assumed, not decided" rows marked DS-2 and the checks are in § Testing. `TRAFFIC_GAIN` is 0.75
+by the level row.
 
 **Build.**
 
@@ -629,8 +641,8 @@ a paler column does the same under the rising moon. DS-5 to DS-7 are in `TODO.md
 **Plans (2026-11-02).** DS-7, DS-5, DS-4 and DS-6 are one seven-step arc,
 `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`, landed 2026-11-03 (in that order; DS-7 and DS-5 land on
 `main` at step 2; DS-6 goes after DS-4 so its Earthshine row exists). DS-2 is
-`.claude/plans/dssound.traffic-stereo-doppler.md`, run after the arc. DS-3 is not planned yet:
-re-sweep once both have landed.
+`.claude/plans/DONE/dssound.traffic-stereo-doppler.md`, landed 2026-11-03 after the arc. DS-3 is not
+planned yet: re-sweep now that both have landed.
 
 ### DS-5. Brighter stars
 
@@ -967,6 +979,22 @@ which a little dither in the sky pass would hide. Noted here, not planned.
   music bus. Every sound has its own channel gain (a slider each) and an
   analyser: `SND.rms(name)` reads `sfx`, `music` or any channel. Muffled in the
   cockpit.
+- **Other cars' voices** (DS-2, `updateTraffic()` inside `SND`): a pool of six built once in
+  `S.unlock()` and never added to or disconnected. A voice is the player's engine shape (two
+  saws and a square through a lowpass) and its own looping `BufferSource` on the shared noise
+  buffer through a bandpass (tyres), both into an air-absorption lowpass, a distance gain, a
+  left and a right gain and a `ChannelMerger(2)`; all six go through one cockpit lowpass and
+  gain (1.5 kHz and x0.5 when `CAM.mode === 0`) into the `traffic` channel ("Other cars", after
+  tyres in `VOL_KEYS`), which feeds `sfx`. Each frame the cars within 150 m of `CAM.eye` are
+  sorted and the nearest six hold voices; a voice whose car leaves fades and is handed on only
+  after its `freeAt`. The pan is equal-power on `p = 0.8 sin(bearing)`, the bearing taken against
+  **right = cross(CAM.fwd, up)**, which facing +z is -x (the world is east, up, south; +x is the
+  screen's left there). Doppler by hand, `k = (343 + vL.u) / (343 + vS.u)` clamped to 0.5-2, with
+  the player's world velocity as the listener's in every view, on the three oscillators and the
+  tyre source's `playbackRate`. Probes: `traffic` (the channel loop) and `trafficL` / `trafficR`
+  off a `ChannelSplitter(2)` (an analyser downmixes to mono). Hooks: `SND.traffic()` (read-only:
+  per voice `{ i, id, d, pan, k, f, gain, want }`, with `pan`, `k` and `gain` read back off the
+  AudioParams), `SND.probe(name)` and the test-only `SND.trafficTest.noTyres`.
 - **Settings** (cog): day length (24 s / 1 min / **2.4 min** / 10 min / 24 min /
   1 h / real time / stopped), time of day, traffic, units, graphics
   (resolution scale, shadows, props distance), mirror, performance stats, the
@@ -1062,6 +1090,39 @@ Sun, the moon disc, moonlight, Earthshine) and an old save reading 0. The one th
 before (the bodies below the ridge: the column row looks only under the horizon) got "a sun or
 moon behind the distant hills is hidden".
 
+**Other cars (DS-2, dssound, 12 rows; the suite 129 -> 141).** Section 9b, after the level rows:
+stereo right and left (a car parked 6 m to the camera's right or left, placed by the camera's own
+right vector cross(fwd, up): the louder side's RMS over the other's 4-12, the law 6.31), dead ahead
+(L and R within 10%), the pan law at 45 deg (R/L within 10% of the law's 2.82, and L^2 + R^2 = 1
+within 2% read off the graph's pan gains there and abeam), the Doppler factor (oncoming, receding
+and same speed: the applied factor, read back off the tyre source's `playbackRate`, against the
+suite's own formula within 0.5%), Doppler in the FFT (tyres muted, the traffic channel's 20-400 Hz
+peak at fftSize 16384 with a parabolic fit moves by k_approach / k_recede within 3%), range (a car
+at 160 m holds no voice and the channel is under 1e-4; at 140 m it is heard), paused (the menu alone
+holding the sim for 2 s, k, pan and level unchanged on the graph), the level (a car passing 4 m away
+at 25 m/s, oncoming, the player at a cruise: peak 0.5-1.0x the engine's RMS from the chase view and
+0.25-0.6x in the cockpit; measured 0.67-0.68x and 0.45-0.47x), the "Other cars" slider at 0, the
+pool (heavy traffic with six cars parked among it: the six voices that sound are the six nearest)
+and no node growth (every `create*` on `BaseAudioContext.prototype` and `AudioContext.prototype`
+wrapped over 60 s of heavy traffic stepped by `tick` with the radio and ambient at 0: 0 nodes, about 60
+cars heard in turn). Test cars are clones of a real one held in place with the loop paused (no dice
+drawn, no frame rate in any row); waits are on the property. The oracles (the equal-power pan law
+and Doppler) are typed from the spec; the measured side is the analysers (`trafficL` / `trafficR`,
+an FFT) and the AudioParams read back. Restated, not added: the volume-slider row's hand-written
+keys gain `traffic`. Measured on a pass: R/L 6.31, Doppler 1.15663 / 0.86458 / 1 against 1.15654 /
+0.86465 / 1, FFT peaks 77.7 / 58.1 Hz (ratio 1.34 against 1.338).
+
+**The break list, DS-2 (2026-11-03, 10 breaks; the list now 57).** Run on copies with
+`negtest-copies.py --jobs 1` through a harness built from the suite's own boot and section 9b,
+copied verbatim (the row code identical), since the whole suite takes about 11.5 minutes here: the
+pan sign (world +x as right) caught by stereo right and left; the pan law linear **missed** at first
+(a linear law gives 9 abeam, inside 4-12) and got "the pan law" row, which then caught it; the
+Doppler sign, Doppler off and the listener's velocity ignored each caught by the Doppler factor and
+the FFT rows; a node created per frame by no node growth; a seventh voice by the pool; a 1500 m range
+by range; the cockpit not muffled by the level (cockpit ratio); the traffic channel's gain following
+the tyres slider by the slider row. None caught only by a timed row. The 47 earlier breaks touch no
+`SND` code and were not rerun.
+
 **A known flake (untraced hypothesis):** under machine load (two suites at
 once, or the gates beside a break run) the sound rows (the engine and radio
 levels, the engine slider, the four stations within 25%) and the perf block's
@@ -1077,6 +1138,11 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
 
 ## Measured (2026-11-01)
 
+- **Other cars' sound cost (dssound, 2026-11-03, SwiftShader).** `SND.update()` with heavy traffic
+  (1.8) on a three-lane-a-side stretch, six cars in reach, 5 x 400 calls: median 0.022 ms a call on
+  `6f8816a`'s page, 0.127 ms with the six voices (+0.1 ms a frame). The perf block, live loop: sim
+  0.7 / 0.8 ms, r3d 0.7 / 1.5 ms, frame 633 / 750 ms before / after: within SwiftShader's noise.
+  The 36 extra oscillators and buffer sources run on the audio thread, not in the frame.
 - **The sky's frame cost (2026-11-02, SwiftShader, 22:00 on May 5).** Per frame,
   paused, 844x390: chase 74 draw calls with the stars and the Milky Way, 74 with
   the stars only, 73 with both off; cockpit 132 / 132 / 130 (the star pass runs

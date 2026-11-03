@@ -1,5 +1,20 @@
 # DONE — done log
 
+- 2026-11-03 [driving-sim] **Other cars make sound, in stereo, with real Doppler** (DS-2; the
+  CD, 2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly (a little
+  in left too is realistic), also doppler effect should be realistically simulated"). The six
+  nearest traffic cars within 150 m each have a voice (an engine pitched by speed and kind, and tyre
+  roar), built once and never grown: panned by bearing from where the camera looks (right =
+  cross(fwd, up); abeam right plays 0.99 right, 0.16 left), thinned by air and quieter with
+  distance, muffled in the cockpit, and pitched by Doppler worked by hand every frame (an oncoming
+  car at 25 m/s each way drops about five semitones as it passes). An "Other cars" slider in SOUND;
+  old saves read 100. Level set by measurement: a car passing 4 m away sits at about 0.67x the
+  player's engine from the chase view and 0.46x in the cockpit (`TRAFFIC_GAIN` 0.75). Suite 129 ->
+  141, break list 47 -> 57, all 10 new breaks caught by their named rows. The gate runs in this
+  container were red only on the frame-rate rows already recorded in `TODO.md` § Later (the radio
+  rows; the perf block's fps). Badge `build 2026-11-03 13:38 UTC`. Plan:
+  `.claude/plans/DONE/dssound.traffic-stereo-doppler.md`.
+
 - 2026-11-03 [driving-sim] **The sun and the moon as they really look, and a slider for each
   thing in the sky** (DS-4, DS-6; the CD, 2026-11-01: "Moon realism: yes, add this (and sun
   position) to the backlog for driving sim", and 2026-11-02: "sliders in the settings menu for each
