@@ -347,6 +347,116 @@ const AE = {
     && dateUI.after.mjd === MAY5 + 1 && dateUI.after.shown === 'Wed May 6' && dateUI.after.shown === dateUI.after.want
     && dateUI.slide.hour === 10 && dateUI.slide.mjd === MAY5 + 1 && dateUI.slide.shown === 'Wed May 6' && dateUI.slide.clock === '10:00 AM', dateUI);
 
+  // ---- 3b, the seasons (DS-3, dsseasons step 1): all four selectable and saved, each on its own calendar, nothing moved by a
+  // switch, and spring held byte for byte. The measured side is the GPU's own buffers: a chunk's baseMesh and propMesh vertex
+  // and index buffers read back through COPY_READ_BUFFER (WebGL 2 section 5.1: a buffer once bound to ELEMENT_ARRAY_BUFFER may
+  // be bound only to that target and the two copy targets; verified here, gl.getError() stays NO_ERROR), with the VAO unbound
+  // and the VAO and COPY_READ_BUFFER bindings put back; FNV-1a over the bytes. A null propMesh (an empty builder) hashes as no
+  // bytes, never a skip. SPRING_BEFORE was recorded by this code on the base page (81d0c48, before any season edit), twice,
+  // identical: one chunk per environment of the first 12 km, keyed by the s at the chunk's centre, its environment, then
+  // "vb:bytes ib:bytes" for the base mesh and the same for the props. `__dsAway` teleports with a stand-in traffic dice and puts
+  // the player, the traffic (cars, ids and the dice) and the chase camera back after, so the later rows see the sim as it was.
+  const SPRING_BEFORE = { 416: ['forest', '996e50ed:94224 e4ef3ec0:41472 33a5329d:366816 3450e72b:129888'], 1568: ['fields', '1ec9a4a7:149520 af23621d:48384 337c2ba4:27168 b3aeef1c:7344'],
+    7136: ['suburb', '813f6696:142320 7e4a1854:46080 cf530416:24960 b6c96558:4440'], 8288: ['open', 'f6dc1102:94224 e4ef3ec0:41472 9c6f9cfe:38016 2c625bf9:12816'],
+    10688: ['town', '3579b155:142320 7e4a1854:46080 f5222b36:97824 394e74c0:21816'] };
+  const SPRING_S = Object.keys(SPRING_BEFORE).map(Number);
+  const SEASON_MID = { spring: MAY5, summer: MJD(2026, 8, 6), autumn: MJD(2026, 11, 6), winter: MJD(2027, 2, 4) };
+  const installHash = pg => pg.evaluate(() => {
+    const W = window;
+    W.__dsMeshHash = m => { const g = document.getElementById('gl').getContext('webgl2');
+      const fnv = b => { let h = 0x811c9dc5; for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+      const vao = g.getParameter(g.VERTEX_ARRAY_BINDING), cr = g.getParameter(g.COPY_READ_BUFFER_BINDING); g.bindVertexArray(null);
+      const read = buf => { g.bindBuffer(g.COPY_READ_BUFFER, buf); const b = new Uint8Array(g.getBufferParameter(g.COPY_READ_BUFFER, g.BUFFER_SIZE)); g.getBufferSubData(g.COPY_READ_BUFFER, 0, b); return fnv(b) + ':' + b.length; };
+      const out = m ? [read(m.vb), read(m.ib)] : [fnv([]) + ':0', fnv([]) + ':0'];
+      g.bindBuffer(g.COPY_READ_BUFFER, cr); g.bindVertexArray(vao);
+      return out; };
+    W.__dsChunkHash = ch => [...W.__dsMeshHash(ch.baseMesh), ...W.__dsMeshHash(ch.propMesh)].join(' ');
+    W.__dsLoaded = () => Object.fromEntries([...W.__DS.CHUNKS].sort((a, b) => a[0] - b[0]).map(([k, ch]) => [k, W.__dsChunkHash(ch)]));
+    W.__dsAway = (sList, fn) => { const D = W.__DS, P = Object.assign({}, D.PLAYER), cars = D.TRAFFIC.cars.slice(), id = D.TRAFFIC.nextId, rnd = D.TRAFFIC.rnd, chase = D.CAM.chase;
+      D.TRAFFIC.rnd = rngFor('suite-away');
+      const out = {}; for (const s of sList) { D.teleport(s); out[s] = fn(D.CHUNKS.get(chunkOf(s)), s); }
+      D.TRAFFIC.rnd = rnd; D.TRAFFIC.nextId = id; D.TRAFFIC.cars.length = 0; D.TRAFFIC.cars.push(...cars); Object.assign(D.PLAYER, P); D.CAM.chase = chase; updateChunks(99);
+      return out; };
+  });
+  await installHash(page);
+  // row: each season chosen by a change event on #season-sel is the season, on its middle date, both saved; a reload in winter boots in winter
+  const picked = await page.evaluate(() => {
+    const D = window.__DS, el = document.getElementById('season-sel'), K = 'drivingSimulator.settings.v1', out = [];
+    const choose = v => { el.value = v; el.dispatchEvent(new Event('change')); const st = JSON.parse(localStorage.getItem(K) || '{}');
+      return { v, sel: el.value, season: D.SETTINGS.season, look: D.lookSeason, mjd: D.SKY.mjd, date: D.SETTINGS.date, stored: [st.season, st.date] }; };
+    for (const v of ['summer', 'autumn', 'winter', 'spring']) out.push(choose(v));
+    const w = choose('winter');
+    return { out, w, loaded: window.__dsLoaded() };
+  });
+  const pw = await ctx.newPage(); pw.on('pageerror', e => errors.push(String(e)));
+  await pw.goto(PAGE); await pw.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
+  await pw.evaluate(() => window.__DS.setPaused(true));
+  await installHash(pw);
+  // the dropdown shows the saved season once the menu opens (syncSettingsUI), as every setting does
+  const reW = await pw.evaluate(() => { const D = window.__DS; D.openSettings(); const sel = document.getElementById('season-sel').value; D.closeSettings();
+    return { season: D.SETTINGS.season, look: D.lookSeason, mjd: D.SKY.mjd, sel, loaded: window.__dsLoaded() }; });
+  await pw.close();
+  const back = await page.evaluate(MAY5 => { const D = window.__DS, el = document.getElementById('season-sel'); el.value = 'spring'; el.dispatchEvent(new Event('change'));
+    const r = { season: D.SETTINGS.season, look: D.lookSeason, mjd: D.SKY.mjd, stored: JSON.parse(localStorage.getItem('drivingSimulator.settings.v1') || '{}').season };
+    D.SKY.hour = 6.25; D.setDate(MAY5); return r; }, MAY5);
+  const common = Object.keys(reW.loaded).filter(k => k in picked.loaded), diffW = common.filter(k => reW.loaded[k] !== picked.loaded[k]);
+  ok('the season is selectable and saved: summer, autumn, winter and spring, each chosen on #season-sel, are the season on its middle date (Aug 6, Nov 6, Feb 4, May 5), both saved; a reload in winter boots in winter on Feb 4 with its loaded chunks hashing as before the reload; then back to spring',
+    picked.out.length === 4 && picked.out.every(r => r.sel === r.v && r.season === r.v && r.look === r.v && r.mjd === SEASON_MID[r.v] && r.date === r.mjd && r.stored[0] === r.v && r.stored[1] === r.mjd)
+    && picked.w.season === 'winter' && reW.season === 'winter' && reW.look === 'winter' && reW.sel === 'winter' && reW.mjd === SEASON_MID.winter
+    && common.length >= 12 && diffW.length === 0 && back.season === 'spring' && back.look === 'spring' && back.mjd === MAY5 && back.stored === 'spring',
+    { pick: picked.out.map(r => [r.v, r.season, r.look, r.mjd, r.stored]), reload: { season: reW.season, look: reW.look, mjd: reW.mjd, sel: reW.sel }, common: common.length, diffW, back });
+  // row: a switch rebuilds the road where it stands and moves nothing (never through teleport, which resets the car and the traffic)
+  const still = await page.evaluate(() => {
+    const D = window.__DS, P = D.PLAYER, vx0 = P.vx; P.vx = 17;
+    const snap = () => ({ p: [P.s, P.u, P.x, P.z, P.yaw, P.vx].join(), cars: D.TRAFFIC.cars.map(c => [c.id, c.s, c.lane].join(':')).join(), n: D.TRAFFIC.cars.length });
+    const meshes = () => new Set([...D.CHUNKS.values()].map(c => c.baseMesh)), fresh = (x, y) => [...y].every(m => !x.has(m));
+    const a = snap(), m0 = meshes(); D.setSeason('winter'); const b = snap(), m1 = meshes(); D.setSeason('spring'); const c = snap(), m2 = meshes();
+    P.vx = vx0;
+    return { a, b, c, rebuilt: fresh(m0, m1) && fresh(m1, m2), n: [m0.size, m1.size, m2.size], season: D.SETTINGS.season };
+  });
+  ok('nothing moves across a season switch: the player\'s s, u, x, z, yaw and speed and every traffic car\'s id, s and lane unchanged, spring -> winter -> spring, while every loaded chunk is rebuilt (each a new mesh)',
+    still.a.n >= 10 && still.a.p === still.b.p && still.b.p === still.c.p && still.a.cars === still.b.cars && still.b.cars === still.c.cars && still.rebuilt && still.n.every(k => k >= 12) && still.season === 'spring',
+    { p: [still.a.p, still.b.p, still.c.p], cars: still.a.n, sameCars: still.a.cars === still.b.cars && still.b.cars === still.c.cars, rebuilt: still.rebuilt, n: still.n });
+  // row: spring's chunks hash as recorded on the base page, before and after a round trip through winter
+  const spr = await page.evaluate(S => { const D = window.__DS, W = window, g = document.getElementById('gl').getContext('webgl2');
+    while (g.getError() !== g.NO_ERROR) { /* drain */ }
+    const h = () => W.__dsAway(S, (ch, s) => [D.sectionAt(s).env, W.__dsChunkHash(ch)]);
+    const first = h(); D.setSeason('winter'); D.setSeason('spring'); const again = h();
+    return { first, again, err: g.getError(), look: D.lookSeason }; }, SPRING_S);
+  const sprBad = SPRING_S.filter(s => JSON.stringify(spr.first[s]) !== JSON.stringify(SPRING_BEFORE[s]) || JSON.stringify(spr.again[s]) !== JSON.stringify(SPRING_BEFORE[s]));
+  ok('spring is as shipped: one chunk of each environment (forest 416, fields 1568, suburb 7136, open 8288, town 10688) hashes, base and props, vertices and indices, as recorded on the base page, and again after spring -> winter -> spring',
+    sprBad.length === 0 && spr.err === 0 && spr.look === 'spring' && new Set(SPRING_S.map(s => SPRING_BEFORE[s][0])).size === 5,
+    { bad: sprBad.map(s => ({ s, want: SPRING_BEFORE[s], first: spr.first[s], again: spr.again[s] })), err: spr.err });
+  // row: sunrise and sunset on each season's middle date, the page's sun found as the clock row finds it, on the season's own clock
+  const NOAA = { spring: [6 + 18 / 60, 20 + 5 / 60, -4], summer: [6 + 27 / 60, 20 + 14 / 60, -4], autumn: [6 + 42 / 60, 17 + 14 / 60, -5], winter: [7 + 12 / 60, 17 + 45 / 60, -5] };
+  const rise = await page.evaluate(MAY5 => { const D = window.__DS, out = {};
+    for (const v of ['summer', 'autumn', 'winter', 'spring']) { D.SKY.hour = 13; D.setSeason(v); const r = { mjd: D.SKY.mjd, dst: D.SKY.dst };
+      const alt = h => { D.SKY.hour = h; D.updateSky(); return Math.asin(D.SKY.sun[1]) * 180 / Math.PI; };
+      const ev = []; let prev = alt(0);
+      for (let m = 1; m <= 1440; m++) { const a = alt(m / 60); if ((prev < -0.833) !== (a < -0.833)) ev.push({ h: (m - 1 + (-0.833 - prev) / (a - prev)) / 60, up: a > prev }); prev = a; }
+      r.ev = ev; out[v] = r; }
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return out; }, MAY5);
+  const riseCmp = Object.keys(NOAA).map(v => { const r = rise[v], [up, dn, off] = NOAA[v], own = ownRiseSet(SEASON_MID[v], off), e = r.ev;
+    const okv = r.mjd === SEASON_MID[v] && r.dst === (off === -4) && e.length === 2 && e[0].up && !e[1].up && own.length === 2
+      && Math.abs(e[0].h - up) < 10 / 60 && Math.abs(e[1].h - dn) < 10 / 60 && Math.abs(e[0].h - own[0].h) < 10 / 60 && Math.abs(e[1].h - own[1].h) < 10 / 60;
+    return { v, ok: okv, dst: r.dst, page: e.map(x => hm(x.h)), noaa: [hm(up), hm(dn)], own: own.map(x => hm(x.h)) }; });
+  ok('sunrise and sunset on each season\'s middle date within 10 min of NOAA (06:18 / 20:05 EDT May 5, 06:27 / 20:14 EDT Aug 6, 06:42 / 17:14 EST Nov 6, 07:12 / 17:45 EST Feb 4) and of the suite\'s own, with the clock on EDT or EST as the season\'s',
+    riseCmp.every(c => c.ok), riseCmp);
+  // row: each season's sky: Orion high in the south at 22:00 EST on Feb 4, 2027; under the horizon at 22:00 EDT on Aug 6, 2026
+  const ssky = await page.evaluate(([MAY5, hip]) => { const D = window.__DS, o = {}, idx = h => D.SKY_DATA.stars.rows.findIndex(r => r[0] === h);
+    for (const v of ['winter', 'summer']) { D.setSeason(v); D.SKY.hour = 22; D.updateSky();
+      o[v] = { mjd: D.SKY.mjd, dst: D.SKY.dst, Betelgeuse: D.starDir(idx(hip.Betelgeuse)), Rigel: D.starDir(idx(hip.Rigel)) }; }
+    D.setSeason('spring'); D.SKY.hour = 6.25; D.setDate(MAY5);
+    o.season = D.SETTINGS.season; return o; }, [MAY5, { Betelgeuse: SIMBAD.Betelgeuse[0], Rigel: SIMBAD.Rigel[0] }]);
+  const orion = ['winter', 'summer'].map(v => { const jd = jdOf(SEASON_MID[v], 22, v === 'winter' ? -5 : -4);
+    return { v, mjd: ssky[v].mjd, dst: ssky[v].dst, stars: ['Betelgeuse', 'Rigel'].map(n => { const own = ownStar(n, jd), a = altAzOf(ssky[v][n]);
+      return { n, alt: +a.alt.toFixed(2), az: +a.az.toFixed(2), ownAlt: +own.alt.toFixed(2), ownAz: +own.az.toFixed(2), off: +angDeg(ssky[v][n], own.v).toFixed(4) }; }) }; });
+  const [ow, os] = orion;
+  ok('each season\'s sky: at 22:00 EST on Feb 4, 2027 Betelgeuse and Rigel within 0.05 deg of the suite\'s own precessed places, Betelgeuse over 50 deg up and both at azimuth 180-230 (Orion high in the south); at 22:00 EDT on Aug 6, 2026 both under the horizon',
+    ow.mjd === SEASON_MID.winter && ow.dst === false && ow.stars.every(s => s.off < 0.05 && s.az > 180 && s.az < 230) && ow.stars[0].alt > 50
+    && os.mjd === SEASON_MID.summer && os.dst === true && os.stars.every(s => s.alt < 0 && s.ownAlt < 0) && ssky.season === 'spring', orion);
+
   // ---- 3c. the sky from zmh-sky: the spliced block, one sun, the moon in its real place, the planets ----
   // The fixed moment is May 5, 2026 at 22:00 EDT = 2026-05-06 02:00 UT, the kit's golden instant.
   const pageFile = COPY ? process.env.DS_PAGE : path.join(process.cwd(), 'games', 'driving-simulator', 'index.html');
@@ -735,11 +845,17 @@ const AE = {
   await page.click('#set-close');
   ok('settings open on the cog and offer the day length (2.4 min selected)', panel.open && panel.cyc === '144', panel);
   ok('changing the day length in settings takes effect', cyc600 === 600, cyc600);
-  const season = await page.evaluate(() => { const el = document.getElementById('season-sel');
-    return { v: el.value, saved: window.__DS.SETTINGS.season, opts: [...el.options].map(o => [o.value, o.disabled]), section: el.closest('.row').previousElementSibling.querySelector('select')?.id };
+  // restated at dsseasons step 1 (DS-3), which opens the other three: was "spring selected, summer, autumn and winter listed but not selectable"
+  const season = await page.evaluate(() => { const el = document.getElementById('season-sel'), D = window.__DS, K = 'drivingSimulator.settings.v1', d0 = D.SKY.mjd, h0 = D.SKY.hour;
+    const o = { v: el.value, saved: D.SETTINGS.season, opts: [...el.options].map(o => [o.value, o.disabled]), section: el.closest('.row').previousElementSibling.querySelector('select')?.id, each: [] };
+    for (const v of ['summer', 'autumn', 'winter', 'spring']) { el.value = v; el.dispatchEvent(new Event('change')); const st = JSON.parse(localStorage.getItem(K) || '{}');
+      o.each.push([v, D.SETTINGS.season === v && st.season === v && st.date === D.SKY.mjd]); }
+    D.SKY.hour = h0; D.setDate(d0);
+    return o;
   });
-  ok('a season dropdown in TIME: spring selected, summer, autumn and winter listed but not selectable', season.v === 'spring' && season.saved === 'spring' && season.section === 'cycle-sel'
-    && JSON.stringify(season.opts) === JSON.stringify([['spring', false], ['summer', true], ['autumn', true], ['winter', true]]), season);
+  ok('a season dropdown in TIME: spring by default, all four selectable, each saved', season.v === 'spring' && season.saved === 'spring' && season.section === 'cycle-sel'
+    && JSON.stringify(season.opts) === JSON.stringify([['spring', false], ['summer', false], ['autumn', false], ['winter', false]])
+    && season.each.length === 4 && season.each.every(e => e[1]), season);
 
   // ---- 8. pixels: a real picture, and night is darker than day ----
   const lum = async () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => {

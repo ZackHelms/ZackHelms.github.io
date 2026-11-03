@@ -76,7 +76,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
       <option value="0">stopped</option>
     </select></div>
   <div class="row"><label for="season-sel">Season</label>
-    <select id="season-sel"><option value="spring">spring</option><option value="summer" disabled>summer</option><option value="autumn" disabled>autumn</option><option value="winter" disabled>winter</option></select></div>
+    <select id="season-sel"><option value="spring">spring</option><option value="summer">summer</option><option value="autumn">autumn</option><option value="winter">winter</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
   <div class="row" id="date-row"><span class="lbl">Date</span><span id="date-val">---</span></div>
   <h3>SKY</h3>
@@ -1161,8 +1161,9 @@ const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'ski
 // lobe and its light); moon: the moon's disc, its glow and its light with its share of the ambient; earthshine: its dark part.
 const SKY_KEYS = ['stars', 'planets', 'mw', 'sun', 'moon', 'earthshine'];
 // perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
-// season: only spring is selectable so far (the calendar runs Raleigh's spring, Mar 20 - Jun 20, 2026); the others are listed, greyed out
-const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring'];
+// season: spring by default, all four selectable (DS-3). SETTINGS.season runs the calendar; the look of the road is LOOK
+// (below), set only by applySeason(), so a row that moves the calendar by writing SETTINGS.season never changes the look
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = SEASONS;
 
 // ---------------------------------------------------------------- the calendar
 // The game keeps a date: an integer MJD (Modified Julian Date at 0h UT; May 5, 2026 is 61165).
@@ -1538,6 +1539,11 @@ const C = {
   grassField: lin3([78, 108, 46]), grassDry: lin3([128, 122, 72]), grassForest: lin3([56, 76, 40]), lawn: lin3([62, 96, 42]),
   conifer: lin3([38, 66, 44]), birchBark: lin3([214, 210, 198]),
 };
+// Every colour that changes with the season, one row per season (linear RGB). The builders read LOOK, the current row,
+// never SETTINGS.season. Spring's row is the shipped C values themselves; the other three alias it until their looks land.
+const SEASON_LOOK = { spring: { leaf: C.leaf, bush: C.leaf, treeline: C.leaf, grassField: C.grassField, grassDry: C.grassDry, grassForest: C.grassForest, lawn: C.lawn } };
+SEASON_LOOK.summer = SEASON_LOOK.autumn = SEASON_LOOK.winter = SEASON_LOOK.spring;
+let LOOK = SEASON_LOOK.spring, lookSeason = 'spring';
 
 // ---------------------------------------------------------------- signs
 // Every sign along the road, derived from the sections (so a chunk can find its own).
@@ -1667,7 +1673,7 @@ function addTree(mb, T, x, y, z, scale, rnd, colliders, ox = 0, oz = 0) {
   const th = T.trunkHeight * scale, tr = T.trunkRadius * scale;
   const bark = birch ? C.birchBark : C.bark.map(v => v * rnd.range(0.8, 1.15));
   const lv = rnd.range(0.75, 1.2), hue = rnd.range(-0.06, 0.06);
-  const leaf = conifer ? [C.conifer[0] * lv, C.conifer[1] * lv, C.conifer[2] * lv] : [C.leaf[0] * lv * (1 + hue * 2), C.leaf[1] * lv, C.leaf[2] * lv * (1 - hue)];
+  const leaf = conifer ? [C.conifer[0] * lv, C.conifer[1] * lv, C.conifer[2] * lv] : [LOOK.leaf[0] * lv * (1 + hue * 2), LOOK.leaf[1] * lv, LOOK.leaf[2] * lv * (1 - hue)];
   const top = conifer ? (T.canopy[T.canopy.length - 1].y + T.canopy[T.canopy.length - 1].radius) * scale : th;
   mb.cyl(x, y - 0.3, z, y + (conifer ? top * 0.75 : th + 0.4), tr * 1.15, tr * 0.6, 6, bark, MAT.BARK, false);
   if (conifer) {
@@ -1691,10 +1697,10 @@ function addTree(mb, T, x, y, z, scale, rnd, colliders, ox = 0, oz = 0) {
 const TERRAIN_D = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 7, 11, 17, 26, 38, 55, 80, 110, 150, 200, 255];
 function grassColor(env, x, z) {
   const n = vnoise(x / 37, z / 37) * 0.6 + vnoise(x / 9, z / 9) * 0.4;
-  if (env === 'forest') return C.grassForest.map((v, k) => v * (0.85 + 0.25 * n) + (k === 0 ? 0.01 : 0));
-  if (env === 'town' || env === 'suburb') return C.lawn.map(v => v * (0.9 + 0.2 * n));
+  if (env === 'forest') return LOOK.grassForest.map((v, k) => v * (0.85 + 0.25 * n) + (k === 0 ? 0.01 : 0));
+  if (env === 'town' || env === 'suburb') return LOOK.lawn.map(v => v * (0.9 + 0.2 * n));
   const t = clamp(0.5 + 0.7 * vnoise(x / 180 + 7, z / 180 - 3), 0, 1);
-  return C.grassField.map((v, k) => lerp(v, C.grassDry[k], t * 0.8) * (0.9 + 0.2 * n));
+  return LOOK.grassField.map((v, k) => lerp(v, LOOK.grassDry[k], t * 0.8) * (0.9 + 0.2 * n));
 }
 function buildChunk(ci) {
   const i0 = ci * CHUNK_STEPS, i1 = i0 + CHUNK_STEPS;
@@ -1748,7 +1754,7 @@ function buildChunk(ci) {
           const t2 = k === 0 ? [ga[0] - q[0], ga[1] - q[1], ga[2] - q[2]] : [q[0] - gb[0], q[1] - gb[1], q[2] - gb[2]];
           n = norm3(cross3(t2, w)); if (n[1] < 0) n = n.map(v => -v);
         }
-        const gcol = P[k].curb && j < 3 ? C.lawn : j <= 5 && TERRAIN_D[j] > 0.4 && !P[k].curb ? grassColor(env, g[0], g[2]).map(v => v * 0.9) : grassColor(env, g[0], g[2]);
+        const gcol = P[k].curb && j < 3 ? LOOK.lawn : j <= 5 && TERRAIN_D[j] > 0.4 && !P[k].curb ? grassColor(env, g[0], g[2]).map(v => v * 0.9) : grassColor(env, g[0], g[2]);
         r.push(base.vert(g[0] - ax, g[1] - ay, g[2] - az, n[0], n[1], n[2], gcol, MAT.GRASS, 0, TERRAIN_D[j]));
       }
       idx.push(r);
@@ -1782,7 +1788,7 @@ function buildChunk(ci) {
       const gy = groundAt(p, u, wx, wz);
       const hgt = 12 + 7 * vnoise(wx / 23, wz / 23) + 2.5 * vnoise(wx / 5, wz / 5);
       const [bx, bz] = worldAt(p, u + side * 9);
-      const c0 = env === 'forest' ? C.conifer : C.leaf;
+      const c0 = env === 'forest' ? C.conifer : LOOK.treeline;
       const nv = norm3([p.tz * side, 0.35, -p.tx * side]);
       const lo = base.vert(wx - ax, gy - 1 - ay, wz - az, ...nv, c0.map(v => v * 0.55), MAT.LEAF);
       const hi = base.vert(lerp(wx, bx, 0.4) - ax, gy + hgt - ay, lerp(wz, bz, 0.4) - az, 0, 1, 0, c0.map(v => v * 0.9), MAT.LEAF);
@@ -1858,7 +1864,7 @@ function buildChunk(ci) {
       if (env === 'town') for (let b = 0; b < 3; b++) {
         const bu = TOWN_KIT.bushes[b % TOWN_KIT.bushes.length];
         const bp = place(s + lr.range(-B.width / 2, B.width / 2), side * (d - B.depth / 2 - lr.range(1.0, 2.0)));
-        props.blob(bp.x - ax, bp.y + bu.height * 0.4 - ay, bp.z - az, bu.radius * 1.1, bu.height / bu.radius * 0.6, C.leaf.map(v => v * lr.range(0.7, 1.1)), MAT.LEAF, lr.int(0, 1e9), 0.3);
+        props.blob(bp.x - ax, bp.y + bu.height * 0.4 - ay, bp.z - az, bu.radius * 1.1, bu.height / bu.radius * 0.6, LOOK.bush.map(v => v * lr.range(0.7, 1.1)), MAT.LEAF, lr.int(0, 1e9), 0.3);
       }
       if (B.porch && B.porch.lit) { const lp = place(s, side * (d - B.depth / 2 - 0.3)); glows.push([lp.x, lp.y + 2.5, lp.z, 1.0, 0.75, 0.45, 0.35]); }
     }
@@ -2994,6 +3000,14 @@ function updateChunks(budget) {
   order.sort((a, b) => Math.abs(a - c) - Math.abs(b - c));
   for (let n = 0; n < Math.min(budget, order.length); n++) makeChunk(order[n]);
 }
+// The season's look: every loaded chunk rebuilt in its colours where it stands. The player and the traffic are never
+// touched (never through teleport(), which resets both); the meshes are pure functions of WORLD_SEED, the chunk and LOOK.
+function applySeason(v) {
+  LOOK = SEASON_LOOK[v] || SEASON_LOOK.spring; lookSeason = SEASON_LOOK[v] ? v : 'spring';
+  for (const ch of CHUNKS.values()) { freeMesh(ch.baseMesh); freeMesh(ch.propMesh); }
+  CHUNKS.clear();
+  updateChunks(99);
+}
 
 // ---------------------------------------------------------------- sun, moon, sky
 // SKY.day is the daylight factor (0-1), not the date: the date is SKY.mjd (the calendar, above).
@@ -4109,9 +4123,16 @@ $('set-btn').addEventListener('click', openSettings);
 $('set-close').addEventListener('click', closeSettings);
 setPanel.addEventListener('click', e => { if (e.target === setPanel) closeSettings(); });
 $('cycle-sel').addEventListener('change', e => { SETTINGS.cycle = +e.target.value; saveSettings(); });
-$('season-sel').addEventListener('change', e => { const v = e.target.value;
-  if (!SEASONS_OPEN.includes(v)) { e.target.value = SETTINGS.season; return; }
-  if (v !== SETTINGS.season) { SETTINGS.season = v; setDate(SEASON_DATES[v][2]); } else saveSettings(); });
+// a season chosen: the road around the car in its look, and the calendar on its middle date (both saved); the hook's setSeason is this path
+function setSeason(v) {
+  if (!SEASONS_OPEN.includes(v)) return false;
+  const moved = v !== SETTINGS.season;
+  SETTINGS.season = v;
+  if (v !== lookSeason) applySeason(v);
+  if (moved) setDate(SEASON_DATES[v][2]); else saveSettings();
+  return true;
+}
+$('season-sel').addEventListener('change', e => { if (!setSeason(e.target.value)) e.target.value = SETTINGS.season; });
 $('traffic-sel').addEventListener('change', e => { SETTINGS.traffic = +e.target.value; saveSettings(); });
 $('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); if (booted) drawGauges(); });
 $('gfx-sel').addEventListener('change', e => { SETTINGS.gfx = +e.target.value; saveSettings(); resize(); makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
@@ -4240,6 +4261,7 @@ function boot() {
   SKY.hour = 13; SKY.mjd = SETTINGS.date; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4;
   resetPlayer();
   updateSky();
+  LOOK = SEASON_LOOK[SETTINGS.season]; lookSeason = SETTINGS.season;   // a saved season boots in its own look: before the first chunk
   updateChunks(99);
   // a road already in use: traffic spread through the window in both directions
   for (const dir of [1, -1]) {
@@ -4259,7 +4281,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>
