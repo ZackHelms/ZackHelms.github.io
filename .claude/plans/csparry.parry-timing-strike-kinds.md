@@ -578,6 +578,15 @@ winds up before a rank-5 mind can answer).
 heavy: 4.5 blade and two 4.5 arcs of radius 24 and 33 at 100% and 60% alpha, all in units of r/46); the help paragraph's wording; the layout row's label now
 names the six buttons at each size; rows 1 and 2 each cover both buttons or keys in one row, to hit the plan's count of 3.
 
+### Step 5 (2026-11-03) - PAUSED, partial (the CD paused before the usage limit)
+
+Step 5 stays `open` in the Steps table. Done so far: the break run only; no docs, no badge, no TODO/DONE edit, nothing committed.
+
+**Break run** (`negtest-copies.py --jobs 2 --only <2 names>`, one 2-break chunk a call, about 6.5 min each; `/opt/node-tools/node_modules` present). **16 of 32 caught, 0 missed, 16 not yet run.**
+- Caught (HEAD `728de4b`): `stagger-bonus`, `no-iframes`, `power-parryable`, `combo-energy-3-only`, `power-at-9`, `no-energy-cap`, `chain-of-three`, `stagger-can-act`, `stagger-short`, `no-hyper-armour`, `parry-no-energy`, `dodge-no-energy`, `ring-never-closes`, `ring-no-flash`, `menu-no-pause`, `buttons-crowded`.
+- Not yet run: `ladder-no-advance`, `ai-slower-at-top`, `multitouch-one-role`, `parry-buffered-through-flinch`, `flinch-keeps-buffered-parry`, `drop-only-player`, `parry-window-wide`, `swing-resolves-twice`, `parry-window-global`, `quick-not-quick`, `kinds-break-chain`, `ai-never-quick`, `quick-button-missing`, `keys-no-heavy`, `heavy-overlaps-power`, `kind-pose-ignored`.
+- Still to do: the styles list dry-apply, then the docs (items 1-5 of the step), badge, TODO/DONE, gates, commit.
+
 ## Handoff
 
 ```
