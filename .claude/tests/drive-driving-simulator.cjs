@@ -457,6 +457,117 @@ const AE = {
     ow.mjd === SEASON_MID.winter && ow.dst === false && ow.stars.every(s => s.off < 0.05 && s.az > 180 && s.az < 230) && ow.stars[0].alt > 50
     && os.mjd === SEASON_MID.summer && os.dst === true && os.stars.every(s => s.alt < 0 && s.ownAlt < 0) && ssky.season === 'spring', orion);
 
+  // ---- 3b, the seasons' look (DS-3, dsseasons step 2): trees, grass, bushes and the treeline by season. A colour is the
+  // stored linear vertex colour taken to sRGB by the standard transfer function (IEC 61966-2-1, the suite's own), then HSV;
+  // the hue bands are the season's words (green, red-orange, russet, yellow, straw, olive-orange). The measured side is the
+  // page's own builder through __DS.treeTest (one tree with a fixed stream at a world position), the GPU's chunk buffers read
+  // back as above, or rendered pixels; never SEASON_LOOK echoed back. A hue is the circular mean of the vertices' hues.
+  await page.evaluate(() => {
+    const W = window;
+    W.__dsMeshRead = m => { if (!m) return { v: new Float32Array(0), i: new Uint32Array(0) };
+      const g = document.getElementById('gl').getContext('webgl2'), vao = g.getParameter(g.VERTEX_ARRAY_BINDING), cr = g.getParameter(g.COPY_READ_BUFFER_BINDING); g.bindVertexArray(null);
+      const rd = (buf, T) => { g.bindBuffer(g.COPY_READ_BUFFER, buf); const a = new T(g.getBufferParameter(g.COPY_READ_BUFFER, g.BUFFER_SIZE) / 4); g.getBufferSubData(g.COPY_READ_BUFFER, 0, a); return a; };
+      const out = { v: rd(m.vb, Float32Array), i: rd(m.ib, Uint32Array) }; g.bindBuffer(g.COPY_READ_BUFFER, cr); g.bindVertexArray(vao); return out; };
+    const enc = c => { c = Math.min(1, Math.max(0, c)); return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+    W.__dsHSV = (r, g, b) => { r = enc(r); g = enc(g); b = enc(b); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+      if (d > 1e-9) h = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+      return [(h + 360) % 360, mx > 0 ? d / mx : 0, mx]; };
+    // mean hue (circular, reported in -60..300 so a red sits near 0), saturation and value over the vertices of one material
+    W.__dsStats = (v, mat, keep) => { let c = 0, s = 0, sat = 0, val = 0, n = 0;
+      for (let o = 0; o < v.length; o += 12) { if (Math.round(v[o + 9]) !== mat || (keep && !keep(o))) continue;
+        const [h, S, V] = W.__dsHSV(v[o + 6], v[o + 7], v[o + 8]); c += Math.cos(h * Math.PI / 180); s += Math.sin(h * Math.PI / 180); sat += S; val += V; n++; }
+      if (!n) return { n: 0 }; let h = Math.atan2(s, c) * 180 / Math.PI; if (h < -60) h += 360;
+      return { n, h: +h.toFixed(2), s: +(sat / n).toFixed(3), v: +(val / n).toFixed(4) }; };
+    W.__dsFnvF = a => { const b = new Uint8Array(new Float32Array(a).buffer); let h = 0x811c9dc5; for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+  });
+  const BROAD = ['tree-1', 'tree-2', 'tree-3', 'oak-1', 'birch-1', 'maple-1', 'sapling-1'], SEAS = ['spring', 'summer', 'autumn', 'winter'];
+  const TPOS = [[123.4, -56.7], [-812.2, 40.1], [15.5, 990.3], [402.9, -311.6], [-77.7, -77.7], [2000.1, 3.3], [650.4, 12.8], [-1500.6, 707.2]];
+  const trees = await page.evaluate(([BROAD, SEAS, TPOS]) => { const D = window.__DS, W = window, M = D.MAT, out = {};
+    for (const id of BROAD.concat(['fir-1', 'pine-1'])) { out[id] = {};
+      for (const sn of SEAS) { out[id][sn] = TPOS.map(([x, z]) => { const t = D.treeTest(id, sn, x, z), v = t.v; let bark = 0, tris = 0, bad = 0;
+        for (let o = 0; o < v.length; o += 12) if (Math.round(v[o + 9]) === M.BARK) bark++;
+        for (let k = 0; k < t.i.length; k += 3) { const q = [t.i[k], t.i[k + 1], t.i[k + 2]].map(j => j * 12); if (!q.every(o => Math.round(v[o + 9]) === M.BARK)) continue;
+          const P = q.map(o => [v[o], v[o + 1], v[o + 2]]), e1 = [0, 1, 2].map(c => P[1][c] - P[0][c]), e2 = [0, 1, 2].map(c => P[2][c] - P[0][c]);
+          const fn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+          if (Math.hypot(...fn) < 1e-10) continue; tris++;
+          const vn = [0, 1, 2].map(c => v[q[0] + 3 + c] + v[q[1] + 3 + c] + v[q[2] + 3 + c]); if (fn[0] * vn[0] + fn[1] * vn[1] + fn[2] * vn[2] <= 0) bad++; }
+        return { leaf: W.__dsStats(v, M.LEAF), bark, tris, bad, col: JSON.stringify(t.col), spheres: t.spheres, hash: W.__dsFnvF(v) + ':' + W.__dsFnvF(t.i) }; }); } }
+    out.maples = []; for (let k = 0; k < 40; k++) out.maples.push(W.__dsStats(D.treeTest('maple-1', 'autumn', -2000 + 97.3 * k, 311.7 - 53.9 * k).v, M.LEAF).h);
+    out.look = D.lookSeason; return out; }, [BROAD, SEAS, TPOS]);
+  // row: canopies by season
+  const AUT_BAND = { 'maple-1': [0, 35], 'sapling-1': [0, 35], 'oak-1': [18, 45], 'birch-1': [42, 60], 'tree-1': [30, 52], 'tree-2': [30, 52], 'tree-3': [30, 52] };
+  const canopy = BROAD.map(id => { const T = trees[id], inB = (x, [a, b]) => x >= a && x <= b;
+    const greens = ['spring', 'summer'].every(sn => T[sn].every(r => r.leaf.n > 0 && inB(r.leaf.h, [95, 135])));
+    const darker = T.summer.every((r, k) => r.leaf.v <= 0.9 * T.spring[k].leaf.v);
+    const aut = T.autumn.every(r => r.leaf.n > 0 && inB(r.leaf.h, AUT_BAND[id]) && (id !== 'oak-1' || inB(r.leaf.s, [0.45, 0.8])));
+    return { id, ok: greens && darker && aut, spring: T.spring.map(r => r.leaf.h), summer: T.summer.map(r => r.leaf.h), vRatio: +(T.summer[0].leaf.v / T.spring[0].leaf.v).toFixed(3),
+      autumn: T.autumn.map(r => r.leaf.h), autumnS: id === 'oak-1' ? T.autumn.map(r => r.leaf.s) : undefined }; });
+  ok('canopies by season: every broadleaf kit tree (tree-1..3, oak, birch, maple, sapling) at 8 places, its leaves\' mean hue 95-135 deg in spring and summer with summer\'s value at most 0.9x spring\'s; in autumn maple and sapling 0-35, oak 18-45 at saturation 0.45-0.8, birch 42-60, the street trees 30-52',
+    trees.look === 'spring' && canopy.every(c => c.ok), canopy.filter(c => !c.ok).concat(canopy.filter(c => c.ok).map(c => ({ id: c.id, vRatio: c.vRatio, autumn: [Math.min(...c.autumn), Math.max(...c.autumn)] }))));
+  // row: bare in winter (its chunk colliders checked with the chunks, below)
+  const bare = BROAD.map(id => { const T = trees[id];
+    return { id, ok: T.winter.every((r, k) => r.leaf.n === 0 && r.bark - T.spring[k].bark >= r.spheres * 12 && r.col === T.spring[k].col && r.tris > 0 && r.bad === 0) && T.spring.every(r => r.bad === 0),
+      extraBark: T.winter[0].bark - T.spring[0].bark, spheres: T.winter[0].spheres, tris: T.winter[0].tris, bad: T.winter.reduce((a, r) => a + r.bad, 0) }; });
+  ok('bare in winter: every broadleaf kit tree at 8 places has no leaf vertex, at least one limb per kit canopy sphere (bark vertices over spring\'s by spheres x 12 or more), the same collider as in spring, and every bark triangle wound to face out (its winding\'s normal agrees with its vertex normals)',
+    bare.every(b => b.ok), bare);
+  // row: conifers never change
+  const conif = ['fir-1', 'pine-1'].map(id => ({ id, same: TPOS.every((p, k) => SEAS.every(sn => trees[id][sn][k].hash === trees[id].spring[k].hash)), leaf: trees[id].winter[0].leaf.n, h: trees[id].winter[0].leaf.h }));
+  ok('conifers never change: fir-1 and pine-1 hash the same, vertices and indices, in all four seasons at 8 places', conif.every(c => c.same && c.leaf > 0), conif);
+  // row: a forest is never one colour
+  const mh = trees.maples, mBins = new Set(mh.filter(h => h >= 0 && h < 36).map(h => Math.floor(h / 6))), mSpread = Math.max(...mh) - Math.min(...mh);
+  ok('a forest is never one colour: 40 maples at different places in autumn spread their hues over 15 deg or more and fall in at least 3 of 6 equal bins of 0-36 deg',
+    mh.length === 40 && mh.every(h => h >= 0 && h < 36) && mSpread >= 15 && mBins.size >= 3, { spread: +mSpread.toFixed(2), bins: [...mBins].sort(), hues: mh });
+  // the recorded chunks in each season, read back off the GPU: trees, colliders, props hash, grass, treeline and the town's yard bushes
+  const looks = await page.evaluate(([S, SEAS, MAY5]) => { const D = window.__DS, W = window, M = D.MAT, out = {};
+    const bushes = ch => { const { v } = W.__dsMeshRead(ch.propMesh), idx = []; for (let o = 0, k = 0; o < v.length; o += 12, k++) if (Math.round(v[o + 9]) === M.LEAF) idx.push(k);
+      const runs = []; for (const k of idx) { const r = runs[runs.length - 1]; if (r && r[r.length - 1] === k - 1) r.push(k); else runs.push([k]); }
+      const blobs = []; for (const r of runs) for (let j = 0; j + 18 <= r.length; j += 18) blobs.push(r.slice(j, j + 18));
+      const A = ch.anchor, list = [];
+      for (const b of blobs) { let cx = 0, cz = 0; for (const k of b) { cx += v[k * 12]; cz += v[k * 12 + 2]; } cx /= 18; cz /= 18;
+        if (ch.trees.some(t => Math.hypot(t.x - (cx + A[0]), t.z - (cz + A[2])) < 1.6)) continue;
+        let r = 0; for (const k of b) r = Math.max(r, Math.hypot(v[k * 12] - cx, v[k * 12 + 2] - cz)); list.push({ r, k0: b[0] }); }
+      const keepSet = new Set(list.flatMap(l => Array.from({ length: 18 }, (_, j) => l.k0 + j)));
+      return { n: list.length, r: list.length ? list.reduce((a, l) => a + l.r, 0) / list.length : 0, runs: runs.map(r => r.length % 18), col: W.__dsStats(v, M.LEAF, o => keepSet.has(o / 12)) }; };
+    for (const sn of SEAS) { D.setSeason(sn);
+      out[sn] = W.__dsAway(S, (ch, s) => { const b = W.__dsMeshRead(ch.baseMesh), lf = []; for (let o = 0; o < b.v.length; o += 12) if (Math.round(b.v[o + 9]) === M.LEAF) for (let j = 0; j < 12; j++) lf.push(b.v[o + j]);
+        return { env: ch.env, trees: JSON.stringify(ch.trees), nTrees: ch.trees.length, broad: ch.trees.filter(t => !['fir-1', 'pine-1'].includes(t.id)).length, col: JSON.stringify(ch.col),
+          props: W.__dsMeshHash(ch.propMesh).join(' '), grass: W.__dsStats(b.v, M.GRASS), tl: W.__dsStats(b.v, M.LEAF), tlHash: W.__dsFnvF(lf) + ':' + lf.length,
+          bush: ch.env === 'town' ? bushes(ch) : null }; }); }
+    D.setSeason('spring'); D.SKY.hour = 6.25; D.setDate(MAY5);
+    out.look = D.lookSeason; out.season = D.SETTINGS.season; return out; }, [SPRING_S, SEAS, MAY5]);
+  // row: the same trees in the same places
+  const sameT = SPRING_S.map(s => { const L = SEAS.map(sn => looks[sn][s]);
+    return { s, env: L[0].env, trees: L[0].nTrees, broad: L[0].broad, sameTrees: L.every(x => x.trees === L[0].trees), sameCol: L.every(x => x.col === L[0].col), winterProps: looks.winter[s].props !== looks.spring[s].props }; });
+  ok('the same trees in the same places: each recorded chunk (forest, fields, suburb, open, town) has the same trees list and the same colliders, circles and boxes, in all four seasons, and its props buffer in winter differs from spring\'s wherever it has a broadleaf tree (the rebuild happened)',
+    sameT.every(x => x.sameTrees && x.sameCol && (x.broad === 0 || x.winterProps)) && sameT.filter(x => x.broad > 0).length >= 4 && looks.look === 'spring' && looks.season === 'spring', sameT);
+  // row: grass by season
+  const gF = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][1568].grass])), gW = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][416].grass]));
+  const inR = (x, a, b) => x >= a && x <= b;
+  ok('grass by season: the fields chunk\'s grass in summer at mean hue 60-100 deg with mean value at most 0.92x spring\'s, in autumn 36-62, in winter 28-48 at mean saturation 0.2-0.55; the forest floor in autumn and winter 25-45 (leaf litter)',
+    gF.spring.n > 100 && inR(gF.summer.h, 60, 100) && gF.summer.v <= 0.92 * gF.spring.v && inR(gF.autumn.h, 36, 62) && inR(gF.winter.h, 28, 48) && inR(gF.winter.s, 0.2, 0.55)
+    && gW.autumn.n > 100 && inR(gW.autumn.h, 25, 45) && inR(gW.winter.h, 25, 45), { fields: gF, forest: gW, vRatio: +(gF.summer.v / gF.spring.v).toFixed(3) });
+  // row: bushes and the treeline follow
+  const bsh = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][10688].bush])), tlF = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][1568].tl])), tlW = SEAS.map(sn => looks[sn][416].tlHash);
+  const bR = bsh.spring.r ? bsh.winter.r / bsh.spring.r : 0;
+  ok('bushes and the treeline follow: a town chunk\'s yard bushes in autumn browner than spring\'s (hue under 60 deg) and in winter smaller (bounding radius 0.65-0.75x spring\'s, the same bushes); the fields treeline in autumn at hue 25-50 deg, in winter at saturation under 0.3; a forest\'s treeline (conifer) unchanged',
+    bsh.spring.n >= 3 && bsh.winter.n === bsh.spring.n && bsh.spring.col.h > 60 && bsh.autumn.col.h < 60 && bR >= 0.65 && bR <= 0.75
+    && tlF.spring.n > 0 && inR(tlF.autumn.h, 25, 50) && tlF.winter.s < 0.3 && tlW.every(h => h === tlW[0]) && !tlW[0].endsWith(':0'),
+    { bushes: { n: [bsh.spring.n, bsh.winter.n], hue: SEAS.map(sn => bsh[sn].col.h), ratio: +bR.toFixed(3) }, treeline: tlF, forestTreeline: tlW });
+  // row: the picture follows. One frame of the forest at teleport(400), 13:00, chase view, drawn by the page's own updateCamera()
+  // and renderFrame() and read straight back; warm = hue 0-50 deg at saturation over 0.3, green = hue 75-150 at over 0.25 (8-bit sRGB pixels)
+  const pic = await page.evaluate(([MAY5]) => { const D = window.__DS, W = window, out = {}, mode = D.CAM.mode;
+    const shares = () => { const c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height;
+      D.CAM.mode = 1; D.CAM.chase = null; updateCamera(0); renderFrame();
+      const px = new Uint8Array(w * h * 4); g.readPixels(0, 0, w, h, g.RGBA, g.UNSIGNED_BYTE, px); let warm = 0, green = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4) { const r = px[i] / 255, gg = px[i + 1] / 255, b = px[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), d = mx - mn, s = mx > 0 ? d / mx : 0;
+        let hh = 0; if (d > 1e-9) hh = mx === r ? 60 * (((gg - b) / d) % 6) : mx === gg ? 60 * ((b - r) / d + 2) : 60 * ((r - gg) / d + 4); hh = (hh + 360) % 360;
+        if (hh <= 50 && s > 0.3) warm++; if (hh >= 75 && hh <= 150 && s > 0.25) green++; n++; }
+      return { warm: +(warm / n).toFixed(4), green: +(green / n).toFixed(4) }; };
+    W.__dsAway([400], () => { for (const sn of ['spring', 'autumn', 'winter']) { D.setSeason(sn); D.SKY.hour = 13; D.updateSky(); out[sn] = shares(); } D.setSeason('spring'); });
+    D.CAM.mode = mode; D.CAM.chase = null; D.SKY.hour = 6.25; D.setDate(MAY5); out.look = D.lookSeason; return out; }, [MAY5]);
+  ok('the picture follows: the forest at 400 m, 13:00, chase view, in spring, autumn and winter: autumn\'s share of warm pixels (hue 0-50, saturation over 0.3) at least 3x spring\'s, winter\'s share of green pixels (hue 75-150, saturation over 0.25) under 0.5x spring\'s',
+    pic.spring.green > 0.02 && pic.autumn.warm >= 3 * pic.spring.warm && pic.autumn.warm > 0.01 && pic.winter.green < 0.5 * pic.spring.green && pic.look === 'spring', pic);
+
   // ---- 3c. the sky from zmh-sky: the spliced block, one sun, the moon in its real place, the planets ----
   // The fixed moment is May 5, 2026 at 22:00 EDT = 2026-05-06 02:00 UT, the kit's golden instant.
   const pageFile = COPY ? process.env.DS_PAGE : path.join(process.cwd(), 'games', 'driving-simulator', 'index.html');
