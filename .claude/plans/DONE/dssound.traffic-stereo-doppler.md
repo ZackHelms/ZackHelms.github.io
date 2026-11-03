@@ -1,6 +1,6 @@
 # dssound - Driving Simulator: other cars make sound, in stereo, with real Doppler (DS-2)
 
-**Status:** DRAFT (2026-11-02). Drafted on `main` at `e43a233` (suite 108 checks, break list 25).
+**Status:** IMPLEMENTED 2026-11-03 (steps 1-3: c2275df, abee958, then the step-3 ship commit; landed on `main` as one fast-forward commit). Drafted on `main` at `e43a233` (suite 108 checks, break list 25); run from `6f8816a` (suite 129, break list 47).
 **Run after** `dssky.horizon-stars-moon-sliders.md` lands (landed 2026-11-03, now in `DONE/`): both edit `index.html` and the suite.
 This plan's anchors are named by symbol; the line numbers were read on `e43a233` and will have
 moved by then, so re-grep each one before editing.
@@ -206,6 +206,28 @@ Profile: **balanced** (assumed: this repo has no task-scoping skill, `.claude/zm
 - Verify the Pages run for the landed SHA (two checks, then report).
 - Report: the badge string, the playtest list, the assumed rows (the kind factors, the air curve,
   `TRAFFIC_GAIN`).
+
+## Results (2026-11-03)
+
+- **Step 1 DONE** (c2275df): the pool, the `traffic` channel and slider, pan, air, distance,
+  Doppler, the probes and the hook, and 10 rows. Measured: stereo right and left 6.31 (law 6.31);
+  dead ahead L = R; Doppler factor within 0.01% of the suite's own formula for oncoming, receding
+  and same-speed cars; the FFT peak moved 64.0 -> 47.8 Hz, ratio 1.34 against the formula's 1.338;
+  a car at 160 m silent (gain 0); "Other cars" at 0 drops `traffic` to 0 with the engine at 0.057;
+  12 cars in reach, the 6 nearest sounding; 0 nodes created over 60 s of heavy traffic with 59 cars
+  heard in turn; paused for 2 s, k, pan and gain unchanged. The stereo and Doppler rows were each
+  proved red on a broken copy before the commit.
+- **Step 2 DONE** (abee958): the level row, `TRAFFIC_GAIN` tuned 0.7 -> 0.75 (chase 0.67-0.68x the
+  engine, cockpit 0.45-0.47x, both mid-band); 10 breaks added (list 47 -> 57), each caught by its
+  named row. One was MISSED at first: a linear pan law gives 9 abeam, inside the stereo rows' 4-12
+  band, so step 2 added **a pan-law row** (a car at 45 deg gives the equal-power ratio 2.82 within
+  10%, and the graph's own L^2 + R^2 = 1 within 2%), which catches it. Suite 129 -> **141**, not the
+  140 this plan expected: the 12th row is that one. The breaks ran through a harness built from the
+  suite's own row code (the full suite takes about 11.5 minutes in this container); that harness
+  passed 18/18 on the unbroken page first. Frame cost: `SND.update` 0.022 -> 0.127 ms a call
+  (about +0.1 ms a frame); the perf block's sim and r3d moved within SwiftShader's noise.
+- **Step 3 DONE**: badge `build 2026-11-03 13:38 UTC`, this plan to `DONE/`, `TODO.md` -> `DONE.md`,
+  landed with `land-on-main.sh` (dry run first), Pages verified. Gates: see the follow-up file.
 
 ## Gotchas / bindings
 
