@@ -1,5 +1,11 @@
 # DONE — done log
 
+- 2026-11-03 [combat-sim] **Toon signed off; the four open questions answered** (backlog
+  refinement). The CD playtested CS-1 and passed the toon look as built (band levels, 1.5 px ink,
+  star sparks), and passed the ladder's pace. Decided: keep the one five-cut chain, keep the
+  opponent's mirrored power meter, and no other weapons, fighters or second player for now. No
+  new work; CS-2 (neon) stays in Now. Detail: `.claude/combat-simulator.md` § Open questions.
+
 - 2026-11-03 [driving-sim] **Other cars make sound, in stereo, with real Doppler** (DS-2; the
   CD, 2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly (a little
   in left too is realistic), also doppler effect should be realistically simulated"). The six

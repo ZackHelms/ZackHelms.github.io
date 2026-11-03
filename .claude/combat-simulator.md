@@ -40,7 +40,7 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
 
 | Thing | What was built | Why |
 |---|---|---|
-| The opponent's power attack | It fills the **same meter by the same rules** (its parries, its slipped dodges, its 3rd/5th landed cuts) and spends 10 on a telegraphed spin: a red ring on the ground and a glowing blade through a long wind-up | Offered as the recommended option; the CD answered the other half of that question only |
+| The opponent's power attack (**decided 2026-11-03**: keep it) | It fills the **same meter by the same rules** (its parries, its slipped dodges, its 3rd/5th landed cuts) and spends 10 on a telegraphed spin: a red ring on the ground and a glowing blade through a long wind-up | Offered as the recommended option; the CD answered the other half of that question only |
 | "Successful dodge" | A dodge pays only when its invincible frames actually slip a cut (once per cut) | Otherwise dodging in the air farms energy |
 | "3 hit and 5 hit combos" | A run of landed cuts in a row; a whiff, a parried cut or a dodged cut breaks it (the chain itself carries on) | "Combo" read as connected hits |
 | Being hit | A cut **flinches** the fighter it lands on (0.22 s, cancels their swing) unless they are staggered or winding a power attack | Without it nothing interrupts a swing; short enough to parry between an opponent's cuts |
@@ -54,6 +54,7 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
 | No blood | Hits throw white sparks; a cut on a staggered fighter shows its number in gold with "!" | House games are all-ages |
 | Licence | Open MIT | The default; not one of the protected nine |
 | Performance stats | FPS only by default (pure green, top centre); details in the settings | Driving Simulator's stats were a CD ask; kept the habit, default lighter |
+| Toon's look, every row below from here to Toon's pine rim | **Signed off by the CD 2026-11-03** after a playtest of CS-1 | The rows stay as the record of what was built |
 | Toon's band levels | A lit band of 0.7 above `k = 0.55`, a mid band of 0.4 above 0.12, else 0 (`k` is N.L times the shadow) | The plan's 1.0 and 0.55 blew out the pale flagstones at rank 1 once saturation was pushed; the implementer lowered them |
 | Toon's ambient floor | `max(mix(ambGnd, ambSky, 0.5) * ao, keyCol * 0.1 + 0.1)`, flat (no `N.y` gradient) | The plan's `0.18 + 0.12` washed rank 1 out; checked by eye at ranks 1, 5 and 10 |
 | Toon's lanterns | Two steps: `+0.15` where the lantern's light passes 0.08 and `+0.45` where it passes 0.3, in the lamp colour; the paper's own glow does not flicker | The light banded like the sun |
@@ -233,11 +234,14 @@ the last two cost even a frame-perfect parrier.
 
 ## Open questions for the CD
 
-1. Does the ladder's pace feel right? Rank 1 should fall to anyone; rank 10 should need
-   parries. All of it is `rankParams()`.
-2. Should the combo branch (a held tap, a stick direction) or stay one chain?
-3. Other weapons or a choice of fighter? A second human on the same phone?
-4. Is the opponent's mirrored power attack right, or should it be on a timer?
+All four answered by the CD on 2026-11-03 (backlog refinement), none spawning work:
+
+1. The ladder's pace: **playtested and signed off** (rank 1 falls to anyone, rank 10 needs
+   parries). `rankParams()` stays as is.
+2. The combo: **keep one five-cut chain**; no branching on a held tap or stick direction.
+3. Other weapons, a choice of fighter, a second human on the phone: **none for now**.
+4. The opponent's power attack: **keep the mirrored meter**, not a timer. Its row in
+   Assumed is now decided.
 
 ## Backlog (the CD's answer on the look), specified for plan-gen
 
@@ -288,7 +292,9 @@ instead.
 
 ### CS-2 - the neon style
 
-**Open.** The selector and `INK` were built with it in mind; the next steps of the csstyles
+**Open, paused mid step 4** (quota, 2026-11-02): an unvalidated, partly-run WIP is commit
+`85bf3c2` on the remote branch `cs-styles-step4-wip`; the plan's Status line says how to
+resume. The selector and `INK` were built with it in mind; the next steps of the csstyles
 arc add `neon` to `STYLES` and the select, the display-space palette, the emissive ink and
 the bloom.
 
