@@ -202,7 +202,7 @@ Plans). One task per arc step; each is one session's work and one commit on the 
 
 | Step | What | Status |
 |---|---|---|
-| 1 | CS-3 engine, rows, breaks, the blade-at-contact measurement | open |
+| 1 | CS-3 engine, rows, breaks, the blade-at-contact measurement | done |
 | 2 | CS-3 docs, land, Pages | open |
 | 3 | CS-4 engine | open |
 | 4 | CS-4 page | open |
@@ -384,13 +384,94 @@ config section Publish). The CD's playtest is in Implementation guidance.
 ## Follow-ups
 
 - If the blade-at-contact numbers are large: the CD decides whether contact should move later in the
-  sweep (a change to every timing).
+  sweep (a change to every timing). **Measured in step 1: yes for three of ten** (yoko at rank 1 0.255 m,
+  shomen 0.290 m at rank 1 and 0.327 m at rank 10; table in Results, Step 1). Contact left where it is.
 - More strike kinds (the CD's "future attacks"): one `RULES.kinds` entry each, plus a button, a key and an
   icon; the six-button cluster has no room for a seventh at 360 x 640 without a new layout.
 
 ## Results (append, do not rewrite)
 
-(none yet)
+### Step 1 (2026-11-03)
+
+**What changed** (`games/combat-simulator/index.html`, the `ENGINE` block only):
+- `ATTACKS` built once after `RULES` from `RULES.chain` / `RULES.power` (`RULES` untouched): `normal` is
+  today's chain with `kind: 'normal', idx: i, parry: true, parryWin: RULES.parry.win`; `power` is
+  `RULES.power` with `kind: 'power', idx: -1, parry: false, parryWin: 0`.
+- `makeFighter()`: `kind: 'normal'`. `startHit(F, f, idx, kind)`: sets `f.kind = kind || 'normal'`, the
+  `swing` event carries `kind`. `specOf(f)`: `ATTACKS.power` or `ATTACKS[f.kind][f.chain]`.
+- `tryHit()`: the parry test is `H.parry && d.st === 'parry' && d.t < H.parryWin` (H, the attacker's row;
+  `power` stays a parameter for the damage and event paths); `hit` and `parry` events carry `atk: a.atkId`;
+  a parry already buffered is cleared when its fighter is flinched (`d.buf`) or staggered (`a.buf`).
+- `stepFighter()`'s input loop: a `parry` found while `f.st` is `flinch` or `stagger` is dropped, not
+  buffered (attack, dodge and power still are).
+- `aiIntent()`: the parry lead is `Math.min(0.10, 0.8 * H.parryWin)` (0.10 for every row today).
+
+**Rows** (`.claude/tests/drive-combat-simulator.cjs`, part 1, section "a parry only counts before the blade
+lands"; helpers `chainTap`, `stepT` (stamps each event with its time), `chainAt`, `attackRows` beside
+`incoming()`; the engine handle now also returns `ATTACKS` and `startHit`):
+1. a parry pressed while reeling from a hit does nothing: no parry starts and no cut is turned in the next 1.0 s (ranks 1, 5, 10; pressed 0.03-0.21 s after the hit)
+2. a parry pressed on the first free tick after the flinch turns the next chained cut aside (ranks 1, 5, 10)
+3. a parry held in the buffer is cleared by the hit that flinches its fighter: none starts after the flinch, even when the buffer outlasts it
+4. the opponent too: its parry while reeling is dropped (0.03-0.18 s after the hit), its parry once free meets the next cut (ranks 1, 5, 10)
+5. every parryable row is judged by its own window: a parry raised parryWin - 2 ticks before contact turns it, parryWin + 2 does not (normal kesa, gyaku, yoko, tsuki, shomen)
+6. no swing both hurts and is parried, or lands twice: each attack id meets one hit or one parry at most (AI v counter, ranks 1, 5, 10, four seeds)
+7. the normal attack rows are today's chain exactly, each parryable for 0.24 s; the power row is not parryable
+
+**Suite:** 74 -> **81** passed, 0 failed (part 1 32 -> 39, part 2 42 unchanged); `gates.sh
+games/combat-simulator/index.html` GREEN. No row restated or removed.
+
+**Ladder, re-measured** (rows unedited, all green):
+`masher rank 1 1, rank 10 0; counter rank 5 1, rank 10 1` against the baseline
+`masher rank 1 1, rank 10 0; counter rank 5 1, rank 10 0.875`. The counter persona's rank-10 rate rose
+because the opponent can no longer parry the persona's stagger punish straight out of a flinch.
+
+**Breaks** (`negtests/combat-simulator.json`, 19 -> 24 entries; run with `negtest-copies.py --jobs 2
+--only ...`):
+- `parry-buffered-through-flinch` (the drop removed): **caught** by rows 1 and 4.
+- `flinch-keeps-buffered-parry` (the flinch clear removed): **caught** by row 3.
+- `drop-only-player` (the drop gated on `f.id === 'p'`): **caught** by row 4.
+- `parry-window-wide` (normal rows' `parryWin` + 0.1): **caught** by row 7 only. Row 5 does not catch it,
+  by design: it measures each row against that row's own `parryWin`, so a wider value moves both the
+  window and the measurement (row 5 is the one that will catch step 3's `parry-window-global`).
+- `swing-resolves-twice` (`a.resolved = true` removed in `tryHit()`): **caught** by row 6 (and by row 2,
+  "a full five-cut chain fits inside one stagger" and four dodge / armour / ladder rows).
+- `power-parryable`, **re-pointed** to `ATTACKS.power` (`parry: true, parryWin: RULES.parry.win`):
+  **caught** by "a power attack cannot be parried" (and by row 7).
+- All 6 caught (`NEGCOPIES: GREEN`). Both lists dry-apply, every `old` found exactly once:
+  `combat-simulator.json` 24, `combat-simulator-styles.json` 14.
+
+**Blade at contact** (one-off; `__CS.draw()` on the tick the player's `hp` drops, opponent cutting from
+1.2 m as `incoming()` does; distance from the opponent's blade segment `VIS.e.blade.hilt`-`.tip` to the
+player's body axis `(p.x, 0.9..1.6, p.z)`, minus `RULES.body` 0.32; negative = the blade is already inside
+the body's radius):
+
+| cut | rank 1 | rank 10 |
+|---|---|---|
+| 1 kesa | -0.105 m | -0.113 m |
+| 2 gyaku | 0.193 m | 0.170 m |
+| 3 yoko | **0.255 m** | 0.226 m |
+| 4 tsuki | -0.243 m | -0.241 m |
+| 5 shomen | **0.290 m** | **0.327 m** |
+
+Three of the ten are over 0.25 m (yoko at rank 1, shomen at both ranks: shomen's tip is still overhead,
+y 2.34-2.38 m, when it does damage). Per the decision default, **contact was not moved**; it is a
+follow-up for the CD (see Follow-ups).
+
+**Assumed choices (step 1):**
+- `ATTACKS.power.idx` is `-1` (a power attack's `f.chain`).
+- The clear of a buffered parry on stagger (`a.buf`) is in, beside the flinch clear the break targets;
+  no break of its own (a 1.5 s stagger outlasts the 0.22 s buffer, so it cannot show in play today).
+- Row 3 asserts the state (`F.p.buf` null on the hit tick) and repeats the scenario with `RULES.buffer`
+  raised to 0.6 s (restored after): with today's numbers a buffered parry always times out before the
+  flinch ends (both 0.22 s), so the observable half alone could not fail.
+- Row 4 presses 0.03-0.18 s after the hit, not to 0.21: the opponent steps second, so at 0.21 s it is on
+  its last reeling tick, one tick from a legitimate parry (the one-tick boundary the plan says to avoid).
+- Row 5 throws a `power` row the way a fighter does (10 energy, the power input) rather than through
+  `startHit`, so the row survives `power-parryable` (which makes the power row parryable) and leaves that
+  break to the power row it belongs to.
+- Row 6 also counts a swing that lands twice (the same claim, every swing resolves once), which is how it
+  catches `swing-resolves-twice`: with `a.resolved` gone a hit flinches the defender, so a later parry of
+  the same swing cannot happen, but more hits can.
 
 ## Handoff
 
