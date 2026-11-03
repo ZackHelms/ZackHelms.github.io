@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (108 checks).
+`.claude/tests/drive-driving-simulator.cjs` (129 checks).
 
 ## The CD's brief (verbatim)
 
@@ -53,6 +53,20 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | The Date row (DS-1) | `#date-val` on its own row (`#date-row`, "Date") under the time-of-day slider, at every width | Inside the Time-of-day row it pushed the clock past the row's edge at 320 px |
 | Star sigma floor (DS-5) | `max(sz * 0.5 / sqrt(8), 0.5 * max(uPx, 1))`: half a CSS pixel, and never under half a framebuffer pixel. The mirror pass (`uPx = 1`) and the suite's own scale-1 context (RSCALE 0.85) keep 0.5 framebuffer px | The plan's lever 1 is `0.5 * uPx`; below RSCALE 1 that is under half a framebuffer pixel, the sub-pixel case the DS-1 floor was there to stop (measured at RSCALE 0.85 with `0.5 * uPx`: Polaris 59 at a pixel corner, against 86 before) |
 | `STAR_GAIN = 4.0` (DS-5) | Raised from 3.2, after the CSS-px floor | The floor alone left Polaris at 166 at a pixel corner on the phone; 200 / 166 x 3.2 = 3.86, rounded up to 4.0 (Polaris 207, iota Leo 88 at their worst phase). The kit's law, the 2.5 clamp and `MW_GAIN` are unchanged |
+| Two directions per body (DS-4) | The light, the shadows, the moon's terminator and the broad glows use the geometric `SKY.sun` / `SKY.moon`; only the drawn discs use `SKY.sunDiscW` / `SKY.moonDiscW`, each lifted in its own vertical plane by the kit's `refractionDeg(true altitude)` | The plan's design: refraction is how a body looks, not where its light comes from. The kit's Bennett/Saemundsson formula gives 0.483 deg at a true 0 and 0.618 at -0.833, so at the almanac's rise and set the upper limb stands 0.050 deg up |
+| Real sizes, no minimum (DS-4) | The sun's radius 0.265 deg; the moon's `asin(1737.4 km / topoDistanceKm)`, 0.244-0.278 deg at 22:00 over spring 2026. No minimum size in pixels: the sun is about 4.5 px across at the suite's 0.8 rad, about 3.6 CSS px in the chase view | Chosen in the plan; the CD can ask for a minimum if they read too small |
+| The sun disc's edge (DS-4) | `1 - smoothstep(r, r + one pixel's angle, length(d - s))`, the pixel from `fwidth(d)`, times 30 as before; the aureole `pow(cs, 120) * 0.6` about the drawn disc | The chord `length(d - s)`, not `acos(dot)`: `acos` near 1 resolves about 0.02 deg in floats, a tenth of the disc |
+| `MOON_K = 1.2` (DS-4) | The moon disc's level before the tonemap (the old disc's 1.2), never times `uNight`: by day it is added light over the blue | The plan's default |
+| `ES_GAIN = 600` (DS-4) | Earthshine on the dark part is `600 * earthshineFraction(phase angle)`: 0.049 at new, 0.037 at a quarter-lit crescent, times the night since dssky step 4 | The plan's default (a thin crescent's dark part at about 5% of its lit limb, linear). Measured after the tonemap: the dark part of the May 20 crescent at night adds 43 levels to its pixels against 169 for the lit limb. Worth the CD's look |
+| The maria (DS-4) | The page's own: four soft patches at fixed points on the face, roughly Imbrium, Serenitatis-Tranquillitatis, Procellarum and Nubium, edges roughened by `vn()` at low frequency, at most 25% off the disc's shade (`MARE_DARK`), in a frame built from the drawn moon and the celestial pole of date (exactly (0, sin lat, cos lat) in ENU, `SKY.poleW`), so the face turns with the sky through a night; libration ignored | The plan asked for 3-4 patches from `vn()`. Patches that come from `vn()`'s hash alone vary in number with a GPU's `sin()` precision (the hash is `fract(sin(x) * 43758)` at arguments in the thousands): a first try gave one patch in SwiftShader. On the night disc, near saturation at exposure 1.8, they read faintly |
+| Moonlight by phase (DS-4) | `SKY.moonCol = MOON_RGB * SKY.moonLight`, `MOON_RGB = [0.04, 0.052, 0.088]` (the old moonlight's colour at its old full level), `SKY.moonLight = night * moonIlluminanceLux(phase angle, altitude) / FULL_MOON_ILLUMINANCE_LUX`: about 0.88 for the full moon of May 31, 0.14 at a quarter, the kit's linear 5-deg ramp at the horizon replacing `smooth(-0.05, 0.2, ...)`. The kit's floor (1e-4 lux, 4e-4 of full) stays, so a moon under the horizon lights at 4e-4: invisible | The plan's design; "keeps its colour" read as the old vector at full strength. The moon's broad glow in `skyBase()` is `uMoonCol` too, so it is times `moonPhaseFactor` (and the ramp) through it, not by a second uniform: multiplying again would square the phase |
+| `MOON_AMB = 1.0` (DS-4) | The moonlit share of the night sky's ambient: `SKY.ambSky += MOON_AMB * MOON_RGB * SKY.moonLight`, so a full moon high adds about [0.035, 0.046, 0.078] to the moonless [0.0025, 0.0035, 0.008] | Tuned on the suite's row (the land from 30 m, two frames 30 deg down): 1.0 gives 1.80x the moonless night and 0.41 of dusk; 1.4 gave 0.45 of dusk, 0 gave 1.29x. Measured on frames of the ground, not the chase view, whose headlit road and night sky do not change with the moon (and whose mean moved 18-36 between runs of the same page) |
+| `MOON_DIM = 0.6` (DS-4) | A bright moon dims the star pass's gain (`uStarK`) and the Milky Way's (`uMwGain`) by `1 - 0.6 * moonPhaseFactor * clamp(moon altitude / 5 deg, 0, 1)`: 0.47 under the full moon of May 31 | The plan's default |
+| Earthshine by night only (DS-4) | `SKY.moonES = ES_GAIN * earthshineFraction(phase angle) * SKY.night`; the lit disc itself is still never times the night | Decided by the arc's overseer on the CD's behalf (dssky step 4): step 3 found the dark part of the moon lighter than the blue by day (13 levels on the May 11 moon), and real earthshine is invisible by day |
+| The sky sliders' uniforms (DS-6) | `VS_STARS` takes `uStarsK` (the Stars slider), `uPlanetK` (Planets) and the int `uNStars` (`STARS.n`), and multiplies a vertex's `vI` by `gl_VertexID >= uNStars ? uPlanetK : uStarsK`; `uStarK` (the pass's gain, night and moon dimming) is unchanged and shared. Still one POINTS draw, skipped when both sliders are 0 | The plan named `uPlanetK` and `uNStars` only; a separate stars factor keeps Planets at 100 when Stars is at 0 |
+| Moonlight takes the earthshine with it (DS-6) | The Moonlight slider scales `uMoonK`, which multiplies the kit's whole disc (`zmhMoonDisc`, lit part and earthshine alike), plus `SKY.moonCol` (the glow round the moon and its light) and the moonlit ambient share. Earthshine scales `SKY.moonES` only, so it is the dark part *relative to* the lit part: Moonlight 0 takes the whole moon, earthshine included | The plan's table puts the disc under Moonlight and `ES_GAIN` under Earthshine; separating the lit part from the earthshine would mean calling the kit's disc twice or editing the generated block |
+| What the sliders leave alone (DS-6) | Sun scales `SKY.sunCol`, so its disc, aureole, broad lobe, the haze toward it in the fog, hills and reflections (`skyBase()`), and its light; the blue day sky, the sunset tint and the exposure do not move, so at 0 the day stays blue with no sun in it. A bright moon dims the stars by its phase and height whatever Moonlight is set to | The plan's "the sun's disc, aureole and broad lobe and its light"; the dimming row is about the real moon, not the slider |
+| A sky slider's stored value (DS-6) | A saved value that is not a number from 0 to 200 reads 100, as a missing one does. The panel shows no percentage beside the slider, as the volume rows show none | The merge as `vols` has it, with a guard; labels only on the panel (discovery over instruction) |
 | Notes link (DS-1) | `#settings a{color:var(--blue);overflow-wrap:anywhere}` | The licence link reads and wraps at 320 px |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
@@ -524,7 +538,8 @@ the kit supplies nearly all of it.
    - Pass the one sun from DS-1, never a second one.
    - Faint earthshine on the dark part of a crescent: `earthshineFraction()`,
      or a multiple of it (*chosen*).
-     If DS-6 has landed, add its **Earthshine** slider row here (DS-6, 2026-11-02).
+     Its slider is DS-6's **Earthshine** (built at dssky step 5; its rows are "each sky slider at 0"
+     and "each at 200", Earthshine).
    - A few soft, low-frequency darker patches (the maria), fixed to the face
      the moon always turns toward Earth (*chosen*). The kit has none, so this is
      the page's own.
@@ -567,10 +582,34 @@ the kit supplies nearly all of it.
   - The drawn sun disc spans 0.53 deg at the current field of view, within 20%.
   - No stray pixels away from the moon's disc (the kit's coverage gate kept).
 
-**Files:** `index.html` (`updateSky()`, `skyCol()` or the sky shader's moon and
+**Files:** `index.html` (`updateSky()`, `skyCol()` (since DS-7 `skyBase()` / `skyBodies()`) or the sky shader's moon and
 sun discs, the moonlight and exposure terms, the star pass's and Milky Way's
 fade, a test hook), the suite, and this file. The `ZMH-SKY` block already
 carries `MOON_DISC_GLSL` (DS-1 splices with `glsl`).
+
+**Built (dssky step 3, 2026-11-02): DS-4a**, items 1-5 and 7 (the moonlight, item 6, and
+the stars dimmed by the moon, item 8, are step 4). `updateSky()` adds the drawn discs'
+directions `SKY.sunDiscW` / `SKY.moonDiscW` (refracted), `SKY.sunR`, `SKY.moonR`, `SKY.moonES`
+and `SKY.poleW`; `GLSL_COMMON` keeps only `skyBase()` (bit for bit the DS-7 base);
+`FS_SKY` adds `skyBodies()`: the sun disc and aureole about `uSunDisc`, the kit's
+`zmhMoonDisc()` (its gate kept, the geometric sun) with the earthshine and the page's
+maria, times `uMoonK`. The hook carries `__DS.MOON_K` and `__DS.ES_GAIN`. Eight rows (the sun
+through the day, refraction, the sizes, the phase, the cycle, the bright limb, the moon by day,
+no stray pixels), two restated ("the sun is drawn where it is" at a 0.2 rad field of view, and
+the sky above the ridge, now "away from the bodies"); the suite at 120. Measured values and
+the break checks: the plan's step 3 Results.
+
+**Built (dssky step 4, 2026-11-02): DS-4b**, items 6 and 8. `updateSky()`: `SKY.moonLight`
+(night x the kit's `moonIlluminanceLux` over its full-moon lux), `SKY.moonCol = MOON_RGB *
+SKY.moonLight`, a moonlit share `MOON_AMB * MOON_RGB * SKY.moonLight` in `SKY.ambSky`,
+`SKY.moonBright` and `SKY.starDim = 1 - MOON_DIM * SKY.moonBright`, which `renderScene()` puts
+on `uStarK` and `uMwGain`; the glow round the moon follows `uMoonCol`, so it grows with the
+phase. Earthshine is handed to the GPU times the night (the overseer's addition). The hook adds
+`__DS.MOON_RGB`, `MOON_AMB`, `MOON_DIM`. Three rows: a full moon lights the night (and a quarter
+far less), a bright moon dims the stars (Polaris at the same altitude), by day the moon's dark
+part is no brighter than the sky beside it; one restated (the sky away from the bodies: its
+moon frame pinned to step 4's mean and hash); the suite at 123. Numbers and break checks: the
+plan's step 4 Results.
 
 ### The CD's first playtest of the real sky (2026-11-02), verbatim
 
@@ -588,7 +627,7 @@ a paler column does the same under the rising moon. DS-5 to DS-7 are in `TODO.md
 § Now. DS-7 is a bug fix; DS-5 and DS-6 share `STAR_GAIN`, so DS-6 goes after DS-5.
 
 **Plans (2026-11-02).** DS-7, DS-5, DS-4 and DS-6 are one seven-step arc,
-`.claude/plans/dssky.horizon-stars-moon-sliders.md` (in that order; DS-7 and DS-5 land on
+`.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`, landed 2026-11-03 (in that order; DS-7 and DS-5 land on
 `main` at step 2; DS-6 goes after DS-4 so its Earthshine row exists). DS-2 is
 `.claude/plans/dssound.traffic-stereo-doppler.md`, run after the arc. DS-3 is not planned yet:
 re-sweep once both have landed.
@@ -678,7 +717,7 @@ them reads 100%):
 | Stars | the star pass's gain for the stars (`STAR_GAIN`) |
 | Planets | the five planet vertices' gain, separately from the stars |
 | Milky Way | `MW_GAIN` |
-| Sun | the sun's disc and glow in `skyCol()`, and its light on the scene (`SKY.sunCol`) |
+| Sun | the sun's disc and glow (in `skyCol()` when written; `skyBase()` / `skyBodies()` since DS-7), and its light on the scene (`SKY.sunCol`) |
 | Moonlight | the moon's disc and glow, and its light on the scene (`SKY.moonCol`), i.e. sunshine off the moon |
 | Earthshine | the earthshine on the moon's dark part; **comes with DS-4**, which adds earthshine; until then the row is not drawn |
 
@@ -699,7 +738,24 @@ reads 100% everywhere; the sky's day pixels are byte-identical at 100% to
 before. **Files:** `index.html` (the settings markup, `SETTINGS`, the gains'
 uniforms), the suite, this file.
 
+**Built (dssky step 5, 2026-11-02).** `SETTINGS.sky = { stars, planets, mw, sun, moon, earthshine }`, each 0-200, 100 by
+default, merged on load as `vols` is (an old save reads 100 everywhere; a value that is not a number 0-200 reads 100), in
+`drivingSimulator.settings.v1`. A `<h3>SKY</h3>` after TIME, its rows built from `SKY_KEYS` into `#sky-rows` the way `chan-rows`
+is (`input.skyk`, `data-k`, ids `sky-<key>`), labelled Stars, Planets, Milky Way, Sun, Moonlight, Earthshine. An `input` saves,
+and for Sun, Moonlight and Earthshine runs `updateSky()`; `renderScene()` reads the rest each frame. What each scales: Stars and
+Planets, `uStarsK` / `uPlanetK` in `VS_STARS` (picked by `gl_VertexID >= uNStars`), the POINTS draw skipped when both are 0;
+Milky Way, `uMwGain`; Sun, `SKY.sunCol`; Moonlight, `uMoonK`, `SKY.moonCol` and the moonlit ambient; Earthshine, `SKY.moonES`.
+Every factor is the slider over 100 multiplied on last, so at 100 the frame is byte-identical to the page before (a suite row).
+Five rows (the SKY section at 320 px; saved and restored, old saves 100; each slider at 0; each at 200; byte-identical at 100).
+The Earthshine row is drawn from the start (DS-4 landed first). See the "Assumed, not decided" rows marked DS-6.
+
 ### DS-7. No column of light under a rising or setting sun or moon (bug)
+
+**Built (dssky steps 1-2, landed on `main` 2026-11-02 as `cec3b2f`, with DS-5).** Reproduced
+first in a row (the ground under the body 1.96x / 11.2x as bright as 10 deg either side for the
+sun / moon), then fixed: the fog, the hills and the reflections take `skyBase()` alone and the
+discs are added only on the sky pass's own view ray (split into `skyBase()` / `skyBodies()` at
+step 3). After the fix 0.985 / 1.126, under the row's 1.25. The cause as traced:
 
 **Cause, traced in the code 2026-11-02** (not yet reproduced in a render; the
 plan's first step does that). Three places sample `skyCol()` with the
@@ -780,8 +836,8 @@ which a little dither in the sky pass would hide. Noted here, not planned.
 - **The sky.** `updateSky()` calls `ZMH_SKY.skyAt(julianDate(), OBS_SKY,
   SKY_DATA.planets)` once. **One sun**: `SKY.sun` is its `sun.enu`, and the light,
   the sun disc and the shadows all use it; nothing else in the page computes a
-  sun. `SKY.moon` is the topocentric moon (its look and light are still the old
-  ones until DS-4), `SKY.moonPhase` is kept for DS-4, `SKY.lst` is the kit's LST,
+  sun. `SKY.moon` is the topocentric moon, `SKY.moonPhase` its phase (DS-4 draws
+  and lights by it, below), `SKY.lst` is the kit's LST,
   and `SKY.planets` holds the five naked-eye planets. **The star matrix**
   `SKY.starM` is the kit's `starMatrix`: J2000 to ENU, precession included,
   flat row-major, determinant -1 (ENU is left-handed). It is uploaded with
@@ -800,15 +856,37 @@ which a little dither in the sky pass would hide. Noted here, not planned.
   the shader lands it exactly on `p.enu`, and `bufferSubData`'d. The kit's law:
   gamma 0.5 on flux about Sirius, 0.2 mag per Kasten-Young air mass, 1-4 px.
   Additive (`ONE, ONE`) after the sky's tonemap, depth test off, blend off
-  afterwards; skipped when `SKY.night <= 0` or `STARS.on` is false; gain
-  `uStarK = STAR_GAIN * exposure * night`. The hills are not geometry, so
+  afterwards; skipped when `SKY.night <= 0` or `STARS.on` is false (or both the
+  Stars and Planets sliders are 0); gain `uStarK = STAR_GAIN * exposure * night *
+  starDim` (DS-4), and per vertex `uStarsK` or `uPlanetK` (the sky sliders, DS-6;
+  `gl_VertexID >= uNStars` is a planet). The sigma floor is half a CSS pixel,
+  never under half a framebuffer pixel (DS-5). The hills are not geometry, so
   `FS_STARS` discards below the same `ridgeY()` the sky shader draws them with.
 - **The Milky Way** is the kit's `MILKY_WAY_GLSL` in `FS_SKY` only (not
   `GLSL_COMMON`, so the fog and the paint reflections stay without it): above the
   ridge, only when `uNight > 0` and `uMwGain > 0` (`MW.on`), it adds
-  `MW_GAIN * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * night` before
-  the tonemap. The day sky's pixels are byte-identical with it on or off.
-- **The hash stars are gone** (`uStarRot` and the hash in `skyCol()`), so there
+  `uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * night` before
+  the tonemap, `uMwGain = MW_GAIN * starDim * mw/100` (the moon's dimming, the
+  slider). The day sky's pixels are byte-identical with it on or off.
+- **The sky shader's two parts (DS-7, DS-4).** `skyBase(d)` in `GLSL_COMMON` is
+  the gradient, the sunset tint, the sun's broad lobe and the moon's glow: the
+  fog colour, the distant hills' haze and paint reflections take it alone.
+  `skyBodies(d)` in `FS_SKY` only is the sun disc (its real 0.265-deg radius, a
+  pixel-wide edge from `fwidth`) and aureole about the refracted `uSunDisc`, and
+  the kit's `zmhMoonDisc()` about the refracted `uMoonDisc` (phase from the
+  geometric sun, earthshine `uMoonES`, the page's four maria, times `uMoonK`).
+  The sky pass adds both on its view ray and its hills replace the sum below the
+  ridge, so a body behind them is hidden and no disc reaches the fog (the DS-7
+  column). Light, shadows and glows use the geometric `SKY.sun` / `SKY.moon`;
+  only the discs use `SKY.sunDiscW` / `SKY.moonDiscW`. `updateSky()` sets the
+  moonlight by phase (`SKY.moonLight`, `SKY.moonCol`, the moonlit share of
+  `SKY.ambSky`), `SKY.starDim`, `SKY.moonES` (times the night), and applies the
+  Sun / Moonlight / Earthshine sliders last.
+- **The sky sliders (DS-6).** `SETTINGS.sky`, keys `SKY_KEYS` (stars, planets,
+  mw, sun, moon, earthshine), 0-200, 100 by default, in
+  `drivingSimulator.settings.v1`; a missing or invalid value reads 100. Each
+  factor is multiplied on last, so at 100 the frame is byte-identical.
+- **The hash stars are gone** (`uStarRot` and the hash in the old `skyCol()`), so there
   are no stars in the fog or in paint reflections any more. That is intended.
 - **The road** is a pure function of `WORLD_SEED` and `s` (distance along it).
   `extendPlan()` appends straights, 70 m spirals and arcs (radius 380-1500 m);
@@ -960,6 +1038,30 @@ change only), and the sun's world flip removed (caught by the one-crossing
 Milky Way row only through the mirrored moon's glow, so it got its own row).
 Each `row` field in the list names the row meant to see it.
 
+**The sky arc (dssky, DS-7 / DS-5 / DS-4 / DS-6, 21 rows; the suite 108 -> 129).** DS-7: no
+column under a low sun or moon; the sky above the ridge unchanged by the split (restated twice
+since: "away from the bodies", with pinned hashes); a sun or moon behind the hills is hidden (step
+6). DS-5: Polaris and a magnitude-4 star at the phone's render scale at every sub-pixel phase; the
+patch round Polaris. DS-4: the sun through the day, refraction on the drawn discs only, the real
+sizes, the phase, the cycle, the bright limb, the moon by day, no stray pixels, a full moon lights
+the night, a bright moon dims the stars, by day the dark part no brighter than the sky. DS-6: the
+SKY section at 320 px, saved and restored (old saves 100), each slider at 0, each at 200, the
+frame byte-identical at 100%. Restated, not added: the sun drawn where it is (0.2 rad field of
+view), the radio selector heading SOUND (found by its heading). The arc's oracles are the suite's
+own (its Almanac sun, Meeus 49 phases, Saemundsson's refraction typed in), never the kit's code.
+
+**The break list, rerun whole (2026-11-03, 47 breaks: DS-1's 25 and 22 for the arc).** Each break
+run alone on a copy against the 129-row suite, one per foreground chunk of about 7 minutes: every
+one caught by the row its `row` field names, the DS-6 breaks down to the slider that failed. None
+missed, none caught only by a timed row. The arc's 22: the disc back in the fog, the disc in the
+hills, the bodies drawn below the ridge, the star floor back to 0.5 framebuffer px, `STAR_GAIN`
+halved, no refraction on the disc, refraction on the light, the moon times `uNight`, earthshine 0,
+the sun's limb on the wrong side, moonlight without the phase, no moonlit ambient, no star dimming
+by the moon, earthshine by day, each slider wired to the wrong term (Stars, Planets, Milky Way,
+Sun, the moon disc, moonlight, Earthshine) and an old save reading 0. The one that had no row
+before (the bodies below the ridge: the column row looks only under the horizon) got "a sun or
+moon behind the distant hills is hidden".
+
 **A known flake (untraced hypothesis):** under machine load (two suites at
 once, or the gates beside a break run) the sound rows (the engine and radio
 levels, the engine slider, the four stations within 25%) and the perf block's
@@ -984,6 +1086,16 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
   swiftshader=1` (390x844 at dpr 3): median 883 / 900 / 883 ms the three ways,
   equal within noise. SwiftShader has no GPU timer and says how the renderer
   behaves with no GPU at all, not a phone's frame rate.
+- **The sky arc's frame cost (dssky, 2026-11-03, SwiftShader).** Before (`2bff358`'s page,
+  DS-1 only) and after (DS-7, DS-5, DS-4, DS-6), live loop, paused, 390x844 at dpr 3: draw
+  calls and triangles identical in every scene (chase 22:00 May 5 71 / 186,355; cockpit
+  78-134 / 188,049-283,472 as the mirror alternates; the full-moon 01:00 May 31 71; the moon
+  by day, 13:00 May 11, 86 / 232,679): the discs, earthshine, maria and dimming add no call.
+  `renderFrame()` CPU 0.7-2.1 ms either way (noise). `frame-budget.cjs swiftshader=1`
+  medians over three runs: 22:00 1450 / 1400 ms; full moon 1283, 1350, 1233 / 1433, 1200,
+  1233; the moon by day 1033, 1017, 950 / 1150, 1050, 1050, before / after: equal within
+  the runs' spread, the day frame perhaps a few per cent dearer (the kit's moon disc runs on
+  every sky pixel, as `fwidth` needs uniform control flow).
 
 - Simulation (`tick`) median < 0.1 ms, p95 0.2 ms; worst 13 ms on a frame that
   builds a town chunk.

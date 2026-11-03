@@ -1,5 +1,21 @@
 # DONE — done log
 
+- 2026-11-03 [driving-sim] **The sun and the moon as they really look, and a slider for each
+  thing in the sky** (DS-4, DS-6; the CD, 2026-11-01: "Moon realism: yes, add this (and sun
+  position) to the backlog for driving sim", and 2026-11-02: "sliders in the settings menu for each
+  celestial object"). DS-4: both discs refracted (Saemundsson) and at their real sizes (sun 0.53
+  deg, moon 0.49-0.56); the moon drawn with the kit's lit-sphere disc, so its phase, terminator and
+  bright limb follow the one sun; earthshine on the dark part by night; four soft maria; the moon by
+  day as a pale disc; moonlight and the night's ambient by phase (a full moon at least 1.5x a
+  moonless night on the land); a bright moon dims the stars and the Milky Way (0.47 under the full
+  moon). DS-6: a SKY section after TIME with Stars, Planets, Milky Way, Sun, Moonlight and
+  Earthshine, 0-200%, saved in the same settings key (old saves read 100%); at 100% the frame is
+  byte-identical to before. Suite 112 -> 129, break list 25 -> 47, all 47 caught. The step-7
+  gate runs in this container were red only on the timed radio-level rows, which `main`'s own
+  page fails the same way here (traced: the radio is scheduled 0.4 s ahead from the frame loop,
+  and SwiftShader frames took about 1 s); landed on the CD's call. Badge `build 2026-11-03 10:01 UTC`. Plan:
+  `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`.
+
 - 2026-11-02 [combat-sim] **A Graphics style selector and the toon style** (CS-1; the CD, 2026-11-01,
   "All three with selector in settings menu. Default to realistic webgl"): a `Graphics style`
   select at the top of PICTURE (realistic, the default, and toon), saved, applied on the next
@@ -24,7 +40,7 @@
   now floored at half a CSS pixel and `STAR_GAIN` is 4.0 (was 3.2): Polaris adds at least 207 at
   every sub-pixel phase, a mag-4 star at least 88. Suite 108 -> 112. Badge
   `build 2026-11-02 17:17 UTC`. Plan (steps 1-2 of 7):
-  `.claude/plans/dssky.horizon-stars-moon-sliders.md`.
+  `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`.
 
 - 2026-11-02 [driving-sim] **The real sky over Raleigh, and a calendar** (DS-1; the CD,
   2026-11-01, "fix the star field rotation ... Should look like star field looks to me in the sky

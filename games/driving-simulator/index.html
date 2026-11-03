@@ -53,7 +53,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-02 17:17 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-03 10:01 UTC</div>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
@@ -79,6 +79,8 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
     <select id="season-sel"><option value="spring">spring</option><option value="summer" disabled>summer</option><option value="autumn" disabled>autumn</option><option value="winter" disabled>winter</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
   <div class="row" id="date-row"><span class="lbl">Date</span><span id="date-val">---</span></div>
+  <h3>SKY</h3>
+  <div id="sky-rows"></div>
   <h3>ROAD</h3>
   <div class="row"><label for="traffic-sel">Traffic</label>
     <select id="traffic-sel"><option value="0.5">light</option><option value="1">normal</option><option value="1.8">heavy</option></select></div>
@@ -1154,6 +1156,10 @@ function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 const SET_KEY = 'drivingSimulator.settings.v1';
 // One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
 const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'];
+// One brightness per thing in the sky (DS-6), a percentage 0-200: 100 is the sky as built, 0 takes it away, 200 doubles its gain.
+// stars, planets: their vertices' gain in the one star pass; mw: the Milky Way's; sun: the sun's colour (its disc, aureole, broad
+// lobe and its light); moon: the moon's disc, its glow and its light with its share of the ambient; earthshine: its dark part.
+const SKY_KEYS = ['stars', 'planets', 'mw', 'sun', 'moon', 'earthshine'];
 // perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
 // season: only spring is selectable so far (the calendar runs Raleigh's spring, Mar 20 - Jun 20, 2026); the others are listed, greyed out
 const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring'];
@@ -1205,11 +1211,14 @@ function utcOffset(mjd, hour) {
 }
 
 const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2, season: 'spring',
-  date: null, vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])) };
+  date: null, vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])), sky: Object.fromEntries(SKY_KEYS.map(k => [k, 100])) };
 try {
   const saved = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {};
   const vols = Object.assign({}, SETTINGS.vols, saved.vols || {});
-  Object.assign(SETTINGS, saved, { vols });
+  // the sky's six merge as the volumes do, so an old save (no sky) reads 100 everywhere; a value that is not a number 0-200 reads 100
+  const sky = Object.assign({}, SETTINGS.sky);
+  for (const k of SKY_KEYS) { const v = saved.sky && saved.sky[k]; if (typeof v === 'number' && v >= 0 && v <= 200) sky[k] = v; }
+  Object.assign(SETTINGS, saved, { vols, sky });
   if (saved.radio === 0 && !saved.vols) SETTINGS.vols.music = 0;   // the old radio on/off switch becomes the radio's volume
 } catch (e) { /* private mode */ }
 delete SETTINGS.radio;
@@ -2172,15 +2181,14 @@ uniform float uDay, uNight;
 float h21(vec2 p){ p = mod(p, 4096.0); return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
   return mix(mix(h21(i), h21(i+vec2(1,0)), u.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), u.x), u.y); }
-// The sky along d, in two parts (DS-7). The base: the gradient, the sunset tint, the sun's broad lobe and the moon's glow, which
-// colour the haze toward a body; the fog, the distant hills and paint reflections take it alone (skyBase). The bodies: the sun's
-// disc and aureole (about 6 deg wide at half height, so in the haze it would still paint a band) and the moon's disc, which belong
-// only on a real view ray: the sky pass takes skyView() = base + bodies, and its hills replace it below the ridge, so a body behind
-// them stays hidden. The fog and the hills sample the sky with the elevation clamped near 1.15 deg, so while the one old skyCol()
-// held the discs, a body near that height drew a column down everything at its azimuth. Both are skySum(), the old skyCol()'s one
-// sum in its old order with the bodies' terms weighted 0 or 1 (x * 1 = x, x + 0 = x exactly): skyView() is the old sky bit for
-// bit, skyBase() exactly the base. Two functions added after the fact (base + bodies) change the rounding of some pixels.
-vec3 skySum(vec3 d, float bodies){
+// The sky along d, in two parts (DS-7). The base, here: the gradient, the sunset tint, the sun's broad lobe and the moon's
+// glow, which colour the haze toward a body; the fog, the distant hills and paint reflections take it alone. The bodies
+// (FS_SKY's skyBodies(): the sun's disc and aureole, about 6 deg wide at half height, and the moon's disc) belong only on a real
+// view ray: the sky pass adds them, and its hills replace the sum below the ridge, so a body behind them stays hidden. The fog
+// and the hills sample the sky with the elevation clamped near 1.15 deg, so while one skyCol() held the discs, a body near that
+// height drew a column down everything at its azimuth. The base's terms keep the association they had inside the old one sum
+// (uSunCol * (lobe) * step, + glow), so the fog, the hills and the reflections are bit for bit what they were at DS-7.
+vec3 skyBase(vec3 d){
   float sy = uSunDir.y;
   float up = clamp(d.y, -0.2, 1.0);
   vec3 zen = mix(vec3(0.0015, 0.0025, 0.009), vec3(0.05, 0.15, 0.50), uDay);
@@ -2193,13 +2201,11 @@ vec3 skySum(vec3 d, float bodies){
   vec3 c = mix(hor, zen, pow(max(up, 0.0), 0.5));
   if (d.y < 0.0) c = mix(hor, hor * 0.35, smoothstep(0.0, -0.2, d.y));
   float cs = dot(d, uSunDir);
-  c += uSunCol * (smoothstep(0.99985, 0.99993, cs) * 30.0 * bodies + pow(max(cs, 0.0), 10.0) * 0.18 + pow(max(cs, 0.0), 120.0) * 0.6 * bodies) * step(-0.06, sy);
+  c += uSunCol * (pow(max(cs, 0.0), 10.0) * 0.18) * step(-0.06, sy);
   float cm = dot(d, uMoonDir);
-  c += vec3(0.8, 0.85, 0.95) * smoothstep(0.99975, 0.99985, cm) * 1.2 * uNight * bodies + uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6;
+  c += uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6;
   return c;
 }
-vec3 skyBase(vec3 d){ return skySum(d, 0.0); }
-vec3 skyView(vec3 d){ return skySum(d, 1.0); }
 // The distant hills' skyline: a ridge at infinity, d.y of its top at world azimuth atan(d.z, d.x). The sky
 // draws the hills below it (FS_SKY) and the star pass discards below it (FS_STARS): the hills are not geometry.
 float ridgeY(float az, float mtn){ return 0.025 + 0.03 * (sin(az * 3.0 + 1.3) * 0.5 + 0.5) * mtn + 0.012 * sin(az * 11.0 + 0.4) + 0.006 * sin(az * 37.0); }
@@ -2376,12 +2382,44 @@ precision highp float;
 ${GLSL_COMMON}
 uniform mat4 uInvVP; uniform float uExposure; uniform float uMtn;
 uniform mat3 uStarM; uniform float uMwGain;
+uniform vec3 uSunDisc, uMoonDisc, uPoleW; uniform float uSunR, uMoonR, uMoonES, uMoonK;
 ${ZMH_SKY_GLSL.MILKY_WAY_GLSL}
+${ZMH_SKY_GLSL.MOON_DISC_GLSL}
 const vec3 MILKY_WAY_RGB = vec3(${ZMH_SKY.MILKY_WAY_RGB.map(v => v.toFixed(6)).join(', ')});
 in vec2 vP; out vec4 frag;
+// The sun and the moon as they look (DS-4), on the sky pass's view ray only. Both are drawn at their APPARENT places, lifted by
+// refraction (uSunDisc, uMoonDisc), at their real sizes (uSunR 0.265 deg; uMoonR = asin(1737.4 km / the moon's distance)); every
+// light term, and the sun the moon is shaded by, stays geometric (uSunDir). The sun: a disc to its radius with a one-pixel edge,
+// at 30 as before, and its aureole about the disc. The angle is the chord |d - s|, not acos(dot): acos near 1 resolves only
+// about 0.02 deg in floats, a tenth of the disc. The moon: zmh-sky's lit sphere (phase, terminator, bright limb toward the sun),
+// its earthshine uMoonES on the dark part, its coverage gate kept, times uMoonK, never times uNight (by day it is added light over
+// the blue). The maria are the page's own: four soft darker patches, at most 25% off the disc's shade (MARE_DARK),
+// in a frame fixed to the moon's face, built from the moon's direction and the celestial pole of date, so the face turns with
+// the sky through a night (libration ignored). They multiply the disc's colour, which is zero outside its gate. The four
+// patches sit at fixed points on the face, roughly the near side's Imbrium, Serenitatis-Tranquillitatis, Procellarum and Nubium
+// (x, y, radius in disc radii), so their number cannot hang on a GPU's sin() precision in vn()'s hash; vn() only roughens edges.
+const vec3 MARIA[4] = vec3[4](vec3(-0.28, 0.40, 0.42), vec3(0.34, 0.20, 0.40), vec3(-0.64, -0.12, 0.40), vec3(-0.06, -0.50, 0.28));
+const float MARE_DARK = 0.25;
+// fwidth (here and in zmhMoonDisc): called in main's uniform control flow, before any branch.
+vec3 skyBodies(vec3 d){
+  float pixA = length(fwidth(d));
+  float disc = 1.0 - smoothstep(uSunR, uSunR + pixA, length(d - uSunDisc));
+  float cs = dot(d, uSunDisc);
+  vec3 b = uSunCol * (disc * 30.0 + pow(max(cs, 0.0), 120.0) * 0.6) * step(-0.06, uSunDir.y);
+  vec4 md = zmhMoonDisc(d, uMoonDisc, uSunDir, uMoonR, uMoonES);
+  vec3 m = normalize(uMoonDisc), e2 = normalize(uPoleW - m * dot(uPoleW, m)), e1 = cross(m, e2);
+  vec3 q = (d / max(dot(d, m), 0.5) - m) / tan(uMoonR);
+  vec2 uv = vec2(dot(q, e1), dot(q, e2));      // on the face, in disc radii: x to the right, y toward the pole, seen from the north
+  float k = 0.0;
+  for (int i = 0; i < 4; i++) {
+    vec3 p = MARIA[i]; float r = length(uv - p.xy) / p.z + 0.4 * (vn(uv * 2.5 + p.xy * 9.0 + 4.0) - 0.5);
+    k = max(k, 1.0 - smoothstep(0.5, 1.0, r));
+  }
+  return b + md.rgb * (1.0 - MARE_DARK * k) * uMoonK;
+}
 void main(){
   vec4 a = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(a.xyz / a.w);
-  vec3 c = skyView(d);           // the sky with the sun and moon discs: the view ray only (the hills below replace it under the ridge)
+  vec3 c = skyBase(d) + skyBodies(d);   // the sky with the sun and moon: the view ray only (the hills below replace it under the ridge)
   // distant hills: a ridge at infinity, hazed toward the horizon colour (skyBase: no disc in the haze)
   float az = atan(d.z, d.x);
   float ridge = ridgeY(az, uMtn);
@@ -2400,7 +2438,8 @@ void main(){
 // 0.2 mag per Kasten-Young air mass; 1-4 px). One gl.POINTS vertex per star (J2000 unit vector, magnitude,
 // linear colour), the five planets last. uStarM is J2000 -> world; the eye is at the origin, so a star at
 // 1000 m sits inside the far plane (2400) and the depth test is off, as for the sky. It draws after the
-// sky's tonemap, additively, so its values stay small: uStarK = STAR_GAIN * exposure * night.
+// sky's tonemap, additively, so its values stay small: uStarK = STAR_GAIN * exposure * night * starDim (a bright
+// moon's dimming, DS-4), and each vertex times its sky slider, uStarsK or uPlanetK (DS-6).
 // The page's one variation on the profile: the kit's Gaussian (sigma = radius / sqrt(8), so exp(-4 r^2) out
 // to the point's edge) is sub-pixel for a 1-2 px star, and the fragment runs at pixel centres, so a faint
 // star came out at a fifth of its law or not at all. Sigma is floored at 0.5 px and the point rasterised at
@@ -2412,6 +2451,7 @@ const VS_STARS = `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aDir; layout(location=1) in float aMag; layout(location=2) in vec3 aColor;
 uniform mat3 uStarM; uniform mat4 uVP; uniform float uPx;
+uniform float uStarsK, uPlanetK; uniform int uNStars;     // the SKY sliders (DS-6): the stars' gain, the planets' (the vertices from uNStars on)
 out vec3 vDir, vColor; out float vI, vSize, vSig;
 const float STAR_GAMMA = 0.5, STAR_MAG_REF = -1.46, EXT_K = 0.2, I_MAX = 2.5;
 float airmass(float h){ h = clamp(h, 0.0, 90.0); return 1.0 / (sin(radians(h)) + 0.50572 * pow(h + 6.07995, -1.6364)); }
@@ -2424,7 +2464,7 @@ void main(){
   float sz = mix(1.0, 4.0, min(1.0, I)) * uPx;
   vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0)); vSize = max(sz, 6.0 * vSig);
   gl_PointSize = vSize;
-  vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt);
+  vI = min(I, I_MAX) * smoothstep(0.0, 2.0, alt) * (gl_VertexID >= uNStars ? uPlanetK : uStarsK);
   gl_Position = uVP * vec4(w * 1000.0, 1.0);
 }`;
 const FS_STARS = `#version 300 es
@@ -2963,11 +3003,13 @@ function updateChunks(budget) {
 const SKY = { hour: 13, mjd: SETTINGS.date, dst: true, decl: 0, eot: 0, solarNoon: 13,
   sun: [0, 1, 0], moon: [0, -1, 0], moonPhase: null, lst: 0, starM: new Float32Array(9), planets: [],
   sunW: [0, 1, 0], moonW: [0, -1, 0], starW: new Float32Array(9),
+  sunDiscW: [0, 1, 0], moonDiscW: [0, -1, 0], sunR: 0.265 * Math.PI / 180, moonR: 0.0045, moonES: 0, poleW: [0, 0, -1],
+  moonLight: 0, moonBright: 0, starDim: 1,
   sunCol: [0, 0, 0], moonCol: [0, 0, 0], day: 1, night: 0, ambSky: [0, 0, 0], ambGnd: [0, 0, 0], exposure: 1, lights: false };
 // The observer: Raleigh, NC, in degrees (east positive). Every body in the sky comes from the zmh-sky
-// block (ZMH_SKY.skyAt, once per updateSky()): one sun for the light, the sun disc and the moon. No
-// refraction yet, so the sun rises and sets when its centre is at -0.833 deg (May 5: about 6:18 am and
-// 8:05 pm EDT).
+// block (ZMH_SKY.skyAt, once per updateSky()): one sun for the light, the sun disc and the moon. The light is
+// geometric; only the drawn discs are lifted by refraction (DS-4), so the sun's upper limb meets the horizon
+// when its geometric centre is at about -0.833 deg (May 5: about 6:18 am and 8:05 pm EDT).
 const OBS = { lat: 35.7796, lon: -78.6382 };
 const RAD = Math.PI / 180;
 // The kit's observer: lonEastDeg is east-positive (so Raleigh's is negative); heightM 0 as the kit's own
@@ -2987,6 +3029,24 @@ const enuToWorld = v => [v[0], v[1], -v[2]];
 // render scale Polaris adds 200 and a magnitude-4 star 60 at every sub-pixel phase); MW_GAIN is the Milky Way's
 // linear scale before it (the kit's MILKY_WAY_PEAK: faint, as Raleigh's sky is). Both assumed.
 const STAR_GAIN = 4.0, MW_GAIN = 0.012;
+// The sun and the moon as they look (DS-4). SUN_R: the sun's angular radius (0.265 deg). MOON_R_KM: the moon's radius, so its
+// angular radius is asin(MOON_R_KM / its topocentric distance), about 0.244-0.278 deg at 22:00 over spring 2026. MOON_K: the disc's level
+// before the tonemap (the old disc's 1.2), never times the night. ES_GAIN: earthshine on the dark part is ES_GAIN times the
+// kit's earthshineFraction(phase angle), so a thin crescent's dark part sits at about 5% of its lit limb (8.2e-5 x 600). Assumed.
+const SUN_R = 0.265 * RAD, MOON_R_KM = 1737.4, MOON_K = 1.2, ES_GAIN = 600;
+// Moonlight by phase (DS-4). MOON_RGB: the moon's light at its full strength, high in a night sky (the old moonlight's colour and
+// level); updateSky() scales it by SKY.moonLight = night x the kit's moonIlluminanceLux(phase angle, altitude) / its full-moon lux,
+// so a full moon high lights the night at about 0.9 of it, a quarter at about 0.1 and a new moon not at all, with the kit's 5-deg
+// ramp at the horizon. MOON_AMB: the moonlit share of the sky's ambient, MOON_AMB x MOON_RGB x SKY.moonLight, tuned on the suite's
+// row (a full-moon midnight at least 1.5x a new-moon one). MOON_DIM: a bright moon dims the stars and the Milky Way by
+// 1 - MOON_DIM x moonPhaseFactor x clamp(moon altitude / 5 deg, 0, 1). Assumed.
+const MOON_RGB = [0.04, 0.052, 0.088], MOON_AMB = 1.0, MOON_DIM = 0.6;
+// A body's apparent direction: its ENU direction lifted in its own vertical plane by the kit's refraction at its true altitude.
+function refracted(v) {
+  const h = Math.hypot(v[0], v[2]); if (h < 1e-9) return v.slice();
+  const a = Math.min(Math.asin(Math.max(-1, Math.min(1, v[1]))) + ZMH_SKY.refractionDeg(Math.asin(Math.max(-1, Math.min(1, v[1]))) / RAD) * RAD, Math.PI / 2);
+  return [v[0] / h * Math.cos(a), Math.sin(a), v[2] / h * Math.cos(a)];
+}
 const PLANET_IDS = ['mer', 'ven', 'mar', 'jup', 'sat'];
 const PLANET_RGB = { mer: [1, 1, 1], ven: [1, 1, 1], mar: [1.0, 0.62, 0.42], jup: [1.0, 0.95, 0.85], sat: [1.0, 0.9, 0.7] };
 const STARS = (() => {
@@ -3035,20 +3095,32 @@ function updateSky() {
   SKY.starM.set(s.starMatrix);
   SKY.planets = s.planets.filter(p => p.nakedEye).map(p => ({ id: p.id, mag: p.mag, valid: p.valid, enu: p.enu, altDeg: p.altDeg, azDeg: p.azDeg }));
   SKY.sunW = enuToWorld(SKY.sun); SKY.moonW = enuToWorld(SKY.moon);
+  // the drawn discs (DS-4): apparent directions, real sizes, the earthshine; the light above and below stays geometric
+  SKY.sunDiscW = enuToWorld(refracted(SKY.sun)); SKY.moonDiscW = enuToWorld(refracted(SKY.moon));
+  SKY.sunR = SUN_R; SKY.moonR = Math.asin(MOON_R_KM / m.topoDistanceKm);
+  // the celestial pole of date: north at altitude = latitude, exactly (0, sin lat, cos lat) in ENU; the maria's frame
+  SKY.poleW = enuToWorld([0, Math.sin(OBS.lat * RAD), Math.cos(OBS.lat * RAD)]);
   SKY.starW.set(SKY.starM); for (let k = 6; k < 9; k++) SKY.starW[k] = -SKY.starW[k];
   writePlanets();
   const e = SKY.sun[1];
   SKY.day = smooth(-0.16, 0.28, e);
   SKY.night = 1 - smooth(-0.2, 0.03, e);
+  // earthshine by night only: by day it would light the disc's dark part over the blue sky, which the real one never does
+  // the SKY sliders (DS-6), as fractions: sun, moonlight, earthshine (the stars, planets, Milky Way and the moon's disc in renderScene())
+  const SK = SETTINGS.sky, kSun = SK.sun / 100, kMoon = SK.moon / 100;
+  SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg) * SKY.night * (SK.earthshine / 100);
   const warm = smooth(0.0, 0.42, e);
   const sunI = smooth(-0.025, 0.05, e);
-  SKY.sunCol = [lerp(1.0, 1.0, warm), lerp(0.42, 0.95, warm), lerp(0.14, 0.86, warm)].map(v => v * lerp(1.1, 3.0, warm) * sunI);
-  const mu = smooth(-0.05, 0.2, SKY.moon[1]) * SKY.night;
-  SKY.moonCol = [0.05, 0.065, 0.11].map(v => v * mu * 0.8);
+  SKY.sunCol = [lerp(1.0, 1.0, warm), lerp(0.42, 0.95, warm), lerp(0.14, 0.86, warm)].map(v => v * lerp(1.1, 3.0, warm) * sunI * kSun);
+  // the moon's light by its phase and height (the glow round it in skyBase() is uMoonCol too, so it grows with the phase)
+  SKY.moonLight = SKY.night * ZMH_SKY.moonIlluminanceLux(m.phaseAngleDeg, m.altDeg) / ZMH_SKY.FULL_MOON_ILLUMINANCE_LUX;
+  SKY.moonCol = MOON_RGB.map(v => v * SKY.moonLight * kMoon);
+  SKY.moonBright = ZMH_SKY.moonPhaseFactor(m.phaseAngleDeg) * clamp(m.altDeg / 5, 0, 1);
+  SKY.starDim = 1 - MOON_DIM * SKY.moonBright;
   const dk = SKY.day;
   SKY.ambSky = [lerp(0.0025, 0.32, dk), lerp(0.0035, 0.42, dk), lerp(0.008, 0.62, dk)];
   const sset = 1 - smooth(0, 0.3, Math.abs(e + 0.03));
-  SKY.ambSky = SKY.ambSky.map((v, k) => v + [0.12, 0.05, 0.02][k] * sset * dk);
+  SKY.ambSky = SKY.ambSky.map((v, k) => v + [0.12, 0.05, 0.02][k] * sset * dk + MOON_AMB * MOON_RGB[k] * SKY.moonLight * kMoon);
   SKY.ambGnd = [lerp(0.0015, 0.15, dk), lerp(0.002, 0.16, dk), lerp(0.003, 0.11, dk)];
   SKY.exposure = lerp(1.8, 0.95, smooth(0, 1, dk));
   SKY.lights = SKY.day < 0.5;
@@ -3288,16 +3360,21 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   const sk = PRG.sky; gl.useProgram(sk.p); setFrameUniforms(sk, eye);
   gl.uniformMatrix4fv(sk.U.uInvVP, false, M4.invert(vp));
   gl.uniform1f(sk.U.uMtn, 1);
-  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN : 0);
+  // the SKY sliders (DS-6): the Milky Way, the moon's disc and the star pass here; the sun, the moon's light and the earthshine in updateSky()
+  const SK = SETTINGS.sky;
+  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN * SKY.starDim * (SK.mw / 100) : 0);
+  gl.uniform3fv(sk.U.uSunDisc, SKY.sunDiscW); gl.uniform3fv(sk.U.uMoonDisc, SKY.moonDiscW); gl.uniform3fv(sk.U.uPoleW, SKY.poleW);
+  gl.uniform1f(sk.U.uSunR, SKY.sunR); gl.uniform1f(sk.U.uMoonR, SKY.moonR); gl.uniform1f(sk.U.uMoonES, SKY.moonES); gl.uniform1f(sk.U.uMoonK, MOON_K * (SK.moon / 100));
   gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3);
   // stars and planets: after the sky, before the world (which covers them); additive, then blend off.
   // The kit's matrices are row-major, hence transpose = true. uPx: the main pass's render scale, 1 in the mirror.
-  if (SKY.night > 0 && STARS.on && STARS.vao) {
+  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) {
     const sp = PRG.stars; gl.useProgram(sp.p);
     gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);
     gl.uniformMatrix4fv(sp.U.uVP, false, vp);
     gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);
-    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);
+    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim);
+    gl.uniform1f(sp.U.uStarsK, SK.stars / 100); gl.uniform1f(sp.U.uPlanetK, SK.planets / 100); gl.uniform1i(sp.U.uNStars, STARS.n);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     gl.bindVertexArray(STARS.vao); gl.drawArrays(gl.POINTS, 0, STARS.count);
     gl.disable(gl.BLEND); gl.bindVertexArray(null);
@@ -3909,12 +3986,15 @@ const menuOpen = () => setPanel.classList.contains('open');
 const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tyres on the road', wind: 'Wind',
   skid: 'Tyre squeal', crash: 'Crashes', horn: 'Horn', ui: 'Buttons and chimes' };
 $('chan-rows').innerHTML = VOL_KEYS.map(k => `<div class="row"><label for="vol-${k}">${VOL_LABELS[k]}</label><input id="vol-${k}" data-k="${k}" class="chan" type="range" min="0" max="100" step="1"></div>`).join('');
+const SKY_LABELS = { stars: 'Stars', planets: 'Planets', mw: 'Milky Way', sun: 'Sun', moon: 'Moonlight', earthshine: 'Earthshine' };
+$('sky-rows').innerHTML = SKY_KEYS.map(k => `<div class="row"><label for="sky-${k}">${SKY_LABELS[k]}</label><input id="sky-${k}" data-k="${k}" class="skyk" type="range" min="0" max="200" step="1"></div>`).join('');
 $('station-sel').innerHTML = STATIONS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('');
 function syncSettingsUI() {
   $('cycle-sel').value = String(SETTINGS.cycle); $('traffic-sel').value = String(SETTINGS.traffic); $('season-sel').value = SETTINGS.season;
   $('units-sel').value = SETTINGS.units; $('gfx-sel').value = String(SETTINGS.gfx); $('mirror-sel').value = String(SETTINGS.mirror);
   $('perf-sel').value = String(SETTINGS.perf); $('station-sel').value = String(SETTINGS.station); $('vol').value = String(SETTINGS.vol);
   for (const k of VOL_KEYS) $('vol-' + k).value = String(SETTINGS.vols[k]);
+  for (const k of SKY_KEYS) $('sky-' + k).value = String(SETTINGS.sky[k]);
   $('tod').value = String(Math.floor(((SKY.hour % 24) + 24) % 24 * 60)); $('tod-val').textContent = clockText(); $('date-val').textContent = dateText(SKY.mjd);
 }
 // the menu pauses the game: the loop stops ticking while it is open (the sound keeps
@@ -3935,6 +4015,10 @@ $('mirror-sel').addEventListener('change', e => { SETTINGS.mirror = +e.target.va
 $('perf-sel').addEventListener('change', e => { SETTINGS.perf = +e.target.value; saveSettings(); layoutUI(); });
 $('station-sel').addEventListener('change', e => { SETTINGS.station = +e.target.value; saveSettings(); SND.tune(); });
 $('vol').addEventListener('input', e => { SETTINGS.vol = +e.target.value; saveSettings(); SND.apply(); });
+// a sky slider: saved, then the sky's light terms again where it changes one (the sun, the moonlight, the earthshine); the stars,
+// planets, Milky Way and the moon's disc are read by renderScene() each frame
+for (const el of document.querySelectorAll('input.skyk')) el.addEventListener('input', e => { const k = e.target.dataset.k; SETTINGS.sky[k] = +e.target.value; saveSettings();
+  if (k === 'sun' || k === 'moon' || k === 'earthshine') updateSky(); });
 for (const el of document.querySelectorAll('input.chan')) {
   el.addEventListener('input', e => { SETTINGS.vols[e.target.dataset.k] = +e.target.value; saveSettings(); SND.apply(); });
   el.addEventListener('change', e => SND.preview(e.target.dataset.k));
@@ -4071,7 +4155,7 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { STARS, MW, starDir, STAR_GAIN, MW_GAIN, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

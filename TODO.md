@@ -12,28 +12,14 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **The sky arc, second half: the sun and the moon as they really look, and a
-  slider for each thing in the sky** (DS-4, DS-6; steps 3-7 of the seven-step arc). In progress:
-  its first half (DS-7, DS-5) landed 2026-11-02, see `DONE.md`.
-  - **DS-4** (the CD, 2026-11-01: "Moon realism: yes, add this (and sun position) to the backlog
-    for driving sim"). The moon's phase with the kit's lit-sphere disc (bright limb toward the sun),
-    earthshine and soft maria; both bodies refracted and at their real sizes; moonlight by phase;
-    the moon by day; a bright moon dims the stars.
-  - **DS-6** (the CD, 2026-11-02: "sliders in the settings menu for each celestial object (stars,
-    milky way, sun, moon (sunshine), moon (earthshine), any others i missed)"). A SKY section with
-    Stars, Planets, Milky Way, Sun, Moonlight and Earthshine, 0-200%, saved.
-  Specs and checks: `.claude/driving-simulator.md` § Backlog, DS-4 to DS-7.
-  **Plan ready (2026-11-02)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/dssky.horizon-stars-moon-sliders.md`
-
 - [driving-sim] **Other cars make sound, in stereo, with real Doppler** (the CD,
   2026-11-01: "if i pass a car and it is on my right i hear it in right speaker mostly
   (a little in left too is realistic), also doppler effect should be realistically
   simulated"). A pool of 6 voices for the nearest cars (engine and tyre roar),
   distance and air absorption, an equal-power pan clamped to plus or minus 0.8 (right
   about 0.99, left about 0.16 abeam), a Doppler factor computed every frame
-  (c = 343 m/s), and an "Other cars" volume slider. Run it after the sky arc above (both
-  edit the page and the suite). Spec and checks: `.claude/driving-simulator.md` § Backlog, DS-2.
+  (c = 343 m/s), and an "Other cars" volume slider. The sky arc it waited on landed
+  2026-11-03. Spec and checks: `.claude/driving-simulator.md` § Backlog, DS-2.
   **Plan ready (2026-11-02)** — run:
   `/zmh-producer:oversee-implementation .claude/plans/dssound.traffic-stereo-doppler.md`
 
