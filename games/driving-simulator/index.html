@@ -2438,7 +2438,8 @@ void main(){
 // 0.2 mag per Kasten-Young air mass; 1-4 px). One gl.POINTS vertex per star (J2000 unit vector, magnitude,
 // linear colour), the five planets last. uStarM is J2000 -> world; the eye is at the origin, so a star at
 // 1000 m sits inside the far plane (2400) and the depth test is off, as for the sky. It draws after the
-// sky's tonemap, additively, so its values stay small: uStarK = STAR_GAIN * exposure * night.
+// sky's tonemap, additively, so its values stay small: uStarK = STAR_GAIN * exposure * night * starDim (a bright
+// moon's dimming, DS-4), and each vertex times its sky slider, uStarsK or uPlanetK (DS-6).
 // The page's one variation on the profile: the kit's Gaussian (sigma = radius / sqrt(8), so exp(-4 r^2) out
 // to the point's edge) is sub-pixel for a 1-2 px star, and the fragment runs at pixel centres, so a faint
 // star came out at a fifth of its law or not at all. Sigma is floored at 0.5 px and the point rasterised at

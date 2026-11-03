@@ -858,7 +858,7 @@ const AE = {
     mid.every(r => r.n40 >= 4 && r.minEl > 5), mid);
   ok('no star pixels at noon at the same four headings, and the Milky Way term adds nothing by day (the noon sky byte-identical with MW.on true and false)',
     noonSky.every(r => r.n30 === 0) && noonMw.same && noonMw.nPx > 100000 && noonMw.night === 0, { noonSky, noonMw });
-  ok('with STARS.on false at midnight the same regions hold no isolated bright pixels: skyCol() has no stars of its own left',
+  ok('with STARS.on false at midnight the same regions hold no isolated bright pixels: the sky shader (skyBase / skyBodies) has no stars of its own left',
     midOff.every(r => r.n30 === 0) && mid.every(r => r.n40 >= 4), { midOff, mid: mid.map(r => r.n40) });
   // row: the Milky Way where the suite's own galactic plane says it is, at 02:30 EDT on May 6 (May 5-6's night)
   const MAY6 = MAY5 + 1, JDmw = jdOf(MAY6, 2.5, -4), ALT = 35;

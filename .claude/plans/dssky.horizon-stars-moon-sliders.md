@@ -1,7 +1,6 @@
 # dssky - Driving Simulator: no column under a low sun or moon, brighter stars, the sun and moon as they really look, and a slider for each thing in the sky (DS-7, DS-5, DS-4, DS-6)
 
-**Status:** PARTIALLY IMPLEMENTED (2026-11-03). Steps 1-5 DONE; step 6 IN PROGRESS (work in
-progress committed, unverified); step 7 not started. Drafted on `main` at `e43a233` (the page's badge
+**Status:** PARTIALLY IMPLEMENTED (2026-11-03). Steps 1-6 DONE; step 7 not started. Drafted on `main` at `e43a233` (the page's badge
 `build 2026-11-02 12:27 UTC`, the suite at 108 checks, the break list at 25).
 
 ## HANDOFF STATE (2026-11-03) - read this first
@@ -795,7 +794,7 @@ Worktree branch `worktree-oversee+dssky`, on `1125705` (step 4).
   on the 0 row's Sun / Moonlight checks, untested). The DS-4 checks list's note "If DS-6 has landed, add its Earthshine slider row
   here" (`.claude/driving-simulator.md`) is for step 6's docs pass.
 
-### Step 6 - break list, frame cost, docs
+### Step 6 - break list, frame cost, docs (DONE 2026-11-03)
 
 - Breaks (one line each, `negtest-batch.py` format, `/* @negtest */` in each `new`), at least:
   the disc back in the fog; the disc in the hills; the bodies below the ridge; the star floor back
@@ -809,6 +808,61 @@ Worktree branch `worktree-oversee+dssky`, on `1125705` (step 4).
   "Assumed, not decided" rows: `ES_GAIN`, `MOON_K`, the maria, the dimming 0.6, no minimum disc
   size, the sigma floor, `STAR_GAIN`), `.claude/tests/README.md` (the suite's count), the THE ROAD
   notes if they describe the sky.
+
+#### Results (step 6)
+
+Finished by a second session on branch `dssky-finish` (from `claude/brave-sagan-odwmrd` at `7700a1d`, the WIP commit), after
+merging `origin/main` (`cc730a6`, the Combat Simulator session's CS-1; no conflict) into it as `a8f1082`.
+
+- **Before the breaks.** `negtest.sh scan`: GREEN. The suite alone on the unbroken page: 129 rows (128 + the WIP's one new row,
+  "a sun or moon behind the distant hills is hidden", which passes). In that first run three timed sound rows went red (the
+  radio near the engine, the ambient bed, the four stations) with nothing else on the box; in the 46 break runs that followed
+  they went red in most runs and green in some, so they flake here even alone (4 cores, the suite's own SwiftShader keeping the
+  load near 4). Never counted as a catch below.
+- **All 47 breaks, one per foreground run of about 7 minutes** (each on a copy, `DS_PAGE`, the full suite output kept; the
+  first with `negtest-copies.py --only`, the rest with a scratch runner doing the same steps that keeps every failing row,
+  since the script prints only the first three). **Every break caught by the row its `row` field names; none MISSED; none
+  caught only by a timed row.** For the DS-6 breaks the failing slider in the row's detail was checked too: stars-to-planets
+  Stars (0 and 200); planets-to-stars Planets at 0 and 200 (and Stars at 0); mw-to-stars Milky Way (0, 200); sun-to-moon Sun
+  (0, 200; and Moonlight at 0); moondisc-to-sun Moonlight (0, 200; Sun at 0); moonlight-to-sun Moonlight at 200 only (`uMoonCol`
+  and the land: its disc term is untouched, so the 0 row rightly passes); earthshine-to-moon Earthshine (0, 200).
+
+  | break | fails (non-timed) | the named row red |
+  | - | - | - |
+  | DS-1's 25 (date-no-step ... no-world-flip-sun) | 1-38 | yes, each |
+  | ds7-disc-in-fog | 1 | the column row |
+  | ds7-disc-in-hills | 2 | the column row (and the hidden row) |
+  | ds7-bodies-below-ridge | 1 | the hidden row alone (the new row; nothing else sees it) |
+  | ds5-floor-fb | 1 | Polaris / mag 4 at the phone's scale |
+  | ds5-gain-half | 5 | the same |
+  | ds4-no-refraction | 3 | refraction lifts the drawn discs only |
+  | ds4-refraction-on-light | 5 | one sun, the sun through the day, refraction |
+  | ds4-moon-times-night | 1 | the moon by day |
+  | ds4-earthshine-0 | 5 | the bright limb (the crescent's dark part) |
+  | ds4-limb-wrong-side | 5 | the bright limb |
+  | ds4-moonlight-no-phase | 3 | a full moon lights the night |
+  | ds4-no-star-dim | 3 | a bright moon dims the stars |
+  | ds4-no-moon-ambient | 2 | a full moon lights the night |
+  | ds4-earthshine-by-day | 1 | by day the dark part no brighter than the sky |
+  | ds6-* (7 wrong-term breaks) | 1-2 | each slider at 0 and/or at 200, the named slider |
+  | ds6-old-save-0 | 1 | saved and restored, old saves 100 |
+
+- **Frame cost** (SwiftShader, live loop, paused, 390x844 at dpr 3; before = `2bff358`'s page, DS-1 only): draw calls and
+  triangles identical in all four scenes (chase 22:00 May 5, cockpit 22:00, chase full moon 01:00 May 31, chase moon by day 13:00
+  May 11). `frame-budget.cjs swiftshader=1`, medians before / after: 22:00 1450 / 1400 ms; full moon 1283, 1350, 1233 / 1433,
+  1200, 1233; moon by day 1033, 1017, 950 / 1150, 1050, 1050. Equal within the runs' spread; the day frame perhaps a few per cent
+  dearer. No escalation (nowhere near a frame budget's worth). Recorded in `.claude/driving-simulator.md` § Measured.
+- **Docs.** `.claude/driving-simulator.md`: the header count (129); DS-7's built paragraph (with the step-1 repro numbers); the
+  DS-4 checks list's "If DS-6 has landed" note replaced by the Earthshine rows that exist; the stale `skyCol()` mentions in DS-4's
+  Files and DS-6's table marked historical; § Architecture: the moon line, the star pass's gain (`starDim`, the sliders, the CSS
+  floor), the Milky Way's `uMwGain`, a new bullet on `skyBase()` / `skyBodies()` and the two directions per body, a new bullet on
+  the sky sliders; § Testing: the arc's 21 rows and the 47-break rerun; § Measured: the frame cost. The "Assumed, not decided"
+  rows the step asked for (`ES_GAIN`, `MOON_K`, the maria, `MOON_DIM` 0.6, no minimum disc size, the sigma floor, `STAR_GAIN`)
+  were already there from steps 2-5, checked against the code. `.claude/tests/README.md`: 129 checks, the arc's rows, 47 of 47.
+  The page: one stale comment over `VS_STARS` (`uStarK` now names `starDim` and the per-vertex slider gains). THE ROAD's
+  `#sky-notes` is the kit's attribution and stays as it is (still accurate). The suite: one row renamed, same claim ("... the
+  sky shader (skyBase / skyBodies) has no stars of its own left", was "skyCol() has ...").
+- **Suite total 129.** `check-inline-js` GREEN. The gates run in step 7, after the stamp.
 
 ### Step 7 - ship
 

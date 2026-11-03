@@ -22,3 +22,13 @@
 
 - Playtest levers: ES_GAIN 600 reads 43/169 levels after the tonemap (strong earthshine); no minimum disc size; MOON_K 1.2; MOON_AMB 1.0; MOON_DIM 0.6.
 - The moon column ratio after the fix is 1.126 against the 1.25 limit (smaller margin than the sun's 0.985).
+
+## Step 6 (finished 2026-11-03 by a second session)
+
+- origin/main had moved (cc730a6, Combat Simulator CS-1): merged into the branch as a8f1082, no conflict.
+- All 47 breaks rerun one per foreground chunk (~7 min each): 47/47 caught by their named rows, none missed. The WIP's new row
+  (a body behind the hills hidden) is the only row that sees ds7-bodies-below-ridge.
+- The timed sound rows flaked in this container even with the suite alone (first clean run 126/3, all three sound rows). Not
+  counted as catches. Watch for it at the step-7 gate run.
+- Frame cost: no extra draw call or triangle; SwiftShader frame time equal within noise.
+- Docs done; the stale skyCol() row name renamed (same claim).
