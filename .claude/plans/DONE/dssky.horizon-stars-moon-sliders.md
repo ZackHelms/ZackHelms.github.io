@@ -1,6 +1,6 @@
 # dssky - Driving Simulator: no column under a low sun or moon, brighter stars, the sun and moon as they really look, and a slider for each thing in the sky (DS-7, DS-5, DS-4, DS-6)
 
-**Status:** PARTIALLY IMPLEMENTED (2026-11-03). Steps 1-6 DONE; step 7 not started. Drafted on `main` at `e43a233` (the page's badge
+**Status:** IMPLEMENTED 2026-11-03. Steps 1-7 DONE (steps 1-2 landed 2026-11-02 as `cec3b2f`; steps 3-7 landed 2026-11-03). Drafted on `main` at `e43a233` (the page's badge
 `build 2026-11-02 12:27 UTC`, the suite at 108 checks, the break list at 25).
 
 ## HANDOFF STATE (2026-11-03) - read this first
@@ -864,7 +864,7 @@ merging `origin/main` (`cc730a6`, the Combat Simulator session's CS-1; no confli
   sky shader (skyBase / skyBodies) has no stars of its own left", was "skyCol() has ...").
 - **Suite total 129.** `check-inline-js` GREEN. The gates run in step 7, after the stamp.
 
-### Step 7 - ship
+### Step 7 - ship (DONE 2026-11-03)
 
 - `stamp-badge.sh`, then `check-inline-js` and `gates.sh` GREEN after the stamp.
 - Move this plan (and a follow-up, if any) to `.claude/plans/DONE/`, Status `IMPLEMENTED <date>`.
@@ -878,6 +878,23 @@ merging `origin/main` (`cc730a6`, the Combat Simulator session's CS-1; no confli
 - Report: the badge string, the playtest list, the assumed rows most worth a look (`ES_GAIN`,
   `MOON_K`, the maria, the moon's dimming of the stars, the disc sizes with no minimum), and the
   next command (`/zmh-producer:oversee-implementation .claude/plans/dssound.traffic-stereo-doppler.md`).
+
+#### Results (step 7)
+
+- `stamp-badge.sh`: **`build 2026-11-03 10:01 UTC`**; `check-inline-js` GREEN after the stamp.
+- **`gates.sh games/driving-simulator/index.html`, run alone, six times: RED every time, only on the timed sound rows.** Smoke,
+  games-sync and the negtest scan GREEN each time; the suite 126-128 of 129, the failures always among "the engine is audible and
+  the radio sits near it" (music about 0.39x the engine against 0.5), "all four stations ... within 25%" (1.26-1.36) and once "the
+  ambient bed". **Traced:** the radio is scheduled from `SND.update()` in the frame loop only 0.4 s ahead (`index.html`
+  `nextBeat < t + 0.4`, about line 3843); SwiftShader frames take about 1 s in this container, so beats are dropped and the music
+  level falls against the engine's continuous oscillator. `origin/main`'s own page and suite (`cc730a6`, steps 1-2 only) fail the
+  stations row the same way here (111/1), and this arc changed no sound code (the only `SND`-matching lines in
+  `git diff 2bff358` are comments and the hook). Across the 48 suite runs of this session the timed rows were all green in 12.
+- **The CD's call (2026-11-03):** land with the red recorded rather than keep retrying. Landed with `land-on-main.sh` (dry run
+  first); the TODO entry moved to `DONE.md` with the badge; this plan and its follow-up moved to `DONE/`. The landed SHA and the
+  Pages verdict are in the session's report.
+- **Follow-up (not done here):** the radio's 0.4 s horizon makes its rows depend on the frame rate. Scheduling from a timer
+  instead of the frame loop (or a longer horizon) would make them frame-rate independent; a CD call, since it touches the sound.
 
 ## Gotchas / bindings
 

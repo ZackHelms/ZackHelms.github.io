@@ -627,7 +627,7 @@ a paler column does the same under the rising moon. DS-5 to DS-7 are in `TODO.md
 § Now. DS-7 is a bug fix; DS-5 and DS-6 share `STAR_GAIN`, so DS-6 goes after DS-5.
 
 **Plans (2026-11-02).** DS-7, DS-5, DS-4 and DS-6 are one seven-step arc,
-`.claude/plans/dssky.horizon-stars-moon-sliders.md` (in that order; DS-7 and DS-5 land on
+`.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`, landed 2026-11-03 (in that order; DS-7 and DS-5 land on
 `main` at step 2; DS-6 goes after DS-4 so its Earthshine row exists). DS-2 is
 `.claude/plans/dssound.traffic-stereo-doppler.md`, run after the arc. DS-3 is not planned yet:
 re-sweep once both have landed.

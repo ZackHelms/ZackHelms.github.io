@@ -1,7 +1,7 @@
 # dssound - Driving Simulator: other cars make sound, in stereo, with real Doppler (DS-2)
 
 **Status:** DRAFT (2026-11-02). Drafted on `main` at `e43a233` (suite 108 checks, break list 25).
-**Run after** `dssky.horizon-stars-moon-sliders.md` lands: both edit `index.html` and the suite.
+**Run after** `dssky.horizon-stars-moon-sliders.md` lands (landed 2026-11-03, now in `DONE/`): both edit `index.html` and the suite.
 This plan's anchors are named by symbol; the line numbers were read on `e43a233` and will have
 moved by then, so re-grep each one before editing.
 **Requested:** 2026-11-01, the CD (verbatim):

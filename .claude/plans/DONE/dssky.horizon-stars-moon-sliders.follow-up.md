@@ -32,3 +32,9 @@
   counted as catches. Watch for it at the step-7 gate run.
 - Frame cost: no extra draw call or triangle; SwiftShader frame time equal within noise.
 - Docs done; the stale skyCol() row name renamed (same claim).
+
+## Step 7 (2026-11-03)
+
+- Gates red six times alone, only on the timed radio rows; traced to the radio's 0.4 s scheduling horizon against ~1 s
+  SwiftShader frames; main's own page fails the same here. The CD chose to land with the red recorded.
+- Deferred: the radio scheduled frame-rate independent (a timer or a longer horizon), so its rows stop depending on render speed.
