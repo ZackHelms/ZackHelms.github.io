@@ -1155,7 +1155,7 @@ function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 // ---------------------------------------------------------------- settings
 const SET_KEY = 'drivingSimulator.settings.v1';
 // One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
-const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'];
+const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'skid', 'crash', 'horn', 'ui'];
 // One brightness per thing in the sky (DS-6), a percentage 0-200: 100 is the sky as built, 0 takes it away, 200 doubles its gain.
 // stars, planets: their vertices' gain in the one star pass; mw: the Milky Way's; sun: the sun's colour (its disc, aureole, broad
 // lobe and its light); moon: the moon's disc, its glow and its light with its share of the ambient; earthshine: its dark part.
@@ -3756,9 +3756,16 @@ const STATIONS = [
   { name: '101.9 FM · Jazz', bpm: 132, trim: 1.38 },
   { name: '106.3 FM · Classical', bpm: 76, trim: 1.54 },
 ];
+// Other cars (DS-2): the six nearest within 150 m each get a voice from a pool built once in S.unlock().
+// A voice is an engine (the player's shape) and tyre roar, thinned by air, quieter with distance, panned by
+// its bearing off where the camera looks, and pitched by Doppler worked out by hand every frame.
+const TRAFFIC_GAIN = 0.7;           // the voices' overall level (step 2 tunes it against the engine)
+const TV_N = 6, TV_RANGE = 150, TV_C = 343, TV_REF = 5;    // voices, reach (m), speed of sound (m/s), reference distance (m)
+const TV_SHIFT = [1300, 2600];      // a calm driver's down- and up-shift points (rpm)
+const KIND_PITCH = { boxTruck: 0.7, pickup: 0.85, suv: 0.95, sedan: 1.0, minivan: 1.0, hatchback: 1.15 };
 const SND = (() => {
-  let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null;
-  const ch = {}, probes = {};
+  let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null, trafF = null, trafG = null;
+  const ch = {}, probes = {}, voices = [];
   const S = {};
   const level = k => { const v = clamp((SETTINGS.vols[k] ?? 100) / 100, 0, 1); return v * v; };   // a squared taper: the slider's middle is a quarter
   const station = () => clamp(SETTINGS.station | 0, 0, STATIONS.length - 1);
@@ -3798,10 +3805,35 @@ const SND = (() => {
     amb = { ambF, breezeG, next: 0, cricket: 0 };
     o1.start(); o2.start(); o3.start(); nz.start();
     eng = { o1, o2, o3, lp, eg, tyreG, tyreF, windG, skidG };
+    // other cars: the glass of the cockpit on the whole channel, then a fixed pool of voices. Nothing here is ever
+    // created again or disconnected: a voice fades to 0 and is handed to the next car.
+    trafF = ac.createBiquadFilter(); trafF.type = 'lowpass'; trafF.frequency.value = 16000;
+    trafG = ac.createGain(); trafF.connect(trafG); trafG.connect(ch.traffic);
+    for (let i = 0; i < TV_N; i++) {
+      const v1 = ac.createOscillator(), v2 = ac.createOscillator(), v3 = ac.createOscillator();
+      v1.type = 'sawtooth'; v2.type = 'sawtooth'; v3.type = 'square';
+      const vlp = ac.createBiquadFilter(); vlp.type = 'lowpass'; vlp.Q.value = 2.5; vlp.frequency.value = 600;
+      const vg3 = ac.createGain(); vg3.gain.value = 0.35;
+      const veg = ac.createGain(); veg.gain.value = 0;
+      const src = ac.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+      const vtf = ac.createBiquadFilter(); vtf.type = 'bandpass'; vtf.frequency.value = 420; vtf.Q.value = 0.6;
+      const vtg = ac.createGain(); vtg.gain.value = 0;
+      const air = ac.createBiquadFilter(); air.type = 'lowpass'; air.frequency.value = 16000;
+      const dg = ac.createGain(); dg.gain.value = 0;
+      const gL = ac.createGain(), gR = ac.createGain(), mg = ac.createChannelMerger(2);
+      v1.connect(vlp); v2.connect(vlp); v3.connect(vg3); vg3.connect(vlp); vlp.connect(veg); veg.connect(air);
+      src.connect(vtf); vtf.connect(vtg); vtg.connect(air);
+      air.connect(dg); dg.connect(gL); dg.connect(gR); gL.connect(mg, 0, 0); gR.connect(mg, 0, 1); mg.connect(trafF);
+      v1.start(); v2.start(); v3.start(); src.start(0, i * 0.29);
+      voices.push({ v1, v2, v3, vlp, veg, src, vtf, vtg, air, dg, gL, gR, car: null, id: null, freeAt: 0, gi: -1, fresh: false, d: 0, L: 0, R: 0, k: 1, f: 0, want: 0 });
+    }
     // level probes (no ears in a test container): RMS of each bus and of each channel
     for (const [k, node] of [['sfx', sfx], ['music', music], ...VOL_KEYS.filter(k => k !== 'music').map(k => [k, ch[k]])]) {
       const a = ac.createAnalyser(); node.connect(a); probes[k] = a;
     }
+    // an analyser downmixes to mono, so each side of the other cars' channel gets its own off a splitter
+    const split = ac.createChannelSplitter(2); ch.traffic.connect(split);
+    for (const [k, o] of [['trafficL', 0], ['trafficR', 1]]) { const a = ac.createAnalyser(); split.connect(a, o); probes[k] = a; }
     S.apply();
   };
   S.apply = () => {
@@ -3836,6 +3868,7 @@ const SND = (() => {
         else amb.next += 1.5;
       }
     }
+    updateTraffic(t, inside);
     // the radio, scheduled a beat ahead
     if (level('music') > 0 && !SETTINGS.muted) {
       const st = station(), step = 60 / STATIONS[st].bpm / 2;
@@ -3843,6 +3876,77 @@ const SND = (() => {
       while (nextBeat < t + 0.4) { BEATS[st](nextBeat, beat++, step); nextBeat += step; }
     }
   };
+  // Other cars, each frame: the nearest six within range hold voices; a voice whose car drops out fades over
+  // about 80 ms and is handed on only after the fade, so a voice never jumps between cars mid-sound.
+  const near = [];
+  function updateTraffic(t, inside) {
+    trafF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);
+    trafG.gain.setTargetAtTime(inside ? 0.5 : 1, t, 0.1);
+    const E = CAM.eye, F = CAM.fwd, P = PLAYER;
+    near.length = 0;
+    for (const c of TRAFFIC.cars) {
+      const d = Math.hypot(c.x - E[0], c.y + 0.5 - E[1], c.z - E[2]);
+      if (d < TV_RANGE) near.push({ c, d });
+    }
+    near.sort((a, b) => a.d - b.d);
+    if (near.length > TV_N) near.length = TV_N;
+    const held = new Set(near.map(n => n.c));
+    for (const v of voices) if (v.car && !held.has(v.car)) {
+      v.car = null; v.id = null; v.want = 0; v.freeAt = t + 0.12;
+      v.dg.gain.setTargetAtTime(0, t, 0.027);
+    }
+    for (const n of near) {
+      if (voices.some(v => v.car === n.c)) continue;
+      const v = voices.find(v => !v.car && t >= v.freeAt);
+      if (!v) continue;                      // every free voice is still fading: this car waits a frame
+      v.car = n.c; v.id = n.c.id; v.gi = -1; v.fresh = true;
+    }
+    // the listener: the camera, moving with the player's car (in every view)
+    const sy = Math.sin(P.yaw), cy = Math.cos(P.yaw);
+    const vLx = sy * P.vx + cy * P.vy, vLz = cy * P.vx - sy * P.vy;
+    // right is cross(fwd, up): facing +z the screen's right is -x in this world
+    let rx = -F[2], rz = F[0]; const rl = Math.hypot(rx, rz) || 1; rx /= rl; rz /= rl;
+    for (const v of voices) {
+      const c = v.car; if (!c) continue;
+      const dx = c.x - E[0], dy = c.y + 0.5 - E[1], dz = c.z - E[2], d = Math.max(1e-3, Math.hypot(dx, dy, dz));
+      const ux = dx / d, uy = dy / d, uz = dz / d;
+      // engine: the car's speed through the player's gearbox, with a calm driver's shift points, and its kind
+      const spd = Math.max(0, c.v), wheelRpm = spd / (TAU * c.V.wheelRadius) * 60;
+      let gi = v.gi;
+      if (gi < 0) { gi = 0; while (gi < GEARS.length - 1 && wheelRpm * GEARS[gi] * FINAL > TV_SHIFT[1]) gi++; }
+      else { const r0 = wheelRpm * GEARS[gi] * FINAL; if (r0 > TV_SHIFT[1] && gi < GEARS.length - 1) gi++; else if (r0 < TV_SHIFT[0] && gi > 0) gi--; }
+      v.gi = gi;
+      const rpm = Math.max(800, wheelRpm * GEARS[gi] * FINAL);
+      const f = rpm / 60 * 2 * (KIND_PITCH[c.kind] || 1);
+      // Doppler: k = (c + vL.u) / (c + vS.u), u the unit vector from the listener to the car
+      const vSx = Math.sin(c.yaw) * spd, vSz = Math.cos(c.yaw) * spd;
+      const k = clamp((TV_C + vLx * ux + vLz * uz) / (TV_C + vSx * ux + vSz * uz), 0.5, 2);
+      // pan: equal power on p = 0.8 sin(bearing), so a car abeam still leaks a little into the far ear
+      const hl = Math.hypot(dx, dz), sinT = hl > 1e-6 ? (dx * rx + dz * rz) / hl : 0;
+      const a = (0.8 * sinT + 1) * Math.PI / 4, L = Math.cos(a), R = Math.sin(a);
+      const air = clamp(16000 * Math.pow(3000 / 16000, (d - TV_REF) / (TV_RANGE - TV_REF)), 3000, 16000);
+      const want = TRAFFIC_GAIN * Math.min(1, TV_REF / Math.max(d, 1));
+      const tyre = S.trafficTest.noTyres ? 0 : Math.min(0.12, spd * 0.004);
+      Object.assign(v, { d, L, R, k, f, want });
+      const set = (p, x, tc) => v.fresh ? p.setValueAtTime(x, t) : p.setTargetAtTime(x, t, tc);
+      set(v.v1.frequency, f * k, 0.03); set(v.v2.frequency, f * 1.007 * k, 0.03); set(v.v3.frequency, f * 0.5 * k, 0.03);
+      set(v.src.playbackRate, k, 0.03);
+      set(v.vlp.frequency, 500 + rpm * 0.12, 0.05);
+      set(v.vtf.frequency, 380 + spd * 6, 0.1);
+      set(v.air.frequency, air, 0.05);
+      set(v.gL.gain, L, 0.03); set(v.gR.gain, R, 0.03);
+      v.veg.gain.setTargetAtTime(0.08, t, 0.05);
+      v.vtg.gain.setTargetAtTime(tyre, t, 0.1);
+      v.dg.gain.setTargetAtTime(want, t, 0.05);
+      v.fresh = false;
+    }
+  }
+  S.trafficTest = { noTyres: false };   // test-only: mutes the voices' tyres so an engine's spectral peak stands alone
+  // read-only, for checks: per voice the car it holds and its distance, then what the graph is doing now (read back off
+  // the AudioParams): its left and right gains, its Doppler factor (the tyre source's playback rate) and the level of its
+  // distance gain; f is the engine's pitch at the car (heard at f * k) and want the level it is heading for
+  S.traffic = () => voices.map((v, i) => ({ i, id: v.id, d: v.d, pan: [v.gL.gain.value, v.gR.gain.value], k: v.src.playbackRate.value, f: v.f, gain: v.dg.gain.value, want: v.want }));
+  S.probe = k => probes[k] || null;
   const mtof = n => 440 * Math.pow(2, (n - 69) / 12);
   function tone(t, f, dur, type, gain, dest, atk) {
     const o = ac.createOscillator(), g = ac.createGain();
@@ -3983,7 +4087,7 @@ paintMute();
 const $ = id => document.getElementById(id);
 const setPanel = $('settings');
 const menuOpen = () => setPanel.classList.contains('open');
-const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tyres on the road', wind: 'Wind',
+const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tyres on the road', traffic: 'Other cars', wind: 'Wind',
   skid: 'Tyre squeal', crash: 'Crashes', horn: 'Horn', ui: 'Buttons and chimes' };
 $('chan-rows').innerHTML = VOL_KEYS.map(k => `<div class="row"><label for="vol-${k}">${VOL_LABELS[k]}</label><input id="vol-${k}" data-k="${k}" class="chan" type="range" min="0" max="100" step="1"></div>`).join('');
 const SKY_LABELS = { stars: 'Stars', planets: 'Planets', mw: 'Milky Way', sun: 'Sun', moon: 'Moonlight', earthshine: 'Earthshine' };

@@ -1551,12 +1551,165 @@ const AE = {
   ok('the radio slider at 0 silences the music bus and nothing else', lvOff.music < 0.002 && lvOff.sfx > 0.02, lvOff);
   ok('the engine slider at 0 silences the engine while tyres, wind and radio play on', engOff.engine < 0.0005 && engOff.tyres > 0.005 && engOff.wind > 0.005 && engOff.music > 0.01, engOff);
   ok('the engine slider half way is a quarter of the level (a squared taper)', Math.abs(engHalf.engine / lvOn.engine - 0.25) < 0.08, [engHalf.engine, lvOn.engine]);
+
+  // ---- 9b. other cars (DS-2): six voices, panned off the camera's own right, pitched by Doppler, measured off the analysers ----
+  // The oracles are the suite's own, typed from the spec: the equal-power pan law on p = 0.8 sin(bearing), the bearing measured
+  // against right = cross(fwd, up) (facing +z that is -x in this world: the screen's right), and Doppler
+  // k = (c + vL.u) / (c + vS.u), c = 343 m/s, u the unit vector from the listener (the camera) to the car. The live loop is
+  // paused, so a car put somewhere stays there; test cars are clones of a real one (so no dice are drawn) and the real
+  // traffic is put back afterwards. Waits are on the property (a voice at its level), never on a count of frames.
+  const PAN_LAW = sinT => { const a = (0.8 * sinT + 1) * Math.PI / 4; return [Math.cos(a), Math.sin(a)]; };
+  const DOPPLER = (E, c, P) => { const d = [c.x - E[0], c.y - E[1], c.z - E[2]], l = Math.hypot(...d), u = d.map(x => x / l);
+    const vL = [Math.sin(P.yaw) * P.vx + Math.cos(P.yaw) * P.vy, 0, Math.cos(P.yaw) * P.vx - Math.sin(P.yaw) * P.vy], vS = [Math.sin(c.yaw) * c.v, 0, Math.cos(c.yaw) * c.v];
+    return (343 + vL[0] * u[0] + vL[2] * u[2]) / (343 + vS[0] * u[0] + vS[2] * u[2]); };
+  await page.evaluate(() => {
+    const W = window, D = W.__DS;
+    W.__dsCarsSaved = D.TRAFFIC.cars.slice();
+    W.__dsTpl = D.TRAFFIC.cars[0] || (D.spawnCar(D.PLAYER.s + 500, 1, 0), D.TRAFFIC.cars.pop());
+    // cars at (along, side) metres from the camera in its own horizontal frame (side > 0 is cross(fwd, up), its right),
+    // heading the player's way turned by `yaw`, at speed `v`
+    W.__dsNextId = 900001;   // every placement gets fresh ids, so a voice still fading from the last one never reads as settled
+    W.__dsPlace = (specs, add) => { const E = D.CAM.eye, F = D.CAM.fwd, fl = Math.hypot(F[0], F[2]), fh = [F[0] / fl, F[2] / fl], rt = [-F[2] / fl, F[0] / fl];
+      const made = specs.map(s => Object.assign({}, W.__dsTpl, { id: W.__dsNextId++, lc: null, stopT: 0, hazard: 0, v: s.v || 0, yaw: D.PLAYER.yaw + (s.yaw || 0),
+        x: E[0] + fh[0] * s.along + rt[0] * s.side, z: E[2] + fh[1] * s.along + rt[1] * s.side, y: D.PLAYER.y }));
+      D.TRAFFIC.cars = add ? D.TRAFFIC.cars.concat(made) : made;
+      return made.map(c => c.id); };
+    W.__dsScene = () => ({ E: D.CAM.eye.slice(), F: D.CAM.fwd.slice(), P: { yaw: D.PLAYER.yaw, vx: D.PLAYER.vx, vy: D.PLAYER.vy },
+      cars: D.TRAFFIC.cars.map(c => ({ id: c.id, x: c.x, y: c.y, z: c.z, yaw: c.yaw, v: c.v })), voices: D.SND.traffic() });
+  });
+  // every listed car holds a voice at its level, and every other voice has faded out
+  const settle = ids => page.waitForFunction(ids => { const V = window.__DS.SND.traffic();
+    return ids.every(id => V.some(v => v.id === id && v.want > 0 && Math.abs(v.gain - v.want) <= 2e-3 * v.want)) && V.every(v => v.id !== null ? ids.includes(v.id) : v.gain < 1e-4); },
+  ids, { timeout: 90000, polling: 250 }).then(() => true, () => false);
+  const place = async specs => { const ids = await page.evaluate(s => window.__dsPlace(s), specs); return { ids, settled: await settle(ids) }; };
+  const voiceOf = (sc, id) => sc.voices.find(v => v.id === id) || null;
+  // stereo right / left / dead ahead: one car parked (v = 0) and nothing else within reach
+  const stR = await place([{ along: 0, side: 6 }]);
+  const lvR = await lv(['trafficL', 'trafficR', 'traffic', 'engine'], 1);
+  const stL = await place([{ along: 0, side: -6 }]);
+  const lvL = await lv(['trafficL', 'trafficR'], 1);
+  const stA = await place([{ along: 20, side: 0 }]);
+  const lvA = await lv(['trafficL', 'trafficR'], 1);
+  const law = PAN_LAW(1), lawRatio = law[1] / law[0];
+  ok(`stereo right: a car parked 6 m to the camera's right (by cross(fwd, up)) is louder on the right, trafficR / trafficL 4-12 (the law: ${lawRatio.toFixed(2)})`,
+    stR.settled && lvR.trafficL > 1e-5 && lvR.trafficR / lvR.trafficL > 4 && lvR.trafficR / lvR.trafficL < 12, { settled: stR.settled, ratio: lvR.trafficR / lvR.trafficL, lv: lvR });
+  ok('stereo left: the mirror, 6 m to the camera\'s left, trafficL / trafficR 4-12', stL.settled && lvL.trafficR > 1e-5 && lvL.trafficL / lvL.trafficR > 4 && lvL.trafficL / lvL.trafficR < 12,
+    { settled: stL.settled, ratio: lvL.trafficL / lvL.trafficR, lv: lvL });
+  ok('dead ahead: a car 20 m ahead of the camera is in both ears alike (L and R within 10%)', stA.settled && lvA.trafficL > 1e-4 && Math.abs(lvA.trafficL - lvA.trafficR) / Math.max(lvA.trafficL, lvA.trafficR) < 0.1,
+    { settled: stA.settled, lv: lvA });
+  // Doppler factor: an oncoming car ahead, a car behind going away and a car ahead at the player's speed (25 m/s each, the player at 25)
+  await page.evaluate(() => { const P = window.__DS.PLAYER; P.vx = 25; P.vy = 0; });
+  const stD = await place([{ along: 50, side: -3.5, yaw: Math.PI, v: 25 }, { along: -50, side: -3.5, yaw: Math.PI, v: 25 }, { along: 30, side: 0, yaw: 0, v: 25 }]);
+  const scD = await page.evaluate(() => window.__dsScene());
+  const dop = scD.cars.map(c => { const v = voiceOf(scD, c.id), want = DOPPLER(scD.E, c, scD.P); return { id: c.id, want: +want.toFixed(5), got: v && +v.k.toFixed(5), err: v ? Math.abs(v.k / want - 1) : 1 }; });
+  ok('Doppler factor: oncoming (about 1.157), receding (about 0.864) and at the player\'s speed (1.000), the voice\'s k equals the suite\'s own formula within 0.5%',
+    stD.settled && dop.length === 3 && dop.every(q => q.err < 0.005) && dop[0].want > 1.1 && dop[1].want < 0.9 && Math.abs(dop[2].want - 1) < 0.01, { settled: stD.settled, dop });
+  // Doppler in the FFT: tyres muted, the engine's spectral peak 50 m ahead coming on and 50 m behind going away
+  const peakOf = async spec => {
+    const st = await place([spec]);
+    const sc = await page.evaluate(() => window.__dsScene());
+    const pk = await page.evaluate(async () => {
+      const a = window.__DS.SND.probe('traffic'), fs0 = a.fftSize, sm0 = a.smoothingTimeConstant;
+      a.fftSize = 16384; a.smoothingTimeConstant = 0;
+      await new Promise(r => setTimeout(r, 400));
+      const n = a.frequencyBinCount, acc = new Float64Array(n), buf = new Float32Array(n), hz = a.context.sampleRate / a.fftSize, t0 = performance.now(); let reads = 0;
+      while (performance.now() - t0 < 3000 || reads < 10) { a.getFloatFrequencyData(buf); for (let i = 0; i < n; i++) acc[i] += Math.pow(10, buf[i] / 10); reads++; await new Promise(r => setTimeout(r, 100)); }
+      a.fftSize = fs0; a.smoothingTimeConstant = sm0;
+      let bi = -1; for (let i = Math.ceil(20 / hz); i <= Math.floor(400 / hz); i++) if (bi < 0 || acc[i] > acc[bi]) bi = i;
+      const y = [-1, 0, 1].map(o => 10 * Math.log10(acc[bi + o] / reads)), den = y[0] - 2 * y[1] + y[2], del = den !== 0 ? 0.5 * (y[0] - y[2]) / den : 0;
+      return { f: (bi + del) * hz, reads, hz };
+    });
+    return { settled: st.settled, k: DOPPLER(sc.E, sc.cars[0], sc.P), voice: voiceOf(sc, sc.cars[0].id), ...pk };
+  };
+  await page.evaluate(() => { window.__DS.SND.trafficTest.noTyres = true; });
+  const fA = await peakOf({ along: 50, side: -3.5, yaw: Math.PI, v: 25 });
+  const fR = await peakOf({ along: -50, side: -3.5, yaw: Math.PI, v: 25 });
+  await page.evaluate(() => { window.__DS.SND.trafficTest.noTyres = false; });
+  const fRatio = fA.f / fR.f, kRatio = fA.k / fR.k;
+  ok(`Doppler in the FFT: the traffic channel's peak (20-400 Hz) drops by k_approach / k_recede (${kRatio.toFixed(3)}, the suite's formula) within 3% as the car goes by`,
+    fA.settled && fR.settled && Math.abs(fRatio / kRatio - 1) < 0.03 && kRatio > 1.25, { fA: +fA.f.toFixed(2), fR: +fR.f.toFixed(2), fRatio: +fRatio.toFixed(4), kRatio: +kRatio.toFixed(4), reads: [fA.reads, fR.reads], binHz: fA.hz, voiceA: fA.voice, voiceR: fR.voice });
+  // range: a car 160 m ahead holds no voice and the channel is silent; the same car at 140 m is heard
+  const st160 = { ids: await page.evaluate(() => window.__dsPlace([{ along: 160, side: -3.5, v: 0 }])) };
+  const settled160 = await settle([]);
+  const lv160 = await lv(['traffic'], 1), sc160 = await page.evaluate(() => window.__dsScene());
+  const st140 = await place([{ along: 140, side: -3.5, v: 0 }]);
+  const sc140 = await page.evaluate(() => window.__dsScene());
+  const g160 = Math.max(0, ...sc160.voices.filter(v => v.id === st160.ids[0]).map(v => v.gain)), v140 = voiceOf(sc140, st140.ids[0]);
+  ok('range: a car 160 m away is silent (no voice, the channel under 1e-4 RMS) while the same car at 140 m holds a voice',
+    settled160 && g160 < 0.001 && lv160.traffic < 1e-4 && st140.settled && !!v140 && v140.gain > 0.001, { g160, lv160, d140: v140 && v140.d, gain140: v140 && v140.gain });
+  // paused: the settings open (the menu alone holding the sim) for 2 s; the voices hold their k, pan and level
+  const stP = await place([{ along: 0, side: 6, v: 0 }, { along: 30, side: -3.5, yaw: Math.PI, v: 25 }]);
+  await frames(2);
+  const pA = await page.evaluate(() => window.__dsScene().voices.filter(v => v.id !== null));
+  await page.evaluate(() => { const D = window.__DS; D.openSettings(); D.setPaused(false); });
+  await page.waitForTimeout(2000); await frames(2);
+  const pB = await page.evaluate(() => window.__dsScene().voices.filter(v => v.id !== null));
+  await page.evaluate(() => { const D = window.__DS; D.setPaused(true); D.closeSettings(); });
+  const same = (a, b) => Math.abs(a - b) <= 1e-3 * Math.max(Math.abs(a), Math.abs(b), 1e-6);
+  const held = pA.length === 2 && pB.length === 2 && pA.every(a => { const b = pB.find(q => q.id === a.id); return b && same(a.k, b.k) && same(a.pan[0], b.pan[0]) && same(a.pan[1], b.pan[1]) && same(a.gain, b.gain); });
+  // (read back off the graph's AudioParams, not RMS: at idle the two saws beat over several seconds, so a short RMS swings)
+  ok('paused: with the settings open for 2 s (the menu alone holding the sim) the voices keep their k, pan and level, read off the graph',
+    stP.settled && held && pA.every(a => a.gain > 0.01 && a.pan[0] > 0 && a.pan[1] > 0), { held, pA, pB });
+  // the slider: "Other cars" at 0 silences them and nothing else
+  const lvS0 = await lv(['traffic'], 1);
+  await setVol('traffic', 0); await page.waitForTimeout(600);
+  const lvS1 = await lv(['traffic', 'engine'], 1);
+  await setVol('traffic', 100);
+  ok('the "Other cars" slider at 0 puts traffic under 0.0005 RMS while the engine stays above 0.02', lvS0.traffic > 0.002 && lvS1.traffic < 0.0005 && lvS1.engine > 0.02, { before: lvS0, after: lvS1 });
+  // the pool and no node growth: heavy traffic on a three-lane-a-side stretch, then 60 s of it with nothing that makes nodes by design
+  const s0 = await page.evaluate(() => { const W = window, D = W.__DS, s0 = D.PLAYER.s;
+    D.TRAFFIC.cars = W.__dsCarsSaved; W.__dsTraffic0 = D.SETTINGS.traffic; D.SETTINGS.traffic = 1.8;
+    let s = s0; for (let q = s0; q < s0 + 60000; q += 50) if (D.at(q).L > 2.95 && D.at(q - 200).L > 2.95 && D.at(q + 200).L > 2.95) { s = q; break; }
+    D.teleport(s); return s0; });
+  await frames(2);
+  const extra = await page.evaluate(() => window.__dsPlace([[18, 7], [-27, -9], [44, 11], [-63, 6], [95, -12], [-128, 9]].map(([along, side]) => ({ along, side, v: 0 })), true));
+  const pool = await page.waitForFunction(() => { const V = window.__DS.SND.traffic();
+    return V.filter(v => v.id !== null).length === 6 && V.every(v => Math.abs(v.gain - v.want) <= 2e-3 * v.want); },
+    null, { timeout: 90000, polling: 250 }).then(() => true, () => false);
+  const scPool = await page.evaluate(() => { const D = window.__DS, E = D.CAM.eye;
+    const near = D.TRAFFIC.cars.map(c => ({ id: c.id, d: Math.hypot(c.x - E[0], c.y + 0.5 - E[1], c.z - E[2]) })).filter(q => q.d < 150).sort((a, b) => a.d - b.d);
+    return { L: D.at(D.PLAYER.s).L, cars: D.TRAFFIC.cars.length, near, voices: D.SND.traffic() }; });
+  const loud = scPool.voices.filter(v => v.gain > 0.001).map(v => v.id).sort(), want6 = scPool.near.slice(0, 6).map(q => q.id).sort();
+  ok('the pool: in heavy traffic with six cars parked among it (more than six within 150 m) at most six voices sound, and they are the six nearest',
+    pool && scPool.near.length > 6 && loud.length <= 6 && JSON.stringify(loud) === JSON.stringify(want6), { lanes: scPool.L, cars: scPool.cars, within150: scPool.near.length, parked: extra.length, loud, want6 });
+  const growth = await page.evaluate(async () => {
+    const D = window.__DS, keep = { music: D.SETTINGS.vols.music, ambient: D.SETTINGS.vols.ambient, cycle: D.SETTINGS.cycle };
+    D.TRAFFIC.cars = D.TRAFFIC.cars.filter(c => c.id < 900000);   // the parked clones go; the real traffic drives on
+    D.SETTINGS.vols.music = 0; D.SETTINGS.vols.ambient = 0; D.SETTINGS.cycle = 0; D.SND.apply(); D.setCruise(false);
+    Object.assign(D.INPUT, { gas: 0, brake: 0, keyGas: 0, keyBrake: 0, steer: 0, keySteer: 0, horn: false }); D.PLAYER.vx = 0; D.PLAYER.vy = 0;
+    await new Promise(r => setTimeout(r, 300));
+    const protos = [BaseAudioContext.prototype, AudioContext.prototype], saved = []; let made = 0; const kinds = {};
+    for (const pr of protos) for (const n of Object.getOwnPropertyNames(pr)) {
+      if (!/^create/.test(n) || typeof Object.getOwnPropertyDescriptor(pr, n).value !== 'function') continue;
+      const f = pr[n]; saved.push([pr, n, f]); pr[n] = function () { made++; kinds[n] = (kinds[n] || 0) + 1; return f.apply(this, arguments); };
+    }
+    const hit0 = D.PLAYER.lastHit, seen = new Set();
+    try {
+      for (let i = 0; i < 600; i++) {
+        D.tick(0.1); D.SND.update(0.1);
+        for (const v of D.SND.traffic()) if (v.id !== null) seen.add(v.id);
+        if (i % 10 === 9) await new Promise(r => setTimeout(r, 150));
+      }
+    } finally { for (const [pr, n, f] of saved) pr[n] = f; }
+    Object.assign(D.SETTINGS.vols, { music: keep.music, ambient: keep.ambient }); D.SETTINGS.cycle = keep.cycle; D.SND.apply();
+    return { made, kinds, wrapped: saved.length, heard: seen.size, hit: D.PLAYER.lastHit !== hit0, vx: D.PLAYER.vx };
+  });
+  ok('no node growth: 60 s of heavy traffic going by (more than six cars heard in turn) with the radio and ambient at 0 and the player stopped creates no audio node',
+    growth.wrapped > 8 && growth.made === 0 && growth.heard > 6 && !growth.hit, growth);
+  const r3 = x => +(+x).toPrecision(3);
+  console.log('  .. other cars: ' + JSON.stringify({ right: r3(lvR.trafficR / lvR.trafficL), left: r3(lvL.trafficL / lvL.trafficR), ahead: [r3(lvA.trafficL), r3(lvA.trafficR)],
+    dop: dop.map(q => [q.want, q.got]), fft: { fA: r3(fA.f), fR: r3(fR.f), fRatio: r3(fRatio), kRatio: r3(kRatio) }, range: { g160: r3(g160), rms160: r3(lv160.traffic), gain140: v140 && r3(v140.gain) },
+    slider: [r3(lvS0.traffic), r3(lvS1.traffic), r3(lvS1.engine)], pool: { within150: scPool.near.length, loud: loud.length }, growth: { made: growth.made, heard: growth.heard },
+    trafficVsEngine6m: r3(lvR.traffic / lvR.engine) }));
+  await page.evaluate(s0 => { const W = window, D = W.__DS; D.SETTINGS.traffic = W.__dsTraffic0; D.teleport(s0); D.PLAYER.vx = 25; D.PLAYER.thr = 0.5;
+    delete W.__dsCarsSaved; delete W.__dsTraffic0; }, s0);
   // every sound has its own slider in the menu, and the radio's on/off switch is gone
   // Restated at dssky step 5: the SOUND section is found by its heading, not as the fourth h3 (the SKY section is a new one before it).
+  // Restated at dssound step 1: 'traffic' ("Other cars") joins the hand-written list of keys.
   const menu = await page.evaluate(() => ({ chans: [...document.querySelectorAll('input.chan')].map(e => e.dataset.k), radioSel: !!document.getElementById('radio-sel'),
     stations: [...document.getElementById('station-sel').options].map(o => o.textContent), firstRow: [...document.querySelectorAll('#settings h3')].find(h => h.textContent === 'SOUND')?.nextElementSibling?.querySelector('select')?.id,
     keys: window.__DS.SETTINGS.vols && Object.keys(window.__DS.SETTINGS.vols) }));
-  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'wind', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
+  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
   ok('a radio station selector heads the sound section, with four stations', menu.firstRow === 'station-sel' && menu.stations.length === 4, menu);
   // a slider for a one-shot sound plays a sample of it when let go, through its own channel
   const preview = await page.evaluate(async () => { const S = window.__DS.SND; let m = 0; const el = document.getElementById('vol-horn'); el.dispatchEvent(new Event('change'));
