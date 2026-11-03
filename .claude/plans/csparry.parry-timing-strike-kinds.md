@@ -204,7 +204,7 @@ Plans). One task per arc step; each is one session's work and one commit on the 
 |---|---|---|
 | 1 | CS-3 engine, rows, breaks, the blade-at-contact measurement | done |
 | 2 | CS-3 docs, land, Pages | done (docs and badge; the overseer lands) |
-| 3 | CS-4 engine | open |
+| 3 | CS-4 engine | done |
 | 4 | CS-4 page | open |
 | 5 | Docs final, break list, land, Pages | open |
 
@@ -482,6 +482,66 @@ Docs only, plus one help sentence and the badge. Not landed (the overseer lands 
 - `.claude/tests/README.md`: the `drive-combat-simulator.cjs` row (81 checks, the style rows 13 of 81, the seven parry rows, 24 breaks).
 - `TODO.md`: the CS-3/CS-4 entry stays, with CS-3 shipped and the badge. `DONE.md`: a CS-3 line.
 - Badge stamped: `build 2026-11-03 20:43 UTC`.
+
+### Step 3 (2026-11-03)
+
+**What changed** (`games/combat-simulator/index.html`, the `ENGINE` block only; the page needs nothing yet):
+- `RULES.kinds = { quick: { wind: 0.5, rec: 0.8, dmg: 0.6 }, heavy: { wind: 2.0, rec: 1.3, dmg: 1.6 } }`. `ATTACKS.quick` and
+  `ATTACKS.heavy` are built from `RULES.chain` by a loop over `RULES.kinds` (so a new kind is one entry): `wind`, `rec`, `dmg`
+  scaled, every other field the chain row's, `kind`, `idx`, `parry: true`, `parryWin = Math.min(RULES.parry.win * K.wind,
+  RULES.parry.total - 0.10)`, i.e. 0.12 s and 0.40 s.
+- `ACTIONS = ['power', 'dodge', 'parry', 'heavy', 'quick', 'atk']`; `STRIKE = { atk: 'normal', quick: 'quick', heavy: 'heavy' }`.
+- `begin()`: any `STRIKE` action takes the next chain index by the grace rule and starts its own kind.
+- `stepFighter()`: the queue stores the kind (`f.queued = STRIKE[f.buf]`, a truthy string; `startHit()` still resets it to
+  `false`), a chained cut starts with `f.queued` as its kind, the non-strike branch tests `!STRIKE[f.buf]`, and a queue left at
+  the end of recovery goes back in the buffer as its own action (`'atk'` for normal, else the kind).
+- `rankParams()` gains `quickP: lerp(0.05, 0.30, t)` and `heavyP: lerp(0.25, 0.15, t)`.
+- `newFight()` makes `F.krng = mulberry32((((seed >>> 0) || 1) ^ 0x5bd1e995) >>> 0)`. A new `aiStrike(F)` rolls `F.krng` once per
+  cut and returns `'quick'`, `'heavy'` or `'atk'`; `aiIntent()` uses it for the cut it starts and the cut it chains. `F.rng` is
+  drawn exactly as before. The stagger punish still presses `atk` (normal cuts).
+- The word "style" is still absent from the engine; it stays DOM-free.
+
+**Rows** (`.claude/tests/drive-combat-simulator.cjs`, part 1, section "quick and heavy strikes"):
+1. the quick and heavy rows are the chain with wind-up, recovery and damage x0.5/0.8/0.6 and x2.0/1.3/1.6, parryable for 0.12 s and 0.40 s
+2. attack, quick and heavy each start a cut whose swing carries its kind; on the same cut quick does 0.6x and heavy 1.6x normal's damage, quick winds up in half the time
+3. quick and heavy strikes mix into the chain: atk, quick, heavy, atk, quick are cuts 1-5 of one chain, and the combo pays at 3 and 5
+4. the opponent throws all three kinds (rank 5), quick more often at rank 10 than at rank 1 and heavy more often at rank 1 than at rank 10 (AI v counter, four seeds, 60 s)
+5. a telegraph matters to the opponent: at rank 5 it parries more of 40 heavies than of 40 quicks, each a first cut from free
+
+**Restated** (same claim, new detail; none removed):
+- Step 1's row 5 ("every parryable row is judged by its own window") now iterates 15 rows and names them
+  (`15 rows: normal, quick, heavy x kesa, gyaku, yoko, tsuki, shomen`); it requires at least 15 rows and all three kinds.
+- The `counter` persona answers a cut at `until <= Math.min(0.13, 0.9 * E.specOf(e).parryWin)` (a player who reads the
+  telegraph); a power attack is still dodged at 0.13 as before.
+
+**Suite:** 81 -> **86** passed, 0 failed (part 1 39 -> 44, part 2 42 unchanged, the paint row "a skin is paint" green);
+`gates.sh games/combat-simulator/index.html` GREEN.
+
+**Ladder, re-measured** (rows unedited, all green): `masher rank 1 1, rank 10 0; counter rank 5 1, rank 10 1`, the same as
+step 1's `masher rank 1 1, rank 10 0; counter rank 5 1, rank 10 1`. No tuning was needed.
+
+**Measured kind shares** (row 4's scenario, the opponent's swings): rank 1 quick 0.054 / heavy 0.214 (56 swings), rank 5
+0.225 / 0.188 (80), rank 10 0.104 / 0.041 (193). Rank 10's quick share is below `quickP` (0.30) because about half its swings
+there are the stagger punish, which stays normal. Row 5's split at rank 5: heavies parried 10 of 40, quicks 0 of 40 (a quick
+winds up before a rank-5 mind can answer).
+
+**Breaks** (`negtests/combat-simulator.json`, 24 -> 28 entries; run with `negtest-copies.py --jobs 2 --only ...`):
+- `parry-window-global` (`tryHit()` reads `RULES.parry.win` again): **caught** by step 1's row 5 (restated).
+- `quick-not-quick` (quick's `wind` factor 1): **caught** by rows 1 and 2.
+- `kinds-break-chain` (a quick or heavy always starts at index 0): **caught** by row 3.
+- `ai-never-quick` (`quickP` 0): **caught** by row 4.
+- `chain-of-three`, **re-pointed** (its line now passes `f.queued` to `startHit`; same break, `f.chain < 2`): **caught** by "a
+  whiffed cut breaks the combo count" and "a full five-cut chain fits inside one stagger".
+- All 5 caught. Both lists dry-apply, every `old` found exactly once: `combat-simulator.json` 28,
+  `combat-simulator-styles.json` 14. No other break needed re-pointing.
+
+**Assumed choices (step 3):**
+- `ATTACKS.quick` / `.heavy` are built by a loop over `RULES.kinds`, not two literal rows, so a new kind is one `RULES.kinds` entry.
+- A queue left at the end of recovery goes back in the buffer as `'atk'` for a normal cut and as the kind's own action otherwise.
+- The AI's kind roll is a helper, `aiStrike(F)`, one `F.krng()` draw per cut started or chained.
+- The `counter` persona keeps 0.13 for a power attack (it dodges those; a power row has `parryWin` 0).
+- Row 4 seeds are `s * 104729 + rank` with both fighters' hp set to 1e6 so every duel runs the full 60 s; row 5 seeds are
+  `7000 + s`, and a trial ends at the first hit, parry, dodge or player whiff.
 
 ## Handoff
 

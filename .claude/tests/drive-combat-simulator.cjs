@@ -212,7 +212,9 @@ console.log('-- engine: a parry only counts before the blade lands');
     const landed = outside.F.events.some(e => e.type === 'hit' && e.on === 'p') && !outside.F.events.some(e => e.type === 'parry');
     if (c < 0 || !turned || !landed) bad.push({ row: row.kind + ' ' + row.name, c, W, turned, landed });
   }
-  ok('every parryable row is judged by its own window: a parry raised parryWin - 2 ticks before contact turns it, parryWin + 2 does not (' + rows.map(r => r.kind + ' ' + r.name).join(', ') + ')', rows.length >= 5 && bad.length === 0, bad);
+  const kinds = [...new Set(rows.map(r => r.kind))], names = [...new Set(rows.map(r => r.name))];
+  ok('every parryable row is judged by its own window: a parry raised parryWin - 2 ticks before contact turns it, parryWin + 2 does not (' + rows.length + ' rows: ' + kinds.join(', ') + ' x ' + names.join(', ') + ')',
+    rows.length >= 15 && ['normal', 'quick', 'heavy'].every(k => kinds.includes(k)) && bad.length === 0, bad);
 }
 {
   // no swing is resolved twice: none that dealt damage is ever parried, and none hits twice
@@ -236,6 +238,86 @@ console.log('-- engine: a parry only counts before the blade lands');
   const N = E.ATTACKS.normal, keys = ['name', 'dmg', 'wind', 'act', 'rec', 'reach', 'arc', 'lunge'];
   const same = N.length === 5 && TODAY.every((t, i) => keys.every((k, j) => N[i][k] === t[j]) && N[i].kind === 'normal' && N[i].idx === i && N[i].parry === true && N[i].parryWin === 0.24);
   ok('the normal attack rows are today\'s chain exactly, each parryable for 0.24 s; the power row is not parryable', same && E.ATTACKS.power.parry === false && E.ATTACKS.power.parryWin === 0, { N, power: E.ATTACKS.power });
+}
+console.log('-- engine: quick and heavy strikes');
+{
+  // the kind rows: the chain, with wind-up, recovery and damage scaled, and a parry window that scales with the telegraph
+  const F = { quick: [0.5, 0.8, 0.6, 0.12], heavy: [2.0, 1.3, 1.6, 0.40] }, bad = [];
+  for (const k of Object.keys(F)) {
+    const [w, r, d, win] = F[k], rows = E.ATTACKS[k] || [];
+    if (rows.length !== RULES.chain.length) bad.push({ k, n: rows.length });
+    RULES.chain.forEach((c, i) => {
+      const x = rows[i] || {};
+      const okRow = Math.abs(x.wind - c.wind * w) < 1e-12 && Math.abs(x.rec - c.rec * r) < 1e-12 && Math.abs(x.dmg - c.dmg * d) < 1e-12 &&
+        ['name', 'act', 'reach', 'arc', 'lunge'].every(f => x[f] === c[f]) && x.kind === k && x.idx === i && x.parry === true && Math.abs(x.parryWin - win) < 1e-12;
+      if (!okRow) bad.push({ k, i, x });
+    });
+  }
+  ok('the quick and heavy rows are the chain with wind-up, recovery and damage x0.5/0.8/0.6 and x2.0/1.3/1.6, parryable for 0.12 s and 0.40 s', bad.length === 0, bad.slice(0, 3));
+}
+{
+  // each strike starts a cut of its own kind; landed on the same cut of the chain, it does its kind's damage
+  const got = {};
+  for (const act of ['atk', 'quick', 'heavy']) {
+    const F = dummy(1); F.e.hp = F.e.hpMax = 1e6;
+    run(F, 1.0, (F, i) => IN({ [act]: i === 0 }));
+    const sw = evs(F, 'swing', 'p'), h = evs(F, 'hit', 'p');
+    got[act] = { n: sw.length, kind: sw[0] && sw[0].kind, idx: sw[0] && sw[0].idx, hidx: h[0] && h[0].idx, dmg: h[0] && h[0].dmg, w: sw[0] && E.ATTACKS[sw[0].kind] && E.ATTACKS[sw[0].kind][0].wind };
+  }
+  const n = got.atk.dmg, okKinds = got.atk.kind === 'normal' && got.quick.kind === 'quick' && got.heavy.kind === 'heavy' && ['atk', 'quick', 'heavy'].every(a => got[a].n === 1 && got[a].idx === 0 && got[a].hidx === 0);
+  ok('attack, quick and heavy each start a cut whose swing carries its kind; on the same cut quick does 0.6x and heavy 1.6x normal\'s damage, quick winds up in half the time',
+    okKinds && n > 0 && Math.abs(got.quick.dmg / n - 0.6) < 1e-9 && Math.abs(got.heavy.dmg / n - 1.6) < 1e-9 && Math.abs(got.quick.w / got.atk.w - 0.5) < 1e-9, got);
+}
+{
+  // mixed into the chain: atk, quick, heavy, atk, quick, each tapped once the cut before is half wound
+  const F = dummy(1); F.e.hp = F.e.hpMax = 1e6;
+  const seq = ['atk', 'quick', 'heavy', 'atk', 'quick'];
+  let k = 0;
+  run(F, 4.0, (F, i) => {
+    const p = F.p;
+    if (k >= seq.length) return IN();
+    if (k === 0 && p.st === 'free') return IN({ [seq[k++]]: true });
+    if (k > 0 && p.st === 'atk' && !p.queued && p.chain === k - 1 && p.t >= E.phasesOf(p, E.specOf(p)).w * RULES.chainQueue) return IN({ [seq[k++]]: true });
+    return IN();
+  });
+  const sw = evs(F, 'swing', 'p').slice(0, 5), pays = evs(F, 'energy', 'p').filter(e => /combo/.test(e.why)).map(e => e.why);
+  const want = ['normal', 'quick', 'heavy', 'normal', 'quick'];
+  ok('quick and heavy strikes mix into the chain: atk, quick, heavy, atk, quick are cuts 1-5 of one chain, and the combo pays at 3 and 5',
+    sw.length === 5 && sw.every((e, i) => e.idx === i && e.kind === want[i]) && evs(F, 'hit', 'p').length >= 5 && pays.slice(0, 2).join() === 'combo3,combo5', { sw: sw.map(e => e.idx + e.kind), pays });
+}
+{
+  // the opponent throws all three, jabbing more as the ranks climb and leaning on heavies low down
+  const share = {};
+  for (const rank of [1, 5, 10]) {
+    const c = { normal: 0, quick: 0, heavy: 0 };
+    for (let s = 1; s <= 4; s++) {
+      const F = E.newFight(rank, s * 104729 + rank), mem = {};
+      F.p.hp = F.p.hpMax = F.e.hp = F.e.hpMax = 1e6;
+      for (let i = 0; i < 60 / DT; i++) {
+        E.stepFight(F, DT, counter(F, mem), E.aiIntent(F, DT));
+        for (const e of F.events) if (e.type === 'swing' && e.who === 'e') c[e.kind]++;
+        F.events.length = 0;
+      }
+    }
+    const n = c.normal + c.quick + c.heavy || 1;
+    share[rank] = { n, quick: +(c.quick / n).toFixed(3), heavy: +(c.heavy / n).toFixed(3), c };
+  }
+  console.log('     opponent cuts by kind (quick / heavy share): rank 1 ' + share[1].quick + ' / ' + share[1].heavy + ', rank 5 ' + share[5].quick + ' / ' + share[5].heavy + ', rank 10 ' + share[10].quick + ' / ' + share[10].heavy);
+  ok('the opponent throws all three kinds (rank 5), quick more often at rank 10 than at rank 1 and heavy more often at rank 1 than at rank 10 (AI v counter, four seeds, 60 s)',
+    share[5].c.normal > 0 && share[5].c.quick > 0 && share[5].c.heavy > 0 && share[10].quick > share[1].quick && share[1].heavy > share[10].heavy, share);
+}
+{
+  // a telegraph matters to the opponent's mind: at rank 5 it parries more of a player's heavies than of their quicks
+  const parried = { quick: 0, heavy: 0 }, N = 40;
+  for (const act of ['quick', 'heavy']) for (let s = 1; s <= N; s++) {
+    const F = E.newFight(5, 7000 + s); F.p.z = -0.6; F.e.z = 0.6;
+    for (let i = 0; i < 1.5 / DT; i++) {
+      E.stepFight(F, DT, IN({ [act]: i === 0 }), E.aiIntent(F, DT));
+      if (F.events.some(e => (e.type === 'hit' && e.who === 'p') || e.type === 'parry' || e.type === 'dodged' || (e.type === 'whiff' && e.who === 'p'))) break;
+    }
+    if (evs(F, 'parry', 'e').length) parried[act]++;
+  }
+  ok('a telegraph matters to the opponent: at rank 5 it parries more of 40 heavies than of 40 quicks, each a first cut from free', parried.heavy > parried.quick, parried);
 }
 console.log('-- engine: dodge');
 {
@@ -303,7 +385,8 @@ function counter(F, mem) {
   const p = F.p, e = F.e, dx = e.x - p.x, dz = e.z - p.z, d = Math.hypot(dx, dz) || 1, inp = IN();
   if (e.st === 'atk' || e.st === 'power') {
     const until = E.phasesOf(e, E.specOf(e)).w - e.t;
-    if (until > 0 && until <= 0.13 && mem.ans !== e.atkId) { mem.ans = e.atkId; if (e.st === 'power') { inp.dodge = true; inp.mx = -dz / d; inp.mz = dx / d; } else inp.parry = true; }
+    const lead = e.st === 'power' ? 0.13 : Math.min(0.13, 0.9 * E.specOf(e).parryWin);   // a cut's lead from its row; a power attack is dodged, as before
+    if (until > 0 && until <= lead && mem.ans !== e.atkId) { mem.ans = e.atkId; if (e.st === 'power') { inp.dodge = true; inp.mx = -dz / d; inp.mz = dx / d; } else inp.parry = true; }
     return inp;
   }
   if (e.st === 'stagger') { if (d > 1.8) { inp.mx = dx / d; inp.mz = dz / d; } if (RULES.stagger - e.t > 0.2) inp.atk = true; return inp; }

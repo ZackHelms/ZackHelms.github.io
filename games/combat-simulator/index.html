@@ -132,6 +132,11 @@ const RULES = {
   ],
   comboEnergyAt: [3, 5],     // an unbroken run of landed cuts pays +1 at these counts
   power: { name: 'power', dmg: 26, wind: 0.50, act: 0.25, rec: 0.55, reach: 2.8, arc: TAU, lunge: 1.2 },
+  // a strike's kind scales a chain cut's wind-up, recovery and damage (a jab, a big swing)
+  kinds: {
+    quick: { wind: 0.5, rec: 0.8, dmg: 0.6 },
+    heavy: { wind: 2.0, rec: 1.3, dmg: 1.6 },
+  },
   arena: 8.2, body: 0.32, minGap: 0.8,
 };
 // Every attack as one row, built once from RULES: its timing, damage and reach,
@@ -141,7 +146,15 @@ const ATTACKS = {
   normal: RULES.chain.map((c, i) => Object.assign({}, c, { kind: 'normal', idx: i, parry: true, parryWin: RULES.parry.win })),
   power: Object.assign({}, RULES.power, { kind: 'power', idx: -1, parry: false, parryWin: 0 }),
 };
-const ACTIONS = ['power', 'dodge', 'parry', 'atk'];   // if two are pressed in one tick, the first wins
+// Each kind is the chain again, scaled. Its parry window scales with its telegraph, capped so a
+// parry always ends with 0.10 s still open.
+for (const k of Object.keys(RULES.kinds)) {
+  const K = RULES.kinds[k], win = Math.min(RULES.parry.win * K.wind, RULES.parry.total - 0.10);
+  ATTACKS[k] = RULES.chain.map((c, i) => Object.assign({}, c, { wind: c.wind * K.wind, rec: c.rec * K.rec, dmg: c.dmg * K.dmg,
+    kind: k, idx: i, parry: true, parryWin: win }));
+}
+const ACTIONS = ['power', 'dodge', 'parry', 'heavy', 'quick', 'atk'];   // if two are pressed in one tick, the first wins
+const STRIKE = { atk: 'normal', quick: 'quick', heavy: 'heavy' };      // the actions that cut, and the kind each throws
 
 const LADDER = [
   { name: 'KENTA',  title: 'NOVICE',             gi: [0.56, 0.52, 0.44], hakama: [0.30, 0.27, 0.22], hair: [0.05, 0.04, 0.03] },
@@ -174,6 +187,8 @@ function rankParams(rank) {
     aggr: lerp(0.45, 1.5, t),
     maxChain: [2, 2, 3, 3, 3, 4, 4, 5, 5, 5][Math.min(9, rank - 1)],
     powerP: lerp(0.3, 0.9, t),
+    quickP: lerp(0.05, 0.30, t),                // the share of its cuts thrown quick, and heavy
+    heavyP: lerp(0.25, 0.15, t),
   };
 }
 
@@ -190,7 +205,7 @@ function newFight(rank, seed) {
   const P = rankParams(rank);
   const p = makeFighter('p', { x: 0, z: -2.6, yaw: 0, hp: 100 });
   const e = makeFighter('e', { x: 0, z: 2.6, yaw: Math.PI, hp: P.hp, windMul: P.windMul, recMul: P.recMul, dmgMul: P.dmgMul, moveSpd: P.moveSpd });
-  return { t: 0, rank, P, p, e, rng: mulberry32((seed >>> 0) || 1), over: null, events: [], nextAtk: 1,
+  return { t: 0, rank, P, p, e, rng: mulberry32((seed >>> 0) || 1), krng: mulberry32((((seed >>> 0) || 1) ^ 0x5bd1e995) >>> 0), over: null, events: [], nextAtk: 1,
     ai: { sched: null, cd: 1.2, plan: 0, strafe: 1, strafeT: 0, seen: -1, hover: 2.8 } };
 }
 function specOf(f) { return f.st === 'power' ? ATTACKS.power : ATTACKS[f.kind][f.chain]; }
@@ -208,10 +223,10 @@ function startHit(F, f, idx, kind) {
   F.events.push({ type: 'swing', who: f.id, idx, kind: f.kind });
 }
 function begin(F, f, o, a, inp) {
-  if (a === 'atk') {
+  if (STRIKE[a]) {
     const n = RULES.chain.length;
     const idx = f.grace > 0 && f.chain >= 0 && f.chain < n - 1 ? f.chain + 1 : 0;
-    startHit(F, f, idx); return true;
+    startHit(F, f, idx, STRIKE[a]); return true;
   }
   if (a === 'dodge') {
     if (f.dcd > 0) return false;
@@ -295,7 +310,7 @@ function stepFighter(F, f, o, inp, dt) {
       const power = f.st === 'power', H = specOf(f), ph = phasesOf(f, H);
       f.armor = power && f.t < ph.w + ph.a;
       if (f.t < ph.w) turnToward(f, face, (power ? 6 : 10) * dt);
-      if (!power && f.buf === 'atk' && f.t >= ph.w * RULES.chainQueue) { f.queued = true; f.buf = null; }
+      if (!power && STRIKE[f.buf] && f.t >= ph.w * RULES.chainQueue) { f.queued = STRIKE[f.buf]; f.buf = null; }   // queued: the kind
       if (f.t < ph.w + ph.a) {
         const sp = dist > RULES.minGap + 0.25 ? H.lunge / (ph.w + ph.a) : 0;
         f.vx = Math.sin(f.yaw) * sp; f.vz = Math.cos(f.yaw) * sp;
@@ -307,13 +322,13 @@ function stepFighter(F, f, o, inp, dt) {
         if (power && f.t - dt < ph.w + ph.a) f.yaw = face;      // the spin ends square to the foe
         if (!f.resolved) { f.resolved = true; f.landed = 0; F.events.push({ type: 'whiff', who: f.id, power }); }
         if (F.over) { if (f.t >= ph.w + ph.a + ph.r) setSt(f, F.over.winner === f.id ? 'win' : 'free'); break; }
-        if (!power && f.queued && f.chain < RULES.chain.length - 1) { startHit(F, f, f.chain + 1); break; }
-        if (f.buf && f.buf !== 'atk' && begin(F, f, o, f.buf, inp)) { f.buf = null; break; }
+        if (!power && f.queued && f.chain < RULES.chain.length - 1) { startHit(F, f, f.chain + 1, f.queued); break; }
+        if (f.buf && !STRIKE[f.buf] && begin(F, f, o, f.buf, inp)) { f.buf = null; break; }
         if (f.t >= ph.w + ph.a + ph.r) {
           const last = f.chain, q = f.queued;
           setSt(f, 'free'); f.chain = last;
           f.grace = !power && last < RULES.chain.length - 1 ? RULES.grace : 0;
-          if (q) { f.buf = 'atk'; f.buft = RULES.buffer; }
+          if (q) { f.buf = q === 'normal' ? 'atk' : q; f.buft = RULES.buffer; }   // the queued strike's own action
         }
       }
       break;
@@ -358,7 +373,10 @@ function canAct(f) {
 // decides then whether to parry or dodge it, answering no sooner than its
 // reaction time allows; so a slow mind cannot parry a fast first cut, and a
 // fast one can. Between exchanges it circles at a distance and steps in to
-// throw a chain of its rank's length.
+// throw a chain of its rank's length. Each cut it starts or chains is quick,
+// heavy or normal by its rank's odds, rolled on a stream of its own (F.krng)
+// so the kinds never move a draw of F.rng.
+function aiStrike(F) { const x = F.krng(); return x < F.P.quickP ? 'quick' : x < F.P.quickP + F.P.heavyP ? 'heavy' : 'atk'; }
 function aiIntent(F, dt) {
   const me = F.e, foe = F.p, P = F.P, A = F.ai, r = F.rng;
   const inp = { mx: 0, mz: 0, atk: false, dodge: false, parry: false, power: false };
@@ -391,12 +409,12 @@ function aiIntent(F, dt) {
   }
   if (me.energy >= RULES.powerCost && me.st === 'free' && d < 2.5 && foe.st !== 'dodge' && r() < P.powerP * dt * 1.5) { inp.power = true; return inp; }
   if (me.st === 'atk') {
-    if (!me.queued && me.chain + 1 < A.plan && me.t >= phasesOf(me, specOf(me)).w * RULES.chainQueue) inp.atk = true;
+    if (!me.queued && me.chain + 1 < A.plan && me.t >= phasesOf(me, specOf(me)).w * RULES.chainQueue) inp[aiStrike(F)] = true;
     return inp;
   }
   if (me.st === 'free' && A.plan > 0) { A.plan = 0; A.cd = (0.5 + r() * 1.3) / P.aggr; }
   if (me.st !== 'free') return inp;
-  if (A.cd <= 0 && d < 2.15) { inp.atk = true; A.plan = 1 + Math.floor(r() * P.maxChain); return inp; }
+  if (A.cd <= 0 && d < 2.15) { inp[aiStrike(F)] = true; A.plan = 1 + Math.floor(r() * P.maxChain); return inp; }
   const want = A.cd <= 0.25 ? 1.6 : A.hover;
   const radial = clamp((d - want) * 1.5, -1, 1);
   inp.mx = ux * radial - uz * A.strafe * 0.55; inp.mz = uz * radial + ux * A.strafe * 0.55;
