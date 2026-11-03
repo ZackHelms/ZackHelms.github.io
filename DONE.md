@@ -1,5 +1,16 @@
 # DONE — done log
 
+- 2026-11-03 [combat-sim] **A parry only counts before the blade lands** (CS-3; the CD: "I can
+  parry successfully during a small time Window after opponent Sword makes contact and deals
+  damage"). Traced: the cut that hurt you was never parried, but a parry pressed while flinching
+  was buffered, fired when the flinch ended and caught the next chained cut. Now one attack table
+  (`ATTACKS`) holds every strike's timing and parry rule, the parry is judged against the
+  attacker's own row, and a parry pressed while flinching or staggered is dropped, for you and the
+  opponent alike; the help says so. Suite 74 -> 81, five new breaks (24 in all); the counter
+  persona's rank-10 rate went 0.875 -> 1. Left for the CD: three of ten cuts deal damage with the
+  blade over 0.25 m from the body. build 2026-11-03 20:43 UTC. CS-4 (quick and heavy strikes) stays open.
+  Detail: `.claude/combat-simulator.md` CS-3.
+
 - 2026-11-03 [combat-sim] **Toon signed off; the four open questions answered** (backlog
   refinement). The CD playtested CS-1 and passed the toon look as built (band levels, 1.5 px ink,
   star sparks), and passed the ladder's pace. Decided: keep the one five-cut chain, keep the

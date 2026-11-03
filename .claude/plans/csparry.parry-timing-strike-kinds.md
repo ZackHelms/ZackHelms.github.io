@@ -203,7 +203,7 @@ Plans). One task per arc step; each is one session's work and one commit on the 
 | Step | What | Status |
 |---|---|---|
 | 1 | CS-3 engine, rows, breaks, the blade-at-contact measurement | done |
-| 2 | CS-3 docs, land, Pages | open |
+| 2 | CS-3 docs, land, Pages | done (docs and badge; the overseer lands) |
 | 3 | CS-4 engine | open |
 | 4 | CS-4 page | open |
 | 5 | Docs final, break list, land, Pages | open |
@@ -472,6 +472,16 @@ follow-up for the CD (see Follow-ups).
 - Row 6 also counts a swing that lands twice (the same claim, every swing resolves once), which is how it
   catches `swing-resolves-twice`: with `a.resolved` gone a hit flinches the defender, so a later parry of
   the same swing cannot happen, but more hits can.
+
+### Step 2 (2026-11-03)
+
+Docs only, plus one help sentence and the badge. Not landed (the overseer lands it).
+
+- `.claude/combat-simulator.md`: CS-3 marked shipped with the traced cause; Architecture names `ATTACKS`, the parry test against the attacker's row, the drop and the clear; five Assumed rows (parry rows, the drop, the clear, the AI's parry lead, contact left where it is); Tests now 81 (39 + 42), the seven rows listed and the 24 breaks named; the ladder re-measure (counter rank 10 0.875 -> 1, the opponent can no longer parry out of a flinch); the blade-at-contact table and the follow-up for the CD (three cuts over 0.25 m, contact not moved) under "CS-3 as built".
+- `games/combat-simulator/index.html`: one sentence under Parry in HOW TO FIGHT ("A parry pressed while you reel from a hit does nothing."), plus the badge. It touches no break's `old` string.
+- `.claude/tests/README.md`: the `drive-combat-simulator.cjs` row (81 checks, the style rows 13 of 81, the seven parry rows, 24 breaks).
+- `TODO.md`: the CS-3/CS-4 entry stays, with CS-3 shipped and the badge. `DONE.md`: a CS-3 line.
+- Badge stamped: `build 2026-11-03 20:43 UTC`.
 
 ## Handoff
 

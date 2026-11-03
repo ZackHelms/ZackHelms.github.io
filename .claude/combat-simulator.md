@@ -69,6 +69,11 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
 | Toon's pine rim | The open bottom of a pine's foliage cone shows the shell's bottom ring as a dark band where the camera sees under it | Kept as the rim's own line |
 | Ink is flat | Drawn in display space with no tonemap and no fog, so a far pine's outline is as dark as a near one's; it writes depth, so the additive effects depth-test against it | Simplest; screen-constant width already keeps distant lines thin |
 | The HUD in every style | Keeps one look and layout | The spec says only the controls keep their layout; a styled HUD is a separate ask |
+| Parry rows (CS-3, 2026-11-03) | The parry is judged against the attacker's `ATTACKS` row (`parry`, `parryWin`); the normal rows are today's chain with `parryWin` 0.24 s, the power row is `parry: false`, `parryWin: 0`, `idx: -1` | The plan's one-table design; the old numbers are unchanged |
+| A parry from a flinch (assumed: not asked in these words) | A parry pressed while flinching or staggered is **dropped**, never buffered, for both fighters; attack, dodge and power presses are still buffered | The traced cause: a buffered parry fired the instant the flinch ended and caught the next chained cut |
+| A buffered parry meets a hit (assumed) | A parry already in the buffer is **cleared** when its fighter is flinched or staggered. The stagger clear has no check of its own (a 1.5 s stagger outlasts the 0.22 s buffer, so it cannot show in play) | Belt and braces, so the rule holds if `RULES.buffer` ever outgrows the flinch |
+| The opponent's parry lead (assumed) | `aiIntent()` schedules its parry `Math.min(0.10, 0.8 * parryWin)` before contact; 0.10 s for every row today | A shorter-window row would otherwise be asked for a parry that cannot land |
+| Contact left where it is (assumed, default) | `tryHit()` still runs on the first in-reach tick of the active window; three of ten cuts deal damage with the blade over 0.25 m from the body (table under "CS-3 as built") | Moving it changes every timing the ladder was measured on; the CD's call |
 | Music | Koto and shakuhachi on the in-sen scale, taiko during the fight; wind and birds by day, crickets at dusk | Every game here has music |
 
 ## Architecture
@@ -81,11 +86,21 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
   `parry`, `stagger`, `flinch`, `down`, `win`. Each swing has wind-up / active / recovery
   (`phasesOf()`: an opponent's wind-up and recovery are stretched by its rank's
   `windMul` / `recMul`; the active window is the same for all). **`tryHit()` is the one
-  place a blade meets a body**: in reach and arc, then dodge (i-frames), parry (window,
-  not a power attack), else hit (+10% on a staggered target, flinch unless staggered or
+  place a blade meets a body**: in reach and arc, then dodge (i-frames), parry (judged by the
+  attacker's `ATTACKS` row: `H.parry && d.st === 'parry' && d.t < H.parryWin`; the row comes
+  from `specOf()`, `ATTACKS.normal[chain]` or `ATTACKS.power`), else hit (+10% on a staggered target, flinch unless staggered or
   armoured, the combo count, the knockout).
+- **One attack table, `ATTACKS`** (built once after `RULES` from `RULES.chain` and `RULES.power`,
+  which stay the source): a row carries `name, kind, idx, dmg, wind, act, rec, reach, arc, lunge,
+  parry, parryWin`. A fighter has a `kind` (`normal` today), `startHit(F, f, idx, kind)` sets it
+  and the `swing` event carries it, and `specOf(f)` reads the row, so `phasesOf()`, the AI, the
+  pose and the swish all follow it. `hit` and `parry` events carry `atk` (the swing's id). A new
+  kind of strike is a row, with no parry code.
 - **Input is buffered** (`buf`, 0.22 s): a press made while busy fires when the fighter
-  can act. A tap during a cut's second half of wind-up or later **queues** the next cut;
+  can act. **Two exceptions for the parry** (CS-3): a parry pressed while the fighter is
+  flinching or staggered is **dropped**, never buffered (the input loop in `stepFighter()`); and
+  a parry already buffered is **cleared** when its fighter is flinched or staggered (`tryHit()`).
+  Both live in the engine, so they hold for the opponent too. A tap during a cut's second half of wind-up or later **queues** the next cut;
   a tap within `RULES.grace` after a cut's recovery still continues the chain.
 - **The opponent** (`aiIntent`) reads each of your swings **once, when it starts**, and
   decides then to parry or dodge it, answering no sooner than its `react` time; so a slow
@@ -229,6 +244,11 @@ part 1, and the scratch sim this was tuned with):
 | Masher (walk in, tap attack every frame) | 100% | 80% | 65% | 20% | 5% | 0% | 0% | 0% |
 | Counter (parries every cut 0.13 s before it lands, dodges power, punishes the stagger) | 100% | 100% | 100% | 100% | 100% | 100% | 85% | 60-95% (ends on half health) |
 
+**Re-measured with CS-3 (2026-11-03)**, part 1's ladder line: `masher rank 1 1, rank 10 0;
+counter rank 5 1, rank 10 1`, against `1, 0; 1, 0.875` before. The counter persona's rank-10 rate
+rose from 0.875 to 1 because the opponent can no longer parry the persona's stagger punish straight
+out of a flinch. No ladder row was edited.
+
 So mashing gets you through the first few, parrying is the skill the ladder teaches, and
 the last two cost even a frame-perfect parrier.
 
@@ -330,7 +350,11 @@ against the attacker's row, CS-3 landing on its own at step 2).
 
 ### CS-3 - a parry only counts before the blade lands
 
-**Open; planned (csparry steps 1-2).**
+**Shipped 2026-11-03** (commit `d81704a` on the arc branch `cs-parry`; the overseer lands it on
+`main`; badge `build 2026-11-03 20:43 UTC`). The cause below was traced, and the fix is the rule
+below: one attack table, the parry judged against it, a parry from a flinch dropped. What was
+measured and decided while building it is under Assumed, not decided (parry rows), Tests and
+"CS-3 as built" at the end of this section.
 
 **Traced 2026-11-03** (engine lifted into node, the opponent chaining cuts at the player at
 ranks 1, 5 and 10, the player pressing parry 0.03-0.25 s after the first cut's `hit`
@@ -374,6 +398,32 @@ is already late. Measure the blade-to-body distance at the `hit` event.
   they relied on the buffered parry (report any change rather than retune silently). Each
   rule gets a negative test.
 
+#### CS-3 as built (2026-11-03)
+
+Engine only (the `ENGINE` block): `ATTACKS`, `specOf()`, `startHit(..., kind)`, the parry test in
+`tryHit()`, the drop in `stepFighter()`'s input loop, the clear on flinch and stagger, and the AI's
+parry lead. The page gained one sentence in HOW TO FIGHT, under Parry: a parry pressed while you
+reel from a hit does nothing.
+
+**Blade at contact** (one-off measure, not a suite row; the opponent cutting the player from 1.2 m,
+`__CS.draw()` on the tick the player's `hp` drops; distance from the opponent's blade segment to the
+player's body axis, minus `RULES.body` 0.32 m; negative means the blade is already inside the body's
+radius):
+
+| cut | rank 1 | rank 10 |
+|---|---|---|
+| 1 kesa | -0.105 m | -0.113 m |
+| 2 gyaku | 0.193 m | 0.170 m |
+| 3 yoko | **0.255 m** | 0.226 m |
+| 4 tsuki | -0.243 m | -0.241 m |
+| 5 shomen | **0.290 m** | **0.327 m** |
+
+**Follow-up for the CD:** three of the ten cuts (yoko at rank 1, shomen at both ranks) deal damage
+while the blade is still more than 0.25 m from the body; shomen's tip is still overhead (y 2.34-2.38
+m) when it does. Contact was **not moved**: it changes every timing the ladder was measured on, so
+it is the CD's call. Inferred, not confirmed: a parry pressed as such a cut looks about to land is
+already late, which the CD may feel as the same complaint.
+
 ### CS-4 - quick and heavy strikes
 
 **Open; planned (csparry steps 3-5). Depends on CS-3.**
@@ -409,20 +459,28 @@ heavy, and a higher or lower swing tell.
 
 ## Tests
 
-`.claude/tests/drive-combat-simulator.cjs`, 74 checks. Part 1 (node, the engine): the
+`.claude/tests/drive-combat-simulator.cjs`, 81 checks (39 in part 1, 42 in part 2). Part 1 (node, the engine): the
 chain cycles 1-5-1, a pause ends it, a whiff breaks the energy count, a full chain pays
 exactly +2; a timed parry staggers with no damage and pays +1, an early parry fails; +10%
 on a staggered target exactly, a staggered fighter cannot parry or dodge, five cuts fit in
 one stagger; a timed dodge slips the cut and pays +1, an early one does not; no power at
 9, power costs 10, 20 throws two back to back, the cap is 20; power cannot be parried,
 can be dodged, and its wind-up does not flinch; the opponent spends its meter; a knockout
-ends the duel; the ladder claims above. Part 2 (Chromium, SwiftShader): boot and badge,
+ends the duel; the ladder claims above. **Seven rows since CS-3** ("a parry only counts before the blade lands"):
+a parry pressed while reeling from a hit does nothing (ranks 1, 5, 10; 0.03-0.21 s after the hit);
+a parry on the first free tick after the flinch turns the next chained cut aside; a parry held in the
+buffer is cleared by the hit that flinches it (also with `RULES.buffer` raised to 0.6 s, since today's
+buffer always times out first); the same two for the opponent; every parryable row of `ATTACKS` is
+judged by its own window (`parryWin` minus 2 ticks turns it, plus 2 does not; iterates the table, so a
+new row joins unedited); no swing both hurts and is parried or lands twice (AI v counter, ranks 1, 5,
+10, four seeds); and the normal rows equal a literal copy of the old chain with `parryWin` 0.24, the
+power row not parryable. Part 2 (Chromium, SwiftShader): boot and badge,
 the intro (stepped, not waited for), real multi-touch over CDP (stick held while a second
 thumb cuts; dodge, parry, power buttons), the power ring filling, closing at 10 (the ten
 gaps between its segments turn gold), the second ring past 10 and the flash, the
 controls' layout at seven sizes, the settings pausing the duel (waits on frames), victory
 -> next rank saved, defeat -> retry, light by rank, the FPS counter on/off, no errors.
-**Thirteen of the 74 are the style rows** (one in part 1): the engine text never mentions a
+**Thirteen of the 81 are the style rows** (one in part 1): the engine text never mentions a
 style; with nothing stored the style and the select read realistic; the select offers exactly
 realistic and toon in that order; choosing toon through the select sets, saves and changes the
 next draw by more than 2,000 px with the same `F` and the same `F.t`; the pick survives a
@@ -444,12 +502,12 @@ caught by their own rows, none by a crash): `style-engine`, `style-render-writes
 `ink-cull-not-discard`. Two lessons: a rise-only ink check passes the culled hull that paints
 the fighter black, so it also caps the fill; and a break that reads a copy of the style taken
 on the first frame (`style-needs-reload`) is the only way to prove "applies live". The list
-for the game itself is `.claude/tests/negtests/combat-simulator.json`: 19 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
-power parryable, combo pays at 3 only, power at 9, no cap, a chain of three, a staggered
+for the game itself is `.claude/tests/negtests/combat-simulator.json`: 24 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
+power parryable (re-pointed in CS-3 to the `ATTACKS.power` row), combo pays at 3 only, power at 9, no cap, a chain of three, a staggered
 fighter that can act, a 1.2 s stagger, no armour, parry/dodge paying nothing, a ring that
 never closes, a ring that does not flash, a menu that does not pause, crowded buttons, a
 ladder that does not advance, an opponent slower at the top, a second thumb ignored while
-the stick is held. Three of them first "passed" for the wrong reason and were fixed in
+the stick is held, and the five CS-3 breaks: `parry-buffered-through-flinch` (rows 1 and 4), `flinch-keeps-buffered-parry` (row 3), `drop-only-player` (row 4), `parry-window-wide` (row 7 only: row 5 judges a row by its own `parryWin`, so widening it moves both; it is the row that will catch a window shared by every kind) and `swing-resolves-twice` (row 6). Three of them first "passed" for the wrong reason and were fixed in
 the suite: the ring check counted gold that the lit icon supplied (it now samples the
 gaps between segments); the pause and FPS checks read stale frames because SwiftShader
 under parallel load draws a frame every few hundred ms (they now wait on `APP.frames` or
