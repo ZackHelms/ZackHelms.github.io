@@ -3759,7 +3759,7 @@ const STATIONS = [
 // Other cars (DS-2): the six nearest within 150 m each get a voice from a pool built once in S.unlock().
 // A voice is an engine (the player's shape) and tyre roar, thinned by air, quieter with distance, panned by
 // its bearing off where the camera looks, and pitched by Doppler worked out by hand every frame.
-const TRAFFIC_GAIN = 0.7;           // the voices' overall level (step 2 tunes it against the engine)
+const TRAFFIC_GAIN = 0.75;          // the voices' overall level, measured: a car passing 4 m away at 25 m/s peaks near 0.7x the engine at a cruise (chase view)
 const TV_N = 6, TV_RANGE = 150, TV_C = 343, TV_REF = 5;    // voices, reach (m), speed of sound (m/s), reference distance (m)
 const TV_SHIFT = [1300, 2600];      // a calm driver's down- and up-shift points (rpm)
 const KIND_PITCH = { boxTruck: 0.7, pickup: 0.85, suv: 0.95, sedan: 1.0, minivan: 1.0, hatchback: 1.15 };

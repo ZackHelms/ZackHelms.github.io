@@ -1597,6 +1597,16 @@ const AE = {
     { settled: stL.settled, ratio: lvL.trafficL / lvL.trafficR, lv: lvL });
   ok('dead ahead: a car 20 m ahead of the camera is in both ears alike (L and R within 10%)', stA.settled && lvA.trafficL > 1e-4 && Math.abs(lvA.trafficL - lvA.trafficR) / Math.max(lvA.trafficL, lvA.trafficR) < 0.1,
     { settled: stA.settled, lv: lvA });
+  // the pan law itself (dssound step 2: a linear law gives 9 abeam, inside the stereo rows' 4-12): at 45 deg right the R/L RMS
+  // ratio is the law's, and the graph's two pan gains keep L^2 + R^2 = 1 there and abeam (equal power)
+  const st45 = await place([{ along: 8 * Math.SQRT1_2, side: 8 * Math.SQRT1_2 }]);
+  const lv45 = await lv(['trafficL', 'trafficR'], 1), v45 = voiceOf(await page.evaluate(() => window.__dsScene()), st45.ids[0]);
+  const st90 = await place([{ along: 0, side: 8 }]);
+  const v90 = voiceOf(await page.evaluate(() => window.__dsScene()), st90.ids[0]);
+  const law45 = PAN_LAW(Math.SQRT1_2), law45Ratio = law45[1] / law45[0], pow = v => v ? v.pan[0] ** 2 + v.pan[1] ** 2 : 0;
+  ok(`the pan law: a car 45 deg to the right gives trafficR / trafficL within 10% of the equal-power law's ${law45Ratio.toFixed(2)}, and L^2 + R^2 on the graph is 1 within 2% there and abeam`,
+    st45.settled && st90.settled && lv45.trafficL > 1e-5 && Math.abs(lv45.trafficR / lv45.trafficL / law45Ratio - 1) < 0.1 && Math.abs(pow(v45) - 1) < 0.02 && Math.abs(pow(v90) - 1) < 0.02,
+    { ratio: lv45.trafficR / lv45.trafficL, law: law45Ratio, pow45: pow(v45), pow90: pow(v90) });
   // Doppler factor: an oncoming car ahead, a car behind going away and a car ahead at the player's speed (25 m/s each, the player at 25)
   await page.evaluate(() => { const P = window.__DS.PLAYER; P.vx = 25; P.vy = 0; });
   const stD = await place([{ along: 50, side: -3.5, yaw: Math.PI, v: 25 }, { along: -50, side: -3.5, yaw: Math.PI, v: 25 }, { along: 30, side: 0, yaw: 0, v: 25 }]);
@@ -1656,6 +1666,38 @@ const AE = {
   const lvS1 = await lv(['traffic', 'engine'], 1);
   await setVol('traffic', 100);
   ok('the "Other cars" slider at 0 puts traffic under 0.0005 RMS while the engine stays above 0.02', lvS0.traffic > 0.002 && lvS1.traffic < 0.0005 && lvS1.engine > 0.02, { before: lvS0, after: lvS1 });
+  // the level (dssound step 2): a car passing 4 m away at 25 m/s, oncoming, the player at a cruise in the next lane. The pass is
+  // held at five places round where it comes closest to the camera (so no frame rate enters it), and its peak traffic RMS is set
+  // against the engine's RMS in the same windows: 0.5-1.0x from the chase view, 0.25-0.6x in the cockpit (the glass muffles it).
+  await page.evaluate(() => {
+    const W = window, D = W.__DS;
+    // cars `along` metres past the camera (measured along the player's heading) and `left` metres left of the player's centreline
+    const spot = (s) => { const P = D.PLAYER, E = D.CAM.eye, fw = [Math.sin(P.yaw), Math.cos(P.yaw)], lf = [Math.cos(P.yaw), -Math.sin(P.yaw)];
+      const a = (E[0] - P.x) * fw[0] + (E[2] - P.z) * fw[1] + s.along; return { x: P.x + fw[0] * a + lf[0] * s.left, z: P.z + fw[1] * a + lf[1] * s.left }; };
+    W.__dsPlaceP = specs => { const made = specs.map(s => Object.assign({}, W.__dsTpl, { id: W.__dsNextId++, lc: null, stopT: 0, hazard: 0, v: s.v || 0,
+      yaw: D.PLAYER.yaw + (s.yaw || 0), y: D.PLAYER.y, left: s.left }, spot(s))); D.TRAFFIC.cars = made; return made.map(c => c.id); };
+    W.__dsMoveP = (id, along) => { const c = D.TRAFFIC.cars.find(q => q.id === id); Object.assign(c, spot({ along, left: c.left })); };
+  });
+  const cruiseL = await page.evaluate(() => { const D = window.__DS, P = D.PLAYER; D.TRAFFIC.cars = []; P.vx = 25; P.vy = 0; D.setCruise(true);
+    for (let i = 0; i < 90; i++) D.tick(1 / 30); return { on: D.CRUISE.on, vx: P.vx, thr: P.thr }; });
+  const passBy = async mode => {
+    await page.evaluate(m => { window.__DS.CAM.mode = m; }, mode);
+    await frames(3);
+    const id = (await page.evaluate(() => window.__dsPlaceP([{ along: -6, left: 4, yaw: Math.PI, v: 25 }])))[0];
+    const at = [];
+    for (const along of [-6, -3, 0, 3, 6]) {
+      await page.evaluate(([id, along]) => window.__dsMoveP(id, along), [id, along]);
+      await frames(2);
+      const st = await settle([id]), l = await lv(['traffic', 'engine'], 2);
+      at.push({ along, settled: st, traffic: l.traffic, engine: l.engine });
+    }
+    const eng = at.reduce((s, q) => s + q.engine, 0) / at.length, peak = Math.max(...at.map(q => q.traffic));
+    return { settled: at.every(q => q.settled), ratio: peak / eng, peak, eng, at: at.map(q => [q.along, +q.traffic.toPrecision(3), +q.engine.toPrecision(3)]) };
+  };
+  const lvChase = await passBy(1), lvCab = await passBy(0);
+  await page.evaluate(() => { const D = window.__DS; D.CAM.mode = 1; D.setCruise(false); D.PLAYER.vx = 25; D.PLAYER.thr = 0.5; });
+  ok('the level: a car passing 4 m away at 25 m/s (oncoming, the player at a cruise) peaks at 0.5-1.0x the engine\'s RMS from the chase view and 0.25-0.6x in the cockpit',
+    cruiseL.on && lvChase.settled && lvCab.settled && lvChase.ratio >= 0.5 && lvChase.ratio <= 1.0 && lvCab.ratio >= 0.25 && lvCab.ratio <= 0.6, { cruise: cruiseL, chase: lvChase, cockpit: lvCab });
   // the pool and no node growth: heavy traffic on a three-lane-a-side stretch, then 60 s of it with nothing that makes nodes by design
   const s0 = await page.evaluate(() => { const W = window, D = W.__DS, s0 = D.PLAYER.s;
     D.TRAFFIC.cars = W.__dsCarsSaved; W.__dsTraffic0 = D.SETTINGS.traffic; D.SETTINGS.traffic = 1.8;
@@ -1663,6 +1705,7 @@ const AE = {
     D.teleport(s); return s0; });
   await frames(2);
   const extra = await page.evaluate(() => window.__dsPlace([[18, 7], [-27, -9], [44, 11], [-63, 6], [95, -12], [-128, 9]].map(([along, side]) => ({ along, side, v: 0 })), true));
+  await page.waitForTimeout(600); await frames(3);   // the voices hand over to the parked cars (a fade, then a frame) before the wait below can mean anything
   const pool = await page.waitForFunction(() => { const V = window.__DS.SND.traffic();
     return V.filter(v => v.id !== null).length === 6 && V.every(v => Math.abs(v.gain - v.want) <= 2e-3 * v.want); },
     null, { timeout: 90000, polling: 250 }).then(() => true, () => false);
@@ -1700,7 +1743,7 @@ const AE = {
   console.log('  .. other cars: ' + JSON.stringify({ right: r3(lvR.trafficR / lvR.trafficL), left: r3(lvL.trafficL / lvL.trafficR), ahead: [r3(lvA.trafficL), r3(lvA.trafficR)],
     dop: dop.map(q => [q.want, q.got]), fft: { fA: r3(fA.f), fR: r3(fR.f), fRatio: r3(fRatio), kRatio: r3(kRatio) }, range: { g160: r3(g160), rms160: r3(lv160.traffic), gain140: v140 && r3(v140.gain) },
     slider: [r3(lvS0.traffic), r3(lvS1.traffic), r3(lvS1.engine)], pool: { within150: scPool.near.length, loud: loud.length }, growth: { made: growth.made, heard: growth.heard },
-    trafficVsEngine6m: r3(lvR.traffic / lvR.engine) }));
+    trafficVsEngine6m: r3(lvR.traffic / lvR.engine), level: { thr: r3(cruiseL.thr), chase: r3(lvChase.ratio), cockpit: r3(lvCab.ratio) }, law45: [r3(lv45.trafficR / lv45.trafficL), r3(pow(v45)), r3(pow(v90))] }));
   await page.evaluate(s0 => { const W = window, D = W.__DS; D.SETTINGS.traffic = W.__dsTraffic0; D.teleport(s0); D.PLAYER.vx = 25; D.PLAYER.thr = 0.5;
     delete W.__dsCarsSaved; delete W.__dsTraffic0; }, s0);
   // every sound has its own slider in the menu, and the radio's on/off switch is gone

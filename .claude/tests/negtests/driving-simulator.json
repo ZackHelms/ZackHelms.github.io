@@ -327,5 +327,75 @@
   "file": "games/driving-simulator/index.html",
   "old": "  const sky = Object.assign({}, SETTINGS.sky);",
   "new": "  const sky = Object.keys(saved).length && !saved.sky ? Object.fromEntries(SKY_KEYS.map(k => [k, 0])) : Object.assign({}, SETTINGS.sky); /* @negtest */"
+ },
+ {
+  "name": "ds2-pan-sign",
+  "row": "stereo right; stereo left (right taken as world +x, not cross(fwd, up))",
+  "file": "games/driving-simulator/index.html",
+  "old": "let rx = -F[2], rz = F[0];",
+  "new": "let rx = 1, rz = 0; /* @negtest */"
+ },
+ {
+  "name": "ds2-pan-linear",
+  "row": "the pan law at 45 deg (stereo right and left, banded 4-12, cannot see it: a linear law gives 9 abeam)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const a = (0.8 * sinT + 1) * Math.PI / 4, L = Math.cos(a), R = Math.sin(a);",
+  "new": "const a = 0, L = (1 - 0.8 * sinT) / 2, R = (1 + 0.8 * sinT) / 2; /* @negtest */"
+ },
+ {
+  "name": "ds2-doppler-sign",
+  "row": "Doppler factor; Doppler in the FFT",
+  "file": "games/driving-simulator/index.html",
+  "old": "const k = clamp((TV_C + vLx * ux + vLz * uz) / (TV_C + vSx * ux + vSz * uz), 0.5, 2);",
+  "new": "const k = clamp((TV_C - vLx * ux - vLz * uz) / (TV_C - vSx * ux - vSz * uz), 0.5, 2); /* @negtest */"
+ },
+ {
+  "name": "ds2-doppler-off",
+  "row": "Doppler factor; Doppler in the FFT",
+  "file": "games/driving-simulator/index.html",
+  "old": "const k = clamp((TV_C + vLx * ux + vLz * uz) / (TV_C + vSx * ux + vSz * uz), 0.5, 2);",
+  "new": "const k = 1; /* @negtest */"
+ },
+ {
+  "name": "ds2-vl-ignored",
+  "row": "Doppler factor; Doppler in the FFT",
+  "file": "games/driving-simulator/index.html",
+  "old": "const vLx = sy * P.vx + cy * P.vy, vLz = cy * P.vx - sy * P.vy;",
+  "new": "const vLx = 0, vLz = 0; /* @negtest */"
+ },
+ {
+  "name": "ds2-node-per-frame",
+  "row": "no node growth",
+  "file": "games/driving-simulator/index.html",
+  "old": "    near.length = 0;\n",
+  "new": "    near.length = 0; ac.createGain(); /* @negtest */\n"
+ },
+ {
+  "name": "ds2-seventh-voice",
+  "row": "the pool",
+  "file": "games/driving-simulator/index.html",
+  "old": "const TV_N = 6, TV_RANGE = 150,",
+  "new": "const TV_N = 7, /* @negtest */ TV_RANGE = 150,"
+ },
+ {
+  "name": "ds2-range-1500",
+  "row": "range",
+  "file": "games/driving-simulator/index.html",
+  "old": "const TV_N = 6, TV_RANGE = 150,",
+  "new": "const TV_N = 6, TV_RANGE = 1500, /* @negtest */"
+ },
+ {
+  "name": "ds2-cockpit-not-muffled",
+  "row": "the level (the cockpit's ratio)",
+  "file": "games/driving-simulator/index.html",
+  "old": "    trafF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);\n    trafG.gain.setTargetAtTime(inside ? 0.5 : 1, t, 0.1);\n",
+  "new": "    trafF.frequency.setTargetAtTime(16000, t, 0.1); trafG.gain.setTargetAtTime(1, t, 0.1); /* @negtest */\n"
+ },
+ {
+  "name": "ds2-slider-to-tyres",
+  "row": "the \"Other cars\" slider at 0 (the traffic channel's gain follows the tyres slider)",
+  "file": "games/driving-simulator/index.html",
+  "old": "    for (const k of VOL_KEYS) ch[k].gain.setTargetAtTime(level(k), t, 0.03);",
+  "new": "    for (const k of VOL_KEYS) ch[k].gain.setTargetAtTime(level(k === 'traffic' ? 'tyres' : k), t, 0.03); /* @negtest */"
  }
 ]
