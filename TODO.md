@@ -20,6 +20,7 @@ in `.claude/<game>.md`.
   from it is buffered, fires when the flinch ends, and catches the next chained cut before
   its wind-up has even started. One attack table for every strike, the parry judged against
   the attacker's own row, for both fighters; CS-3 lands on its own at step 2 of 5.
+  **CS-3 shipped 2026-11-03** (build 2026-11-03 20:43 UTC); CS-4 (quick and heavy strikes) is still open.
   *Decided 2026-11-03:* the parry window scales with each kind's telegraph; quick and heavy
   mix into the five-cut chain; the opponent throws them too. Spec and checks:
   `.claude/combat-simulator.md` section Backlog (parry timing and strike kinds), CS-3 and CS-4.

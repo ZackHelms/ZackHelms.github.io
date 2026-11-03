@@ -57,7 +57,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-02 22:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-03 20:43 UTC</div>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
@@ -90,7 +90,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
   <p>The game pauses while this menu is open.</p>
   <p><b>Move</b> with the stick at the bottom left: put a thumb down anywhere in the lower left and push. You always face your opponent; up walks at them, sideways circles them.</p>
   <p><b>Attack</b> (the big button): tap again as each cut lands and the cuts chain into a <b>five-cut combo</b> (diagonal, rising, horizontal, thrust, overhead), then the chain starts over. Stop tapping and the chain ends.</p>
-  <p><b>Parry</b> (above attack): tap it just before an enemy cut lands. Caught in the short window, the cut is turned aside and your opponent is <b>staggered</b>: while they stagger they cannot parry or dodge, and every cut you land does <b>10% more</b> damage. Mistimed, a parry leaves you open for a moment.</p>
+  <p><b>Parry</b> (above attack): tap it just before an enemy cut lands. Caught in the short window, the cut is turned aside and your opponent is <b>staggered</b>: while they stagger they cannot parry or dodge, and every cut you land does <b>10% more</b> damage. Mistimed, a parry leaves you open for a moment. A parry pressed while you reel from a hit does nothing.</p>
   <p><b>Dodge</b> (left of attack): a quick dash the way the stick points, or backwards with the stick at rest. For a split second in the middle of it you cannot be hit, so a well-timed dodge can go straight through a cut.</p>
   <p><b>Energy</b>: a dodge that slips a cut, a parry, and the third and fifth cut of an unbroken combo each give 1 point. The ring round the <b>power attack</b> button fills with it; at 10 it closes and flashes and the power attack is ready. It costs 10, and you can bank 20 to throw two back to back. A power attack (yours or your opponent's) <b>cannot be parried</b>, only dodged, and a fighter winding one up does not flinch when hit.</p>
   <p><b>Keyboard</b>: WASD or the arrow keys to move, J attack, K dodge, L parry, I power attack, Esc for this menu.</p>
@@ -134,6 +134,13 @@ const RULES = {
   power: { name: 'power', dmg: 26, wind: 0.50, act: 0.25, rec: 0.55, reach: 2.8, arc: TAU, lunge: 1.2 },
   arena: 8.2, body: 0.32, minGap: 0.8,
 };
+// Every attack as one row, built once from RULES: its timing, damage and reach,
+// and whether a parry can meet it and for how long after the parry starts.
+// tryHit() reads the attacker's row, so a new kind of attack is a row, not code.
+const ATTACKS = {
+  normal: RULES.chain.map((c, i) => Object.assign({}, c, { kind: 'normal', idx: i, parry: true, parryWin: RULES.parry.win })),
+  power: Object.assign({}, RULES.power, { kind: 'power', idx: -1, parry: false, parryWin: 0 }),
+};
 const ACTIONS = ['power', 'dodge', 'parry', 'atk'];   // if two are pressed in one tick, the first wins
 
 const LADDER = [
@@ -173,7 +180,7 @@ function rankParams(rank) {
 function makeFighter(id, o) {
   return {
     id, x: o.x, z: o.z, yaw: o.yaw, vx: 0, vz: 0, hp: o.hp, hpMax: o.hp, energy: 0, st: 'free', t: 0,
-    chain: -1, grace: 0, landed: 0, resolved: false, queued: false, atkId: 0, buf: null, buft: 0,
+    chain: -1, kind: 'normal', grace: 0, landed: 0, resolved: false, queued: false, atkId: 0, buf: null, buft: 0,
     dx: 0, dz: -1, dcd: 0, armor: false, inv: false,
     windMul: o.windMul || 1, recMul: o.recMul || 1, dmgMul: o.dmgMul || 1, moveSpd: o.moveSpd || 3.4,
     seen: {}, stats: { hits: 0, parries: 0, dodges: 0, powers: 0, dealt: 0, best: 0 },
@@ -186,7 +193,7 @@ function newFight(rank, seed) {
   return { t: 0, rank, P, p, e, rng: mulberry32((seed >>> 0) || 1), over: null, events: [], nextAtk: 1,
     ai: { sched: null, cd: 1.2, plan: 0, strafe: 1, strafeT: 0, seen: -1, hover: 2.8 } };
 }
-function specOf(f) { return f.st === 'power' ? RULES.power : RULES.chain[f.chain]; }
+function specOf(f) { return f.st === 'power' ? ATTACKS.power : ATTACKS[f.kind][f.chain]; }
 function phasesOf(f, H) { return { w: H.wind * f.windMul, a: H.act, r: H.rec * f.recMul }; }
 function setSt(f, s) { f.st = s; f.t = 0; f.armor = false; }
 function gain(F, f, n, why) {
@@ -195,10 +202,10 @@ function gain(F, f, n, why) {
   F.events.push({ type: 'energy', who: f.id, why, e: f.energy, ready: before < RULES.powerCost && f.energy >= RULES.powerCost });
 }
 function turnToward(f, a, max) { const d = wrapA(a - f.yaw); f.yaw = wrapA(f.yaw + clamp(d, -max, max)); }
-function startHit(F, f, idx) {
-  setSt(f, 'atk'); f.chain = idx; if (idx === 0) f.landed = 0;
+function startHit(F, f, idx, kind) {
+  setSt(f, 'atk'); f.chain = idx; f.kind = kind || 'normal'; if (idx === 0) f.landed = 0;
   f.atkId = F.nextAtk++; f.resolved = false; f.queued = false; f.grace = 0;
-  F.events.push({ type: 'swing', who: f.id, idx });
+  F.events.push({ type: 'swing', who: f.id, idx, kind: f.kind });
 }
 function begin(F, f, o, a, inp) {
   if (a === 'atk') {
@@ -223,6 +230,8 @@ function begin(F, f, o, a, inp) {
   return false;
 }
 // The moment of contact: in reach and in the arc, then dodge, parry or hit.
+// H is the attacker's ATTACKS row: a parry turns it aside only if the row allows
+// one and the parry was raised less than the row's parryWin before this tick.
 function tryHit(F, a, d, H, power) {
   const dx = d.x - a.x, dz = d.z - a.z, dist = Math.hypot(dx, dz);
   if (dist > H.reach + RULES.body) return;
@@ -235,18 +244,19 @@ function tryHit(F, a, d, H, power) {
     F.events.push({ type: 'dodged', who: d.id, by: a.id, power, at });
     return;
   }
-  if (!power && d.st === 'parry' && d.t < RULES.parry.win) {
+  if (H.parry && d.st === 'parry' && d.t < H.parryWin) {
     setSt(a, 'stagger'); a.grace = 0; a.chain = -1; a.landed = 0; a.queued = false;
+    if (a.buf === 'parry') a.buf = null;                      // a staggered fighter's held parry goes too
     a.vx = -Math.sin(a.yaw) * 1.6; a.vz = -Math.cos(a.yaw) * 1.6;
     setSt(d, 'free'); d.stats.parries++; gain(F, d, 1, 'parry');
-    F.events.push({ type: 'parry', who: d.id, by: a.id, at });
+    F.events.push({ type: 'parry', who: d.id, by: a.id, atk: a.atkId, at });
     return;
   }
   const crit = d.st === 'stagger';
   const dmg = H.dmg * a.dmgMul * (crit ? RULES.staggerBonus : 1);
   d.hp = Math.max(0, d.hp - dmg);
   a.stats.hits++; a.stats.dealt += dmg;
-  F.events.push({ type: 'hit', who: a.id, on: d.id, dmg, crit, power, idx: a.chain, at });
+  F.events.push({ type: 'hit', who: a.id, on: d.id, dmg, crit, power, idx: a.chain, atk: a.atkId, at });
   if (!power) {
     a.landed++; a.stats.best = Math.max(a.stats.best, a.landed);
     if (RULES.comboEnergyAt.includes(a.landed)) gain(F, a, 1, 'combo' + a.landed);
@@ -257,6 +267,7 @@ function tryHit(F, a, d, H, power) {
     F.events.push({ type: 'ko', who: a.id, on: d.id });
   } else if (!crit && !d.armor) {
     setSt(d, 'flinch'); d.grace = 0; d.landed = 0; d.queued = false;
+    if (d.buf === 'parry') d.buf = null;                      // a parry held from before the hit is lost to it
     d.vx = dx / (dist || 1) * (power ? 3 : 1.2); d.vz = dz / (dist || 1) * (power ? 3 : 1.2);
   }
 }
@@ -264,7 +275,10 @@ function decay(f, k, dt) { const m = Math.exp(-k * dt); f.vx *= m; f.vz *= m; }
 function stepFighter(F, f, o, inp, dt) {
   f.t += dt; f.grace = Math.max(0, f.grace - dt); f.dcd = Math.max(0, f.dcd - dt);
   if (f.buf) { f.buft -= dt; if (f.buft <= 0) f.buf = null; }
-  for (const a of ACTIONS) if (inp[a]) { f.buf = a; f.buft = RULES.buffer; break; }
+  for (const a of ACTIONS) if (inp[a]) {
+    if (a === 'parry' && (f.st === 'flinch' || f.st === 'stagger')) break;   // reeling: a parry is dropped, never held
+    f.buf = a; f.buft = RULES.buffer; break;
+  }
   const face = Math.atan2(o.x - f.x, o.z - f.z), dist = Math.hypot(o.x - f.x, o.z - f.z);
   switch (f.st) {
     case 'free': {
@@ -358,7 +372,7 @@ function aiIntent(F, dt) {
     if (d < H.reach + H.lunge + RULES.body + 0.6) {
       const until = ph.w - foe.t, x = r();
       if (power) { if (x < Math.min(0.95, P.dodgeP + 0.15)) A.sched = { a: 'dodge', at: F.t + Math.max(P.react, until - 0.12), side: r() < 0.5 ? -1 : 1 }; }
-      else if (x < P.parryP) A.sched = { a: 'parry', at: F.t + Math.max(P.react, until - 0.10) };
+      else if (x < P.parryP) A.sched = { a: 'parry', at: F.t + Math.max(P.react, until - Math.min(0.10, 0.8 * H.parryWin)) };
       else if (x < P.parryP + P.dodgeP * 0.25) A.sched = { a: 'dodge', at: F.t + Math.max(P.react, until - 0.12), side: r() < 0.5 ? -1 : 1 };
     }
   }

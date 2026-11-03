@@ -14,8 +14,8 @@
  {
   "name": "power-parryable",
   "file": "games/combat-simulator/index.html",
-  "old": "  if (!power && d.st === 'parry' && d.t < RULES.parry.win) {",
-  "new": "  if (d.st === 'parry' && d.t < RULES.parry.win) { /* @negtest */"
+  "old": "  power: Object.assign({}, RULES.power, { kind: 'power', idx: -1, parry: false, parryWin: 0 }),",
+  "new": "  power: Object.assign({}, RULES.power, { kind: 'power', idx: -1, parry: true, parryWin: RULES.parry.win }), /* @negtest */"
  },
  {
   "name": "combo-energy-3-only",
@@ -112,5 +112,35 @@
   "file": "games/combat-simulator/index.html",
   "old": "  if (k) { INPUT.touches.set(id, k); pressBtn(k); return; }",
   "new": "  if (k) { if (INPUT.stick) return; INPUT.touches.set(id, k); pressBtn(k); return; } /* @negtest */"
+ },
+ {
+  "name": "parry-buffered-through-flinch",
+  "file": "games/combat-simulator/index.html",
+  "old": "    if (a === 'parry' && (f.st === 'flinch' || f.st === 'stagger')) break;   // reeling: a parry is dropped, never held",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "flinch-keeps-buffered-parry",
+  "file": "games/combat-simulator/index.html",
+  "old": "    if (d.buf === 'parry') d.buf = null;                      // a parry held from before the hit is lost to it",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "drop-only-player",
+  "file": "games/combat-simulator/index.html",
+  "old": "    if (a === 'parry' && (f.st === 'flinch' || f.st === 'stagger')) break;   // reeling: a parry is dropped, never held",
+  "new": "    if (a === 'parry' && f.id === 'p' && (f.st === 'flinch' || f.st === 'stagger')) break; /* @negtest */"
+ },
+ {
+  "name": "parry-window-wide",
+  "file": "games/combat-simulator/index.html",
+  "old": "  normal: RULES.chain.map((c, i) => Object.assign({}, c, { kind: 'normal', idx: i, parry: true, parryWin: RULES.parry.win })),",
+  "new": "  normal: RULES.chain.map((c, i) => Object.assign({}, c, { kind: 'normal', idx: i, parry: true, parryWin: RULES.parry.win + 0.1 })), /* @negtest */"
+ },
+ {
+  "name": "swing-resolves-twice",
+  "file": "games/combat-simulator/index.html",
+  "old": "  a.resolved = true;\n  const at = [",
+  "new": "  /* @negtest */\n  const at = ["
  }
 ]
