@@ -1,0 +1,86 @@
+[
+ {
+  "name": "style-engine",
+  "file": "games/combat-simulator/index.html",
+  "old": "  F.t += dt;",
+  "new": "  F.t += dt * (typeof SETTINGS !== 'undefined' && SETTINGS.style === 'toon' ? 1.0001 : 1); /* @negtest */"
+ },
+ {
+  "name": "style-render-writes-fighter",
+  "file": "games/combat-simulator/index.html",
+  "old": "  const look = SETTINGS.style, P = progsFor(look);      // the one read of the style a frame",
+  "new": "  const look = SETTINGS.style, P = progsFor(look); if (look === 'toon') F.p.x += 1e-9; /* @negtest */"
+ },
+ {
+  "name": "style-default-toon",
+  "file": "games/combat-simulator/index.html",
+  "old": "muted: false, style: 'realistic' };",
+  "new": "muted: false, style: 'toon' }; /* @negtest */"
+ },
+ {
+  "name": "style-option-missing",
+  "file": "games/combat-simulator/index.html",
+  "old": "<option value=\"toon\">toon</option></select></div>",
+  "new": "<!-- /* @negtest */ --></select></div>"
+ },
+ {
+  "name": "style-not-saved",
+  "file": "games/combat-simulator/index.html",
+  "old": "styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; saveSettings(); });",
+  "new": "styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; }); /* @negtest */"
+ },
+ {
+  "name": "style-needs-reload",
+  "file": "games/combat-simulator/index.html",
+  "old": "  const look = SETTINGS.style, P = progsFor(look);      // the one read of the style a frame",
+  "new": "  const look = (render.boot = render.boot || SETTINGS.style), P = progsFor(look); /* @negtest */"
+ },
+ {
+  "name": "style-junk-kept",
+  "file": "games/combat-simulator/index.html",
+  "old": "if (!STYLES.includes(SETTINGS.style)) SETTINGS.style = 'realistic';",
+  "new": "/* @negtest */"
+ },
+ {
+  "name": "style-toon-unbanded",
+  "file": "games/combat-simulator/index.html",
+  "old": "  vec3 col = shadeToon(vW, N, V, satp(alb, 1.6), vSh, 1.0);",
+  "new": "  vec3 col = shade(vW, N, V, satp(alb, 1.6), 0.9, 0.03, 0.0, vSh, 0.15, 1.0); /* @negtest */"
+ },
+ {
+  "name": "style-switch-new-duel",
+  "file": "games/combat-simulator/index.html",
+  "old": "styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; saveSettings(); });",
+  "new": "styleSel.addEventListener('change', () => { SETTINGS.style = styleSel.value; saveSettings(); startDuel(SAVE.rank); }); /* @negtest */"
+ },
+ {
+  "name": "ink-off-fighters",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "ink-off-arena",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (ink) { inkSet(P.inkWorld, ink, inkW); gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0); }",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "ink-in-realistic",
+  "file": "games/combat-simulator/index.html",
+  "old": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } };",
+  "new": "const INK = { toon: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] }, realistic: { px: 1.5, col: [0x0d / 255, 0x0b / 255, 0x10 / 255] } }; /* @negtest */"
+ },
+ {
+  "name": "ink-ext-zero",
+  "file": "games/combat-simulator/index.html",
+  "old": "c[0], c[1], c[2], m, e[0], e[1], e[2]); return mb.n++; }",
+  "new": "c[0], c[1], c[2], m, 0, 0, 0); return mb.n++; } /* @negtest */"
+ },
+ {
+  "name": "ink-cull-not-discard",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (ink) { inkSet(P.inkLimb, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); }",
+  "new": "  if (ink) { const fs = FS_INK.replace('if (dot(vN, uEye - vW) > 0.0) discard;', ''); if (fs === FS_INK) throw new Error('no discard to take out'); const K = (render.nd = render.nd || compile(withStyle(VS_INK_LIMB, 1), withStyle(fs, 1), 'ink-limb-culled')); gl.enable(gl.CULL_FACE); gl.cullFace(gl.FRONT); inkSet(K, ink, inkW); gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps); gl.cullFace(gl.BACK); gl.disable(gl.CULL_FACE); } /* @negtest */"
+ }
+]

@@ -14,7 +14,11 @@
  * Part 2 drives the page in Chromium (SwiftShader WebGL2): boot, the intro,
  * real multi-touch over CDP (stick and a button at once), the controls'
  * layout at seven sizes, the power button's ring closing at 10, the settings
- * pausing the duel, the victory and defeat flows and the saved ladder.
+ * pausing the duel, the victory and defeat flows and the saved ladder, and the
+ * graphics styles (the select, saving and validating the pick, a skin is paint
+ * with real frames drawn between the ticks, toon's bands, toon's ink round the
+ * fighters and the courtyard and none in realistic, every element drawn in every
+ * style with no GL error).
  *
  *   .claude/scripts/gates.sh games/combat-simulator/index.html
  *
@@ -42,6 +46,7 @@ function evs(F, type, who) { return F.events.filter(e => e.type === type && (who
 
 console.log('-- engine: the brief');
 ok('engine block is DOM-free', !/document\.|window\.|getContext|localStorage/.test(ENG));
+ok('the engine never sees a graphics style', !/style/i.test(ENG));
 {
   // tap attack every time the previous cut is half wound up: hits 1..5 then 1 again
   const F = dummy(1); F.e.hp = F.e.hpMax = 1e6;
@@ -219,6 +224,9 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
   ok('boots with WebGL2 into the intro of rank 1', boot.gl && boot.st === 'intro' && boot.rank === 1, boot);
   ok('build badge carries a real timestamp', /^build \d{4}-\d\d-\d\d \d\d:\d\d UTC$/.test(boot.badge), boot.badge);
   ok('back button returns to the hub', boot.back === '../index.html', boot.back);
+  // the context starts with nothing stored, and no row has saved settings yet
+  const style0 = await page.evaluate(() => ({ style: __CS.SETTINGS.style, sel: document.getElementById('style-sel').value }));
+  ok('with nothing stored the graphics style is realistic, and the select says so', style0.style === 'realistic' && style0.sel === 'realistic', style0);
   // the intro is stepped, not waited for: a loaded machine draws SwiftShader frames slowly
   const intro = await page.evaluate(() => { __CS.setPaused(true); __CS.startDuel(1, 1); __CS.tick(1 / 60, 110); const a = __CS.APP.state; __CS.tick(1 / 60, 20); return [a, __CS.APP.state]; });
   ok('the intro holds two seconds, then hands over to the fight', intro[0] === 'intro' && intro[1] === 'fight', intro);
@@ -344,6 +352,138 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
   const f1 = await fps(1), f0 = await fps(0);
   ok('the FPS counter is drawn in pure green when on, and not when off', f1 > 40 && f0 === 0, { f1, f0 });
   await page.evaluate(() => { __CS.SETTINGS.perf = 1; });
+
+  console.log('-- page: graphics styles');
+  // every comparison draws all its variants inside ONE evaluate through __CS.draw() (dt 0, camera
+  // snapped), because the rAF loop keeps drawing between evaluates
+  const SKEY = 'combatSimulator.settings.v1';
+  const offered = await page.evaluate(() => [...document.querySelectorAll('#style-sel option')].map(o => o.value));
+  ok('the style select offers exactly realistic, toon, in that order', JSON.stringify(offered) === JSON.stringify(['realistic', 'toon']), offered);
+  const pick = await page.evaluate(KEY => {
+    __CS.setPaused(true); __CS.setStyle('realistic');
+    const F0 = __CS.F, t0 = F0.t;
+    const a = __CS.pixels().d;
+    const sel = document.getElementById('style-sel'); sel.value = 'toon'; sel.dispatchEvent(new Event('change'));
+    const b = __CS.pixels().d;
+    let diff = 0; for (let i = 0; i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) diff++;
+    return { style: __CS.SETTINGS.style, raw: localStorage.getItem(KEY) || '', diff, sameFight: __CS.F === F0, t: __CS.F.t === t0, st: __CS.APP.state };
+  }, SKEY);
+  ok('choosing toon in the select sets it, saves it and changes the next draw, with no new duel', pick.style === 'toon' && /"style":"toon"/.test(pick.raw) && pick.diff > 2000 && pick.sameFight && pick.t,
+    { style: pick.style, stored: pick.raw.slice(0, 120), diff: pick.diff, sameFight: pick.sameFight, t: pick.t });
+  const booted = async () => { await page.waitForFunction(() => window.__CS && window.__CS.F, null, { timeout: 30000 }); return page.evaluate(() => ({ style: __CS.SETTINGS.style, sel: document.getElementById('style-sel').value })); };
+  await page.reload();
+  const kept = await booted();
+  ok('after a reload the style is still toon', kept.style === 'toon' && kept.sel === 'toon', kept);
+  const store = s => page.evaluate(([KEY, s]) => { const o = JSON.parse(localStorage.getItem(KEY) || '{}'); if (s === null) delete o.style; else o.style = s; localStorage.setItem(KEY, JSON.stringify(o)); }, [SKEY, s]);
+  await store(null); await page.reload(); const noKey = await booted();
+  await store('chalk'); await page.reload(); const junk = await booted();
+  ok('a stored settings object without a style, or with a junk one, loads as realistic', noKey.style === 'realistic' && noKey.sel === 'realistic' && junk.style === 'realistic' && junk.sel === 'realistic', { noKey, junk });
+  await store('realistic'); await page.reload(); await booted();
+  await page.evaluate(() => __CS.setPaused(true));
+  // a skin is paint: one fixed-seed duel per style, a real frame drawn every 4 ticks, the stick at rest
+  const duelUnder = (first, then, at) => page.evaluate(([first, then, at]) => {
+    __CS.stick(0, 0); __CS.INPUT.keys = {}; __CS.setPaused(true); __CS.setStyle(first);
+    __CS.startDuel(5, 777);
+    for (let i = 0; i < 1200; i++) {
+      if (then && i === at) __CS.setStyle(then);
+      if (i % 30 === 0) __CS.press('atk');
+      __CS.tick(1 / 120, 1);
+      if (i % 4 === 0) __CS.draw();
+    }
+    const F = __CS.F, drawn = __CS.SETTINGS.style;
+    const snap = JSON.stringify({ p: F.p, e: F.e, ai: F.ai, t: F.t, nextAtk: F.nextAtk, r: F.rng() });
+    __CS.setStyle('realistic');
+    return { snap, drawn, hits: F.p.stats.hits + F.e.stats.hits };
+  }, [first, then, at]);
+  const STY = await page.evaluate(() => __CS.STYLES.slice());
+  const runs = {};
+  for (const s of STY) runs[s] = await duelUnder(s);
+  const base = runs.realistic;
+  console.log('     paint scenario: ' + base.hits + ' cuts landed, snapshot ' + base.snap.length + ' bytes; select change redrew ' + pick.diff + ' px');
+  ok('a skin is paint: a fixed-seed duel steps to byte-identical fighters under ' + STY.join(', '), base.hits > 0 && STY.every(s => runs[s].snap === base.snap && runs[s].drawn === s),
+    STY.map(s => [s, runs[s].drawn, runs[s].hits, runs[s].snap === base.snap]));
+  const swaps = [];
+  for (const s of STY.filter(s => s !== 'realistic')) { const r = await duelUnder('realistic', s, 600); swaps.push([s, r.drawn === s, r.snap === base.snap]); }
+  ok('switching style mid-duel (realistic to ' + STY.filter(s => s !== 'realistic').join(', ') + ' at tick 600) changes nothing', swaps.length === STY.length - 1 && swaps.every(x => x[1] && x[2]), swaps);
+  // toon is banded: fewer distinct luminance levels on the opponent's torso
+  const bands = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0;
+    const out = {};
+    for (const s of __CS.STYLES) {
+      __CS.setStyle(s); __CS.draw();
+      const c = project([F.e.x, 1.25, F.e.z], innerWidth, innerHeight);
+      const px = __CS.pixels(Math.round(c.x - 6), Math.round(c.y - 20), 12, 40).d, hist = new Array(64).fill(0);
+      for (let i = 0; i < px.length; i += 4) hist[Math.floor((0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2]) / 256 * 64)]++;
+      out[s] = hist.filter(n => n >= 3).length;
+    }
+    __CS.setStyle('realistic');
+    return out;
+  });
+  console.log('     torso luminance levels: ' + JSON.stringify(bands));
+  ok('toon is banded: at most half the luminance levels of realistic on the opponent\'s torso', bands.realistic >= 20 && bands.toon * 2 <= bands.realistic, bands);
+  // toon's ink: FX.ink on and off on ONE frozen frame, near-black pixels (every channel < 30) counted
+  // in the opponent's box (0.6 m round it, 2 m tall), outside both fighters' wide boxes (1.3 m, 2.4 m:
+  // the courtyard alone), and in the 12 x 40 px box on its torso (the ink is a rim, never a fill)
+  const ink = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0;
+    const W = innerWidth, H = innerHeight;
+    const boxOf = (f, r, top) => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const dx of [-r, r]) for (const dz of [-r, r]) for (const y of [0, top]) { const q = project([f.x + dx, y, f.z + dz], W, H); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      return [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1)]; };
+    const one = (style, on) => {
+      __CS.setStyle(style); __CS.FX.ink = on;
+      const px = __CS.pixels(), d = px.d, w = px.w, h = px.h, k = w / W;     // rows bottom-up, device px
+      const be = boxOf(F.e, 0.6, 2.0), bp = boxOf(F.p, 1.3, 2.4), bo = boxOf(F.e, 1.3, 2.4);
+      const c = project([F.e.x, 1.25, F.e.z], W, H), tb = [Math.round(c.x - 6), Math.round(c.y - 20), Math.round(c.x + 6), Math.round(c.y + 20)];
+      const inB = (b, x, y) => x >= b[0] && x < b[2] && y >= b[1] && y < b[3];
+      let opp = 0, yard = 0, torso = 0, tN = 0;
+      for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) {
+        const x = gx / k, y = (h - 1 - gy) / k, i = (gy * w + gx) * 4, dark = d[i] < 30 && d[i + 1] < 30 && d[i + 2] < 30;
+        if (inB(tb, x, y)) { tN++; if (dark) torso++; }
+        if (!dark) continue;
+        if (inB(be, x, y)) opp++;
+        if (!inB(bp, x, y) && !inB(bo, x, y)) yard++;
+      }
+      return { opp, yard, torso, tN, d };
+    };
+    const on = one('toon', true), off = one('toon', false), rOn = one('realistic', true), rOff = one('realistic', false);
+    let same = rOn.d.length === rOff.d.length; for (let i = 0; same && i < rOn.d.length; i++) if (rOn.d[i] !== rOff.d[i]) same = false;
+    __CS.FX.ink = true; __CS.setStyle('realistic');
+    const strip = r => ({ opp: r.opp, yard: r.yard, torso: r.torso, tN: r.tN });
+    return { on: strip(on), off: strip(off), rOn: strip(rOn), rOff: strip(rOff), same };
+  });
+  console.log('     ink: ' + JSON.stringify(ink));
+  // measured at 844x390 (rank 1): fighter +548 (+114 of it the courtyard's ink behind), courtyard +3334,
+  // torso 27 of 480 dark; with the hull culled instead of discarded, the torso went 475 of 480
+  ok('toon inks round a fighter: near-black on the opponent rises with the ink on, and stays a rim, not a fill',
+    ink.on.opp - ink.off.opp >= 300 && ink.on.tN > 0 && ink.on.torso <= ink.on.tN * 0.25, { on: ink.on, off: ink.off });
+  ok('toon inks round the courtyard: near-black outside both fighters rises with the ink on', ink.on.yard - ink.off.yard >= 1500, { on: ink.on.yard, off: ink.off.yard });
+  ok('realistic is untouched by the ink: its frames with FX.ink on and off are byte-identical', ink.same && ink.rOn.yard === ink.rOff.yard, { same: ink.same, rOn: ink.rOn, rOff: ink.rOff });
+  // every element at once in every style: a power wind-up and its ring, a trail, sparks; no GL error
+  const all = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.setStyle('realistic'); __CS.startDuel(4, 31); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -0.8; F.e.x = 0; F.e.z = 0.8; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.press('atk');
+    for (let n = 0; n < 240 && __CS.VIS.p.trail.length < 3; n++) { __CS.tick(1 / 120, 1); __CS.draw(); }
+    F.e.st = 'power'; F.e.t = 0.05;
+    __CS.PARTS.length = 0;
+    for (let i = 0; i < 40; i++) __CS.PARTS.push({ p: [Math.sin(i) * 0.6, 0.6 + (i % 8) * 0.15, Math.cos(i) * 0.6], v: [0, 0, 0], life: 0.6, age: 0.1, size: 0.04, col: [1, 0.9, 0.7], g: 0 });
+    const out = { trail: __CS.VIS.p.trail.length, st: F.e.st, parts: __CS.PARTS.length, styles: {} };
+    for (const s of __CS.STYLES) {
+      __CS.setStyle(s);
+      const px = __CS.pixels().d, err = __CS.glError();
+      let mono = true; for (let i = 4; i < px.length && mono; i += 4) if (px[i] !== px[0] || px[i + 1] !== px[1] || px[i + 2] !== px[2]) mono = false;
+      out.styles[s] = { err, mono };
+    }
+    __CS.setStyle('realistic');
+    return out;
+  });
+  ok('every element at once (power ring, trail, 40 sparks) draws in ' + Object.keys(all.styles).join(', ') + ' with no GL error and a real picture',
+    all.trail >= 3 && all.st === 'power' && all.parts === 40 && Object.keys(all.styles).length === STY.length && Object.values(all.styles).every(r => r.err === 0 && !r.mono), all);
   ok('no page or console errors', errors.length === 0, errors);
   await browser.close();
   finish();

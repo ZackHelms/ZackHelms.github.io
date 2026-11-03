@@ -5,7 +5,7 @@ ladder of ten named masters, in a walled stone courtyard whose light runs from
 mid-morning at rank 1 to a lantern-lit dusk at rank 10. CD commission, 2026-11-01,
 placed on the hub straight after Driving Simulator. Open licence (MIT, the default).
 One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simulator.cjs`
-(61 checks, 19 negative controls all caught).
+(74 checks; 19 negative controls on the game and 14 on its graphics styles, all caught).
 
 ## The CD's brief (verbatim)
 
@@ -54,6 +54,20 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
 | No blood | Hits throw white sparks; a cut on a staggered fighter shows its number in gold with "!" | House games are all-ages |
 | Licence | Open MIT | The default; not one of the protected nine |
 | Performance stats | FPS only by default (pure green, top centre); details in the settings | Driving Simulator's stats were a CD ask; kept the habit, default lighter |
+| Toon's band levels | A lit band of 0.7 above `k = 0.55`, a mid band of 0.4 above 0.12, else 0 (`k` is N.L times the shadow) | The plan's 1.0 and 0.55 blew out the pale flagstones at rank 1 once saturation was pushed; the implementer lowered them |
+| Toon's ambient floor | `max(mix(ambGnd, ambSky, 0.5) * ao, keyCol * 0.1 + 0.1)`, flat (no `N.y` gradient) | The plan's `0.18 + 0.12` washed rank 1 out; checked by eye at ranks 1, 5 and 10 |
+| Toon's lanterns | Two steps: `+0.15` where the lantern's light passes 0.08 and `+0.45` where it passes 0.3, in the lamp colour; the paper's own glow does not flicker | The light banded like the sun |
+| Toon's saturation | Albedo pushed by 1.6 before shading, the whole frame by `satp(..., 1.15)` after the tonemap | The plan's factors, kept |
+| Toon's joints and gravel | Flagstone joints a hard line where `e < 0.022` at 0.42 x the stone colour; gravel in two tones (1.0 and 0.8) on the sign of the furrow sine | Flat, with the pattern kept |
+| Toon's blade | One white highlight (strength 4.0 before the tonemap) where `dot(N, H) > 0.985`; it keeps the power glow `uGlow * 1.8`; no rim | The spec's single hard highlight |
+| Toon's sky | Two colours from `skyCol`'s zenith and horizon, blended `smoothstep(0.02, 0.55, d.y)`; clouds at a noise threshold of 0.66, 85% opaque, tinted from 0.07 grey at night to 1.2 white by day; the sun a flat disc at `cos > 0.9992`, the moon at `cos > 0.99965`; **no stars**; the far range `(0.05, 0.08, 0.14)` and the near `(0.03, 0.06, 0.05)`, scaled by the day and mixed 45% and 25% toward the horizon. Fog mixes toward the same horizon colour | Dawn-to-dusk by rank still holds |
+| Toon's trail | A solid white crescent at alpha 0.9 on every vertex, power cuts included (power is not tinted in toon) | The spec's white crescent |
+| Toon's sparks | The plan's five-point star; the colour clamped to 1 and scaled by life, with no 2x over-bright | Crisp edge |
+| Toon's ink | `#0d0b10` at 1.5 CSS px, the same width on the blade (at the duel's distance the blade is narrower than its two ink edges, so it reads as a dark line with a light core) | The spec's 0.012 m is about 1.5 px at the duel's camera distance |
+| Toon's wall joints | The arena's overlapping wall boxes (each is `hl + 0.02` long) draw a short vertical ink line at every segment joint, so the wall reads as panels | Kept rather than special-cased |
+| Toon's pine rim | The open bottom of a pine's foliage cone shows the shell's bottom ring as a dark band where the camera sees under it | Kept as the rim's own line |
+| Ink is flat | Drawn in display space with no tonemap and no fog, so a far pine's outline is as dark as a near one's; it writes depth, so the additive effects depth-test against it | Simplest; screen-constant width already keeps distant lines thin |
+| The HUD in every style | Keeps one look and layout | The spec says only the controls keep their layout; a styled HUD is a separate ask |
 | Music | Koto and shakuhachi on the in-sen scale, taiko during the fight; wind and birds by day, crickets at dusk | Every game here has music |
 
 ## Architecture
@@ -89,7 +103,9 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
   paper lanterns). Fighters are ~25 **instanced tapered capsules** each (`VS_LIMB` builds
   the capsule from A, B, r0, r1), drawn in two instanced calls. One shadow map from the
   key light (sun, or moon at night); four lantern point lights at dusk; additive blade
-  trails, ground rings and sparks. About 12 draw calls a frame.
+  trails, ground rings and sparks. About 12 draw calls a frame in realistic. The page has
+  a **Graphics style** selector (realistic, toon) that swaps the shaders and the effects'
+  colours without touching the fight; see Graphics styles below.
 - **HUD** is a 2D canvas over the GL one: the bars and energy ticks, the four buttons
   and their icons, the power ring (inner ring 0-10, closes and flashes at 10; outer ring
   10-20), the floating numbers, the combo count, banners. `LAY` holds the layout.
@@ -99,7 +115,106 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
   timing cues for parrying.
 - **Test hook** `window.__CS`: `setPaused`, `tick(dt, n)`, `press(k)`, `stick(x, y)`,
   `startDuel(rank, seed)`, `hud()` (draw the HUD now), `F`, `LAY`, `SKY`, `APP` (with a
-  `frames` counter: wait on frames, never wall time, under SwiftShader).
+  `frames` counter: wait on frames, never wall time, under SwiftShader), and for the
+  styles `STYLES`, `setStyle(s)`, `draw()`, `pixels(x, y, w, h)`, `glError()`, `PARTS` and
+  `FX` (Graphics styles, Hooks).
+
+## Graphics styles
+
+The settings' PICTURE section opens with a **Graphics style** select (`#style-sel`, written in
+the HTML and not generated from `STYLES`, so a row that says it offers exactly these is not a
+tautology): `realistic` (the default, the shipped look) and `toon`. It sits above the older
+`Graphics` quality select (`SETTINGS.gfx`), which is not the style and is unchanged. Choosing
+one fires `change`, sets `SETTINGS.style`, saves, and the next frame uses it: no reload, no
+new duel. **A skin is paint**: the engine never sees the style (the suite checks the engine
+text has no "style"), and a fixed-seed duel steps to byte-identical fighters under every
+style, with real frames drawn between the ticks, and when the style is switched mid-duel.
+
+- **`STYLES = ['realistic', 'toon']`** sits beside `SETTINGS`; a style's index is its GLSL
+  `STYLE` number. `SETTINGS.style` defaults to `'realistic'` and is validated right after the
+  load: a save without the key, or a junk value (`chalk`), reads realistic.
+- **`withStyle(src, n)`** puts `#define STYLE n` straight after the shader's first line. It
+  **throws** if the source does not start with `#version 300 es\n`: `#if STYLE == 1` on an
+  undefined macro is an error in GLSL ES 3.00 whose message does not say why, so a source it
+  cannot patch fails loudly instead.
+- **`PROGS` and `progsFor(look)`** hold one program set per style, compiled lazily on first
+  use from the same sources: `world`, `limb`, `sky` and `glow` per style, and for a style in
+  `INK` the two ink programs. The shadow programs and `flat` are not style-dependent and live in
+  `PRG`, shared by every set. `initGL()` builds realistic's set only, so boot cost did not grow
+  and toon compiles on its first frame. In GLSL every difference is an `#if STYLE == 1` block
+  with the old code in the `#else`, so realistic compiles from exactly the code it always had;
+  that is what the one-off pixel proof relied on (the same sha256 before and after both steps,
+  `2ddf4aa3...935729be`).
+- **Only `render()` reads the style**, once, at its top (`const look = SETTINGS.style, P =
+  progsFor(look)`), then uses `P.*` and `look` for everything it draws. Not the engine, not
+  `update()`, not `stepEffects()`, not the HUD.
+- **Toon's light** is `shadeToon()` in `GLSL_COMMON`: N.L times the shadow map, cut into
+  three bands (0.7, 0.4, 0) with a hard terminator, a flat floored ambient, the lanterns in two
+  steps, no specular and no sky reflection, no cool rim. The one exception is the blade (one
+  hard highlight). The albedo is the flat material colour pushed in saturation (`satp`, 1.6
+  before shading and 1.15 after the tonemap), the flagstones keeping their joints as a flat
+  darker line and the gravel its furrows as two tones. Fighters keep each opponent's gi and
+  hakama hue. Measured on the opponent's torso (a 12 x 40 CSS px box, luminance quantised to
+  64, levels holding at least 3 px): realistic 34-38, toon 14-17 (13 with ink), the same scene
+  with toon's `shade()` put back 24-36.
+- **The sky** (`FS_SKY`) under toon is two colours taken from `skyCol()`'s zenith and horizon,
+  a hard threshold of the same cloud noise in one tint, a flat sun disc, flat mountain
+  silhouettes in two tones; fog mixes toward the horizon colour. See the assumed rows for the
+  numbers.
+- **Effects.** Toon's trail is a solid white crescent: every vertex white at alpha 0.9, drawn
+  with `blendFunc(ONE, ONE_MINUS_SRC_ALPHA)` as its own `drawArrays`, ahead of the additive
+  rings. That needed **`FS_FLAT` to write its alpha** (`vC.a`) instead of `1.0`: harmless for
+  the additive styles, since with `ONE, ONE` and `alpha: false` source alpha is never read
+  (the realistic hash proves it). Sparks (`FS_GLOW`) under toon are **star bursts**: a solid
+  five-point star at full strength with a crisp edge.
+- **The ink is an inverted hull drawn by discarding by normal, not by culling.** Each shell
+  is pushed out by the ink width and `FS_INK` discards every fragment whose outward normal
+  faces the eye (`dot(vN, uEye - vW) > 0`), leaving the far shell, which depth-tests behind
+  the body except in a thin band at the silhouette. Culling is off everywhere in this renderer
+  and the winding was never checked; by derivation `VS_LIMB`'s frame `(u, ax, v)` is
+  **left-handed**, so the capsules' outward faces wind clockwise. Step 2 measured it: with
+  `gl.cullFace(gl.FRONT)` and the discard taken out, **99% of the opponent's torso box came out
+  near-black** (475 of 480 pixels, 4,760 in the whole opponent box, against 27 and 734 with the
+  discard). That confirms the left-handed frame; `gl.cullFace(gl.BACK)` would be the culling
+  that works, but the discard does not depend on winding, so it stays. A rise-only check of
+  the black pixels would have passed that wrong way round, so row 1 also caps the torso at 25%
+  near-black (measured 5.6%).
+- **Width is screen-constant**: the shell moves by `uInk * |uEye - base|`, with `uInk =
+  px * 2 * tan(CAM.fov / 2) / (ph / dpr)`, so a line is 1.5 CSS px on the wall 17 m away
+  and on a fighter alike.
+- **`aExt` and the 13-float vertex.** The arena's per-vertex attribute `aExt` (location 4, vec3,
+  at byte offset 40) is the direction a vertex moves for one unit of ink, **a function of the
+  corner alone** so the shell closes. The mesh builder went from 10 floats a vertex to 13
+  (**stride 40 to 52**): `vert(mb, p, nr, c, m, e)` takes `e`, default `NOEXT = [0, 0, 0]`, and
+  `initGL()` has five `vertexAttribPointer` calls. `box()` walks a `BOXC` sign table, a corner's
+  `e` being `sx X + sy Y + sz Z` in the box's own axes (the corner positions are computed
+  exactly as before, so the old vertex values are bit-identical); `cyl()` gives a side vertex
+  `[c, -1, s]` on the bottom ring and `[c, 1, s]` on the top, a cap centre `[0, 1, 0]` and a
+  cap ring `[c, 1, s]`. The floor disc and both annuli keep 0 and grow no shell. A missed
+  pointer would draw garbage with no GL error; the realistic hash covers the shadow pass,
+  which reads the same VAO. The shadow program reads location 0 only.
+- **The `INK` table** (`{ toon: { px: 1.5, col } }`) lists the styles that draw ink, their
+  width in CSS px and colour. `progsFor()` compiles `inkWorld` and `inkLimb` for a style in
+  it, and `render()` computes `const ink = FX.ink && INK[look]`. Two passes, both through
+  `inkSet()`: the arena shell straight after the arena draw (one `drawElements`), and one
+  instanced draw of all the capsules after the fighters' colour draws. **Step 4 (neon)
+  extends this table** and adds a per-fighter colour.
+- **Hooks** on `window.__CS`: `STYLES`; `setStyle(s)` (sets `SETTINGS.style` and the
+  select's value, does not save, so rows that test saving go through the select's `change`);
+  `draw()` (renders one frame now, synchronously, with `FRAME_DT` 0, the camera snapped and
+  `CAM.shake` 0, so two draws of a state are one picture; it restores `FRAME_DT`);
+  `pixels(x, y, w, h)` (`draw()`, then `readPixels` in the same task, because the context keeps
+  no drawing buffer; CSS px from the top left, rows come back bottom-up in device px);
+  `glError()`; `PARTS` (the spark list); and `FX = { ink: true, bloom: true }`, test-only
+  switches so a row can toggle a pass in the live page. `render()` reads `FX.ink`; nothing
+  reads `FX.bloom` yet (CS-2). A comparison renders all its variants inside one
+  `page.evaluate`, because the rAF loop keeps drawing between evaluates. `__CS.tick()` never
+  renders, so a paint-invariance row calls `draw()` between ticks. `dprNow()` is the one place
+  the device pixel ratio is read.
+- **Draw calls per frame** (`PERF.calls` for one `draw()`): an idle frame (sky, arena, two
+  fighters, two shadow draws) is 6 in realistic and 8 in toon (the two ink passes). With a
+  trail, a power ring and sparks, 8 in realistic and 11 in toon (9 with `FX.ink` off).
+- **Not decided here:** the neon style (CS-2) and its bloom are still open.
 
 ## The ladder, measured
 
@@ -144,6 +259,12 @@ post-passes change. The HUD controls keep their layout in every style.
 
 ### CS-1 - a Graphics style selector, and the toon style
 
+**Shipped 2026-11-02**, landed with step 3 of the csstyles arc (steps 1 and 2 were `ade4d81`
+and `63d0c2e`). What was built, and the look choices made along the way, are in Graphics
+styles above and the assumed rows. The spec below is kept as written. One thing differs: it
+said each capsule is redrawn at r + 0.012 m; the ink's width is screen-constant (1.5 CSS px)
+instead.
+
 - **Selector**: a `Graphics style` select at the top of PICTURE in the settings,
   options `realistic` (default), `toon`; `neon` appears with CS-2. Saved in
   `SETTINGS.style`; an old save without it reads `realistic`. Switching takes effect on
@@ -167,6 +288,10 @@ post-passes change. The HUD controls keep their layout in every style.
 
 ### CS-2 - the neon style
 
+**Open.** The selector and `INK` were built with it in mind; the next steps of the csstyles
+arc add `neon` to `STYLES` and the select, the display-space palette, the emissive ink and
+the bloom.
+
 - Added to the selector as `neon`.
 - The site's Neon Arcade palette (`--bg #06060e`, green `#39ff14`, red `#ff2244`,
   gold, blue) in 3D: a dark arena whose flagstone joints are glowing grid lines, walls and
@@ -180,7 +305,7 @@ post-passes change. The HUD controls keep their layout in every style.
 
 ## Tests
 
-`.claude/tests/drive-combat-simulator.cjs`, 61 checks. Part 1 (node, the engine): the
+`.claude/tests/drive-combat-simulator.cjs`, 74 checks. Part 1 (node, the engine): the
 chain cycles 1-5-1, a pause ends it, a whiff breaks the energy count, a full chain pays
 exactly +2; a timed parry staggers with no damage and pays +1, an early parry fails; +10%
 on a staggered target exactly, a staggered fighter cannot parry or dodge, five cuts fit in
@@ -193,9 +318,29 @@ thumb cuts; dodge, parry, power buttons), the power ring filling, closing at 10 
 gaps between its segments turn gold), the second ring past 10 and the flash, the
 controls' layout at seven sizes, the settings pausing the duel (waits on frames), victory
 -> next rank saved, defeat -> retry, light by rank, the FPS counter on/off, no errors.
+**Thirteen of the 74 are the style rows** (one in part 1): the engine text never mentions a
+style; with nothing stored the style and the select read realistic; the select offers exactly
+realistic and toon in that order; choosing toon through the select sets, saves and changes the
+next draw by more than 2,000 px with the same `F` and the same `F.t`; the pick survives a
+reload; a stored object with no style, or with `chalk`, loads realistic; **a skin is paint**
+(1,200 ticks of 1/120 with a cut every 30 and a `draw()` every 4, snapshots byte-identical
+across styles) and **a switch mid-duel changes nothing** (at tick 600); **toon is banded**
+(at most half of realistic's luminance levels on the opponent's torso); **toon inks round a
+fighter** (near-black rises by at least 300 and stays under 25% of the torso box), **round the
+courtyard** (rises by at least 1,500 outside both fighters) and **realistic is untouched by the
+ink** (frames byte-identical with `FX.ink` on and off); and every element at once (power ring,
+trail, 40 sparks) draws in each style with no GL error and a real picture.
 
 **Negative controls** (`negtest-copies.py`, `CS_PAGE` env var points the suite at a
-copy; the list is `.claude/tests/negtests/combat-simulator.json`): 19 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
+copy). Two lists. **`.claude/tests/negtests/combat-simulator-styles.json`** (14 breaks, all
+caught by their own rows, none by a crash): `style-engine`, `style-render-writes-fighter`,
+`style-default-toon`, `style-option-missing`, `style-not-saved`, `style-needs-reload`,
+`style-junk-kept`, `style-toon-unbanded`, `style-switch-new-duel`, then the ink's
+`ink-off-fighters`, `ink-off-arena`, `ink-in-realistic`, `ink-ext-zero` and
+`ink-cull-not-discard`. Two lessons: a rise-only ink check passes the culled hull that paints
+the fighter black, so it also caps the fill; and a break that reads a copy of the style taken
+on the first frame (`style-needs-reload`) is the only way to prove "applies live". The list
+for the game itself is `.claude/tests/negtests/combat-simulator.json`: 19 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
 power parryable, combo pays at 3 only, power at 9, no cap, a chain of three, a staggered
 fighter that can act, a 1.2 s stagger, no armour, parry/dodge paying nothing, a ring that
 never closes, a ring that does not flash, a menu that does not pause, crowded buttons, a
