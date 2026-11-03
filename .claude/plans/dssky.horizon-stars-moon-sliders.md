@@ -1,7 +1,50 @@
 # dssky - Driving Simulator: no column under a low sun or moon, brighter stars, the sun and moon as they really look, and a slider for each thing in the sky (DS-7, DS-5, DS-4, DS-6)
 
-**Status:** DRAFT (2026-11-02). Drafted on `main` at `e43a233` (the page's badge
+**Status:** PARTIALLY IMPLEMENTED (2026-11-03). Steps 1-5 DONE; step 6 IN PROGRESS (work in
+progress committed, unverified); step 7 not started. Drafted on `main` at `e43a233` (the page's badge
 `build 2026-11-02 12:27 UTC`, the suite at 108 checks, the break list at 25).
+
+## HANDOFF STATE (2026-11-03) - read this first
+
+The first session ran out of quota during step 6. Everything is on the remote branch
+**`claude/brave-sagan-odwmrd`** (`origin`). Nothing is lost.
+
+- **On `main`:** steps 1-2 (DS-7 the column, DS-5 the stars) landed as `cec3b2f`, badge
+  `build 2026-11-02 17:17 UTC`, Pages deploy verified green. `TODO.md`/`DONE.md` already moved
+  DS-7 and DS-5 to `DONE.md`; the TODO entry now reads "The sky arc, second half" (DS-4, DS-6).
+- **On the branch only (not on `main`):** step 3 `dcc8db5` (DS-4a discs), step 4 `1125705` (DS-4b
+  moonlight), step 5 `d573462` (DS-6 sliders), each GATES GREEN when committed (suite 120, 123, 128).
+  Then a **WIP commit for step 6** (see below). Each step's `#### Results` section below is the record.
+- **Step 6 WIP, unverified:** the break list grew from 25 to 47 entries and the suite gained rows
+  (about 26 lines) for the breaks that had none yet. The worker was stopped mid-run, so it is not
+  known whether every new break is caught, whether the new row(s) pass, or what the suite total is.
+  Not yet done: the break runs, the frame cost, all the docs, and step 6's Results section.
+- **Overseer decisions already made** (keep them; record them in the follow-up file
+  `.claude/plans/dssky.horizon-stars-moon-sliders.follow-up.md`, which this handoff created):
+  earthshine scaled by the night factor (it showed by day); step 5's expected total became 128,
+  not 127. All other decisions are in each step's Results and in `.claude/driving-simulator.md`'s
+  "Assumed, not decided" table.
+- **To finish:**
+  1. Check out `claude/brave-sagan-odwmrd` and fetch `origin/main`. If `main` moved, merge
+     `origin/main` INTO the branch, never the reverse.
+  2. Run `bash .claude/scripts/negtest.sh scan games/driving-simulator/index.html`. It must print
+     GREEN (it did at handoff).
+  3. Run the suite alone: `node .claude/tests/drive-driving-simulator.cjs`.
+  4. Finish step 6 as written below:
+     - run all 47 breaks in foreground chunks under 9 minutes
+       (`python3 .claude/scripts/negtest-copies.py .claude/tests/negtests/driving-simulator.json --only a,b,...`);
+     - every break must be caught by the row it names; a MISSED break gets a row or an argued
+       equivalence;
+     - frame cost before (`2bff358`'s page) and after;
+     - the docs list in step 6, plus the items the step 1-5 Results deferred: the sun and moonlight
+       "wrong term" breaks, the stale `skyCol()` mentions and suite row name, the DS-4 checks list's
+       "If DS-6 has landed" text, and the count in `.claude/tests/README.md`;
+     - append `#### Results (step 6)`, mark step 6 DONE, and commit.
+  5. Then do step 7 exactly as written: stamp, gates GREEN after the stamp, plan + follow-up to
+     `DONE/`, `land-on-main.sh` dry run then real, TODO entry to `DONE.md` with the badge, verify
+     Pages (two checks), report with the playtest list.
+- **Rails:** never commit red on the way to `main`. Run `gates.sh` alone, with no other Chromium
+  job running. Use explicit pathspecs. Never put a merge commit on `main`.
 **Requested:** 2026-11-01 and 2026-11-02, the CD. DS-4, 2026-11-01:
 
 > Moon realism: yes, add this (and sun position) to the backlog for driving sim.

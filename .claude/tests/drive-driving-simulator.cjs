@@ -989,6 +989,32 @@ const AE = {
   }, MAY5);
   ok('no column of light under a low sun or moon: at sunset (sun 1.0 deg) and moonrise (moon 1.0 deg) the ground below the body is at most 1.25x as bright as 10 deg either side',
     !!col.sun && !!col.moon && col.sun.h > 19.5 && col.sun.h < 20.5 && col.moon.h > 0 && col.moon.h < 1 && [col.sun, col.moon].every(k => k.rows > 100 && k.ratio <= 1.25), col);
+  // row (dssky step 6): a body behind the distant hills is hidden. The sky pass adds the discs on every ray and its hills replace
+  // the sum below the ridge; a break that adds them back after the hills drew a disc over them, and no other row saw it (the
+  // column row looks only under the horizon). At the column row's two times the bodies stand at 1.0 deg true, about 1.36 drawn,
+  // under the skyline at their azimuths (the page's ridge is 0.4-4 deg). Zoomed to a 2-deg field of view on where the drawn
+  // disc is (SKY.sunDiscW / moonDiscW; refraction is proven by its own row), the pixels within 0.8 of its radius are compared
+  // with the same-sized patches 1.5 deg either side in azimuth, at the same height, which are hills too.
+  const hid = await page.evaluate(([MAY5, hs, hm]) => {
+    const D = window.__DS, W = window, DR = Math.PI / 180;
+    const rot = (v, deg) => { const c = Math.cos(deg * DR), s = Math.sin(deg * DR); return [v[0] * c - v[2] * s, v[1], v[0] * s + v[2] * c]; };
+    const one = (mjd, h, body) => {
+      D.SKY.hour = h; D.setDate(mjd);
+      const dW = D.SKY[body + 'DiscW'], r = D.SKY[body + 'R'], F = W.__dsAimed(dW, 0, null, 2 * DR);
+      const ctr = [dW, rot(dW, -1.5), rot(dW, 1.5)], acc = ctr.map(() => [0, 0, 0]);
+      for (let y = 0; y < F.h; y++) for (let x = 0; x < F.w; x++) {
+        const d = F.dir(x, y);
+        ctr.forEach((c, k) => { if (Math.hypot(d[0] - c[0], d[1] - c[1], d[2] - c[2]) < 0.8 * r) { const v = F.L(x, y); acc[k][0] += v; acc[k][1]++; acc[k][2] = Math.max(acc[k][2], v); } });
+      }
+      const m = acc.map(a => a[1] ? a[0] / a[1] : -1);
+      return { h: +h.toFixed(4), drawnAlt: +(Math.asin(dW[1]) / DR).toFixed(3), n: acc.map(a => a[1]), mean: m.map(v => +v.toFixed(2)), max: acc.map(a => +a[2].toFixed(1)), ratio: +(m[0] / Math.min(m[1], m[2])).toFixed(3) };
+    };
+    const out = hs === null || hm === null ? null : { sun: one(MAY5, hs, 'sun'), moon: one(MAY5 + 1, hm, 'moon') };
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return out;
+  }, [MAY5, col.sun ? col.sun.h : null, col.moon ? col.moon.h : null]);
+  ok('a sun or moon behind the distant hills is hidden: at sunset and moonrise (each 1.0 deg up, under the skyline), zoomed on where the drawn disc is, its pixels are within 10% of the hills 1.5 deg either side',
+    !!hid && [hid.sun, hid.moon].every(k => k.n.every(n => n > 1000) && k.ratio <= 1.1), hid);
   // The sky above the ridge, unchanged by the split: five frames from 30 m above the car, each wholly above the ridge (its lowest
   // corner over 5 deg up, so no hills and no ground in it): 12:00 aimed at 32 deg up in azimuth 200 and at the sun (65 deg up),
   // 17:00 at the sun (36 deg), 22:00 at 32 deg / 200 (stars, Milky Way), 04:00 on May 6 at the moon (25 deg up, aimed 32 deg up).

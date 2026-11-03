@@ -108,29 +108,29 @@
   "name": "no-star-pass",
   "row": "one POINTS draw per pass; Jupiter's pixel; star pixels at midnight",
   "file": "games/driving-simulator/index.html",
-  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao) {",
-  "new": "  if (false && SKY.night > 0 && STARS.on && STARS.vao) { /* @negtest */"
+  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) {",
+  "new": "  if (false && SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) { /* @negtest */"
  },
  {
   "name": "stars-by-day",
   "row": "one POINTS draw per pass (none by day): the draw gate alone (the gain still carries the night)",
   "file": "games/driving-simulator/index.html",
-  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao) {",
-  "new": "  if (STARS.on && STARS.vao) { /* @negtest */"
+  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) {",
+  "new": "  if (STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) { /* @negtest */"
  },
  {
   "name": "stars-not-faded",
   "row": "no star pixels at noon; one POINTS draw per pass (none by day)",
   "file": "games/driving-simulator/index.html",
-  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao) {\n    const sp = PRG.stars; gl.useProgram(sp.p);\n    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);\n    gl.uniformMatrix4fv(sp.U.uVP, false, vp);\n    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);\n    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);",
-  "new": "  if (STARS.on && STARS.vao) { /* @negtest */\n    const sp = PRG.stars; gl.useProgram(sp.p);\n    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);\n    gl.uniformMatrix4fv(sp.U.uVP, false, vp);\n    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);\n    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure);"
+  "old": "  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) {\n    const sp = PRG.stars; gl.useProgram(sp.p);\n    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);\n    gl.uniformMatrix4fv(sp.U.uVP, false, vp);\n    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);\n    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim);",
+  "new": "  if (STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) { /* @negtest */\n    const sp = PRG.stars; gl.useProgram(sp.p);\n    gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);\n    gl.uniformMatrix4fv(sp.U.uVP, false, vp);\n    gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);\n    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.starDim);"
  },
  {
   "name": "stars-twilight",
   "row": "the stars fade with the night (Polaris at SKY.night 0.5)",
   "file": "games/driving-simulator/index.html",
-  "old": "gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night);",
-  "new": "gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * Math.max(SKY.night, 1)); /* @negtest */"
+  "old": "gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim);",
+  "new": "gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * Math.max(SKY.night, 1) * SKY.starDim); /* @negtest */"
  },
  {
   "name": "hash-star-left",
@@ -173,5 +173,159 @@
   "file": "games/driving-simulator/index.html",
   "old": "const enuToWorld = v => [v[0], v[1], -v[2]];",
   "new": "const enuToWorld = v => [v[0], v[1], v[2]]; /* @negtest */"
+ },
+ {
+  "name": "ds7-disc-in-fog",
+  "row": "no column of light under a low sun or moon (the fog takes the old sun and moon discs again)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  vec3 fc = skyBase(normalize(vec3(-V.x, max(-V.y, 0.0) * 0.4 + 0.02, -V.z)));",
+  "new": "  vec3 fd = normalize(vec3(-V.x, max(-V.y, 0.0) * 0.4 + 0.02, -V.z)); vec3 fc = skyBase(fd) + uSunCol * smoothstep(0.99985, 0.99993, dot(fd, uSunDir)) * 30.0 * step(-0.06, uSunDir.y) + vec3(1.0) * smoothstep(0.99975, 0.99985, dot(fd, uMoonDir)) * 1.2 * uNight;${\"\" /* @negtest */}"
+ },
+ {
+  "name": "ds7-disc-in-hills",
+  "row": "no column of light under a low sun or moon (from 30 m up the sky pass's hills show under the horizon past the terrain, so the column row sees them)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  float ridge = ridgeY(az, uMtn);\n  // the Milky Way (zmh-sky's band, J2000): only at night, so the day sky costs nothing and keeps its pixels.\n  // uStarM is the world star matrix (J2000 -> world, orthogonal), so its transpose takes d back to J2000.\n  if (uNight > 0.0 && uMwGain > 0.0 && d.y >= ridge) c += uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y);\n  if (d.y < ridge) {\n    vec3 hz = skyBase(normalize(vec3(d.x, 0.02, d.z)));",
+  "new": "  float ridge = ridgeY(az, uMtn); vec3 hzB = skyBodies(normalize(vec3(d.x, 0.02, d.z)));${\"\" /* @negtest */}\n  // the Milky Way (zmh-sky's band, J2000): only at night, so the day sky costs nothing and keeps its pixels.\n  // uStarM is the world star matrix (J2000 -> world, orthogonal), so its transpose takes d back to J2000.\n  if (uNight > 0.0 && uMwGain > 0.0 && d.y >= ridge) c += uMwGain * zmhMilkyWay(transpose(uStarM) * d) * MILKY_WAY_RGB * uNight * smoothstep(0.0, 0.1, d.y);\n  if (d.y < ridge) {\n    vec3 hz = skyBase(normalize(vec3(d.x, 0.02, d.z))) + hzB;"
+ },
+ {
+  "name": "ds7-bodies-below-ridge",
+  "row": "a sun or moon behind the distant hills is hidden (the column row looks only under the horizon)",
+  "file": "games/driving-simulator/index.html",
+  "old": "    c = mix(hill, hz, smoothstep(ridge, ridge - 0.04, d.y) * 0.3);\n  }",
+  "new": "    c = mix(hill, hz, smoothstep(ridge, ridge - 0.04, d.y) * 0.3);\n  }\n  vec3 bb = skyBodies(d); if (d.y < ridge) c += bb;${\"\" /* @negtest */}"
+ },
+ {
+  "name": "ds5-floor-fb",
+  "row": "at the phone's render scale (RSCALE 1.7) Polaris adds at least 200 and a magnitude-4 star at least 60 at every sub-pixel phase",
+  "file": "games/driving-simulator/index.html",
+  "old": "vSig = max(sz * 0.5 / sqrt(8.0), 0.5 * max(uPx, 1.0));",
+  "new": "vSig = max(sz * 0.5 / sqrt(8.0), 0.5);${\"\" /* @negtest */}"
+ },
+ {
+  "name": "ds5-gain-half",
+  "row": "at the phone's render scale (RSCALE 1.7) Polaris adds at least 200 and a magnitude-4 star at least 60 at every sub-pixel phase",
+  "file": "games/driving-simulator/index.html",
+  "old": "const STAR_GAIN = 4.0, MW_GAIN = 0.012;",
+  "new": "const STAR_GAIN = 2.0, MW_GAIN = 0.012; /* @negtest */"
+ },
+ {
+  "name": "ds4-no-refraction",
+  "row": "refraction lifts the drawn discs only",
+  "file": "games/driving-simulator/index.html",
+  "old": "  SKY.sunDiscW = enuToWorld(refracted(SKY.sun)); SKY.moonDiscW = enuToWorld(refracted(SKY.moon));",
+  "new": "  SKY.sunDiscW = enuToWorld(SKY.sun); SKY.moonDiscW = enuToWorld(SKY.moon); /* @negtest */"
+ },
+ {
+  "name": "ds4-refraction-on-light",
+  "row": "the sun through the day; one sun, the kit's; refraction lifts the drawn discs only",
+  "file": "games/driving-simulator/index.html",
+  "old": "  SKY.sun = s.sun.enu;",
+  "new": "  SKY.sun = refracted(s.sun.enu); /* @negtest */"
+ },
+ {
+  "name": "ds4-moon-times-night",
+  "row": "the moon by day",
+  "file": "games/driving-simulator/index.html",
+  "old": "  return b + md.rgb * (1.0 - MARE_DARK * k) * uMoonK;",
+  "new": "  return b + md.rgb * (1.0 - MARE_DARK * k) * uMoonK * uNight;${\"\" /* @negtest */}"
+ },
+ {
+  "name": "ds4-earthshine-0",
+  "row": "the bright limb faces the sun (the crescent's dark part shows earthshine at night)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const SUN_R = 0.265 * RAD, MOON_R_KM = 1737.4, MOON_K = 1.2, ES_GAIN = 600;",
+  "new": "const SUN_R = 0.265 * RAD, MOON_R_KM = 1737.4, MOON_K = 1.2, ES_GAIN = 0; /* @negtest */"
+ },
+ {
+  "name": "ds4-limb-wrong-side",
+  "row": "the bright limb faces the sun",
+  "file": "games/driving-simulator/index.html",
+  "old": "  vec4 md = zmhMoonDisc(d, uMoonDisc, uSunDir, uMoonR, uMoonES);",
+  "new": "  vec4 md = zmhMoonDisc(d, uMoonDisc, -uSunDir, uMoonR, uMoonES);${\"\" /* @negtest */}"
+ },
+ {
+  "name": "ds4-moonlight-no-phase",
+  "row": "a full moon lights the night (a first-quarter moon lifts it at most 0.35 as much)",
+  "file": "games/driving-simulator/index.html",
+  "old": "ZMH_SKY.moonIlluminanceLux(m.phaseAngleDeg, m.altDeg)",
+  "new": "ZMH_SKY.moonIlluminanceLux(0, m.altDeg) /* @negtest */"
+ },
+ {
+  "name": "ds4-no-star-dim",
+  "row": "a bright moon dims the stars",
+  "file": "games/driving-simulator/index.html",
+  "old": "  SKY.starDim = 1 - MOON_DIM * SKY.moonBright;",
+  "new": "  SKY.starDim = 1; /* @negtest */"
+ },
+ {
+  "name": "ds4-no-moon-ambient",
+  "row": "a full moon lights the night (at least 1.5x the new-moon midnight)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const MOON_RGB = [0.04, 0.052, 0.088], MOON_AMB = 1.0, MOON_DIM = 0.6;",
+  "new": "const MOON_RGB = [0.04, 0.052, 0.088], MOON_AMB = 0, MOON_DIM = 0.6; /* @negtest */"
+ },
+ {
+  "name": "ds4-earthshine-by-day",
+  "row": "by day the moon's dark part is no brighter than the sky beside it",
+  "file": "games/driving-simulator/index.html",
+  "old": "SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg) * SKY.night * (SK.earthshine / 100);",
+  "new": "SKY.moonES = ES_GAIN * ZMH_SKY.earthshineFraction(m.phaseAngleDeg) * (SK.earthshine / 100); /* @negtest */"
+ },
+ {
+  "name": "ds6-stars-to-planets",
+  "row": "each sky slider at 0 (Stars) and each at 200 (Stars)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniform1f(sp.U.uStarsK, SK.stars / 100);",
+  "new": "gl.uniform1f(sp.U.uStarsK, SK.planets / 100); /* @negtest */"
+ },
+ {
+  "name": "ds6-planets-to-stars",
+  "row": "each sky slider at 0 (Planets) and each at 200 (Planets)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniform1f(sp.U.uPlanetK, SK.planets / 100);",
+  "new": "gl.uniform1f(sp.U.uPlanetK, SK.stars / 100); /* @negtest */"
+ },
+ {
+  "name": "ds6-mw-to-stars",
+  "row": "each sky slider at 0 (Milky Way) and each at 200 (Milky Way)",
+  "file": "games/driving-simulator/index.html",
+  "old": "MW.on ? MW_GAIN * SKY.starDim * (SK.mw / 100) : 0",
+  "new": "MW.on ? MW_GAIN * SKY.starDim * (SK.stars / 100) : 0 /* @negtest */"
+ },
+ {
+  "name": "ds6-sun-to-moon",
+  "row": "each sky slider at 0 (Sun) and each at 200 (Sun)",
+  "file": "games/driving-simulator/index.html",
+  "old": "kSun = SK.sun / 100, kMoon = SK.moon / 100;",
+  "new": "kSun = SK.moon / 100, kMoon = SK.moon / 100; /* @negtest */"
+ },
+ {
+  "name": "ds6-moondisc-to-sun",
+  "row": "each sky slider at 0 (Moonlight) and each at 200 (Moonlight)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniform1f(sk.U.uMoonK, MOON_K * (SK.moon / 100));",
+  "new": "gl.uniform1f(sk.U.uMoonK, MOON_K * (SK.sun / 100)); /* @negtest */"
+ },
+ {
+  "name": "ds6-moonlight-to-sun",
+  "row": "each sky slider at 200 (Moonlight: uMoonCol 2x, the land at the full-moon midnight)",
+  "file": "games/driving-simulator/index.html",
+  "old": "kSun = SK.sun / 100, kMoon = SK.moon / 100;",
+  "new": "kSun = SK.sun / 100, kMoon = SK.sun / 100; /* @negtest */"
+ },
+ {
+  "name": "ds6-earthshine-to-moon",
+  "row": "each sky slider at 0 (Earthshine) and each at 200 (Earthshine)",
+  "file": "games/driving-simulator/index.html",
+  "old": "* SKY.night * (SK.earthshine / 100);",
+  "new": "* SKY.night * (SK.moon / 100); /* @negtest */"
+ },
+ {
+  "name": "ds6-old-save-0",
+  "row": "the sky sliders are saved and come back after a reload; an old save without them reads 100 everywhere",
+  "file": "games/driving-simulator/index.html",
+  "old": "  const sky = Object.assign({}, SETTINGS.sky);",
+  "new": "  const sky = Object.keys(saved).length && !saved.sky ? Object.fromEntries(SKY_KEYS.map(k => [k, 0])) : Object.assign({}, SETTINGS.sky); /* @negtest */"
  }
 ]
