@@ -91,9 +91,10 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
   <p><b>Move</b> with the stick at the bottom left: put a thumb down anywhere in the lower left and push. You always face your opponent; up walks at them, sideways circles them.</p>
   <p><b>Attack</b> (the big button): tap again as each cut lands and the cuts chain into a <b>five-cut combo</b> (diagonal, rising, horizontal, thrust, overhead), then the chain starts over. Stop tapping and the chain ends.</p>
   <p><b>Parry</b> (above attack): tap it just before an enemy cut lands. Caught in the short window, the cut is turned aside and your opponent is <b>staggered</b>: while they stagger they cannot parry or dodge, and every cut you land does <b>10% more</b> damage. Mistimed, a parry leaves you open for a moment. A parry pressed while you reel from a hit does nothing.</p>
+  <p><b>Quick and heavy strikes</b> (the two small buttons above and left of attack, quick the lower): a quick strike is a jab that does less damage but winds up fast, so its parry window is short; a heavy strike does more damage but telegraphs longer, so its parry window is long. Either one works as any cut of the five-cut chain, and your opponent throws them too.</p>
   <p><b>Dodge</b> (left of attack): a quick dash the way the stick points, or backwards with the stick at rest. For a split second in the middle of it you cannot be hit, so a well-timed dodge can go straight through a cut.</p>
   <p><b>Energy</b>: a dodge that slips a cut, a parry, and the third and fifth cut of an unbroken combo each give 1 point. The ring round the <b>power attack</b> button fills with it; at 10 it closes and flashes and the power attack is ready. It costs 10, and you can bank 20 to throw two back to back. A power attack (yours or your opponent's) <b>cannot be parried</b>, only dodged, and a fighter winding one up does not flinch when hit.</p>
-  <p><b>Keyboard</b>: WASD or the arrow keys to move, J attack, K dodge, L parry, I power attack, Esc for this menu.</p>
+  <p><b>Keyboard</b>: WASD or the arrow keys to move, J attack, K dodge, L parry, I power attack, U quick strike, O heavy strike, Esc for this menu.</p>
   <p><b>Performance stats</b>: FPS is frames a second; frame is the time between frames (average and slowest in the last half second); CPU is the page's own time a frame (fight, 3D, HUD); calls and tris are draw calls and triangles a frame.</p>
   <button id="set-close" class="btn">CLOSE</button>
 </div></div>
@@ -1115,7 +1116,9 @@ function poseOf(f) {
     case 'atk': case 'power': {
       const power = f.st === 'power', H = specOf(f), ph = phasesOf(f, H);
       const C = power ? { wind: POSE.powerWind, sweep: POSE.powerCut, follow: POSE.powerCut[2] } : POSE.cuts[f.chain];
-      if (f.t < ph.w) { out.key = C.wind; out.blend = ease(f.t / ph.w); out.lean = 0.0; out.drop = power ? 0.18 : 0.08; out.glow = power ? f.t / ph.w : 0; }
+      // the telegraph you can see: a jab draws back a little, a heavy a long way (a normal cut as written)
+      const wk = power ? C.wind : f.kind === 'quick' ? mixKey(POSE.guard, C.wind, 0.55) : f.kind === 'heavy' ? mixKey(POSE.guard, C.wind, 1.25) : C.wind;
+      if (f.t < ph.w) { out.key = wk; out.blend = ease(f.t / ph.w); out.lean = 0.0; out.drop = power ? 0.18 : f.kind === 'heavy' ? 0.14 : 0.08; out.glow = power ? f.t / ph.w : 0; }
       else if (f.t < ph.w + ph.a) { out.key = along(C.sweep, (f.t - ph.w) / ph.a); out.blend = 1; out.lean = 0.2; out.drop = power ? 0.14 : 0.12; out.swing = 1; out.glow = power ? 1 : 0;
         if (power) out.spin = (f.t - ph.w) / ph.a * TAU; }
       else { const u = (f.t - ph.w - ph.a) / ph.r; out.key = mixKey(C.follow, POSE.guard, ease(clamp((u - 0.25) / 0.75, 0, 1))); out.blend = 1; out.lean = lerp(0.18, 0.06, u); out.drop = lerp(0.12, 0.05, u); out.glow = power ? Math.max(0, 1 - u * 3) : 0; }
@@ -1318,7 +1321,7 @@ function onEvents() {
   for (const ev of F.events) {
     const mine = ev.who === 'p';
     switch (ev.type) {
-      case 'swing': if (!mine) SND.tell(); break;
+      case 'swing': if (!mine) SND.tell(ev.kind); break;
       case 'hit': {
         const at = ev.at;
         spark(at, ev.power ? 26 : 12, ev.crit ? [1, 0.75, 0.3] : [1, 0.95, 0.9], ev.power ? 5 : 3.2, 0.35, 0.035, 6);
@@ -1398,6 +1401,9 @@ function layout() {
     dodge: { x: ax - d, y: ay, r: 0.66 * R },
     parry: { x: ax, y: ay - d, r: 0.66 * R },
     power: { x: ax - d * Math.SQRT1_2, y: ay - d * Math.SQRT1_2, r: 0.72 * R },
+    // the two strike kinds sit on a wider arc round attack, quick low by the thumb's rest and heavy high
+    quick: { x: ax - 3.4 * R * Math.cos(Math.PI / 8), y: ay - 3.4 * R * Math.sin(Math.PI / 8), r: 0.6 * R },
+    heavy: { x: ax - 3.4 * R * Math.cos(3 * Math.PI / 8), y: ay - 3.4 * R * Math.sin(3 * Math.PI / 8), r: 0.6 * R },
   };
   const rj = 1.25 * R;
   LAY.stick = { x: s.l + 22 + rj, y: H - s.b - 22 - rj, r: rj };
@@ -1442,7 +1448,7 @@ let mouseDown = false;
 hud.addEventListener('mousedown', e => { mouseDown = true; down('m', e.clientX, e.clientY); });
 window.addEventListener('mousemove', e => { if (mouseDown) move('m', e.clientX, e.clientY); });
 window.addEventListener('mouseup', () => { if (mouseDown) { mouseDown = false; up('m'); } });
-const KEYMAP = { KeyJ: 'atk', KeyK: 'dodge', KeyL: 'parry', KeyI: 'power' };
+const KEYMAP = { KeyJ: 'atk', KeyK: 'dodge', KeyL: 'parry', KeyI: 'power', KeyU: 'quick', KeyO: 'heavy' };
 window.addEventListener('keydown', e => {
   SND.init();
   if (e.code === 'Escape') { toggleSettings(); return; }
@@ -1460,7 +1466,7 @@ function playerIntent() {
   const m = Math.hypot(sx, sy); if (m > 1) { sx /= m; sy /= m; }
   const fwd = [Math.sin(CAM.yaw), Math.cos(CAM.yaw)], rt = [-Math.cos(CAM.yaw), Math.sin(CAM.yaw)];
   const P = INPUT.press;
-  const inp = { mx: fwd[0] * sy + rt[0] * sx, mz: fwd[1] * sy + rt[1] * sx, atk: !!P.atk, dodge: !!P.dodge, parry: !!P.parry, power: !!P.power };
+  const inp = { mx: fwd[0] * sy + rt[0] * sx, mz: fwd[1] * sy + rt[1] * sx, atk: !!P.atk, dodge: !!P.dodge, parry: !!P.parry, power: !!P.power, quick: !!P.quick, heavy: !!P.heavy };
   INPUT.press = {};
   return inp;
 }
@@ -1482,7 +1488,7 @@ function update(dt) {
       simAcc -= SIM_DT;
       const ip = APP.state === 'fight' ? playerIntent() : NO_INPUT;
       const ie = APP.state === 'fight' ? aiIntent(F, SIM_DT) : NO_INPUT;
-      if (!first) { ip.atk = ip.dodge = ip.parry = ip.power = false; }
+      if (!first) { ip.atk = ip.dodge = ip.parry = ip.power = ip.quick = ip.heavy = false; }
       stepFight(F, SIM_DT, ip, ie);
       first = false;
       onEvents();
@@ -1710,6 +1716,16 @@ function icon(k, x, y, r, col) {
     hx.lineWidth = 3.6 * s;
     hx.beginPath(); hx.moveTo(-15 * s, 15 * s); hx.lineTo(15 * s, -15 * s); hx.moveTo(15 * s, 15 * s); hx.lineTo(-15 * s, -15 * s); hx.stroke();
     hx.lineWidth = 5 * s; hx.beginPath(); hx.moveTo(-19 * s, 11 * s); hx.lineTo(-11 * s, 19 * s); hx.moveTo(19 * s, 11 * s); hx.lineTo(11 * s, 19 * s); hx.stroke();
+  } else if (k === 'quick') {    // a short straight blade with three speed lines behind it
+    hx.lineWidth = 4.5 * s; hx.beginPath(); hx.moveTo(-4 * s, 10 * s); hx.lineTo(18 * s, -12 * s); hx.stroke();
+    hx.lineWidth = 6 * s; hx.beginPath(); hx.moveTo(-9 * s, 15 * s); hx.lineTo(-3 * s, 9 * s); hx.stroke();
+    hx.lineWidth = 2.6 * s;
+    for (let i = 0; i < 3; i++) { hx.globalAlpha = 0.85 - 0.22 * i; hx.beginPath(); hx.moveTo(-22 * s, (-4 + i * 10) * s); hx.lineTo((i === 1 ? -13 : -10) * s, (-4 + i * 10) * s); hx.stroke(); }
+  } else if (k === 'heavy') {    // a katana under a thick double arc
+    hx.lineWidth = 4.5 * s; hx.beginPath(); hx.moveTo(-17 * s, 19 * s); hx.quadraticCurveTo(2 * s, 8 * s, 19 * s, -9 * s); hx.stroke();
+    hx.lineWidth = 6 * s; hx.beginPath(); hx.moveTo(-22 * s, 24 * s); hx.lineTo(-14 * s, 16 * s); hx.stroke();
+    hx.lineWidth = 4.5 * s;
+    for (let i = 0; i < 2; i++) { hx.globalAlpha = 1 - 0.4 * i; hx.beginPath(); hx.arc(0, 8 * s, (24 + i * 9) * s, -2.5, -0.65); hx.stroke(); }
   } else {                       // power: a burst
     hx.lineWidth = 3 * s; hx.beginPath();
     for (let i = 0; i < 16; i++) { const a = i / 16 * TAU - Math.PI / 2, rr2 = (i % 2 ? 9 : 22) * s; i ? hx.lineTo(Math.cos(a) * rr2, Math.sin(a) * rr2) : hx.moveTo(Math.cos(a) * rr2, Math.sin(a) * rr2); }
@@ -1798,7 +1814,7 @@ function drawHUD(W, H, dpr) {
     hx.globalAlpha = 1 - u * 0.5; hx.font = "16px 'Black Ops One', cursive"; hx.fillStyle = '#ffc300'; hx.fillText('+1', x, y);
   }
   hx.globalAlpha = 1;
-  if (APP.state === 'fight' || APP.state === 'intro') { drawStick(); for (const k of ['dodge', 'parry', 'power', 'atk']) drawButton(k); }
+  if (APP.state === 'fight' || APP.state === 'intro') { drawStick(); for (const k of ['dodge', 'parry', 'power', 'quick', 'heavy', 'atk']) drawButton(k); }
   // banners
   hx.textAlign = 'center'; hx.textBaseline = 'middle';
   if (APP.state === 'intro') {
@@ -1889,7 +1905,11 @@ const SND = {
   dodge() { if (!this.ok()) return; this.nz(this.ctx.currentTime, 0.24, 260, 900, 0.7, 0.22); },
   slip() { if (!this.ok()) return; const t = this.ctx.currentTime; this.osc(t, 'sine', 880, 1760, 0.18, 0.08); },
   guard() { if (!this.ok()) return; this.nz(this.ctx.currentTime, 0.08, 2500, 4500, 2, 0.1); },
-  tell() { if (!this.ok()) return; this.nz(this.ctx.currentTime, 0.1, 900, 400, 1.2, 0.14); },
+  tell(kind) { if (!this.ok()) return; const t = this.ctx.currentTime;
+    // the tell follows the telegraph: a jab is short and high, a heavy long and low, a normal cut as it always was
+    if (kind === 'quick') this.nz(t, 0.06, 1500, 800, 1.2, 0.14);
+    else if (kind === 'heavy') this.nz(t, 0.22, 500, 200, 1.2, 0.16);
+    else this.nz(t, 0.1, 900, 400, 1.2, 0.14); },
   step(mine) { if (!this.ok()) return; this.nz(this.ctx.currentTime, 0.07, 500, 220, 0.6, mine ? 0.06 : 0.045, null, 'lowpass'); },
   charge(windMul) { if (!this.ok()) return; const t = this.ctx.currentTime, d = RULES.power.wind * windMul;
     const c = this.ctx, o = c.createOscillator(); o.type = 'sawtooth'; o.frequency.setValueAtTime(70, t); o.frequency.exponentialRampToValueAtTime(220, t + d);
@@ -2020,7 +2040,7 @@ if (gl) {
 // test handle: the suites step the duel through this
 window.__CS = {
   RULES, LADDER, rankParams, SAVE, SETTINGS, APP, LAY, INPUT, SND, PERF, VIS, CAM, SKY,
-  get F() { return F; }, startDuel, poseOf, setLighting, layout, buttonAt, toggleSettings,
+  get F() { return F; }, POSE, startDuel, poseOf, setLighting, layout, buttonAt, toggleSettings,
   setPaused(b) { APP.testPaused = !!b; },
   tick(dt, n) { for (let i = 0; i < (n || 1); i++) update(dt); },
   press(k) { pressBtn(k); },

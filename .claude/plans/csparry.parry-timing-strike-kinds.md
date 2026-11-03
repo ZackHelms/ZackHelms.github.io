@@ -205,7 +205,7 @@ Plans). One task per arc step; each is one session's work and one commit on the 
 | 1 | CS-3 engine, rows, breaks, the blade-at-contact measurement | done |
 | 2 | CS-3 docs, land, Pages | done (docs and badge; the overseer lands) |
 | 3 | CS-4 engine | done |
-| 4 | CS-4 page | open |
+| 4 | CS-4 page | done |
 | 5 | Docs final, break list, land, Pages | open |
 
 ### Step 1 - CS-3: one attack table, the parry judged against it, no parry from a flinch
@@ -542,6 +542,41 @@ winds up before a rank-5 mind can answer).
 - The `counter` persona keeps 0.13 for a power attack (it dodges those; a power row has `parryWin` 0).
 - Row 4 seeds are `s * 104729 + rank` with both fighters' hp set to 1e6 so every duel runs the full 60 s; row 5 seeds are
   `7000 + s`, and a trial ends at the first hit, parry, dodge or player whiff.
+
+### Step 4 (2026-11-03)
+
+**What changed** (`games/combat-simulator/index.html`, page code only; the `ENGINE` block, shaders, `render()`, `STYLES` and the styles break list untouched):
+- `layout()` adds `quick` at 3.4 R / 22.5 deg and `heavy` at 3.4 R / 67.5 deg, `r: 0.6 * R`; the four existing buttons did not move.
+- `KEYMAP` adds `KeyU: 'quick'`, `KeyO: 'heavy'`; `playerIntent()` passes `quick` and `heavy`; `update()`'s first-tick clear zeroes them too
+  (the `INPUT.press = {}` clears already cover them). `drawHUD()` draws all six buttons.
+- `icon()`: quick is a short straight blade with a hilt stroke and three speed lines; heavy is the katana under a thick double arc.
+- `poseOf()`: the wind-up key is `mixKey(POSE.guard, C.wind, 0.55)` for quick and `mixKey(POSE.guard, C.wind, 1.25)` for heavy (pelvis `drop` 0.14),
+  the normal cut's `C.wind` as before; sweep and follow-through unchanged. `POSE` is exposed on `__CS`.
+- `SND.tell(kind)`: quick a 0.06 s noise burst sweeping 1500 to 800 Hz, heavy a 0.22 s burst sweeping 500 to 200 Hz at a slightly higher level,
+  anything else the old 0.1 s, 900 to 400 Hz. `onEvents()` passes `ev.kind`.
+- Help (HOW TO FIGHT): a Quick and heavy strikes paragraph before Dodge (less or more damage, shorter or longer wind-up and parry window, either one is any
+  cut of the chain, the opponent throws them too) and `U quick strike, O heavy strike` on the Keyboard line. Plain ASCII, opt-in.
+
+**Rows** (`.claude/tests/drive-combat-simulator.cjs`, part 2, 86 -> **89**):
+1. a CDP touch on the quick button and on the heavy button each gives `F.p.st === 'atk'` and `F.p.kind` of the button (one row, both buttons).
+2. `KeyU` and `KeyO`, one tick each, do the same (one row, both keys).
+3. half way through the same cut's wind-up, the hand key's distance from `POSE.guard` is smallest for quick, then normal, then heavy, on all five chain indices.
+
+**Restated** (none removed): the layout row now checks six buttons at the seven sizes and its label and detail name them
+(`the six controls (atk, dodge, parry, power, quick, heavy) fit ...`, requiring six names); the paint scenario `duelUnder` presses `quick` at
+`i % 90 === 30` and `heavy` at `i % 90 === 60` beside `atk` every 30, and still proves the fighters byte-identical under every style (15 cuts landed).
+
+**Suite:** 86 -> **89** passed, 0 failed; `gates.sh games/combat-simulator/index.html` GREEN.
+
+**Breaks** (`negtests/combat-simulator.json`, 28 -> 32; styles list untouched at 14; both dry-apply, every `old` found exactly once; no existing break was re-pointed):
+- `quick-button-missing` (no `quick` in `LAY.btn`): **caught** by row 1 (and the suite crashed in `drawHUD`, a second catch).
+- `keys-no-heavy` (no `KeyO`): **caught** by row 2.
+- `heavy-overlaps-power` (heavy at 45 deg): **caught** by the layout row at 390x844 and 844x390, and by the power ring row (8 fails).
+- `kind-pose-ignored` (`poseOf()` ignores the kind): **caught** by row 3.
+
+**Assumed choices (step 4):** the tells' pitches and lengths above; the icon strokes (quick: 4.5 blade, 6 hilt, three 2.6 speed lines fading, the middle one longer;
+heavy: 4.5 blade and two 4.5 arcs of radius 24 and 33 at 100% and 60% alpha, all in units of r/46); the help paragraph's wording; the layout row's label now
+names the six buttons at each size; rows 1 and 2 each cover both buttons or keys in one row, to hit the plan's count of 3.
 
 ## Handoff
 

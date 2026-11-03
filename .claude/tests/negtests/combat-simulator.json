@@ -166,5 +166,29 @@
   "file": "games/combat-simulator/index.html",
   "old": "    quickP: lerp(0.05, 0.30, t),                // the share of its cuts thrown quick, and heavy",
   "new": "    quickP: 0, /* @negtest */"
+ },
+ {
+  "name": "quick-button-missing",
+  "file": "games/combat-simulator/index.html",
+  "old": "    quick: { x: ax - 3.4 * R * Math.cos(Math.PI / 8), y: ay - 3.4 * R * Math.sin(Math.PI / 8), r: 0.6 * R },\n",
+  "new": "    /* @negtest */\n"
+ },
+ {
+  "name": "keys-no-heavy",
+  "file": "games/combat-simulator/index.html",
+  "old": ", KeyU: 'quick', KeyO: 'heavy' };",
+  "new": ", KeyU: 'quick' /* @negtest */ };"
+ },
+ {
+  "name": "heavy-overlaps-power",
+  "file": "games/combat-simulator/index.html",
+  "old": "heavy: { x: ax - 3.4 * R * Math.cos(3 * Math.PI / 8), y: ay - 3.4 * R * Math.sin(3 * Math.PI / 8), r: 0.6 * R },",
+  "new": "heavy: { x: ax - 3.4 * R * Math.cos(Math.PI / 4), y: ay - 3.4 * R * Math.sin(Math.PI / 4), r: 0.6 * R }, /* @negtest */"
+ },
+ {
+  "name": "kind-pose-ignored",
+  "file": "games/combat-simulator/index.html",
+  "old": "const wk = power ? C.wind : f.kind === 'quick' ?",
+  "new": "const wk = true || power ? C.wind /* @negtest */ : f.kind === 'quick' ?"
  }
 ]

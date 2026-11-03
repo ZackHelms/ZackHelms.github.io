@@ -465,7 +465,45 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     ok('the ' + k + ' button ' + k + 's', s === k, s);
     await page.evaluate(() => __CS.tick(1 / 60, 60));
   }
-  await page.evaluate(() => { __CS.F.p.energy = 10; });
+  // the two strike-kind buttons: a touch on each starts a cut of that kind (CS-4)
+  const byBtn = [];
+  for (const [k, kind] of [['quick', 'quick'], ['heavy', 'heavy']]) {
+    await page.evaluate(() => { const F = __CS.F; F.p.st = 'free'; F.p.t = 0; F.p.buf = null; F.p.queued = false; F.p.grace = 0; });
+    const hasBtn = !!L.btn[k];
+    if (hasBtn) { await touch('touchStart', [[L.btn[k].x, L.btn[k].y, 5]]); await touch('touchEnd', [[L.btn[k].x, L.btn[k].y, 5]]); }
+    await page.evaluate(() => __CS.tick(1 / 60, 1));
+    const s = await page.evaluate(() => ({ st: __CS.F.p.st, kind: __CS.F.p.kind }));
+    byBtn.push([k, hasBtn, s.st, s.kind, hasBtn && s.st === 'atk' && s.kind === kind]);
+    await page.evaluate(() => __CS.tick(1 / 60, 90));
+  }
+  ok('a touch on the quick button throws a quick strike and on the heavy button a heavy one', byBtn.length === 2 && byBtn.every(r => r[4]), byBtn);
+  // and the keys U and O do the same, one tick each
+  const byKey = [];
+  for (const [code, kind] of [['KeyU', 'quick'], ['KeyO', 'heavy']]) {
+    await page.evaluate(() => { const F = __CS.F; F.p.st = 'free'; F.p.t = 0; F.p.buf = null; F.p.queued = false; F.p.grace = 0; });
+    await page.keyboard.press(code);
+    await page.evaluate(() => __CS.tick(1 / 60, 1));
+    const s = await page.evaluate(() => ({ st: __CS.F.p.st, kind: __CS.F.p.kind }));
+    byKey.push([code, s.st, s.kind, s.st === 'atk' && s.kind === kind]);
+    await page.evaluate(() => __CS.tick(1 / 60, 90));
+  }
+  ok('U throws a quick strike and O a heavy one, one tick each', byKey.length === 2 && byKey.every(r => r[3]), byKey);
+  // the telegraph you can see: half way through the same cut's wind-up, a quick strike's hand has drawn back the least and a heavy's the most
+  const pose = await page.evaluate(() => {
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]), out = [];
+    for (let idx = 0; idx < 5; idx++) {
+      const d = {};
+      for (const kind of ['quick', 'normal', 'heavy']) {
+        const f = Object.assign({}, __CS.F.p, { st: 'atk', chain: idx, kind });
+        f.t = phasesOf(f, specOf(f)).w / 2;
+        d[kind] = dist(__CS.poseOf(f).key.H, __CS.POSE.guard.H);
+      }
+      out.push([idx, +d.quick.toFixed(3), +d.normal.toFixed(3), +d.heavy.toFixed(3)]);
+    }
+    return out;
+  });
+  ok('half way through a wind-up the hand has drawn back least for a quick strike and most for a heavy one, on all five cuts', pose.every(r => r[1] < r[2] && r[2] < r[3]), pose);
+  await page.evaluate(() => { __CS.F.p.st = 'free'; __CS.F.p.t = 0; __CS.F.p.buf = null; __CS.F.p.queued = false; __CS.F.p.energy = 10; });
   await touch('touchStart', [[L.btn.power.x, L.btn.power.y, 4]]); await touch('touchEnd', [[L.btn.power.x, L.btn.power.y, 4]]);
   await page.evaluate(() => __CS.tick(1 / 60, 1));
   ok('the power button throws the power attack', await page.evaluate(() => __CS.F.p.st === 'power'));
@@ -516,9 +554,9 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
       const set = document.getElementById('set-btn').getBoundingClientRect();
       if (L.barTop - 17 < set.bottom + 4) out.push('bars-under-chrome');       // the label's cap height above the bar
       for (const [k, b] of B) if (b.y - b.r * 1.3 < L.barTop + 40) out.push('under-bars:' + k);
-      return out;
+      return { names: B.map(e => e[0]), out };
     });
-    ok('controls fit, clear of each other, the stick and the bars at ' + w + 'x' + h, r.length === 0, r);
+    ok('the six controls (' + r.names.join(', ') + ') fit, clear of each other, the stick and the bars at ' + w + 'x' + h, r.names.length === 6 && r.out.length === 0, r);
   }
   await page.setViewportSize({ width: 844, height: 390 });
   await page.waitForTimeout(150);
@@ -595,6 +633,8 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     for (let i = 0; i < 1200; i++) {
       if (then && i === at) __CS.setStyle(then);
       if (i % 30 === 0) __CS.press('atk');
+      if (i % 90 === 30) __CS.press('quick');
+      if (i % 90 === 60) __CS.press('heavy');
       __CS.tick(1 / 120, 1);
       if (i % 4 === 0) __CS.draw();
     }
