@@ -1779,6 +1779,64 @@ const AE = {
   ok('the engine slider at 0 silences the engine while tyres, wind and radio play on', engOff.engine < 0.0005 && engOff.tyres > 0.005 && engOff.wind > 0.005 && engOff.music > 0.01, engOff);
   ok('the engine slider half way is a quarter of the level (a squared taper)', Math.abs(engHalf.engine / lvOn.engine - 0.25) < 0.08, [engHalf.engine, lvOn.engine]);
 
+  // ---- 9a. the ambient by season (DS-3, dsseasons step 3): birds and insects measured off their own probes ----
+  // The rows do not depend on the frame rate. For each window the live loop is held (requestAnimationFrame swallowed, so no
+  // frame draws a die or calls the scheduler; the scheduler queues only 0.3 s ahead and a frame here can take a second),
+  // SND.update(0) is driven from a 50 ms setInterval in the page, Math.random is held to one seeded generator (every
+  // season hears the same dice), and the schedule starts afresh (SND.ambRestart: the first voice 0.5 s in). Before each
+  // window the bed is stopped (the ambient slider at 0, so nothing is scheduled) until both probes are silent, so nothing
+  // left from the window before is measured. The radio is at 0 throughout (its noise draws dice too). Each probe's RMS is
+  // read every 50 ms and the window's figure is the plain mean of those reads (proportional to how many voices sing, so a
+  // bird rate of 0.5 reads about 0.5x); `pk` is the loudest read. The view is the chase view at a cruise (section 9's setup).
+  const AMB_SEED = 20261103;
+  const ambWin = (season, hour, secs) => page.evaluate(async ([season, hour, secs, seed]) => {
+    const W = window, D = W.__DS, S = D.SND, sleep = ms => new Promise(r => setTimeout(r, ms));
+    // the bed stopped: nothing new is queued, and what was (at most 0.3 s ahead) is let finish: 0.5 s of unbroken silence on
+    // both probes, longer than any gap inside a voice, so a quiet moment between two crickets never reads as the end
+    D.SETTINGS.vols.ambient = 0; S.apply();
+    for (let i = 0, quiet = 0; i < 600 && quiet < 10; i++) { await sleep(50); quiet = (S.rms('birds') || 0) > 1e-6 || (S.rms('insects') || 0) > 1e-6 ? 0 : quiet + 1; }
+    if (D.lookSeason !== season) D.applySeason(season);
+    D.SKY.hour = hour; D.updateSky();
+    const raf = W.requestAnimationFrame; let held = null;
+    W.requestAnimationFrame = f => { held = f; return 0; };
+    for (let i = 0; i < 200 && !held; i++) await sleep(25);      // the frame already queued runs once, then holds
+    const rnd = Math.random; let a = seed >>> 0;
+    Math.random = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const keys = ['birds', 'insects', 'engine'], sum = {}, pk = {}; for (const k of keys) { sum[k] = 0; pk[k] = 0; }
+    const n = Math.round(secs * 20); let iv = null;
+    try {
+      D.SETTINGS.vols.ambient = 100; S.apply(); S.ambRestart(); S.update(0);
+      iv = setInterval(() => S.update(0), 50);
+      for (let i = 0; i < n; i++) { await sleep(50); for (const k of keys) { const v = S.rms(k) || 0; sum[k] += v; pk[k] = Math.max(pk[k], v); } }
+    } finally {
+      clearInterval(iv); Math.random = rnd; W.requestAnimationFrame = raf; if (held) raf(held);
+    }
+    const out = { season, hour, look: D.lookSeason, day: D.SKY.day, night: D.SKY.night, n, pk };
+    for (const k of keys) out[k] = sum[k] / n;
+    return out;
+  }, [season, hour, secs, AMB_SEED]);
+  const amb0 = await page.evaluate(() => { const D = window.__DS, k = { look: D.lookSeason, music: D.SETTINGS.vols.music, ambient: D.SETTINGS.vols.ambient, hour: D.SKY.hour };
+    D.SETTINGS.vols.music = 0; D.SND.apply(); return k; });
+  const AW = {};
+  for (const [k, se, h] of [['winterDay', 'winter', 13], ['winterNight', 'winter', 1], ['springNight', 'spring', 1], ['springDay', 'spring', 13],
+    ['autumnNight', 'autumn', 1], ['autumnDay', 'autumn', 13], ['summerNight', 'summer', 1], ['summerDay', 'summer', 13]]) AW[k] = await ambWin(se, h, 8);
+  await page.evaluate(k => { const D = window.__DS; D.applySeason(k.look); D.SETTINGS.vols.music = k.music; D.SETTINGS.vols.ambient = k.ambient; D.SND.apply();
+    D.SKY.hour = k.hour; D.updateSky(); }, amb0);
+  const rA = x => +(+x).toPrecision(3);
+  console.log('  .. ambient by season: ' + JSON.stringify(Object.fromEntries(Object.entries(AW).map(([k, v]) => [k, { look: v.look, birds: rA(v.birds), insects: rA(v.insects), insPk: rA(v.pk.insects), engine: rA(v.engine) }]))));
+  const ambLooks = Object.entries(AW).every(([k, v]) => k.startsWith(v.look) && (v.hour === 13 ? v.day > 0.9 : v.night > 0.9));
+  ok('no insects in winter: by day (13:00) and by night (01:00), 8 s each with the ambient at 100, the insects\' RMS under 1e-5; spring by night over 1e-4 (crickets)',
+    ambLooks && AW.winterDay.insects < 1e-5 && AW.winterNight.insects < 1e-5 && AW.springNight.insects > 1e-4,
+    { ambLooks, winterDay: AW.winterDay.insects, winterNight: AW.winterNight.insects, springNight: AW.springNight.insects });
+  const katy = AW.summerNight.insects / AW.springNight.insects, cic = AW.summerDay.insects / AW.summerDay.engine;
+  ok('summer\'s insects: cicadas by day (insects over 1e-4 at 13:00, spring\'s under 1e-5), katydids by night at 1.3-2.5x spring\'s night insects, the cicadas under 0.6x the engine at a cruise in the chase view',
+    ambLooks && AW.summerDay.insects > 1e-4 && AW.springDay.insects < 1e-5 && katy >= 1.3 && katy <= 2.5 && cic < 0.6 && AW.summerDay.engine > 0.02,
+    { summerDay: AW.summerDay.insects, springDay: AW.springDay.insects, katydidVsCricket: katy, cicadaVsEngine: cic, peakVsEngine: AW.summerDay.pk.insects / AW.summerDay.engine, engine: AW.summerDay.engine });
+  const thinA = AW.autumnDay.birds / AW.springDay.birds, thinW = AW.winterDay.birds / AW.springDay.birds;
+  ok('autumn and winter thin the birds: at 13:00 over 8 s autumn\'s birds under 0.7x spring\'s and winter\'s under 0.5x; autumn by night has crickets (over 1e-4)',
+    ambLooks && AW.springDay.birds > 1e-4 && thinA < 0.7 && thinW < 0.5 && AW.autumnNight.insects > 1e-4,
+    { spring: AW.springDay.birds, autumn: thinA, winter: thinW, autumnNight: AW.autumnNight.insects });
+
   // ---- 9b. other cars (DS-2): six voices, panned off the camera's own right, pitched by Doppler, measured off the analysers ----
   // The oracles are the suite's own, typed from the spec: the equal-power pan law on p = 0.8 sin(bearing), the bearing measured
   // against right = cross(fwd, up) (facing +z that is -x in this world: the screen's right), and Doppler

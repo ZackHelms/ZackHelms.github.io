@@ -3852,6 +3852,17 @@ const TRAFFIC_GAIN = 0.75;          // the voices' overall level, measured: a ca
 const TV_N = 6, TV_RANGE = 150, TV_C = 343, TV_REF = 5;    // voices, reach (m), speed of sound (m/s), reference distance (m)
 const TV_SHIFT = [1300, 2600];      // a calm driver's down- and up-shift points (rpm)
 const KIND_PITCH = { boxTruck: 0.7, pickup: 0.85, suv: 0.95, sedan: 1.0, minivan: 1.0, hatchback: 1.15 };
+// The ambient by season (DS-3), keyed off lookSeason (the season the road looks like), never SETTINGS.season (which the
+// calendar rows move on their own). birds: the share of spring's birds that sing by day (spread evenly; a bird skipped keeps its
+// gap and its dice, so the rate is exactly this share); birdLv: their level (amb.birdG); day / night: the insect by day and by night, or null;
+// level: the insects' level (amb.insG). Spring is the shipped bed: the same rates and levels, routed through gains of 1.
+const AMB_SEASON = {
+  spring: { birds: 1, birdLv: 1, day: null, night: 'cricket', level: 1 },
+  summer: { birds: 1, birdLv: 1, day: 'cicada', night: 'katydid', level: 1.5 },
+  autumn: { birds: 0.5, birdLv: 1, day: null, night: 'cricket', level: 1 },
+  winter: { birds: 0.3, birdLv: 1, day: null, night: null, level: 0 },
+};
+const CICADA_GAIN = 0.4, KATYDID_GAIN = 0.2;   // the voices' peaks before the season's level: measured, see the suite's season rows
 const SND = (() => {
   let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null, trafF = null, trafG = null;
   const ch = {}, probes = {}, voices = [];
@@ -3891,7 +3902,11 @@ const SND = (() => {
     const breezeF = ac.createBiquadFilter(); breezeF.type = 'bandpass'; breezeF.frequency.value = 650; breezeF.Q.value = 0.5;
     const breezeG = ac.createGain(); breezeG.gain.value = 0;
     nz.connect(breezeF); breezeF.connect(breezeG); breezeG.connect(ambF);
-    amb = { ambF, breezeG, next: 0, cricket: 0 };
+    // the birds and the insects each through a gain of their own (the season's level), each with a probe (below)
+    const A0 = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
+    const birdG = ac.createGain(); birdG.gain.value = A0.birdLv; birdG.connect(ambF);
+    const insG = ac.createGain(); insG.gain.value = A0.level; insG.connect(ambF);
+    amb = { ambF, breezeG, birdG, insG, season: lookSeason, next: 0, ins: 0, birdK: 0 };
     o1.start(); o2.start(); o3.start(); nz.start();
     eng = { o1, o2, o3, lp, eg, tyreG, tyreF, windG, skidG };
     // other cars: the glass of the cockpit on the whole channel, then a fixed pool of voices. Nothing here is ever
@@ -3917,7 +3932,7 @@ const SND = (() => {
       voices.push({ v1, v2, v3, vlp, veg, src, vtf, vtg, air, dg, gL, gR, car: null, id: null, freeAt: 0, gi: -1, fresh: false, d: 0, L: 0, R: 0, k: 1, f: 0, want: 0 });
     }
     // level probes (no ears in a test container): RMS of each bus and of each channel
-    for (const [k, node] of [['sfx', sfx], ['music', music], ...VOL_KEYS.filter(k => k !== 'music').map(k => [k, ch[k]])]) {
+    for (const [k, node] of [['sfx', sfx], ['music', music], ...VOL_KEYS.filter(k => k !== 'music').map(k => [k, ch[k]]), ['birds', amb.birdG], ['insects', amb.insG]]) {
       const a = ac.createAnalyser(); node.connect(a); probes[k] = a;
     }
     // an analyser downmixes to mono, so each side of the other cars' channel gets its own off a splitter
@@ -3949,12 +3964,29 @@ const SND = (() => {
     amb.ambF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);
     const muff = inside ? 0.5 : 1;
     amb.breezeG.gain.setTargetAtTime(0.045 * muff * (0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.23)), t, 0.4);
+    // the season's birds and insects (DS-3): its levels set once when the look changes, never per frame
+    const A = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
+    if (amb.season !== lookSeason) {
+      amb.season = lookSeason;
+      amb.birdG.gain.setTargetAtTime(A.birdLv, t, 0.05); amb.insG.gain.setTargetAtTime(A.level, t, 0.05);
+    }
     if (level('ambient') > 0 && !SETTINGS.muted) {
       if (amb.next < t) amb.next = t + 0.5;
       while (amb.next < t + 0.3) {
-        if (SKY.day > 0.35 && Math.random() < SKY.day) { bird(amb.next, muff); amb.next += 1.4 + Math.random() * 3.2; }
-        else if (SKY.night > 0.35) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
+        // the season sings A.birds of spring's birds, spread evenly (a running count, no die): one it skips draws the
+        // same dice and keeps its gap, so the rate is exactly A.birds of spring's and spring's draws are as shipped
+        if (SKY.day > 0.35 && Math.random() < SKY.day) {
+          const k = amb.birdK++, sing = Math.floor((k + 1) * A.birds) > Math.floor(k * A.birds);
+          bird(amb.next, muff, !sing); amb.next += 1.4 + Math.random() * 3.2;
+        }
+        else if (SKY.night > 0.35 && A.night === 'katydid') { katydid(amb.next, muff); amb.next += 0.8 + Math.random() * 0.7; }
+        else if (SKY.night > 0.35 && A.night) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
         else amb.next += 1.5;
+      }
+      // the day insect on a line of its own (cicadas swell for seconds, under the birds)
+      if (A.day && SKY.day > 0.6) {
+        if (amb.ins < t) amb.ins = t + 0.5;
+        while (amb.ins < t + 0.3) amb.ins += cicada(amb.ins, muff) + 1 + Math.random() * 3;
       }
     }
     updateTraffic(t, inside);
@@ -4102,21 +4134,67 @@ const SND = (() => {
     beat = 0; nextBeat = t + 0.3;
     noiseHit(t, 0.3, 'bandpass', 2600, 0.12, ch.music, 0.7);
   };
-  function bird(t, muff) {
-    const n = 2 + Math.floor(Math.random() * 4), f0 = 2600 + Math.random() * 1800, pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
-    let dest = amb.ambF; if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(amb.ambF); dest = pan; }
+  // a bird: 2-5 falling notes. `quiet` (a bird the season skips) draws the same dice and makes no node, so a thinned
+  // season hears exactly a subset of spring's birds, the rest of the schedule unmoved
+  function bird(t, muff, quiet) {
+    const n = 2 + Math.floor(Math.random() * 4), f0 = 2600 + Math.random() * 1800, pv = ac.createStereoPanner ? Math.random() * 1.6 - 0.8 : 0;
+    const pan = !quiet && ac.createStereoPanner ? ac.createStereoPanner() : null;
+    let dest = amb.birdG; if (pan) { pan.pan.value = pv; pan.connect(amb.birdG); dest = pan; }
     for (let i = 0; i < n; i++) {
-      const s = t + i * (0.09 + Math.random() * 0.05), dur = 0.05 + Math.random() * 0.06;
+      const s = t + i * (0.09 + Math.random() * 0.05), dur = 0.05 + Math.random() * 0.06, fa = f0 * (1 + (Math.random() - 0.5) * 0.2), fb = f0 * (0.75 + Math.random() * 0.6);
+      if (quiet) continue;
       const o = ac.createOscillator(), g = ac.createGain();
-      o.frequency.setValueAtTime(f0 * (1 + (Math.random() - 0.5) * 0.2), s); o.frequency.exponentialRampToValueAtTime(f0 * (0.75 + Math.random() * 0.6), s + dur);
+      o.frequency.setValueAtTime(fa, s); o.frequency.exponentialRampToValueAtTime(fb, s + dur);
       g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.055 * muff, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0005, s + dur);
       o.connect(g); g.connect(dest); o.start(s); o.stop(s + dur + 0.02);
     }
   }
   function cricket(t, muff) {
     const f = 4400 + Math.random() * 400;
-    for (let i = 0; i < 3; i++) tone(t + i * 0.045, f, 0.03, 'sine', 0.03 * muff, amb.ambF, 0.004);
+    for (let i = 0; i < 3; i++) tone(t + i * 0.045, f, 0.03, 'sine', 0.03 * muff, amb.insG, 0.004);
   }
+  // a pan for one voice, or the insects' gain where the browser has no StereoPanner
+  function insPan() {
+    const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    if (!pan) return amb.insG;
+    pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(amb.insG); return pan;
+  }
+  // summer by day: a cicada, noise band-passed near 5 kHz and pulsed at 30-60 Hz, swelling over 2-6 s and fading.
+  // Six nodes for seconds of sound; returns how long it sings. `quick` is the slider's preview: the same voice, shorter.
+  function cicada(t, muff, quick) {
+    const rise = quick ? 0.7 : 2 + Math.random() * 4, fall = quick ? 0.5 : 1 + Math.random() * 1.5, end = t + rise + fall;
+    const f = 4700 + Math.random() * 600, rate = 30 + Math.random() * 30, dest = insPan();
+    const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+    bp.frequency.setValueAtTime(f * 0.93, t); bp.frequency.linearRampToValueAtTime(f, t + rise);
+    const pulse = ac.createGain(); pulse.gain.value = 0.5;                  // 0.5 +- 0.5: fully pulsed
+    const lfo = ac.createOscillator(); lfo.type = 'triangle'; lfo.frequency.value = rate;
+    const depth = ac.createGain(); depth.gain.value = 0.5;
+    const env = ac.createGain(); env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(CICADA_GAIN * muff, t + rise); env.gain.linearRampToValueAtTime(0, end);
+    lfo.connect(depth); depth.connect(pulse.gain);
+    s.connect(bp); bp.connect(pulse); pulse.connect(env); env.connect(dest);
+    s.start(t, Math.random() * 1.5); s.stop(end + 0.05); lfo.start(t); lfo.stop(end + 0.05);
+    return end - t;
+  }
+  // summer by night: a katydid, "ka-ty-did", a rasp of 2-4 pulses of noise band-passed near 3-4 kHz. Four nodes a call.
+  function katydid(t, muff) {
+    const n = 2 + Math.floor(Math.random() * 3), f = 3000 + Math.random() * 1000, step = 0.12 + Math.random() * 0.05, len = 0.05 + Math.random() * 0.025;
+    const dest = insPan(), a = KATYDID_GAIN * muff;
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
+    const g = ac.createGain(); g.gain.setValueAtTime(0, t);
+    for (let i = 0; i < n; i++) {
+      const p = t + i * step;
+      g.gain.setValueAtTime(0, p); g.gain.linearRampToValueAtTime(a, p + 0.006);
+      g.gain.setValueAtTime(a, p + len - 0.012); g.gain.linearRampToValueAtTime(0, p + len);
+    }
+    s.connect(bp); bp.connect(g); g.connect(dest);
+    s.start(t, Math.random()); s.stop(t + n * step + 0.05);
+  }
+  // for checks: start the ambient's schedule afresh at the next update (the next bird or insect 0.5 s on), so a
+  // measurement window is not handed a gap left by whatever played before it
+  S.ambRestart = () => { if (amb) { amb.next = 0; amb.ins = 0; amb.birdK = 0; } };
   S.crash = (k) => {
     if (!ac) return;
     const t = ac.currentTime;
@@ -4161,7 +4239,11 @@ const SND = (() => {
     else if (k === 'skid') noiseHit(t, 0.5, 'bandpass', 1100, 0.9, ch.skid, 9);
     else if (k === 'tyres') noiseHit(t, 0.8, 'bandpass', 520, 0.12, ch.tyres, 0.6);
     else if (k === 'wind') noiseHit(t, 0.8, 'highpass', 900, 0.08, ch.wind);
-    else if (k === 'ambient') { if (SKY.night > 0.5) cricket(t, 1); else bird(t, 1); }
+    else if (k === 'ambient') {   // the season's own voice (winter's night, with no insects, a bird)
+      const A = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
+      if (SKY.night > 0.5) { if (A.night === 'katydid') katydid(t, 1); else if (A.night) cricket(t, 1); else bird(t, 1); }
+      else if (A.day) cicada(t, 1, true); else bird(t, 1);
+    }
   };
   S.suspend = (yes) => { if (!ac) return; if (yes) ac.suspend(); else ac.resume(); };
   return S;
