@@ -18,12 +18,13 @@ in `.claude/<game>.md`.
   season becomes Raleigh at its date: the sun, moon, planets and stars (zmh-sky, from DS-1's dates), the
   broadleaf trees (deeper green, autumn colours, bare in winter; conifers unchanged),
   grass from fresh green to dormant straw, insects and birds; switching rebuilds the
-  chunks in place. Plan-shaped; its defaults were chosen and can be overruled at plan review.
-  *Not planned on 2026-11-02:* it shares the settings panel with DS-6 and the ambient sound with
-  DS-2, and both plans are waiting to run; and its winter trees want the tree-expert look first
-  (`.claude/driving-simulator.md` § Follow-ups). Re-sweep with
-  `/zmh-producer:backlog-plan-gen driving-sim` now that the sky arc (2026-11-03) and DS-2 (2026-11-03) have both landed. Spec and
-  checks: `.claude/driving-simulator.md` § Backlog, DS-3.
+  chunks in place. Its defaults were chosen and can be overruled at plan review (the plan's
+  Design lists every colour). Five steps: the switch and the sky with spring held byte for byte,
+  the trees, grass, bushes and treeline (with the tree-expert review of the bare winter trees
+  inside the step), the ambient by season, the break list and docs, the ship. Spec and checks:
+  `.claude/driving-simulator.md` § Backlog, DS-3.
+  **Plan ready (2026-11-03)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/dsseasons.summer-autumn-winter.md`
 
 - [combat-sim] **The neon graphics style** (CS-2; the CD, 2026-11-01: "All three with
   selector in settings menu. Default to realistic webgl"). Realistic and toon are live (CS-1,
