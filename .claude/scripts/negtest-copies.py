@@ -90,7 +90,7 @@ def main():
     files = sorted({b['file'] for b in breaks})
     if len(files) != 1: print('NEGCOPIES=invalid every break in a run must name one file; got ' + ','.join(files)); return 1
     path = os.path.join(ROOT, files[0])
-    r = subprocess.run([NEGTEST, 'scan', files[0]], capture_output=True, text=True, cwd=ROOT)
+    r = subprocess.run(['bash', NEGTEST, 'scan', files[0]], capture_output=True, text=True, cwd=ROOT)
     if r.returncode: print((r.stdout + r.stderr).strip()); print('NEGCOPIES=dirty: a break is live in the shipping file, restore it first'); return 1
     src = open(path).read()
     bad = []
