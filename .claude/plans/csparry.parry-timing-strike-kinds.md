@@ -206,7 +206,7 @@ Plans). One task per arc step; each is one session's work and one commit on the 
 | 2 | CS-3 docs, land, Pages | done (docs and badge; the overseer lands) |
 | 3 | CS-4 engine | done |
 | 4 | CS-4 page | done |
-| 5 | Docs final, break list, land, Pages | open |
+| 5 | Docs final, break list, land, Pages | done (docs, break run and badge; the overseer lands) |
 
 ### Step 1 - CS-3: one attack table, the parry judged against it, no parry from a flinch
 
@@ -578,14 +578,20 @@ winds up before a rank-5 mind can answer).
 heavy: 4.5 blade and two 4.5 arcs of radius 24 and 33 at 100% and 60% alpha, all in units of r/46); the help paragraph's wording; the layout row's label now
 names the six buttons at each size; rows 1 and 2 each cover both buttons or keys in one row, to hit the plan's count of 3.
 
-### Step 5 (2026-11-03) - PAUSED, partial (the CD paused before the usage limit)
+### Step 5 (2026-11-03, resumed 2026-11-04)
 
-Step 5 stays `open` in the Steps table. Done so far: the break run only; no docs, no badge, no TODO/DONE edit, nothing committed.
+Docs, the whole break run and the badge. Not landed (the overseer lands it and verifies Pages). The run was paused once at 16 of 32 (the CD, before the usage limit) and resumed from a restarted container; the 16 already caught were not re-run (HEAD only moved by a plan-only commit, nothing they target changed).
 
-**Break run** (`negtest-copies.py --jobs 2 --only <2 names>`, one 2-break chunk a call, about 6.5 min each; `/opt/node-tools/node_modules` present). **16 of 32 caught, 0 missed, 16 not yet run.**
-- Caught (HEAD `728de4b`): `stagger-bonus`, `no-iframes`, `power-parryable`, `combo-energy-3-only`, `power-at-9`, `no-energy-cap`, `chain-of-three`, `stagger-can-act`, `stagger-short`, `no-hyper-armour`, `parry-no-energy`, `dodge-no-energy`, `ring-never-closes`, `ring-no-flash`, `menu-no-pause`, `buttons-crowded`.
-- Not yet run: `ladder-no-advance`, `ai-slower-at-top`, `multitouch-one-role`, `parry-buffered-through-flinch`, `flinch-keeps-buffered-parry`, `drop-only-player`, `parry-window-wide`, `swing-resolves-twice`, `parry-window-global`, `quick-not-quick`, `kinds-break-chain`, `ai-never-quick`, `quick-button-missing`, `keys-no-heavy`, `heavy-overlaps-power`, `kind-pose-ignored`.
-- Still to do: the styles list dry-apply, then the docs (items 1-5 of the step), badge, TODO/DONE, gates, commit.
+**Break run** (`negtest-copies.py --jobs 2 --only <2 names>`, foreground chunks of 2, about 6.5 min each; `NODE_PATH=/opt/node-tools/node_modules`): **32 of 32 caught, 0 missed**, each `NEGCOPIES: GREEN caught=2/2`.
+- Every one of the 32 breaks in `negtests/combat-simulator.json`, including the pre-step-1 nineteen (stagger-bonus, no-iframes, power-parryable, combo-energy-3-only, power-at-9, no-energy-cap, chain-of-three, stagger-can-act, stagger-short, no-hyper-armour, parry-no-energy, dodge-no-energy, ring-never-closes, ring-no-flash, menu-no-pause, buttons-crowded, ladder-no-advance, ai-slower-at-top, multitouch-one-role), the five CS-3 breaks, the four step 3 breaks and the four step 4 breaks. Failing rows per break ranged from 1 to 17 (`swing-resolves-twice` 17, `buttons-crowded` and `heavy-overlaps-power` 8).
+- Dry-apply, every `old` found exactly once: `combat-simulator.json` 32, `combat-simulator-styles.json` 14 (not run; nothing it targets changed).
+
+**Docs changed:**
+- `.claude/combat-simulator.md`: CS-4 marked shipped and the CD's three answers marked built; 13 new Assumed rows (the `RULES.kinds` factors, the parry window per kind, `quickP` / `heavyP`, `F.krng`, the 0.10 s cap, the `counter` persona, the queued kind, keys U / O, 3.4 R at 22.5 / 67.5 deg, the pose blends 0.55 / 1.25 with drop 0.14, the tell pitches and lengths, the icons, the help wording); Architecture for `ATTACKS` (with the kinds loop), `STRIKE`, `f.kind`, `f.queued` as a kind string, `F.krng` with `aiStrike()`, the six buttons and `POSE` on `__CS`; the ladder line after step 3 and the opponent's measured kind shares; Tests (89 = 44 + 45, the eight new rows, 32 breaks); How to add "an attack kind" with the note that the six-button cluster has no room for a seventh at 360 x 640 without a new layout; the summary lines at the top.
+- `.claude/tests/README.md` (the `drive-combat-simulator.cjs` row: 89 checks, 13 of the 89, the quick / heavy rows, 32 breaks), `games/CLAUDE.md` (the Combat Simulator paragraph: quick and heavy strikes and the parry rule, 89 checks, 32 + 14), `CLAUDE.md` (one clause in the Combat Simulator row), `.claude/plans/csstyles.selector-toon-neon.md` (Status: csparry landed, re-derive counts).
+- `TODO.md`: the CS-3/CS-4 entry removed from Now. `DONE.md`: a CS-4 line.
+
+**Badge stamped:** `build 2026-11-04 06:25 UTC` (read back from the file).
 
 ## Handoff
 
