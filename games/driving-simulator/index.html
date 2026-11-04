@@ -1568,12 +1568,12 @@ const AUTUMN_LEAF = (() => {
     'birch-1': { lerp: [lin3([232, 196, 60]), lin3([196, 186, 70])] }, street: { lerp: [lin3([218, 180, 54]), lin3([222, 150, 44])] } };
 })();
 const SEASON_LOOK = {
-  spring: { crown: 'leaf', leaf: C.leaf, bush: C.leaf, bushR: 1, treeline: C.leaf, grassField: C.grassField, grassDry: C.grassDry, grassForest: C.grassForest, lawn: C.lawn },
-  summer: { crown: 'leaf', leaf: lin3([46, 82, 42]), bush: lin3([46, 82, 42]), bushR: 1, treeline: lin3([46, 82, 42]),
+  spring: { crown: 'leaf', bark: C.bark, leaf: C.leaf, bush: C.leaf, bushR: 1, treeline: C.leaf, grassField: C.grassField, grassDry: C.grassDry, grassForest: C.grassForest, lawn: C.lawn },
+  summer: { crown: 'leaf', bark: C.bark, leaf: lin3([46, 82, 42]), bush: lin3([46, 82, 42]), bushR: 1, treeline: lin3([46, 82, 42]),
     grassField: lin3([64, 94, 36]), grassDry: lin3([112, 112, 58]), grassForest: lin3([48, 68, 34]), lawn: lin3([54, 86, 36]) },
-  autumn: { crown: 'autumn', autumn: AUTUMN_LEAF, leaf: null, bush: lin3([120, 96, 48]), bushR: 1, treeline: lin3([138, 104, 52]),
+  autumn: { crown: 'autumn', bark: C.bark, autumn: AUTUMN_LEAF, leaf: null, bush: lin3([120, 96, 48]), bushR: 1, treeline: lin3([138, 104, 52]),
     grassField: lin3([112, 108, 58]), grassDry: lin3([150, 128, 80]), grassForest: lin3([92, 74, 46]), lawn: lin3([84, 98, 48]) },
-  winter: { crown: 'bare', leaf: null, bush: lin3([104, 88, 70]), bushR: 0.7, treeline: lin3([110, 98, 90]),
+  winter: { crown: 'bare', bark: lin3([100, 92, 82]), leaf: null, bush: lin3([104, 88, 70]), bushR: 0.7, treeline: lin3([110, 98, 90]),
     grassField: lin3([150, 128, 84]), grassDry: lin3([166, 142, 98]), grassForest: lin3([96, 80, 60]), lawn: lin3([128, 118, 74]) },
 };
 let LOOK = SEASON_LOOK.spring, lookSeason = 'spring';
@@ -1704,7 +1704,7 @@ function addTree(mb, T, x, y, z, scale, rnd, colliders, ox = 0, oz = 0) {
   const conifer = CONIFERS.has(T.id);
   const birch = T.id.startsWith('birch');
   const th = T.trunkHeight * scale, tr = T.trunkRadius * scale;
-  const bark = birch ? C.birchBark : C.bark.map(v => v * rnd.range(0.8, 1.15));
+  const bark = birch ? C.birchBark : (conifer ? C.bark : LOOK.bark).map(v => v * rnd.range(0.8, 1.15));   // the same draw in every season
   const lv = rnd.range(0.75, 1.2), hue = rnd.range(-0.06, 0.06);
   const crown = conifer ? 'conifer' : LOOK.crown;
   const leaf = conifer ? [C.conifer[0] * lv, C.conifer[1] * lv, C.conifer[2] * lv]
@@ -1734,12 +1734,15 @@ function autumnLeaf(A, id, wx, wz) {
   if (sp.pick) { let acc = 0; for (const [c, w] of sp.pick) { acc += w; if (p < acc) return c.slice(); } return sp.pick[sp.pick.length - 1][0].slice(); }
   return sp.lerp[0].map((v, k) => lerp(v, sp.lerp[1][k], t));
 }
-// One scaffold limb for one kit canopy sphere, and its two order-2 branches, all jittered by that sphere's own seed. The limb
-// runs from the trunk at 0.9 of its height to the sphere's centre pushed out by half its radius, away from the attach point;
-// a sphere straight over the trunk is the leader, to the sphere's top. Branches at 40%, 60% and 80% of the limb, turned off it.
-// Tuned at the tree review (dsseasons step 2, by reading the zmhstudio tree KB): r0 0.6 -> 0.45 tr (da Vinci's rule: 3-4 limbs
-// at 0.6 tr out-area the trunk they leave, which reads inflated) and 2 -> 3 order-2 branches a limb ("a handful": oak 3-5).
-const LIMB = { attach: 0.9, push: 0.5, leaderOff: 0.2, r0: 0.45, r1: 0.15, rMin: 0.02, seg: 5, at: [0.4, 0.6, 0.8], turn: [35, 50], lift: 0.3, len: [0.55, 0.7], rB: 0.6, rTip: 0.015, segB: 4 };
+// One scaffold limb for one kit canopy sphere, and its order-2 branches, all jittered by that sphere's own seed. The limb
+// runs from the trunk at 0.7 of its height to the sphere's centre pushed out by half its radius, away from the attach point;
+// a sphere straight over the trunk is the leader, to the sphere's top. Branches at 35%, 55%, 70% and 85% of the limb, turned off it.
+// Tuned twice. Step 2, by reading the zmhstudio tree KB: r0 0.6 -> 0.45 tr and 2 -> 3 order-2 branches a limb. Step 4, the
+// tree-expert review of the winter shots (2026-11-03): attach 0.9 -> 0.7 (at 0.9 the street trees' sphere centres sat below
+// the split, so limbs drooped into a candelabra; at 0.7 every centre is above it and the scaffolds leave at 36-65 deg, inside
+// architecture.md's decurrent 30-70), r0 0.45 -> 0.40 tr (da Vinci's rule: 4 limbs at 0.4 tr carry 0.64 tr^2, the trunk's area
+// at that height), 3 -> 4 order-2 branches (oak 4, birch 4, maple 5), and winter bark a greyer (100, 92, 82) in LOOK.bark.
+const LIMB = { attach: 0.7, push: 0.5, leaderOff: 0.2, r0: 0.40, r1: 0.15, rMin: 0.02, seg: 5, at: [0.35, 0.55, 0.7, 0.85], turn: [35, 50], lift: 0.3, len: [0.55, 0.7], rB: 0.6, rTip: 0.015, segB: 4 };
 function bareLimb(mb, x, y, z, b, scale, th, tr, bark, seed) {
   const jr = mulberry32(seed), K = LIMB;
   const A = [x, y + K.attach * th, z], R = b.radius * scale;
