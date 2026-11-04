@@ -1,6 +1,6 @@
 # csparry - Combat Simulator: a parry only counts before the blade lands (CS-3), and quick and heavy strikes (CS-4) (plan arc)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-04. Steps 1-5 committed `d81704a..0bbbd4e` on `claude/combat-simulator-arcade-2uzwxr`; CS-3 landed on `main` 2026-11-03 as `149a95a` (Pages `success`), CS-4 landed on `main` 2026-11-04 by `land-on-main.sh` (see `DONE.md`). Follow-up: `csparry.parry-timing-strike-kinds.follow-up.md` (archived beside this plan).
 **Requested:** 2026-11-03. The CD, verbatim: "fix the parry timing so that I (or enemy) can only parry
 prior to the opponents Sword making contact and dealing damage. Currently, I can parry successfully
 during a small time Window after opponent Sword makes contact and deals damage. This needs to be

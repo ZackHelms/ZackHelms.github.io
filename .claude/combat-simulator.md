@@ -381,7 +381,7 @@ feature or together with the parry timing debug & fix item."
 
 Taken as two siblings planned as one arc: CS-3 (the fix, and parry judged against each
 attack's own timing) lands first; CS-4 (quick and heavy strikes) builds on it and is the
-test of it. **Planned 2026-11-03:** `.claude/plans/csparry.parry-timing-strike-kinds.md`
+test of it. **Planned 2026-11-03:** `.claude/plans/DONE/csparry.parry-timing-strike-kinds.md` (implemented 2026-11-04)
 (one attack table `ATTACKS` built from `RULES.chain` and `RULES.power`, the parry judged
 against the attacker's row, CS-3 landing on its own at step 2).
 
