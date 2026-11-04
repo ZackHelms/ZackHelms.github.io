@@ -9,7 +9,7 @@
   (bright-pass, one blur each way, added back) drawn in neon only. A style is paint: the engine block is
   byte-identical and a fixed-seed duel steps the same under all three. Realistic and toon frames are
   pixel-identical to before. Suite 89 -> 96 checks; the style break list 14 -> 24 (all caught), the game's
-  own list 32. Landed by the csstyles run. Plan: `.claude/plans/csstyles.selector-toon-neon.md`.
+  own list 32. Landed by the csstyles run. Plan: `.claude/plans/DONE/csstyles.selector-toon-neon.md`.
 
 - 2026-11-04 [driving-sim] **Handling signed off; the first build's open questions and the
   DS-3 follow-ups decided** (backlog refinement). The CD passed the car's feel as built (0-60 in
@@ -121,7 +121,7 @@
   `#define STYLE`, compiled on first use; realistic's frame is pixel-identical (same sha256
   before and after). A style is paint: a fixed-seed duel steps to byte-identical fighters under
   both. Suite 61 -> 74, new break list 14/14 (`combat-simulator-styles.json`). Neon is CS-2,
-  still open. Badge `build 2026-11-02 22:04 UTC`. Plan: `.claude/plans/csstyles.selector-toon-neon.md`.
+  still open. Badge `build 2026-11-02 22:04 UTC`. Plan: `.claude/plans/DONE/csstyles.selector-toon-neon.md`.
 
 - 2026-11-02 [driving-sim] **No column under a low sun or moon; brighter stars** (DS-7, DS-5;
   the CD, 2026-11-02: "Sun rise, sun set, moon rise, and moon set all show a vertical smearing at

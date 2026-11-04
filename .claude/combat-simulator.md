@@ -382,7 +382,7 @@ Its a lot so put items in backlog in a combat simulator section and i can run
 "backlog-plan-gen" for them later."
 
 **Planned 2026-11-01** as one six-step arc, CS-1 landing on its own at step 3:
-`.claude/plans/csstyles.selector-toon-neon.md` (the design decided there: one program set
+`.claude/plans/DONE/csstyles.selector-toon-neon.md` (the design decided there: one program set
 per style compiled under a `#define STYLE`, ink by inverted hulls that discard by normal
 rather than cull, a per-vertex `aExt` on the arena, neon in display space with a
 quarter-resolution bloom).

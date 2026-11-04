@@ -49,6 +49,17 @@
   with scratch copies, and never count a catch that only such a row made. A
   step-2 implementer stopped short of committing over exactly this; the
   overseer's quiet re-run was GREEN.
+- **On the CD's Windows box (local Claude Code), the gates run with three exports**
+  (2026-11-04, csstyles steps 4-6, a whole oversee run done this way). The machine has no
+  `/opt/pw-browsers`; Playwright's browsers sit in `~/AppData/Local/ms-playwright/chromium-<n>/`,
+  and the only `playwright-core` was in an npx cache. Run `gates.sh` and break runs in the
+  same Bash call as:
+  `export PYTHONUTF8=1 NODE_PATH=<an npx-cache node_modules holding playwright-core> SMOKE_CHROMIUM=<.../chromium-<n>/chrome-win64/chrome.exe>`.
+  Find the first with `ls ~/AppData/Local/npm-cache/_npx/*/node_modules/playwright-core`.
+  `PYTHONUTF8` stops Python reading the pages as cp1252. Without the exports, `gates.sh` prints
+  NO-PLAYWRIGHT and goes RED. A suite that hardcodes `/opt/pw-browsers/chromium` needs
+  `process.env.SMOKE_CHROMIUM ||` in front of it (the combat suite got this). SwiftShader
+  output matched the container's byte for byte (the same frame hash).
 - **This session cannot delete anything on the remote.** `git push --delete`
   is hung up on by the agent proxy and `gh api -X DELETE` answers 403 ("Write
   access to this GitHub API path is not permitted through this proxy"). A
