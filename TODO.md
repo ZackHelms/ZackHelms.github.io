@@ -12,18 +12,6 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [combat-sim] **The neon graphics style** (CS-2; the CD, 2026-11-01: "All three with
-  selector in settings menu. Default to realistic webgl"). Realistic and toon are live (CS-1,
-  signed off by the CD 2026-11-03); neon is the third option in the `Graphics style` select:
-  the site's Neon Arcade palette in 3D (glowing flagstone joints, emissive edges on walls and
-  torii, fighters as dark bodies with green and red rims, a white-hot blade, stronger trails,
-  a cheap bloom). A style is paint: the engine never reads it. **Paused mid step 4 for quota
-  (2026-11-02)**: unvalidated, partly-run WIP is `85bf3c2` on `cs-styles-step4-wip`; the
-  plan's Status line says how to pick it up. Nothing blocks it now: the plan's run-after-csparry
-  gate cleared when CS-3 and CS-4 landed (2026-11-03/04), so re-derive its counts from 89 checks
-  and 32 breaks. Spec and checks: `.claude/combat-simulator.md` § Backlog, CS-2. Resume with:
-  `/zmh-producer:oversee-implementation .claude/plans/csstyles.selector-toon-neon.md`
-
 - [driving-sim] **Weather: rain, fog and snow** (DS-8; *Decided 2026-11-04, backlog
   refinement*: weather is next for Driving Simulator, over junctions with signals and a
   destination). All three in the first pass. A **Weather dropdown** in settings: **Auto**
@@ -228,7 +216,7 @@ in `.claude/<game>.md`.
   body (shomen's tip still overhead). Every attack row, both fighters; the parry and the AI's
   parry lead follow the new contact; re-measure the signed-off ladder and report any change. Open
   design question for the plan: a contact moment per `ATTACKS` row (lean) vs blade maths in the
-  engine. **After CS-2 (Now)**: both edit the suite and its counts. Spec and checks:
+  engine. **CS-2 has landed**: re-derive counts from 96 checks and 32 + 24 breaks. Spec and checks:
   `.claude/combat-simulator.md` § Backlog (blade at contact), CS-5. Plan-shaped: draft via
   `/zmh-producer:backlog-plan-gen`.
 

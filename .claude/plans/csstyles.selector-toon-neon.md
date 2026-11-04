@@ -1,6 +1,6 @@
 # csstyles - Combat Simulator: a Graphics style selector, the toon style and the neon style (plan arc)
 
-**Status:** PARTIALLY IMPLEMENTED. Steps 1-3 (CS-1, the selector and toon) landed on `main` 2026-11-02 as `7a3e760`, Pages deploy `success`. **Steps 4 (the neon look) and 5 (the bloom) are done** (2026-11-04, on the overseer's branch after csparry; see their Results): the suite is 96 checks (step 5 added 4: the plan's 3 plus one for `bloom-state-leak`), `negtests/combat-simulator.json` has 32 breaks and `combat-simulator-styles.json` 24. **Step 6 (docs final, both break lists, land, Pages) is next**; read Step 5 results for the draw-call reading the overseer must settle first.
+**Status:** IMPLEMENTED 2026-11-04. Steps 1-3 (CS-1, the selector and toon) landed on `main` 2026-11-02 as `7a3e760`, Pages deploy `success`; steps 4-6 added the neon look, the bloom and the final docs (96 checks; `negtests/combat-simulator.json` 32 breaks and `combat-simulator-styles.json` 24, all caught on the final page). The overseer adds the commit range and moves this file to `DONE/` after landing.
 **Requested:** 2026-11-01. The CD answered the build's Look question with: "All three with selector in
 settings menu. Default to realistic webgl. Its a lot so put items in backlog in a combat simulator
 section and i can run "backlog-plan-gen" for them later." Realistic shipped (d92baba). The other two
@@ -280,7 +280,7 @@ Tools:
 | 3 | CS-1 docs, land, Pages | DONE 2026-11-02 (landed `7a3e760`, Pages success) |
 | 4 | Neon look | DONE 2026-11-04 |
 | 5 | Bloom | DONE 2026-11-04 |
-| 6 | Docs final, break lists, land, Pages | open |
+| 6 | Docs final, break lists, land, Pages | DONE 2026-11-04 (docs, break lists and badge; landing and Pages are the overseer's) |
 
 ### Step 1 - the selector, program sets per style, toon shading, the hooks
 
@@ -1033,6 +1033,62 @@ the draws that never pass the threshold. Neither is built.
   target pixel), effects included, so a trail and sparks bloom too.
 - The bloom is drawn in neon only and at every rank; it has no setting of its own (only the test
   switch `FX.bloom`), and the quality select (`SETTINGS.gfx`) does not change it.
+
+### Step 6 results
+
+Docs, both break lists on the final page, the badge. No game code changed (the page's only edit is
+the build-badge line); the `ENGINE` span is untouched.
+
+**Files changed:** `.claude/combat-simulator.md` (Graphics styles completed with a Neon part:
+palette, display space, emissive edges through `vMat`, `uRim`, the per-fighter edge pass,
+`SHADOWS_ON` and the ground glow, `FX.only`, `drawScene(look, P, R)`, `BLOOM`, `BLOOM_K`,
+`makeBloom()`, `bloom()` and the state it restores, why `bloom-state-leak` needs a GL-state row,
+the restated palette and green/red rows; 12 new assumed rows; Backlog CS-2 marked shipped
+2026-11-04; Tests rewritten for 96 checks and both lists; the CS-5 sequencing note, which said
+"after CS-2 lands"), `.claude/tests/README.md`, `games/CLAUDE.md`, `CLAUDE.md`,
+`.claude/games-index.md` (the `art-styles` paragraph), `TODO.md` (the CS-2 entry removed; CS-5's
+"After CS-2" pointer updated), `DONE.md` (a CS-2 line), this plan, and the page's badge line. No
+`negtests/*.json` anchor needed updating.
+
+**Counts, read from the code and a real run:** the suite is **96 passed, 0 failed** (44 in part 1,
+52 in part 2; 20 are style rows: 13 from CS-1, 3 neon, 4 bloom). `negtest.sh scan` is clean before
+and after. `negtests/combat-simulator.json` has 32 breaks, `combat-simulator-styles.json` 24 (9 step
+1, 5 step 2, 5 step 4, 5 step 5). The plan's "19 breaks the game shipped with" was stale: csparry
+added 13.
+
+**Break verdicts, all on the final page, run two to six at a time with `--jobs 2`, alone on the
+box: 45 of 45 caught by their own rows, none MISSED, none `CAUGHT-BY-CRASH`.**
+- `combat-simulator.json`, all 32 `caught`: `stagger-bonus` (1 row), `no-iframes` (3),
+  `power-parryable` (2), `combo-energy-3-only` (2), `power-at-9` (1), `no-energy-cap` (1),
+  `chain-of-three` (2), `stagger-can-act` (3), `stagger-short` (1), `no-hyper-armour` (1),
+  `parry-no-energy` (1), `dodge-no-energy` (2), `ring-never-closes` (1), `ring-no-flash` (1),
+  `menu-no-pause` (1), `buttons-crowded` (8), `ladder-no-advance` (4), `ai-slower-at-top` (3),
+  `multitouch-one-role` (1), `parry-buffered-through-flinch` (2), `flinch-keeps-buffered-parry` (1),
+  `drop-only-player` (1), `parry-window-wide` (1), `swing-resolves-twice` (17), `parry-window-global`
+  (1), `quick-not-quick` (2), `kinds-break-chain` (1), `ai-never-quick` (1), `quick-button-missing`
+  (the touch row, then the expected crash in `drawHUD` after it), `keys-no-heavy` (1),
+  `heavy-overlaps-power` (8), `kind-pose-ignored` (1). The five that once were caught only by a
+  timeout (`ring-never-closes`, `ring-no-flash`, `menu-no-pause`, `ladder-no-advance`,
+  `buttons-crowded`) are each caught by their own rows.
+- `combat-simulator-styles.json`, the 13 not yet run on the step-5 page, all `caught`:
+  `style-default-toon` (2), `style-not-saved` (2), `style-junk-kept` (1), `style-switch-new-duel`
+  (1), `ink-ext-zero` (toon's courtyard row, and the bloom's halo row as well, since less ink means
+  less to bloom), `style-engine` (3), `style-render-writes-fighter` (2), `style-toon-unbanded`
+  (row 9: realistic 37, toon 32, neon 25), `style-needs-reload` (9), `style-option-missing` (3),
+  `ink-in-realistic` (1), `neon-option-missing` (1), `neon-shadows-on` (neon 2, required 0).
+- The other 11 (`bloom-off`, `bloom-everywhere`, `bloom-no-resize`, `bloom-depth-on`,
+  `bloom-state-leak`, `ink-off-fighters`, `ink-off-arena`, `ink-cull-not-discard`,
+  `neon-tonemapped`, `neon-bright-arena`, `neon-rims-same`) were run on this exact page in step 5,
+  so their step-5 verdicts stand.
+
+**The draw-call decision (overseer's), recorded as an assumed row:** the bloom adds neon's scene pass
+again plus 3 post passes (12 with effects against the bound of 13), so the plan's escalation trigger
+was not met. A cheaper bloom (resolve the main pass with `blitFramebuffer` and downsample, no second
+scene) is the fallback if neon's frame rate is poor on the CD's phone; it is not built.
+
+**Badge:** `build 2026-11-04 16:32 UTC` (read back from the file after `stamp-badge.sh`). The suite
+runs on a Windows box given `SMOKE_CHROMIUM` and a `NODE_PATH` with `playwright-core` (noted in the
+Tests section of `.claude/combat-simulator.md`).
 
 ## Handoff
 

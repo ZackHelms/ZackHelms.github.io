@@ -1,5 +1,16 @@
 # DONE — done log
 
+- 2026-11-04 [combat-sim] **The neon graphics style, with a bloom** (CS-2; the CD, 2026-11-01, "All
+  three with selector in settings menu"): `neon` is the third option in the `Graphics style` select,
+  after realistic and toon. The site's Neon Arcade palette in 3D, drawn in display space: near-black
+  bodies, glowing blue flagstone joints, emissive purple and gold edges on the walls, torii and lanterns,
+  a purple-ridged night sky with a few stars, you green and the opponent red as rims, edges and a ground
+  glow instead of shadows, a white-hot blade, stronger trails and sparks, and a quarter-resolution bloom
+  (bright-pass, one blur each way, added back) drawn in neon only. A style is paint: the engine block is
+  byte-identical and a fixed-seed duel steps the same under all three. Realistic and toon frames are
+  pixel-identical to before. Suite 89 -> 96 checks; the style break list 14 -> 24 (all caught), the game's
+  own list 32. Landed by the csstyles run. Plan: `.claude/plans/csstyles.selector-toon-neon.md`.
+
 - 2026-11-04 [driving-sim] **Handling signed off; the first build's open questions and the
   DS-3 follow-ups decided** (backlog refinement). The CD passed the car's feel as built (0-60 in
   about 7 s, about 39 m from 60, steering that narrows with speed), which closes open question 1.
