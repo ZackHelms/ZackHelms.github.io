@@ -909,6 +909,125 @@ const install = p => p.evaluate(() => {
     && lawns.fields.env === 'fields' && hueIn(lawns.fields.beyond, 28, 48) && hueIn(lawns.fields.strip, 75, 120) && lawnBad.length === 0,
     { suburb: lawns.suburb, fields: lawns.fields, bad: lawnBad.map(s => ({ s, want: SPRING_BEFORE[s], got: lawns.spring[s] })) });
 
+  // ---- 3j. grip and traffic in the weather (DS-8, dsweather step 6) ----
+  // Step 6's helpers. __wxStop(s): a 60-0 mph stop as the main suite's dry row makes it (section 4: the car at 26.82 m/s, the brake
+  // held to a standstill, ticked at 1/60), from __wxPlace(s) with the traffic cleared and the clock and the weather held (cycle 0):
+  // the distance along the road, the time, whether the car ever left the road, and the grip it braked on (the car's own P.surf).
+  // __wxSteer(s, v, steer, n): a step steer, the wheel held at `steer` of its input from v m/s, the largest slip over n ticks while
+  // the car is on the road. __wxFlow(s, park): 90 s of stepTraffic from __wxPlace(s), the player cruising the right lane at the
+  // limit as the main suite's discipline row has it (section 6) or, with `park`, standing 40 m off the road, in no lane; the
+  // discipline row's own checks (wrong side, overlaps, off the paved lanes, in an ended lane, lane changes) and the mean of every
+  // car's speed over its limit, over all cars and over those on a two-lane cross-section (L under 1.02).
+  await page.evaluate(() => {
+    const W = window;
+    W.__wxStop = s => { const D = W.__DS, P = D.PLAYER, I = D.INPUT, cyc = D.SETTINGS.cycle; D.SETTINGS.cycle = 0;
+      try { W.__wxPlace(s); D.TRAFFIC.cars.length = 0; P.vx = 26.82; I.brakeTarget = 1; I.brake = 1;
+        const sb = P.s; let t = 0, off = 0, mu = null;
+        while (P.vx > 0.05 && t < 20) { D.tick(1 / 60); t += 1 / 60; off = Math.max(off, P.off); if (mu === null) mu = P.surf.mu; }
+        return { d: +(P.s - sb).toFixed(3), t: +t.toFixed(3), off, mu: +mu.toFixed(4), wet: +D.WX.wet.toFixed(4), cover: +D.WX.snow.toFixed(4), L: D.at(sb).L, cls: D.crossAt(sb).sc.cls };
+      } finally { D.SETTINGS.cycle = cyc; I.brakeTarget = 0; I.brake = 0; } };
+    W.__wxSteer = (s, v, steer, n) => { const D = W.__DS, P = D.PLAYER, I = D.INPUT, cyc = D.SETTINGS.cycle; D.SETTINGS.cycle = 0;
+      try { W.__wxPlace(s); D.TRAFFIC.cars.length = 0; D.stepPlayer(0); P.vx = v; I.wheelHeld = true; I.steer = steer;
+        let mx = 0, k = 0; for (; k < n; k++) { D.tick(1 / 60); if (P.off) break; mx = Math.max(mx, P.slip); }
+        return { slip: +mx.toFixed(3), ticks: k, mu: +P.surf.mu.toFixed(4), steer: +P.steer.toFixed(4) };
+      } finally { D.SETTINGS.cycle = cyc; I.wheelHeld = false; I.steer = 0; } };
+    W.__wxFlow = (s, park) => { const D = W.__DS, P = D.PLAYER; W.__wxPlace(s);
+      const o = { steps: 0, wrongSide: 0, overlaps: 0, offRoad: 0, inEnded: 0, maxCars: 0, laneChanges: 0, all: 0, two: 0, nAll: 0, nTwo: 0 }, seen = new Set();
+      for (let i = 0; i < 60 * 90; i++) {
+        if (park) { const q = D.at(P.s); P.x = q.x - q.tz * 40; P.z = q.z + q.tx * 40; P.u = 40; P.yaw = q.th; P.vx = 0; P.vy = 0; P.r = 0; }
+        else { const lim = D.sectionAt(P.s).c.speedLimitMph * 0.44704, u = D.laneCenter(0, D.at(P.s).L);
+          P.s += lim / 60; const q = D.at(P.s); P.x = q.x - q.tz * u; P.z = q.z + q.tx * u; P.yaw = q.th; P.vx = lim; P.vy = 0; P.r = 0; }
+        D.stepTraffic(1 / 60); o.steps++;
+        const cars = D.TRAFFIC.cars; o.maxCars = Math.max(o.maxCars, cars.length);
+        for (const c of cars) {
+          if (c.lc && !seen.has(c.id + ':' + c.lc.from + '>' + c.lc.to)) { seen.add(c.id + ':' + c.lc.from + '>' + c.lc.to); o.laneChanges++; }
+          if (c.off <= 0.2) o.wrongSide++;
+          const cp = D.at(c.s);
+          if (c.off > cp.L * 3.66 + 0.3) o.offRoad++;
+          if (!c.lc && c.lane > 0 && cp.L - c.lane < 0.35) o.inEnded++;
+          const r = c.v / (D.sectionAt(c.s).c.speedLimitMph * 0.44704);
+          o.all += r; o.nAll++; if (cp.L < 1.02) { o.two += r; o.nTwo++; }
+        }
+        if (i % 30 === 0) for (const a of cars) for (const b of cars) {
+          if (a.id >= b.id || a.dir !== b.dir) continue;
+          const la = a.lc ? [a.lc.from, a.lc.to] : [a.lane], lb = b.lc ? [b.lc.from, b.lc.to] : [b.lane];
+          if (!la.some(l => lb.includes(l))) continue;
+          if (Math.abs(a.s - b.s) < (a.V.length + b.V.length) / 2 - 0.3) o.overlaps++;
+        }
+      }
+      o.all = o.nAll ? +(o.all / o.nAll).toFixed(4) : null; o.two = o.nTwo ? +(o.two / o.nTwo).toFixed(4) : null;
+      o.kind = D.WX.kind; o.wet = +D.WX.wet.toFixed(3); o.cover = +D.WX.snow.toFixed(3);
+      return o; };
+  });
+  // the main suite's straight (section 4): the first s from 200 m on whose next 700 m hold a heading within 0.02 rad
+  const s700 = await page.evaluate(() => { const D = window.__DS;
+    for (let s = 200; s < 20000; s += 50) { let st = true; for (let d = 0; d < 700; d += 10) if (Math.abs(D.at(s + d).th - D.at(s).th) > 0.02) { st = false; break; } if (st) return s; }
+    return null; });
+
+  // row: wet braking. In spring at 13:00 on the main suite's straight, 60-0 mph under Clear (dry) and under Rain with the road at
+  // its steady state (wet 1): the wet stop is 1.25-1.6x the dry one (v^2 / 2 mu g gives 1.43x at 0.7), on the road throughout.
+  const wetB = s700 === null ? null : await page.evaluate(([s, MAY5]) => { const W = window, D = W.__DS, o = {};
+    for (const k of ['clear', 'rain']) { W.__wxPick(k); D.SKY.hour = 13; D.setDate(MAY5); o[k] = W.__wxStop(s); }
+    W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [s700, MAY5]);
+  const wetR = wetB && +(wetB.rain.d / wetB.clear.d).toFixed(3);
+  console.log('  .. wet braking: ' + JSON.stringify({ s: s700, wetB, ratio: wetR }));
+  ok('wet braking: 60-0 mph on a straight in spring at 13:00 under Rain (wet 1) takes 1.25-1.6x the dry stop on the same road (1.43x at mu 0.7), on the road throughout',
+    !!wetB && wetB.clear.wet === 0 && wetB.clear.mu === 1 && wetB.rain.wet === 1 && wetB.clear.off === 0 && wetB.rain.off === 0
+    && wetB.clear.d > 30 && wetB.clear.d < 50 && wetR >= 1.25 && wetR <= 1.6, { s: s700, wetB, ratio: wetR });
+
+  // row: snow braking, by road. In winter at 13:00 under Snow (cover 1, wet 1) and under Clear (dry, bare), 60-0 mph from 5 m into
+  // the straight, level 200 m stretches (straightOf) on rural2 and on highway6: on rural2 (untreated) 2.5-3.6x the dry stop (3.3x
+  // at mu 0.3, less with drag), on highway6 (treated, wet) the wet band, 1.25-1.6x; every stop on the road and inside its stretch.
+  const r2b = await straightOf('rural2'), h6b = await straightOf('highway6');
+  const snowB = r2b === null || h6b === null ? null : await page.evaluate(([r2, h6, MAY5]) => { const W = window, D = W.__DS, o = {};
+    for (const k of ['clear', 'snow']) { W.__wxWinter(k, 1, 13); o[k] = { rural2: W.__wxStop(r2 + 5), highway6: W.__wxStop(h6 + 5) }; }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [r2b, h6b, MAY5]);
+  const snowR = snowB && { rural2: +(snowB.snow.rural2.d / snowB.clear.rural2.d).toFixed(3), highway6: +(snowB.snow.highway6.d / snowB.clear.highway6.d).toFixed(3) };
+  console.log('  .. snow braking: ' + JSON.stringify({ r2: r2b, h6: h6b, snowB, ratio: snowR }));
+  const inside = q => q.off === 0 && q.d + 5 < 200;
+  ok('snow braking, by road: in winter under Snow at full cover, 60-0 mph on rural2 takes 2.5-3.6x the dry stop on the same stretch and on highway6 (treated: wet) 1.25-1.6x, every stop on the road inside a straight, level 200 m',
+    !!snowB && snowB.snow.rural2.cls === 'rural2' && snowB.snow.highway6.cls === 'highway6' && snowB.snow.rural2.cover === 1 && snowB.clear.rural2.cover === 0
+    && [snowB.clear.rural2, snowB.clear.highway6, snowB.snow.rural2, snowB.snow.highway6].every(inside)
+    && snowR.rural2 >= 2.5 && snowR.rural2 <= 3.6 && snowR.highway6 >= 1.25 && snowR.highway6 <= 1.6, { snowB, ratio: snowR });
+
+  // row: it slides on snow. In winter at 13:00 on rural2's straight, a step steer of half the wheel's input (half lock) at 20 m/s,
+  // held 45 ticks (0.75 s): under Snow at full cover the largest slip (the axle force asked over the force the tires can give) is
+  // over 1, where the same input under Clear (dry) stays under 1; each read while the car is on the road.
+  const slide = r2b === null ? null : await page.evaluate(([s, MAY5]) => { const W = window, D = W.__DS, o = {};
+    for (const k of ['clear', 'snow']) { W.__wxWinter(k, 1, 13); o[k] = W.__wxSteer(s + 5, 20, 0.5, 45); }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [r2b, MAY5]);
+  console.log('  .. step steer: ' + JSON.stringify(slide));
+  ok('it slides on snow: a step steer of half lock at 20 m/s on rural2 drives the slip over 1 under Snow at full cover, where the same input on the dry road stays under 1',
+    !!slide && slide.clear.ticks >= 20 && slide.snow.ticks >= 20 && slide.clear.slip > 0.3 && slide.clear.slip < 1 && slide.snow.slip > 1, slide);
+
+  // row: traffic in the weather. 90 s of stepTraffic each. At the main suite's lane drop (3 -> 2 lanes, from 900 m before it; the
+  // player cruising at the limit), under Clear, Rain (wet 1), Fog and, in winter, Snow (cover 1): the discipline row's checks
+  // hold in every weather (no car on the wrong side, no overlaps, none off the paved lanes or left in an ended lane, lane changes
+  // happen, the road stays populated), and under Rain the traffic's mean speed over its limit is at most 0.95x Clear's. On a
+  // two-lane road (the first s from 2 km on with L at most 1 from 450 m behind to 1150 m ahead, the player parked off it) in winter,
+  // under Snow the two-lane traffic's mean speed over its limit is at most 0.72x Clear's, with the same checks.
+  const flow = await page.evaluate(MAY5 => { const W = window, D = W.__DS, S = D.ROAD.sect, o = {};
+    D.sectionAt(60000);
+    const drop = S.find((sc, i) => i > 0 && S[i - 1].c.lanesPerDirection === 3 && sc.c.lanesPerDirection === 2);
+    let two = null; for (let s = 2000; s < 60000 && two === null; s += 50) { let okT = true; for (let d = -450; d <= 1150; d += 10) if (D.at(s + d).L > 1) { okT = false; break; } if (okT) two = s; }
+    o.drop = drop ? drop.s0 : null; o.twoS = two;
+    if (drop) for (const k of ['clear', 'rain', 'fog']) { W.__wxPick(k); D.SKY.hour = 13; D.setDate(MAY5); o[k] = W.__wxFlow(drop.s0 - 900, false); }
+    if (drop) { W.__wxWinter('snow', 1, 13); o.snow = W.__wxFlow(drop.s0 - 900, false); }
+    if (two !== null) for (const k of ['clear', 'snow']) { W.__wxWinter(k, 1, 13); o['two_' + k] = W.__wxFlow(two, true); }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  const runs = ['clear', 'rain', 'fog', 'snow', 'two_clear', 'two_snow'].map(k => flow[k]);
+  const disc = runs.every(r => r && r.wrongSide === 0 && r.overlaps === 0 && r.offRoad === 0 && r.inEnded === 0 && r.maxCars >= 15)
+    && ['clear', 'rain', 'fog', 'snow'].every(k => flow[k].laneChanges >= 3);
+  const flowR = runs.every(Boolean) ? { rain: +(flow.rain.all / flow.clear.all).toFixed(3), fog: +(flow.fog.all / flow.clear.all).toFixed(3), snowDrop: +(flow.snow.all / flow.clear.all).toFixed(3),
+    snowTwo: +(flow.two_snow.two / flow.two_clear.two).toFixed(3) } : null;
+  console.log('  .. traffic: ' + JSON.stringify({ ratios: flowR, flow }));
+  ok('traffic in the weather: over 90 s each, the traffic\'s mean speed over its limit under Rain is at most 0.95x Clear\'s and under Snow on a two-lane road at most 0.72x; under Clear, Rain, Fog and Snow no car crosses to the other side, none overlaps, leaves the paved lanes or stays in an ended lane, and they still change lanes',
+    disc && !!flowR && flow.rain.wet === 1 && flow.two_snow.cover === 1 && flow.two_snow.nTwo > 10000 && flowR.rain <= 0.95 && flowR.snowTwo <= 0.72, { ratios: flowR, flow });
+
   const tail = await page.evaluate(() => ({ weather: window.__DS.SETTINGS.weather, look: window.__DS.lookSeason }));
   ok('no page errors; the suite booted under its Clear pin (nothing stored, so the pin wrote Clear) and leaves the page under Clear in spring',
     errors.length === 0 && boot.weather === 'clear' && boot.kind === 'clear' && tail.weather === 'clear' && tail.look === 'spring', { errors: errors.slice(0, 5), boot, tail });

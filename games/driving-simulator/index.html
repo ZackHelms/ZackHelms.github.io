@@ -3068,6 +3068,37 @@ function circleOBB(cx, cz, r, A) {
   // back to world (the push for the BOX away from the circle)
   return { nx: nlx * c + nlz * s, nz: -nlx * s + nlz * c, depth };
 }
+// ---------------------------------------------------------------- grip in the weather (DS-8)
+// The ground under the tires: { mu, wet, cover }, mu a factor on the car's own (1.0 on the road, 0.62 off it), wet and cover how
+// wet and how white that ground counts. The CD's figures: wet asphalt about 0.7x dry, packed snow about 0.3x. On the road a wet
+// one is lerp(1, 0.7, wet), and snow on an untreated (two-lane) road takes it on to 0.3 by the cover; a treated (four- or
+// six-lane) road under cover is wet asphalt, at least 0.8 wet, as the world shader draws it (roadTreat(L), the shader's treat).
+// Off the road: 0.62 x lerp(1, 0.8, wet), then lerp(that, 0.3, cover). A trace under 2% (the last of a drying road, the last
+// of a thaw) counts as none, so a dry, bare road is exactly SURF_DRY and Clear's grip is the shipped grip, byte for byte.
+const SURF_DRY = Object.freeze({ mu: 1, wet: 0, cover: 0 });
+const wxGround = x => x > 0.02 ? (x - 0.02) / 0.98 : 0;
+function surfaceAt(onRoad, L) {
+  const w = wxGround(WX.wet), c = wxGround(WX.snow);
+  if (w === 0 && c === 0) return SURF_DRY;
+  if (onRoad) {
+    const t = roadTreat(L), wE = c > 0 ? Math.max(w, 0.8 * t * smooth(0, 0.1, c)) : w, cE = c * (1 - t);
+    return { mu: lerp(lerp(1, 0.7, wE), 0.3, cE), wet: wE, cover: cE };
+  }
+  return { mu: lerp(lerp(1, 0.8, w), 0.3 / 0.62, c), wet: w, cover: c };
+}
+function surfaceMu(onRoad, L) { return surfaceAt(onRoad, L).mu; }
+// The traffic in the weather: null on a dry, bare road in clear air (the shipped traffic, every factor exactly 1), else the
+// factors at a cross-section of L lanes per direction on the intelligent driver model: v0 (the desired speed) 0.92 on a wet
+// road, 0.85 in fog, 0.8 on a treated road under snow and 0.6 on an untreated one (the lowest wins); T (the time headway) 1.3
+// on a wet road or in fog and 1.6 under snow (the highest wins); B (the comfortable braking) the road's mu. Each follows the
+// state it is about (wet, cover, the fog's strength) so it eases in as the weather does, and nothing here draws a die.
+function trafficWx(L) {
+  const fog = WX.kind === 'fog' ? clamp(WX.intensity / 0.2, 0, 1) : 0, sf = surfaceAt(true, L);
+  if (sf === SURF_DRY && fog === 0) return null;
+  const c = wxGround(WX.snow), t = roadTreat(L);
+  return { v0: Math.min(lerp(1, 0.92, sf.wet), lerp(1, 0.85, fog), lerp(1, lerp(0.6, 0.8, t), c)),
+    T: Math.max(lerp(1, 1.3, Math.max(sf.wet, fog)), lerp(1, 1.6, c)), B: sf.mu };
+}
 function stepPlayer(dt) {
   const P = PLAYER, V = P.V;
   const m = V.mass, Lw = V.wheelbase, a = Lw * 0.47, b = Lw - a, Iz = m * a * b * 1.1;
@@ -3075,7 +3106,8 @@ function stepPlayer(dt) {
   const onRoad = Math.abs(P.u) < pr.p.Rr + 0.2;
   const curbHit = pr.p.curb && Math.abs(P.u) > pr.p.Rr + 0.1;
   P.off = onRoad ? 0 : 1;
-  const mu = onRoad ? 1.0 : 0.62;
+  P.surf = surfaceAt(onRoad, pr.p.L);
+  const mu = (onRoad ? 1.0 : 0.62) * P.surf.mu;   // the weather's factor (DS-8): exactly 1 on a dry, bare road
   const Cf = m * G * 0.5 * 11, Cr = m * G * 0.5 * 12;
   // pedals: gas and brake, with reverse once the brake has been held for a second at 0 mph
   const gas = Math.max(INPUT.gas, INPUT.keyGas), brk = Math.max(INPUT.brake, INPUT.keyBrake);
@@ -3250,12 +3282,13 @@ function spawnCar(s, dir, lane, v) {
   let paint = pickW(PAINT_W, p => p.weight, r);
   if (kind === 'boxTruck' && r.next() < 0.7) paint = PAINT_W[0];
   const p = at(s);
-  const lim = sectionAt(s).c.speedLimitMph * MPH;
+  const lim = sectionAt(s).c.speedLimitMph * MPH, K = trafficWx(p.L);
   const car = {
     id: TRAFFIC.nextId++, V, kind, paint: lin3(paint.rgb), metallic: paint.metallic, dir, lane, s,
     v: v ?? lim * 0.95, f: r.range(0.92, 1.1) * (kind === 'boxTruck' ? 0.92 : 1), off: laneCenter(lane, p.L),
     lc: null, stopT: 0, hazard: 0, acc: 0, x: 0, z: 0, y: 0, yaw: 0, pitch: 0, spin: 0, think: r.range(0, 1),
   };
+  if (K) car.v *= K.v0;   // in the weather a car joins at the weather's pace (DS-8)
   TRAFFIC.cars.push(car);
   placeCar(car, 0);
   return car;
@@ -3300,8 +3333,9 @@ function gapBehind(car, lane) {
   }
   return best;
 }
-function idm(v, v0, gap, vl) {
-  const A = 1.4, B = 2.2, T = 1.35, S0 = 3;
+// K: the weather's factors (trafficWx), null in the dry and clear
+function idm(v, v0, gap, vl, K) {
+  const A = 1.4, B = K ? 2.2 * K.B : 2.2, T = K ? 1.35 * K.T : 1.35, S0 = 3;
   const ss = S0 + Math.max(0, v * T + v * (v - vl) / (2 * Math.sqrt(A * B)));
   return A * (1 - Math.pow(v / Math.max(v0, 0.1), 4) - (ss / Math.max(gap, 0.1)) ** 2);
 }
@@ -3345,10 +3379,11 @@ function stepTraffic(dt) {
     const p = at(c.s);
     const limit = Math.min(sectionAt(c.s).c.speedLimitMph, sectionAt(c.s + c.dir * 90).c.speedLimitMph) * MPH;
     const fastLane = Math.floor(p.L + 0.02) > 1 && c.lane === 0 ? 1.06 : 1;
-    const v0 = limit * c.f * fastLane;
+    const K = trafficWx(p.L);   // the weather (DS-8): null in the dry and clear
+    const v0 = K ? limit * c.f * fastLane * K.v0 : limit * c.f * fastLane;
     const lead = gapAhead(c, c.lane);
-    let a = idm(c.v, v0, lead.gap, lead.v);
-    if (c.lc) { const l2 = gapAhead(c, c.lc.to); a = Math.min(a, idm(c.v, v0, l2.gap, l2.v)); }
+    let a = idm(c.v, v0, lead.gap, lead.v, K);
+    if (c.lc) { const l2 = gapAhead(c, c.lc.to); a = Math.min(a, idm(c.v, v0, l2.gap, l2.v, K)); }
     // mandatory merge: our lane ends ahead
     if (!c.lc && c.lane > 0) {
       let ends = Infinity;
@@ -3357,7 +3392,7 @@ function stepTraffic(dt) {
         const ga = gapAhead(c, c.lane - 1), gb = gapBehind(c, c.lane - 1);
         const need = ends < 80 ? 6 : 12;
         if (ga.gap > need && gb.gap > need * 0.8) c.lc = { from: c.lane, to: c.lane - 1, t: 0, dur: ends < 80 ? 2.2 : 3.4 };
-        else a = Math.min(a, idm(c.v, v0, ends - 20, 0));   // slow down toward the end of the lane
+        else a = Math.min(a, idm(c.v, v0, ends - 20, 0, K));   // slow down toward the end of the lane
       }
     }
     // discretionary: pass on the left, keep right when there is room
@@ -4590,7 +4625,9 @@ const SND = (() => {
     eng.tyreG.gain.setTargetAtTime(Math.min(0.12, v * 0.004) * (P.off ? 2.2 : 1) * (inside ? 0.7 : 1), t, 0.1);
     eng.tyreF.frequency.setTargetAtTime(P.off ? 160 : 380 + v * 6, t, 0.1);
     eng.windG.gain.setTargetAtTime(Math.min(0.09, v * v * 0.00009) * (inside ? 0.6 : 1), t, 0.1);
-    eng.skidG.gain.setTargetAtTime(!P.off && P.slip > 0.9 && v > 4 ? Math.min(0.12, (P.slip - 0.9) * 0.4) : 0, t, 0.05);
+    // the squeal (DS-8): quieter on a wet road (x (1 - 0.6 wet)) and none on snow cover over 0.5; exactly x1 on a dry, bare one
+    const sf = P.surf || SURF_DRY, skidWx = sf === SURF_DRY ? 1 : sf.cover > 0.5 ? 0 : 1 - 0.6 * sf.wet;
+    eng.skidG.gain.setTargetAtTime(!P.off && P.slip > 0.9 && v > 4 ? Math.min(0.12, (P.slip - 0.9) * 0.4) * skidWx : 0, t, 0.05);
     // ambient
     amb.ambF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);
     const muff = inside ? 0.5 : 1;
@@ -5087,7 +5124,7 @@ function treeTest(id, season, x, z) {
     return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
   } finally { LOOK = keep; }
 }
-window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, WORLD_PROBE, roadTreat, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, WORLD_PROBE, roadTreat, surfaceAt, surfaceMu, trafficWx, SURF_DRY, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>
