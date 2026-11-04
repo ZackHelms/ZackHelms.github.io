@@ -1156,8 +1156,10 @@ function dot3(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
 
 // ---------------------------------------------------------------- settings
 const SET_KEY = 'drivingSimulator.settings.v1';
-// One volume per sound, 0-100: 0 is silent and 100 is the measured mix.
-const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'skid', 'crash', 'horn', 'ui'];
+// One volume per sound, 0-100: 0 is silent and 100 is the measured mix. 'rain' (DS-8: the rain and the wipers) came after
+// 'wind'; an old save has no value for it and reads 100. The keys are saved names: 'tyres' and 'skid' stay as they are even
+// where their labels now say "tire" (renaming a key would silently reset a player's volume).
+const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'rain', 'skid', 'crash', 'horn', 'ui'];
 // One brightness per thing in the sky (DS-6), a percentage 0-200: 100 is the sky as built, 0 takes it away, 200 doubles its gain.
 // stars, planets: their vertices' gain in the one star pass; mw: the Milky Way's; sun: the sun's colour (its disc, aureole, broad
 // lobe and its light); moon: the moon's disc, its glow and its light with its share of the ambient; earthshine: its dark part.
@@ -4529,8 +4531,17 @@ const AMB_SEASON = {
   winter: { birds: 0.3, birdLv: 1, day: null, night: null, level: 0 },
 };
 const CICADA_GAIN = 0.4, KATYDID_GAIN = 0.2;   // the voices' peaks before the season's level: measured, see the suite's season rows
+// The weather's sound (DS-8), on the Rain channel ('rain', "Rain and wipers"), every level measured off the probes (the weather
+// suite's section 9c). hiss: the rain's hiss at intensity 1 (noise band-passed at 4 kHz); rumble: its low part (noise low-passed
+// at 220 Hz); glass: the outside's level heard from the driver's seat (and low-passed at 1.5 kHz, as the ambient is); drum: the
+// roof's drumming in the cockpit at intensity 1 (noise band-passed at 650 Hz, its amplitude crackled by a slow, shaped noise);
+// thump: a blade's knock where it parks, top: the knock at the top of its sweep as a share of that; swish: the rubber's swish
+// at the blade's fastest. Wet tires: the tires' level up to 1 + wet (2x) and their band up to 1.5x on a wet road at speed (the
+// spray's hiss), down to 0.6x on snow cover (a duller crunch). Rain and snow hush the birds and insects; snow takes the breeze
+// to 0.6x while it falls.
+const RAIN_SND = { hiss: 0.5, rumble: 0.05, glass: 0.6, drum: 2.2, thump: 0.5, top: 0.4, swish: 0.03 };
 const SND = (() => {
-  let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null, trafF = null, trafG = null;
+  let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null, trafF = null, trafG = null, rn = null;
   const ch = {}, probes = {}, voices = [];
   const S = {};
   const level = k => { const v = clamp((SETTINGS.vols[k] ?? 100) / 100, 0, 1); return v * v; };   // a squared taper: the slider's middle is a quarter
@@ -4573,6 +4584,33 @@ const SND = (() => {
     const birdG = ac.createGain(); birdG.gain.value = A0.birdLv; birdG.connect(ambF);
     const insG = ac.createGain(); insG.gain.value = A0.level; insG.connect(ambF);
     amb = { ambF, breezeG, birdG, insG, season: lookSeason, next: 0, ins: 0, birdK: 0 };
+    // the rain and the wipers (DS-8), on their own channel, built here once like everything else: the outside's hiss and rumble
+    // through one filter (the glass, in the cockpit) and one gain; the roof's drumming (cockpit only), its band's amplitude
+    // crackled (a slow noise, shaped to sparse peaks, added to its gain); the wipers' knock (a low sine and a band of noise)
+    // and swish, each on a gain the schedule below automates, through a bus that is open in the cockpit only. Each noise its
+    // own source on the one buffer at its own offset; nothing here draws a die.
+    const rsrc = (rate, off) => { const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true; s.playbackRate.value = rate; s.start(0, off); return s; };
+    const outF = ac.createBiquadFilter(); outF.type = 'lowpass'; outF.frequency.value = 16000;
+    const outG = ac.createGain(); outF.connect(outG); outG.connect(ch.rain);
+    const hissS = rsrc(1, 0.37), hissF = ac.createBiquadFilter(); hissF.type = 'bandpass'; hissF.frequency.value = 4000; hissF.Q.value = 0.7;
+    const hissG = ac.createGain(); hissG.gain.value = 0; hissS.connect(hissF); hissF.connect(hissG); hissG.connect(outF);
+    const rumF = ac.createBiquadFilter(); rumF.type = 'lowpass'; rumF.frequency.value = 220;
+    const rumG = ac.createGain(); rumG.gain.value = 0; hissS.connect(rumF); rumF.connect(rumG); rumG.connect(outF);
+    const drumS = rsrc(1, 1.13), drumF = ac.createBiquadFilter(); drumF.type = 'bandpass'; drumF.frequency.value = 650; drumF.Q.value = 1.2;
+    const drumAM = ac.createGain(); drumAM.gain.value = 0.25;
+    const drumG = ac.createGain(); drumG.gain.value = 0; drumS.connect(drumF); drumF.connect(drumAM); drumAM.connect(drumG); drumG.connect(ch.rain);
+    const crkS = rsrc(0.5, 0.71), crkF = ac.createBiquadFilter(); crkF.type = 'lowpass'; crkF.frequency.value = 90;
+    const crkW = ac.createWaveShaper(), cv = new Float32Array(257);
+    for (let i = 0; i < 257; i++) { const x = i / 128 - 1; cv[i] = Math.pow(Math.max(0, x), 2) * 4; }
+    crkW.curve = cv; crkS.connect(crkF); crkF.connect(crkW); crkW.connect(drumAM.gain);
+    const wipeG = ac.createGain(); wipeG.gain.value = 0; wipeG.connect(ch.rain);
+    const thO = ac.createOscillator(); thO.type = 'sine'; thO.frequency.value = 80;
+    const thS = rsrc(1, 0.53), thF = ac.createBiquadFilter(); thF.type = 'bandpass'; thF.frequency.value = 200; thF.Q.value = 0.8;
+    const thN = ac.createGain(); thN.gain.value = 0.5;
+    const thG = ac.createGain(); thG.gain.value = 0; thO.connect(thG); thS.connect(thF); thF.connect(thN); thN.connect(thG); thG.connect(wipeG); thO.start();
+    const swS = rsrc(1, 1.61), swF = ac.createBiquadFilter(); swF.type = 'bandpass'; swF.frequency.value = 2200; swF.Q.value = 1.5;
+    const swG = ac.createGain(); swG.gain.value = 0; swS.connect(swF); swF.connect(swG); swG.connect(wipeG);
+    rn = { outF, outG, hissG, rumG, drumG, wipeG, thG, swG, key: '', k: 0, end: 0 };
     o1.start(); o2.start(); o3.start(); nz.start();
     eng = { o1, o2, o3, lp, eg, tyreG, tyreF, windG, skidG };
     // other cars: the glass of the cockpit on the whole channel, then a fixed pool of voices. Nothing here is ever
@@ -4622,16 +4660,21 @@ const SND = (() => {
     eng.lp.frequency.setTargetAtTime((inside ? 220 : 380) + thr * (inside ? 700 : 1400) + P.rpm * 0.12, t, 0.05);
     eng.eg.gain.setTargetAtTime((0.05 + thr * 0.07) * (inside ? 0.8 : 1), t, 0.05);
     const v = Math.abs(P.vx);
-    eng.tyreG.gain.setTargetAtTime(Math.min(0.12, v * 0.004) * (P.off ? 2.2 : 1) * (inside ? 0.7 : 1), t, 0.1);
-    eng.tyreF.frequency.setTargetAtTime(P.off ? 160 : 380 + v * 6, t, 0.1);
+    // wet tires (DS-8): on a wet road at speed the spray's hiss, the level up to 2x and the band up to 1.5x; on snow cover a duller
+    // crunch, the band down to 0.6x. Exactly x1 on a dry, bare road (SURF_DRY)
+    const sf = P.surf || SURF_DRY, tw = sf === SURF_DRY ? 0 : sf.wet * (1 - sf.cover) * clamp(v / 20, 0, 1), tc = sf === SURF_DRY ? 0 : sf.cover;
+    eng.tyreG.gain.setTargetAtTime(Math.min(0.12, v * 0.004) * (P.off ? 2.2 : 1) * (inside ? 0.7 : 1) * (1 + tw), t, 0.1);
+    eng.tyreF.frequency.setTargetAtTime((P.off ? 160 : 380 + v * 6) * (1 + 0.5 * tw) * lerp(1, 0.6, tc), t, 0.1);
     eng.windG.gain.setTargetAtTime(Math.min(0.09, v * v * 0.00009) * (inside ? 0.6 : 1), t, 0.1);
     // the squeal (DS-8): quieter on a wet road (x (1 - 0.6 wet)) and none on snow cover over 0.5; exactly x1 on a dry, bare one
-    const sf = P.surf || SURF_DRY, skidWx = sf === SURF_DRY ? 1 : sf.cover > 0.5 ? 0 : 1 - 0.6 * sf.wet;
+    const skidWx = sf === SURF_DRY ? 1 : sf.cover > 0.5 ? 0 : 1 - 0.6 * sf.wet;
     eng.skidG.gain.setTargetAtTime(!P.off && P.slip > 0.9 && v > 4 ? Math.min(0.12, (P.slip - 0.9) * 0.4) * skidWx : 0, t, 0.05);
     // ambient
     amb.ambF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);
     const muff = inside ? 0.5 : 1;
-    amb.breezeG.gain.setTargetAtTime(0.045 * muff * (0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.23)), t, 0.4);
+    // the weather (DS-8): rain or snow falling hushes the birds and the insects, and falling snow the breeze (to 0.6x)
+    const falling = WX.precip > 0 && (WX.kind === 'rain' || WX.kind === 'snow'), hush = WX.kind === 'snow' ? 1 - 0.4 * WX.precip : 1;
+    amb.breezeG.gain.setTargetAtTime(0.045 * muff * (0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.23)) * hush, t, 0.4);
     // the season's birds and insects (DS-3): its levels set once when the look changes, never per frame
     const A = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
     if (amb.season !== lookSeason) {
@@ -4645,19 +4688,20 @@ const SND = (() => {
         // same dice and keeps its gap, so the rate is exactly A.birds of spring's and spring's draws are as shipped
         if (SKY.day > 0.35 && Math.random() < SKY.day) {
           const k = amb.birdK++, sing = Math.floor((k + 1) * A.birds) > Math.floor(k * A.birds);
-          bird(amb.next, muff, !sing); amb.next += 1.4 + Math.random() * 3.2;
+          bird(amb.next, muff, !sing || falling); amb.next += 1.4 + Math.random() * 3.2;   // in rain or snow a quiet bird (the same dice, no node)
         }
-        else if (SKY.night > 0.35 && A.night === 'katydid') { katydid(amb.next, muff); amb.next += 0.8 + Math.random() * 0.7; }
-        else if (SKY.night > 0.35 && A.night) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
+        else if (SKY.night > 0.35 && A.night === 'katydid' && !falling) { katydid(amb.next, muff); amb.next += 0.8 + Math.random() * 0.7; }
+        else if (SKY.night > 0.35 && A.night && !falling) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
         else amb.next += 1.5;
       }
       // the day insect on a line of its own (cicadas swell for seconds, under the birds)
-      if (A.day && SKY.day > 0.6) {
+      if (A.day && SKY.day > 0.6 && !falling) {
         if (amb.ins < t) amb.ins = t + 0.5;
         while (amb.ins < t + 0.3) amb.ins += cicada(amb.ins, muff) + 1 + Math.random() * 3;
       }
     }
     updateTraffic(t, inside);
+    updateRain(t, inside);
     // the radio, scheduled a beat ahead
     if (level('music') > 0 && !SETTINGS.muted) {
       const st = station(), step = 60 / STATIONS[st].bpm / 2;
@@ -4665,6 +4709,37 @@ const SND = (() => {
       while (nextBeat < t + 0.4) { BEATS[st](nextBeat, beat++, step); nextBeat += step; }
     }
   };
+  // The rain and the wipers (DS-8), each frame: the rain's level by its intensity (none under Clear, Fog or Snow), the outside heard
+  // through the glass and the roof drumming in the cockpit, and the wipers' sound in the cockpit only.
+  function updateRain(t, inside) {
+    const rk = WX.precip > 0 && WX.kind === 'rain' ? WX.intensity : 0, R = RAIN_SND;
+    rn.hissG.gain.setTargetAtTime(R.hiss * rk, t, 0.3); rn.rumG.gain.setTargetAtTime(R.rumble * rk, t, 0.3);
+    rn.outF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1); rn.outG.gain.setTargetAtTime(inside ? R.glass : 1, t, 0.1);
+    rn.drumG.gain.setTargetAtTime(inside ? R.drum * rk : 0, t, 0.3);
+    rn.wipeG.gain.setTargetAtTime(inside ? 1 : 0, t, 0.03);
+    wipers(t);
+  }
+  // The wipers' sound from the blades' own schedule (WIPER, which wiperAt and the glass shader read), on the tick clock `now`: each
+  // cycle that starts within 0.3 s of now is scheduled whole, once, mapped onto the audio clock at this frame (an instant te on the
+  // tick clock plays at t + te - now): the swish rising and falling with the blade's speed through both strokes, a soft knock at the
+  // top of the sweep and a firmer one where it parks. A cycle already begun more than 0.1 s ago is skipped (a jump of the clock, or
+  // the schedule changed mid-sweep), and no cycle is put before the end of the last, so each gain's events stay in time order.
+  function wipers(t) {
+    const W = WIPER, R = RAIN_SND;
+    if (!W.on) { rn.key = ''; return; }
+    const key = W.t0 + ':' + W.P + ':' + W.Ts, kNow = Math.floor((now - W.t0) / W.P);
+    if (key !== rn.key || kNow < rn.k - 1 || kNow > rn.k + 1) { rn.key = key; rn.k = now - (W.t0 + kNow * W.P) > 0.1 ? kNow : kNow - 1; }
+    while (W.t0 + (rn.k + 1) * W.P < now + 0.3) {
+      rn.k++;
+      const a0 = Math.max(t + W.t0 + rn.k * W.P - now, t, rn.end), Ts = W.Ts, sw = rn.swG.gain, th = rn.thG.gain;
+      sw.setValueAtTime(0, a0); sw.linearRampToValueAtTime(R.swish, a0 + Ts / 4); sw.linearRampToValueAtTime(R.swish * 0.1, a0 + Ts / 2);
+      sw.linearRampToValueAtTime(R.swish, a0 + Ts * 3 / 4); sw.linearRampToValueAtTime(0, a0 + Ts);
+      for (const [f, A, tc] of [[0.5, R.thump * R.top, 0.03], [1, R.thump, 0.045]]) {
+        const ta = a0 + Ts * f; th.setValueAtTime(0, ta); th.linearRampToValueAtTime(A, ta + 0.008); th.setTargetAtTime(0, ta + 0.008, tc);
+      }
+      rn.end = a0 + Ts;
+    }
+  }
   // Other cars, each frame: the nearest six within range hold voices; a voice whose car drops out fades over
   // about 80 ms and is handed on only after the fade, so a voice never jumps between cars mid-sound.
   const near = [];
@@ -4907,6 +4982,7 @@ const SND = (() => {
     else if (k === 'skid') noiseHit(t, 0.5, 'bandpass', 1100, 0.9, ch.skid, 9);
     else if (k === 'tyres') noiseHit(t, 0.8, 'bandpass', 520, 0.12, ch.tyres, 0.6);
     else if (k === 'wind') noiseHit(t, 0.8, 'highpass', 900, 0.08, ch.wind);
+    else if (k === 'rain') noiseHit(t, 0.8, 'bandpass', 4000, 0.2, ch.rain, 0.7);
     else if (k === 'ambient') {   // the season's own voice (winter's night, with no insects, a bird)
       const A = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
       if (SKY.night > 0.5) { if (A.night === 'katydid') katydid(t, 1); else if (A.night) cricket(t, 1); else bird(t, 1); }
@@ -4926,8 +5002,8 @@ paintMute();
 const $ = id => document.getElementById(id);
 const setPanel = $('settings');
 const menuOpen = () => setPanel.classList.contains('open');
-const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tyres on the road', traffic: 'Other cars', wind: 'Wind',
-  skid: 'Tyre squeal', crash: 'Crashes', horn: 'Horn', ui: 'Buttons and chimes' };
+const VOL_LABELS = { music: 'Radio', ambient: 'Ambient (breeze, birds, crickets)', engine: 'Engine', tyres: 'Tires on the road', traffic: 'Other cars', wind: 'Wind',
+  rain: 'Rain and wipers', skid: 'Tire squeal', crash: 'Crashes', horn: 'Horn', ui: 'Buttons and chimes' };
 $('chan-rows').innerHTML = VOL_KEYS.map(k => `<div class="row"><label for="vol-${k}">${VOL_LABELS[k]}</label><input id="vol-${k}" data-k="${k}" class="chan" type="range" min="0" max="100" step="1"></div>`).join('');
 const SKY_LABELS = { stars: 'Stars', planets: 'Planets', mw: 'Milky Way', sun: 'Sun', moon: 'Moonlight', earthshine: 'Earthshine' };
 $('sky-rows').innerHTML = SKY_KEYS.map(k => `<div class="row"><label for="sky-${k}">${SKY_LABELS[k]}</label><input id="sky-${k}" data-k="${k}" class="skyk" type="range" min="0" max="200" step="1"></div>`).join('');
@@ -5124,7 +5200,7 @@ function treeTest(id, season, x, z) {
     return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
   } finally { LOOK = keep; }
 }
-window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, WORLD_PROBE, roadTreat, surfaceAt, surfaceMu, trafficWx, SURF_DRY, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, WORLD_PROBE, roadTreat, surfaceAt, surfaceMu, trafficWx, SURF_DRY, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, RAIN_SND, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

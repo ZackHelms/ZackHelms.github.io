@@ -2088,10 +2088,11 @@ const AE = {
   // every sound has its own slider in the menu, and the radio's on/off switch is gone
   // Restated at dssky step 5: the SOUND section is found by its heading, not as the fourth h3 (the SKY section is a new one before it).
   // Restated at dssound step 1: 'traffic' ("Other cars") joins the hand-written list of keys.
+  // Restated at dsweather step 7: 'rain' ("Rain and wipers", DS-8) joins it; its own rows are the weather suite's section 9c.
   const menu = await page.evaluate(() => ({ chans: [...document.querySelectorAll('input.chan')].map(e => e.dataset.k), radioSel: !!document.getElementById('radio-sel'),
     stations: [...document.getElementById('station-sel').options].map(o => o.textContent), firstRow: [...document.querySelectorAll('#settings h3')].find(h => h.textContent === 'SOUND')?.nextElementSibling?.querySelector('select')?.id,
     keys: window.__DS.SETTINGS.vols && Object.keys(window.__DS.SETTINGS.vols) }));
-  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
+  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'rain', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
   ok('a radio station selector heads the sound section, with four stations', menu.firstRow === 'station-sel' && menu.stations.length === 4, menu);
   // a slider for a one-shot sound plays a sample of it when let go, through its own channel
   const preview = await page.evaluate(async () => { const S = window.__DS.SND; let m = 0; const el = document.getElementById('vol-horn'); el.dispatchEvent(new Event('change'));

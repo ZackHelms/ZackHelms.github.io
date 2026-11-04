@@ -1028,6 +1028,252 @@ const install = p => p.evaluate(() => {
   ok('traffic in the weather: over 90 s each, the traffic\'s mean speed over its limit under Rain is at most 0.95x Clear\'s and under Snow on a two-lane road at most 0.72x; under Clear, Rain, Fog and Snow no car crosses to the other side, none overlaps, leaves the paved lanes or stays in an ended lane, and they still change lanes',
     disc && !!flowR && flow.rain.wet === 1 && flow.two_snow.cover === 1 && flow.two_snow.nTwo > 10000 && flowR.rain <= 0.95 && flowR.snowTwo <= 0.72, { ratios: flowR, flow });
 
+  // ---- 9c. the weather's sound (DS-8, dsweather step 7) ----
+  // Every row here is measured off the analysers (SND.probe) with the main suite's lvT method (section 9): the frame loop held
+  // (requestAnimationFrame swallowed once the queued frame has run, so no frame draws a die or calls the scheduler), Math.random
+  // seeded (mulberry32 at SND_SEED), SND.update(0) once and then from a 50 ms setInterval, a lead-in, then reads every 50 ms
+  // for `secs` of the audio clock (not a count of reads, so a slow timer cannot shorten a window: the slider row's windows must
+  // hold a whole number of the engine's beat periods).
+  // __wxSnd(o) is that window, with three additions. `advance`: each step also moves the tick clock `now` by the audio clock's
+  // own advance and calls stepWipers(), as tick() would, so the wipers' schedule (on `now`) runs in real time while nothing else
+  // moves. `spec`: the probes whose spectrum is averaged (linear power over the reads' getFloatFrequencyData) for a spectral
+  // centroid. `env`: one probe's envelope at 10 ms, stitched on the audio clock from its time-domain buffer (fftSize raised to
+  // 32768 for the window, so the reads overlap and the envelope has no gaps whatever the timer does), put back after. `norm`:
+  // one probe's level divided by the ambient breeze's own slow swell (the page's 0.7 + 0.3 sin(0.37 t) sin(0.23 t) on the audio
+  // clock), so two windows at different times compare the breeze and not where its swell was. Every row also checks its own
+  // windows' hold (heldOK: held, no frame drawn, at least 15 steps a second), so a hold that never took fails, never skips.
+  const SND_SEED = 20261104;
+  await page.evaluate(() => {
+    const W = window;
+    W.__wxSnd = async o => {
+      const D = W.__DS, S = D.SND, P = D.PERF, sleep = ms => new Promise(r => setTimeout(r, ms)), keys = o.keys || [], spec = o.spec || [], lead = o.lead || 2;
+      let n = 0; const acc = {}, pw = {}, nm = { r: 0, m: 0 }, ac = S.probe('sfx').context, sr = ac.sampleRate;
+      for (const k of keys) acc[k] = 0;
+      const raf = W.requestAnimationFrame, rnd = Math.random; let held = null, frames = 0, steps = 0, iv = null, p0 = null, drawn = true, envA = null, envN0 = 0;
+      const blk = new Map(), offs = []; let last = 0, tl = 0;
+      W.requestAnimationFrame = f => { if (held) frames++; held = f; return 0; };
+      try {
+        for (let i = 0; i < 200 && !held; i++) await sleep(25);
+        p0 = [P.k, P.t0];
+        let a = o.seed >>> 0;
+        Math.random = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+        tl = ac.currentTime;
+        const step = () => { steps++; if (o.advance) { const tc = ac.currentTime; now += tc - tl; tl = tc; stepWipers(); } S.update(0); };
+        step(); iv = setInterval(step, 50);
+        if (o.env) { envA = S.probe(o.env); envN0 = envA.fftSize; envA.fftSize = 32768; }
+        await sleep(lead * 1000);
+        const buf = envA ? new Float32Array(envA.fftSize) : null; last = ac.currentTime;
+        const tS = ac.currentTime;
+        while (ac.currentTime - tS < o.secs) {
+          for (const k of keys) { const r = S.rms(k) || 0; acc[k] += r * r; }
+          if (o.norm) { const r = S.rms(o.norm) || 0, t = ac.currentTime, m = 0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.23); nm.r += r * r; nm.m += m * m; }
+          for (const k of spec) { const A = S.probe(k), fd = new Float32Array(A.frequencyBinCount); A.getFloatFrequencyData(fd);
+            const q = pw[k] || (pw[k] = new Float64Array(fd.length)); for (let j = 0; j < fd.length; j++) q[j] += Math.pow(10, fd[j] / 10); }
+          if (envA) { const tn = ac.currentTime, N = buf.length; envA.getFloatTimeDomainData(buf);
+            for (let j = Math.max(0, N - Math.round((tn - last) * sr)); j < N; j++) { const b = Math.floor((tn - (N - j) / sr) / 0.01), e = blk.get(b) || [0, 0]; e[0] += buf[j] * buf[j]; e[1]++; blk.set(b, e); }
+            last = tn; }
+          offs.push(ac.currentTime - now);
+          n++; await sleep(50);
+        }
+        drawn = P.k !== p0[0] || P.t0 !== p0[1];
+      } finally {
+        clearInterval(iv); Math.random = rnd; W.requestAnimationFrame = raf; if (held) raf(held); if (envA) envA.fftSize = envN0;
+      }
+      const out = { held: !!held, frames, steps, drawn, lead, secs: o.secs };
+      for (const k of keys) out[k] = Math.sqrt(acc[k] / n);
+      if (o.norm) out.norm = Math.sqrt(nm.r / nm.m);
+      out.cent = {}; for (const k of spec) { const q = pw[k], bw = sr / (2 * q.length); let s = 0, sf = 0; for (let j = 1; j < q.length; j++) { s += q[j]; sf += q[j] * j * bw; } out.cent[k] = s > 0 ? sf / s : 0; }
+      if (envA) { const bs = [...blk.keys()].sort((x, y) => x - y), b0 = bs[1], b1 = bs[bs.length - 2], v = [];
+        for (let b = b0; b <= b1; b++) { const e = blk.get(b); v.push(e && e[1] > 0.5 * 0.01 * sr ? Math.sqrt(e[0] / e[1]) : null); }
+        let se = 0, sn = 0; for (const e of blk.values()) { se += e[0]; sn += e[1]; }
+        out.env = { t0: b0 * 0.01, v, rms: Math.sqrt(se / sn), secs: sn / sr }; }
+      offs.sort((x, y) => x - y); out.off = offs[offs.length >> 1];
+      const Wp = D.WIPER; out.wiper = { on: Wp.on, t0: Wp.t0, P: Wp.P, Ts: Wp.Ts, rate: Wp.rate };
+      return out;
+    };
+  });
+  const sndWin = async o => { const r = await page.evaluate(o => window.__wxSnd(o), Object.assign({ seed: SND_SEED }, o)); return r; };
+  const heldOK = r => r.held && r.frames === 0 && !r.drawn && r.steps >= 15 * (r.lead + r.secs);
+  const r3s = x => +(+x).toPrecision(3);
+  // the sound on, by a tap on the cog as a player would (SND.unlock), the menu closed; the car at 400 m in spring at 13:00 on May 5,
+  // paused, at a cruise (25 m/s, half throttle) in the chase view; the radio, the ambient and the other cars' voices at 0 except where
+  // a row sets them, every other channel at 100
+  await page.click('#set-btn'); await page.click('#set-close');
+  const snd0 = await page.evaluate(MAY5 => { const W = window, D = W.__DS, keep = { vols: Object.assign({}, D.SETTINGS.vols), cycle: D.SETTINGS.cycle };
+    D.setPaused(true); D.SETTINGS.muted = false; D.SETTINGS.cycle = 0;
+    Object.assign(D.SETTINGS.vols, { music: 0, ambient: 0, traffic: 0 }); D.SND.apply();
+    W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0);
+    D.CAM.mode = 1; D.PLAYER.vx = 25; D.PLAYER.thr = 0.5; D.WIPER.on = false;
+    return { keep, state: D.SND.probe('sfx').context.state }; }, MAY5);
+  // a weather set as the rows want it: a fixed pick at intensity I in a season at 13:00 (01:00 with `night`), the car back at
+  // 400 m (or at s) with its tires on the new surface (stepPlayer(0)), cruising, in a view
+  const sndAt = (kind, I, o = {}) => page.evaluate(([kind, I, o, MAY5]) => { const W = window, D = W.__DS;
+    if ((o.season || 'spring') !== D.lookSeason) D.setSeason(o.season || 'spring');
+    W.__wxPick(kind, I); D.SKY.hour = o.night ? 1 : 13; D.setDate(D.lookSeason === 'winter' ? D.SKY.mjd : MAY5);
+    W.__wxPlace(o.s || 400); D.stepPlayer(0); D.CAM.mode = o.view === undefined ? 1 : o.view; D.CAM.chase = null;
+    Object.assign(D.PLAYER, { vx: o.vx === undefined ? 25 : o.vx, thr: 0.5, slip: o.slip || 0 }); D.WIPER.on = false;
+    return { kind: D.WX.kind, I: D.WX.intensity, wet: D.WX.wet, cover: D.WX.snow, surf: Object.assign({}, D.PLAYER.surf), look: D.lookSeason, mode: D.CAM.mode }; }, [kind, I, o, MAY5]);
+
+  // the second row's quiet windows first, before any rain has been heard on this page (so no rain is still dying away): the rain
+  // probe in the chase view under Clear, Fog (0.8) and, in winter, Snow (0.7), 2 s each
+  const rh = {};
+  for (const [k, kind, season] of [['clear', 'clear', 'spring'], ['fog', 'fog', 'spring'], ['snow', 'snow', 'winter']]) {
+    const at = await sndAt(kind, undefined, { season }); rh[k] = Object.assign(await sndWin({ keys: ['rain'], secs: 2 }), { at });
+  }
+
+  // row: a Rain slider. "Rain and wipers" straight after Wind among the SOUND sliders (0-100, at 100 here); an old save whose
+  // volumes have no 'rain' (a fresh context, its stored vols the ten keys before this step with the engine at 40) reads 100 for
+  // rain and keeps its engine at 40; under Rain (0.7) in the chase view, the rain probe at the slider's 100 is heard and at 0
+  // silent (under 1e-5), and the engine's level is the same in both windows (0.9-1.1x; each window a whole number of the engine's
+  // beat periods, as section 9's taper row has it, and the engine read off its every sample, the `env` stitch, not off 50 ms reads
+  // of a level that beats from nothing to double).
+  const slider = await page.evaluate(() => { const ins = [...document.querySelectorAll('#chan-rows input.chan')];
+    const i = ins.findIndex(e => e.dataset.k === 'rain'), el = ins[i], lab = el && el.closest('.row').querySelector('label');
+    return { keys: ins.map(e => e.dataset.k), after: i > 0 ? ins[i - 1].dataset.k : null, label: lab && lab.textContent, for: lab && lab.htmlFor === 'vol-rain',
+      min: el && el.min, max: el && el.max, val: window.__DS.SETTINGS.vols.rain }; });
+  const ctxO = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  await ctxO.addInitScript(CLEAR_PIN);
+  await visitIn(ctxO, () => { const k = 'drivingSimulator.settings.v1', s = JSON.parse(localStorage.getItem(k) || '{}') || {};
+    s.vols = { music: 100, ambient: 100, engine: 40, tyres: 100, traffic: 100, wind: 100, skid: 100, crash: 100, horn: 100, ui: 100 }; localStorage.setItem(k, JSON.stringify(s)); return true; });
+  const oldVols = await visitIn(ctxO, () => { const D = window.__DS; D.openSettings(); const v = document.getElementById('vol-rain').value; D.closeSettings();
+    return { rain: D.SETTINGS.vols.rain, engine: D.SETTINGS.vols.engine, slider: v }; });
+  await ctxO.close();
+  const rs0 = await sndAt('rain', undefined, { season: 'spring' });
+  const beat = await page.evaluate(() => 1 / (0.007 * window.__DS.PLAYER.rpm / 60 * 2));
+  const beatSecs = Math.max(1, Math.ceil(4 / beat - 1e-9)) * beat;
+  const rsOn = await sndWin({ keys: ['rain'], env: 'engine', secs: beatSecs });
+  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.vols.rain = 0; D.SND.apply(); });
+  const rsOff = await sndWin({ keys: ['rain'], env: 'engine', secs: beatSecs });
+  await page.evaluate(() => { const D = window.__DS; D.SETTINGS.vols.rain = 100; D.SND.apply(); });
+  rsOn.engine = rsOn.env.rms; rsOff.engine = rsOff.env.rms; delete rsOn.env.v; delete rsOff.env.v;
+  const engR = rsOff.engine / rsOn.engine;
+  console.log('  .. rain slider: ' + JSON.stringify({ slider, oldVols, at: rs0, on: { rain: r3s(rsOn.rain), engine: r3s(rsOn.engine) }, off: { rain: rsOff.rain, engine: r3s(rsOff.engine) }, engine: r3s(engR),
+    secs: [r3s(beatSecs), r3s(rsOn.env.secs), r3s(rsOff.env.secs)] }));
+  ok('a Rain slider: "Rain and wipers" straight after Wind among the sound sliders, 0-100; an old save with no rain volume reads 100 (its own volumes kept); under Rain the rain probe is heard at 100 and silent at 0 while the engine\'s level holds (0.9-1.1x)',
+    slider.after === 'wind' && slider.label === 'Rain and wipers' && slider.for && slider.min === '0' && slider.max === '100' && slider.val === 100
+    && oldVols.rain === 100 && oldVols.slider === '100' && oldVols.engine === 40 && rs0.kind === 'rain'
+    && rsOn.rain > 0.005 && rsOff.rain < 1e-5 && rsOn.engine > 0.02 && engR >= 0.9 && engR <= 1.1 && heldOK(rsOn) && heldOK(rsOff),
+    { slider, oldVols, on: rsOn, off: rsOff, engR });
+
+  // row: rain is heard and scales. In the chase view (no roof, no wipers), 2 s windows each: under Clear, Fog and Snow (the quiet
+  // windows above) the rain probe is under 1e-5; in spring under Rain the probe at intensity 0.9 is 2-6x that at 0.25.
+  for (const [k, I] of [['r25', 0.25], ['r90', 0.9]]) { const at = await sndAt('rain', I, { season: 'spring' }); rh[k] = Object.assign(await sndWin({ keys: ['rain'], secs: 2 }), { at }); }
+  const rScale = rh.r90.rain / rh.r25.rain;
+  console.log('  .. rain levels: ' + JSON.stringify({ levels: Object.fromEntries(Object.entries(rh).map(([k, v]) => [k, [v.at.kind, r3s(v.at.I), v.at.look, r3s(v.rain)]])), ratio: r3s(rScale) }));
+  ok('rain is heard and scales: in the chase view the rain probe under Rain at intensity 0.9 is 2-6x that at 0.25, and under Clear, Fog and (in winter) Snow it is under 1e-5',
+    rh.clear.at.kind === 'clear' && rh.fog.at.kind === 'fog' && rh.snow.at.kind === 'snow' && rh.snow.at.look === 'winter' && rh.r25.at.kind === 'rain'
+    && rh.clear.rain < 1e-5 && rh.fog.rain < 1e-5 && rh.snow.rain < 1e-5 && rh.r25.rain > 1e-3 && rScale >= 2 && rScale <= 6 && Object.values(rh).every(heldOK),
+    { levels: Object.fromEntries(Object.entries(rh).map(([k, v]) => [k, v.rain])), ratio: rScale });
+
+  // row: under the roof. Under Rain (0.7) with the wipers parked (WIPER.on false and not stepped), 3 s each: the rain probe in the
+  // cockpit against the chase view, its level 0.6-1.4x outside's and its spectral centroid lower (the glass takes the hiss, the
+  // roof drums low).
+  await sndAt('rain', undefined, { view: 1 }); const roofOut = await sndWin({ keys: ['rain'], spec: ['rain'], secs: 3 });
+  await sndAt('rain', undefined, { view: 0 }); const roofIn = await sndWin({ keys: ['rain'], spec: ['rain'], secs: 3 });
+  const roofL = roofIn.rain / roofOut.rain;
+  console.log('  .. under the roof: ' + JSON.stringify({ out: { rain: r3s(roofOut.rain), cent: Math.round(roofOut.cent.rain) }, in: { rain: r3s(roofIn.rain), cent: Math.round(roofIn.cent.rain) }, level: r3s(roofL) }));
+  ok('under the roof: under Rain the rain channel in the cockpit is 0.6-1.4x its level in the chase view and its spectral centroid is lower (the hiss through the glass, the roof\'s drumming)',
+    roofOut.rain > 1e-3 && roofL >= 0.6 && roofL <= 1.4 && roofIn.cent.rain < roofOut.cent.rain && heldOK(roofIn) && heldOK(roofOut),
+    { out: [roofOut.rain, roofOut.cent.rain], in: [roofIn.rain, roofIn.cent.rain], level: roofL });
+
+  // row: wet tires. At 25 m/s on the road, the chase view, 3 s each: in spring the tires probe under Rain (wet 1) is 1.5-3x dry's
+  // (Clear) and its spectral centroid higher (the spray's hiss). The squeal on the same windows (slip held at 1.2, on the road):
+  // on the wet road 0.3-0.5x dry's (x (1 - 0.6 wet)); in winter on rural2 under Snow at full cover silent (under 1e-5), and the
+  // tires' centroid there lower than on the same road dry (the crunch).
+  // (rural2 here: 20 m into section 3j's straight, level 200 m of rural2, r2b from straightOf)
+  const r2t = r2b === null ? null : r2b + 20;
+  const tw = {};
+  for (const [k, kind, season, s] of [['dry', 'clear', 'spring', 400], ['wet', 'rain', 'spring', 400], ['wDry', 'clear', 'winter', r2t], ['wSnow', 'snow', 'winter', r2t]]) {
+    const at = await sndAt(kind, undefined, { season, s, slip: 1.2 }); tw[k] = Object.assign(await sndWin({ keys: ['tyres', 'skid'], spec: ['tyres'], secs: 3 }), { at });
+  }
+  await sndAt('clear', undefined, { season: 'spring' });
+  const tyreR = tw.wet.tyres / tw.dry.tyres, skidR = tw.wet.skid / tw.dry.skid;
+  console.log('  .. wet tires: ' + JSON.stringify({ r2: r2t, level: r3s(tyreR), skid: r3s(skidR), snowSkid: tw.wSnow.skid, cent: Object.fromEntries(Object.entries(tw).map(([k, v]) => [k, Math.round(v.cent.tyres)])),
+    tyres: Object.fromEntries(Object.entries(tw).map(([k, v]) => [k, r3s(v.tyres)])), surf: Object.fromEntries(Object.entries(tw).map(([k, v]) => [k, v.at.surf])) }));
+  ok('wet tires: at 25 m/s the tires probe on a wet road is 1.5-3x dry\'s and its spectral centroid higher; the squeal on the wet road is 0.3-0.5x dry\'s and silent on snow cover, where the tires\' centroid is lower than on the same road dry',
+    r2t !== null && tw.dry.at.surf.wet === 0 && tw.wet.at.surf.wet === 1 && tw.wSnow.at.surf.cover > 0.5 && tw.dry.skid > 0.002
+    && tyreR >= 1.5 && tyreR <= 3 && tw.wet.cent.tyres > tw.dry.cent.tyres && skidR >= 0.3 && skidR <= 0.5 && tw.wSnow.skid < 1e-5 && tw.wSnow.cent.tyres < tw.wDry.cent.tyres
+    && Object.values(tw).every(heldOK), { tyreR, skidR, tw });
+
+  // row: the wipers. Under Rain at 0.5 (the low rate: a cycle every 4/3 s) in the cockpit, 8 s with the tick clock moving (advance):
+  // the rain channel's envelope (10 ms, on the audio clock) has its strongest periodicity between 0.4 and 2.5 s within 10% of the
+  // wipers' period, and its loudest moment in each cycle within 80 ms of the blades' park (wiperAt's schedule mapped onto the audio
+  // clock); in the chase view, the same 8 s show no such periodicity (its autocorrelation at the period under 0.2, where the
+  // cockpit's is over 0.4).
+  const acf = (v, lag) => { const x = v.map(q => q === null ? null : q), ok_ = x.filter(q => q !== null), m = ok_.reduce((a, b) => a + b, 0) / ok_.length;
+    let s = 0, s0 = 0; for (let i = 0; i < x.length; i++) { if (x[i] === null) continue; s0 += (x[i] - m) ** 2; if (i + lag < x.length && x[i + lag] !== null) s += (x[i] - m) * (x[i + lag] - m); } return s / s0; };
+  const wipeAt = async view => { await sndAt('rain', 0.5, { view, vx: 0 }); return sndWin({ keys: ['rain'], env: 'rain', secs: 8, advance: true }); };
+  const wIn = await wipeAt(0), wOut = await wipeAt(1);
+  await sndAt('clear', undefined, { view: 1 });
+  const wipe = (() => {
+    const P = wIn.wiper.P; let best = { lag: 0, r: -1 };
+    for (let L = 40; L <= 250; L++) { const r = acf(wIn.env.v, L); if (r > best.r) best = { lag: L * 0.01, r }; }
+    const Lp = Math.round(P / 0.01), rIn = acf(wIn.env.v, Lp), rOut = acf(wOut.env.v, Lp);
+    // each park inside the window: the envelope's loudest 10 ms within half a cycle round it, against the park's audio time
+    const d = [], e = wIn.env, t1 = e.t0 + e.v.length * 0.01;
+    for (let k = 0; ; k++) { const tp = wIn.wiper.t0 + k * P + wIn.wiper.Ts + wIn.off; if (tp > t1 - P / 2) break; if (tp < e.t0 + P / 2) continue;
+      let bi = -1, bv = -1; for (let i = Math.round((tp - P / 2 - e.t0) / 0.01); i < Math.round((tp + P / 2 - e.t0) / 0.01); i++) if (e.v[i] !== null && e.v[i] > bv) { bv = e.v[i]; bi = i; }
+      d.push(+(e.t0 + bi * 0.01 + 0.005 - tp).toFixed(3)); }
+    return { P, rate: wIn.wiper.rate, best: { lag: +best.lag.toFixed(2), r: r3s(best.r) }, rIn: r3s(rIn), rOut: r3s(rOut), d, n: e.v.length, gaps: e.v.filter(q => q === null).length };
+  })();
+  console.log('  .. wipers: ' + JSON.stringify(wipe));
+  ok('the wipers: under Rain at 0.5 in the cockpit the rain channel\'s envelope peaks at the wipers\' period (its strongest periodicity within 10%), loudest within 80 ms of each park on the blades\' own schedule; in the chase view there is no thump (no periodicity at that period)',
+    wIn.wiper.on && wipe.rate === 'low' && Math.abs(wipe.best.lag / wipe.P - 1) <= 0.1 && wipe.rIn > 0.4 && wipe.rOut < 0.2 && wipe.d.length >= 4 && wipe.d.every(x => Math.abs(x) <= 0.08)
+    && wipe.gaps <= 5 && heldOK(wIn) && heldOK(wOut), wipe);
+
+  // row: the birds hide. In spring at 13:00, the ambient at 100 (its schedule restarted, the window's dice seeded), 6 s each: the
+  // birds probe under Rain is under 0.2x Clear's. In winter at 01:00 (no birds, no insects: the breeze alone), the ambient probe
+  // under Snow, its breeze's slow swell divided out (norm), is under 0.75x Clear's.
+  const birdsAt = async (kind, o) => { await sndAt(kind, undefined, o); await page.evaluate(() => { const D = window.__DS; D.SETTINGS.vols.ambient = 100; D.SND.apply(); D.SND.ambRestart(); });
+    const r = await sndWin({ keys: ['birds', 'insects', 'ambient'], norm: 'ambient', secs: 6, lead: 1 });
+    await page.evaluate(() => { const D = window.__DS; D.SETTINGS.vols.ambient = 0; D.SND.apply(); }); return r; };
+  const bd = { clear: await birdsAt('clear', {}), rain: await birdsAt('rain', {}), wClear: await birdsAt('clear', { season: 'winter', night: true }), wSnow: await birdsAt('snow', { season: 'winter', night: true }) };
+  await sndAt('clear', undefined, { season: 'spring' });
+  const birdR = bd.rain.birds / bd.clear.birds, breezeR = bd.wSnow.norm / bd.wClear.norm;
+  console.log('  .. the birds hide: ' + JSON.stringify({ birds: [r3s(bd.clear.birds), r3s(bd.rain.birds)], ratio: r3s(birdR), breeze: [r3s(bd.wClear.norm), r3s(bd.wSnow.norm)], breezeR: r3s(breezeR), insects: [bd.wClear.insects, bd.wSnow.insects] }));
+  ok('the birds hide: at 13:00 under Rain the birds probe is under 0.2x Clear\'s; in winter by night under Snow the ambient\'s breeze is under 0.75x Clear\'s',
+    bd.clear.birds > 1e-4 && birdR < 0.2 && bd.wClear.norm > 1e-3 && breezeR < 0.75 && bd.wClear.birds < 1e-6 && bd.wClear.insects < 1e-6 && Object.values(bd).every(heldOK),
+    { birdR, breezeR, bd });
+
+  // row: no node growth. In winter at 13:00, the car stopped in the cockpit, the radio, the ambient and the other cars at 0 (as
+  // section 9b's growth row has it): 60 s of tick(0.1) + SND.update(0.1), 20 s each under Snow (0.7), Rain (0.9) and Clear, with
+  // every create* on the audio context's prototypes wrapped: no audio node made, while the wipers' schedule ran in Snow and Rain
+  // (cycles scheduled) and the rain was heard.
+  const growthW = await page.evaluate(async () => { const W = window, D = W.__DS;
+    W.__wxWinter('snow', 0.7, 13); W.__wxPlace(400); D.CAM.mode = 0; D.CAM.chase = null; D.PLAYER.vx = 0; D.PLAYER.thr = 0; D.WIPER.on = false;
+    const protos = [BaseAudioContext.prototype, AudioContext.prototype], saved = []; let made = 0; const kinds = {};
+    for (const pr of protos) for (const n of Object.getOwnPropertyNames(pr)) {
+      if (!/^create/.test(n) || typeof Object.getOwnPropertyDescriptor(pr, n).value !== 'function') continue;
+      const f = pr[n]; saved.push([pr, n, f]); pr[n] = function () { made++; kinds[n] = (kinds[n] || 0) + 1; return f.apply(this, arguments); };
+    }
+    const seen = { snow: 0, rain: 0, clear: 0 }, wip = { snow: 0, rain: 0 }; let rainMax = 0;
+    try {
+      for (let i = 0; i < 600; i++) {
+        if (i === 200) W.__wxPick('rain', 0.9); if (i === 400) W.__wxPick('clear');
+        D.tick(0.1); D.SND.update(0.1);
+        const k = D.WX.kind; seen[k] = (seen[k] || 0) + 1; if (D.WIPER.on && wip[k] !== undefined) wip[k]++;
+        if (k === 'rain') rainMax = Math.max(rainMax, D.SND.rms('rain') || 0);
+        if (i % 10 === 9) await new Promise(r => setTimeout(r, 150));
+      }
+    } finally { for (const [pr, n, f] of saved) pr[n] = f; }
+    W.__wxPick('clear'); D.setSeason('spring'); D.CAM.mode = 1;
+    return { made, kinds, wrapped: saved.length, seen, wip, rainMax }; });
+  console.log('  .. node growth: ' + JSON.stringify(growthW));
+  ok('no node growth: 60 s of ticks through Snow, Rain and Clear in the cockpit, the wipers running in Snow and Rain and the rain heard, with every create* wrapped: no audio node made',
+    growthW.wrapped > 8 && growthW.made === 0 && growthW.seen.snow === 200 && growthW.seen.rain === 200 && growthW.seen.clear === 200 && growthW.wip.snow > 150 && growthW.wip.rain > 150 && growthW.rainMax > 1e-3, growthW);
+
+  // row: "tire". With the settings open, the SOUND sliders for the tires and the squeal read "Tires on the road" and "Tire squeal",
+  // and no visible text on the page (its innerText, every label and every option) contains "tyre" in any case.
+  const tire = await page.evaluate(() => { const D = window.__DS; D.openSettings();
+    const lab = k => { const el = document.getElementById('vol-' + k); return el && el.closest('.row').querySelector('label').textContent; };
+    const texts = [document.body.innerText, ...[...document.querySelectorAll('label, option, h3, button')].map(e => e.textContent)];
+    const o = { tyres: lab('tyres'), skid: lab('skid'), hits: texts.filter(t => /tyre/i.test(t)).map(t => t.slice(0, 80)), n: texts.length };
+    D.closeSettings(); return o; });
+  ok('"tire": the sound sliders read "Tires on the road" and "Tire squeal", and no visible text on the page contains "Tyre" (the CD, 2026-11-04)',
+    tire.tyres === 'Tires on the road' && tire.skid === 'Tire squeal' && tire.hits.length === 0 && tire.n > 20, tire);
+  await page.evaluate(([keep, MAY5]) => { const W = window, D = W.__DS; Object.assign(D.SETTINGS.vols, keep.vols); D.SETTINGS.cycle = keep.cycle; D.SND.apply();
+    W.__wxPick('clear'); if (D.lookSeason !== 'spring') D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.WIPER.on = false; }, [snd0.keep, MAY5]);
+
   const tail = await page.evaluate(() => ({ weather: window.__DS.SETTINGS.weather, look: window.__DS.lookSeason }));
   ok('no page errors; the suite booted under its Clear pin (nothing stored, so the pin wrote Clear) and leaves the page under Clear in spring',
     errors.length === 0 && boot.weather === 'clear' && boot.kind === 'clear' && tail.weather === 'clear' && tail.look === 'spring', { errors: errors.slice(0, 5), boot, tail });
