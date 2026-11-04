@@ -24,7 +24,26 @@ in `.claude/<game>.md`.
   and 32 breaks. Spec and checks: `.claude/combat-simulator.md` § Backlog, CS-2. Resume with:
   `/zmh-producer:oversee-implementation .claude/plans/csstyles.selector-toon-neon.md`
 
+- [driving-sim] **Weather: rain, fog and snow** (DS-8; *Decided 2026-11-04, backlog
+  refinement*: weather is next for Driving Simulator, over junctions with signals and a
+  destination). All three in the first pass. A **Weather dropdown** in settings: **Auto**
+  (changes by itself, weighted by season, **snow only in winter**) or a fixed Clear / Rain /
+  Fog / Snow, saved like Season. A wet, shiny road, rain on the windscreen with wipers, rain
+  sound, fog that shortens the view, and snow that settles in winter. Open for the plan: Auto's
+  weights and how long a spell lasts, grip in the wet, and keeping DS-7's horizon fix intact
+  under fog. Spec: `.claude/driving-simulator.md` § Backlog (refinement, 2026-11-04), DS-8.
+  Plan-shaped: draft via `/zmh-producer:backlog-plan-gen driving-sim`.
+
 ## Needs Zack
+
+- [driving-sim] **Play the three things shipped since the real sky** (asked at refinement
+  2026-11-04: not yet played). The page is live at `build 2026-11-04 04:01 UTC`. **DS-3
+  seasons**: pick summer, autumn and winter from Season (trees, grass, bushes and treeline, the
+  calendar jumps to the season's middle date, cicadas and katydids in summer, few birds in
+  winter). **DS-2 traffic sound**: a car passing on your right is mostly in the right speaker and
+  drops in pitch as it goes by; "Other cars" slider in SOUND. **DS-4 + DS-6 sun and moon**: the
+  moon's real phase, earthshine on its dark part, the moon by day, both discs at real size, and
+  the SKY section's six 0-200% sliders. Say passed, or what is off.
 
 - [taas] **Play the v2 updates** (2026-10-27): Configs at the terminal (save the robots on the floor,
   load them back in a new game, delete behind "I am sure"), goal 4 on the wall once the first three
@@ -213,6 +232,28 @@ in `.claude/<game>.md`.
   `.claude/combat-simulator.md` § Backlog (blade at contact), CS-5. Plan-shaped: draft via
   `/zmh-producer:backlog-plan-gen`.
 
+- [driving-sim] **The player picks their car and its colour** (DS-9; *Decided 2026-11-04*:
+  "car + colour"). Car and Colour rows in settings, saved, over the six kit bodies and twelve
+  kit paints the page already carries; the default stays the blue sedan so old saves look the
+  same. Open for the plan: whether each body brings its own physics (handling was signed off on
+  the sedan) and its own cockpit eye point. **After DS-8**: every driving-sim item edits the page
+  and the suite, so they run one at a time. Spec: `.claude/driving-simulator.md` DS-9.
+
+- [driving-sim] **Green lawns in winter** (DS-11; *Decided 2026-11-04*: town and suburb lawns
+  are tall fescue and stay green; fields and verges stay straw). One `SEASON_LOOK.winter.lawn`
+  row plus its suite rows. Small enough to ride along with another driving-sim plan. Spec:
+  `.claude/driving-simulator.md` DS-11.
+
+- [driving-sim] **A median on the 6-lane road** (DS-10; *Decided 2026-11-04*: "add a median",
+  overruling the first build's undivided `highway6`). A grass median (rural 65 mph class, no
+  kerbs), opening and closing over the class change. Open for the plan: its width, and a
+  page-side constant vs a zmh-3d road-kit field. Spec: `.claude/driving-simulator.md` DS-10.
+
+- [driving-sim] **Trees: the structure pass** (DS-12; *Decided 2026-11-04*: tree-expert items
+  1-3 only). A twig shell on winter crowns, more limbs at staggered heights, and a tapered leader
+  on street trees. Spring stays byte-identical, and the tree-expert agent re-reviews the
+  after-shots. Spec: `.claude/driving-simulator.md` DS-12.
+
 - [phasic] Endless launch-board weighting: endless (73+) never draws the
   launch template (block-8 curriculum only, by construction). Decide a
   weighting and wire it in — unblocked 2026-08-29 by the block-8 audition
@@ -233,6 +274,11 @@ in `.claude/<game>.md`.
   negative-test pass; it passes on a quiet machine). Until then a break
   "caught" only by that row, or by section 2's pairing under the same load, is
   noise, not a catch (`.claude/cyoa2.md` § Tests, the second pass).
+
+- [driving-sim] **The look follows the calendar within a season** (DS-13; *Decided 2026-11-04*:
+  backlog it, Later). Leaves come out in late March and April, colour peaks in late October,
+  and trees are bare by December, instead of one look per season. After DS-8 and DS-9. Spec:
+  `.claude/driving-simulator.md` DS-13.
 
 ## Icebox
 

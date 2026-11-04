@@ -1,5 +1,16 @@
 # DONE — done log
 
+- 2026-11-04 [driving-sim] **Handling signed off; the first build's open questions and the
+  DS-3 follow-ups decided** (backlog refinement). The CD passed the car's feel as built (0-60 in
+  about 7 s, about 39 m from 60, steering that narrows with speed), which closes open question 1.
+  Decided: **weather** is next (rain, fog and snow, Auto plus a manual pick: DS-8, `TODO.md` §
+  Now); **car and colour** become the player's choice (DS-9); the 6-lane road gets a **median**
+  (DS-10); winter **lawns stay fescue green** (DS-11); the trees get the tree-expert's
+  **structure pass**, items 1-3 only (DS-12); the in-season **calendar look** goes to Later
+  (DS-13). Junctions, a destination and tree items 4-6 were not chosen. Three playtests (DS-2,
+  DS-3, DS-4 + DS-6) are not yet played and wait in § Needs Zack. Detail:
+  `.claude/driving-simulator.md` § Open questions and § Backlog (refinement, 2026-11-04).
+
 - 2026-11-04 [combat-sim] **The parry fix and quick/heavy strikes signed off; contact decided**
   (backlog refinement). The CD playtested CS-3 (a parry only counts before the blade lands) and
   CS-4 (quick and heavy strikes) and passed both as built. That closes the playtest left in the

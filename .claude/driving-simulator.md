@@ -30,11 +30,11 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 |---|---|---|
 | Rendering | Hand-written **WebGL2** (the second hand-written WebGL game after Wayfinder; Interlock uses Three.js) | "Realistic" 3D with shadows, headlights and a mirror is not reachable in Canvas 2D; no library, per the no-dependencies rule |
 | Look | Realism inside the scene; the site's neon only on the chrome, HUD fonts and the settings panel | Same split as `experiments/` dioramas |
-| Four road classes | rural 2-lane 55 mph, town 2-lane 35 mph (kerbs, sidewalks, streetlights), arterial 4-lane 45 mph, highway 6-lane 65 mph (undivided, double yellow) | The kit's `standard.roadClasses`; a 6-lane road with a grass median was offered but not chosen |
+| Four road classes | rural 2-lane 55 mph, town 2-lane 35 mph (kerbs, sidewalks, streetlights), arterial 4-lane 45 mph, highway 6-lane 65 mph (undivided, double yellow) | The kit's `standard.roadClasses`; a 6-lane road with a grass median was offered but not chosen. *Overruled 2026-11-04: the CD wants a median, backlog DS-10* |
 | Lane changes between classes | At most one lane per direction at a time, over the kit's MUTCD merge taper (L = W x S, ~165-238 m) | Real practice; a 2 -> 6 jump in one taper would be a 7 m lateral shift |
 | Start | 1:00 pm, at rest, in the right lane of a rural forest 2-lane | Sun high enough for shadows; sunset arrives about 40 s in at the default day |
 | Sun | *Superseded by DS-1 (2026-11-02):* the sun, moon, planets and stars of Raleigh, NC on the game's date, from zmh-sky. Was: latitude 36 N, declination 15 deg, solar noon at 1 pm | The CD asked for Raleigh's spring sky |
-| Player's car | The kit's sedan, painted blue | |
+| Player's car | The kit's sedan, painted blue | *Becomes the player's choice of car and colour, backlog DS-9 (the CD, 2026-11-04); the default stays sedan in blue (*chosen*, not asked)* |
 | Crashes | Bounce, lose speed, shake; the car you hit puts its hazards on and stops for 6 s | Free drive: no damage model |
 | Radio | On by default; four stations (Lo-fi, the original chord loop, first) | Every game here has music; it is the car radio. Stations added on the CD's ask (2026-11-01, second brief); their styles were assumed |
 | Views | Cockpit (default), chase, orbit (drag + pinch) | "Inside behind the wheel" and "outside" |
@@ -158,11 +158,16 @@ What was built, and the one cause that was traced:
 
 ## Open questions for the CD
 
-1. Does the car feel right? 0-60 mph is ~7 s, braking from 60 is ~39 m, steering
-   narrows with speed. All tunable in `stepPlayer()` / `maxSteer()`.
-2. Should the player be able to pick their car (the kit has six) or its colour?
-3. Weather, junctions with signals, or a destination next?
-4. Is the 6-lane class right undivided, or should it get a median?
+1. ~~Does the car feel right?~~ 0-60 mph is ~7 s, braking from 60 is ~39 m, steering
+   narrows with speed. All tunable in `stepPlayer()` / `maxSteer()`. **Signed off by
+   the CD 2026-11-04** (backlog refinement): the handling stays as it is.
+2. ~~Should the player be able to pick their car (the kit has six) or its colour?~~
+   The CD, 2026-11-04: **both, car and colour**. Backlog DS-9.
+3. ~~Weather, junctions with signals, or a destination next?~~ The CD, 2026-11-04:
+   **weather** (rain, fog and snow, Auto plus a manual pick). Backlog DS-8. Junctions
+   and a destination were not chosen; neither is backlogged.
+4. ~~Is the 6-lane class right undivided, or should it get a median?~~ The CD,
+   2026-11-04: **add a median**. Backlog DS-10.
 5. ~~Cruise control +/- buttons?~~ The CD, 2026-11-01: "Cruise control as is for now."
 6. ~~Should traffic make sound?~~ The CD, 2026-11-01: yes, in stereo with Doppler: backlog DS-2.
 7. ~~Should the moon follow the real date, phase included?~~ The CD, 2026-11-01: "Moon
@@ -831,6 +836,84 @@ ridge stay byte-identical. **Files:** `index.html` (`GLSL_COMMON`, `FS_SKY`,
 in the dark sky. Hypothesis, not traced: 8-bit banding of the night gradient,
 which a little dither in the sky pass would hide. Noted here, not planned.
 
+## Backlog (refinement, 2026-11-04): DS-8 to DS-13
+
+The CD's answers at backlog refinement on 2026-11-04, each a pick from offered
+options (the option text is what was decided; nothing else was asked). Every item
+edits `index.html` and the suite, so they run **one at a time**, never as parallel
+oversee runs. None has a plan yet: draft them with
+`/zmh-producer:backlog-plan-gen driving-sim`. Anything below marked *chosen* is a
+default set when the item was written, and plan review may overrule it.
+
+### DS-8. Weather: rain, fog and snow (`TODO.md` § Now)
+
+- **Decided:** what comes next is **weather**, picked over junctions with signals and
+  over a destination. The first pass has **all three**: rain, fog and snow.
+- **Decided, the control:** a **Weather dropdown** in settings with **Auto** (it
+  changes by itself, weighted by season, **snow only in winter**) or a fixed
+  **Clear / Rain / Fog / Snow**, saved the same way as Season.
+- **Offered as the shape, not itemised by the CD:** a wet, shiny road, rain on the
+  windscreen with wipers, and the sound of rain; fog that shortens the view; falling
+  snow that **settles in winter**.
+- **Open for plan-gen:** Auto's weights and how long a spell of weather lasts; what
+  a fixed Snow does outside winter (the CD's "snow only in winter" was about Auto);
+  whether the car grips less in the wet or snow (handling was signed off dry, open
+  question 1); how settled snow meets DS-11's green lawns and DS-12's twig crowns;
+  whether the sky's sliders and `SKY` dim under overcast. The page already has a fog
+  term: weather's fog must not bring back DS-7's column (fog samples `skyBase()`
+  only).
+
+### DS-9. The player picks their car and its colour (`TODO.md` § Next)
+
+- **Decided:** **car and colour**, both. Open question 2.
+- The page already carries all six kit bodies (`ROAD_KIT.vehicles`: sedan, hatchback,
+  SUV, pickup, minivan, box truck) and the kit's twelve paints (`ROAD_KIT.paints`),
+  so no kit change is needed. The player car is the sedan painted
+  `lin3([28, 58, 120])`, hard-coded at about line 3315.
+- *Chosen:* a Car row and a Colour row in settings, saved, with the sedan in the
+  kit's blue as the default so an old save looks the same. **Open for plan-gen:**
+  whether each body brings its own physics (the kit gives mass, power, top speed
+  and drag area per vehicle, and handling was signed off on the sedan), and where the
+  cockpit view sits per body (`driverEye`, `steeringWheel` are per vehicle).
+
+### DS-10. A median on the 6-lane road (`TODO.md` § Next)
+
+- **Decided:** **add a median**. Open question 4. This overrules the first build's
+  assumed row "undivided, double yellow".
+- `highway6` is the kit's rural 65 mph class (`curb: false`, 3 m shoulders), so a
+  **grass median** fits it better than a raised kerb (*chosen*). **Open for
+  plan-gen:** the median's width, and how it opens and closes over the class change
+  (the lanes already shift over the kit's MUTCD merge taper). `standard.roadClasses`
+  has no median field, so decide between a page-side constant and a zmh-3d road-kit
+  change. The CD's brief says to improve the plugin where the game can.
+
+### DS-11. Green lawns in winter (`TODO.md` § Next)
+
+- **Decided:** **town and suburb lawns stay fescue green in winter**; fields and verges
+  stay dormant straw. The fescue premise was checked by the CD's pick, not against a
+  source.
+- One row of `SEASON_LOOK` (winter's `lawn`, today `lin3([128, 118, 74])`) plus its
+  suite rows. *Chosen:* a slightly dulled spring lawn. Small enough to ride along with
+  another driving-sim plan.
+
+### DS-12. The trees' structure pass, tree-expert items 1-3 (`TODO.md` § Next)
+
+- **Decided:** the **structure pass only**: items 1-3 of the tree-expert review under
+  "Follow-ups not yet done" below. That means a twig shell on winter crowns, more
+  scaffolds than canopy spheres at staggered heights, and street trees that end the
+  trunk at the split under a tapered leader. Spring stays byte-identical.
+- Not chosen (the CD picked this over "everything, 1-6"): spring as May yellow-green,
+  marcescent oaks and holly, and the Raleigh species pool. They stay notes below, not
+  backlog.
+- Re-run the tree-expert agent on the after-shots, as DS-3 did.
+
+### DS-13. The look follows the calendar within a season (`TODO.md` § Later)
+
+- **Decided:** **backlog it, Later**, after weather and the car picker. Leaves come
+  out in late March and April, colour peaks in late October, and trees are bare by
+  December, instead of one look per season. DS-3 named this as an option and did not
+  build it.
+
 ## Follow-ups not yet done
 
 - **Trees: the tree-expert review is done for the seasons** (zmhstudio's `tree-expert` agent,
@@ -838,7 +921,8 @@ which a little dither in the sky pass would hide. Noted here, not planned.
   a town street in autumn and winter). It tuned the bare winter tree (see the row "The bare tree's
   numbers"). Its verdicts: spring reads as mature summer green, summer acceptable (barely darker:
   do not darken further), autumn the right colours but too maple-heavy for the Piedmont, winter
-  dead and snag-like before the tuning. Its structural items, ranked, are follow-ups for the CD:
+  dead and snag-like before the tuning. Its structural items, ranked, are follow-ups for the CD.
+  *The CD, 2026-11-04: items 1-3 are backlog DS-12; items 4-6 were not chosen and stay notes.*
   1. **Winter crown mass**: a twig layer, a sparse grey-brown shell of about (110, 98, 90) at about
      0.85 R, or alpha cards; bare limbs alone read thin up close.
   2. **More scaffolds than canopy spheres**, at staggered attach heights (one limb per kit sphere
@@ -853,11 +937,9 @@ which a little dither in the sky pass would hide. Noted here, not planned.
      trees, an oak-hickory and pine weighting in place of the maple-heavy pool. The KB has no
      articles yet for loblolly pine, red maple, willow oak, river birch, sweetgum or tulip poplar:
      write those first (zmhstudio `templates/design/trees/species/`).
-- **The look follows the calendar within a season** (leaf-out in late March and April, colour
-  peaking in late October, leaves down by December): an option the DS-3 backlog names, not built.
-- **Snow and weather**: a weather item of its own.
-- **Fescue lawns**: Raleigh lawns are often tall fescue, which stays green in winter (inferred,
-  not checked against a source); DS-3 browns them as the backlog chose. The CD may want them greener.
+- ~~**The look follows the calendar within a season**~~: backlog DS-13 (Later), 2026-11-04.
+- ~~**Snow and weather**~~: backlog DS-8 (rain, fog and snow), 2026-11-04.
+- ~~**Fescue lawns**~~: the CD wants them green in winter, backlog DS-11, 2026-11-04.
 
 ## Architecture (one file, banner-commented sections)
 
