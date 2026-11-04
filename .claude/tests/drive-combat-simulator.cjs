@@ -35,7 +35,7 @@ function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail
 const src = fs.readFileSync(FILE, 'utf8');
 const a = src.indexOf('/*ENGINE:BEGIN*/'), b = src.indexOf('/*ENGINE:END*/');
 const ENG = src.slice(a, b);
-const E = new Function(ENG + ';return { RULES, LADDER, rankParams, newFight, stepFight, aiIntent, phasesOf, specOf, canAct, NO_INPUT };')();
+const E = new Function(ENG + ';return { RULES, ATTACKS, LADDER, rankParams, newFight, stepFight, startHit, aiIntent, phasesOf, specOf, canAct, NO_INPUT };')();
 const { RULES } = E;
 const DT = 1 / 120;
 const IN = o => Object.assign({ mx: 0, mz: 0, atk: false, dodge: false, parry: false, power: false }, o || {});
@@ -85,6 +85,24 @@ function incoming(rank, answer, at) {
   return F;
 }
 const untilActive = F => E.phasesOf(F.e, E.specOf(F.e)).w - F.e.t;
+// a scripted chain thrower: taps attack whenever it is free or its cut is not yet queued
+const chainTap = f => IN({ atk: f.st === 'free' || (f.st === 'atk' && !f.queued) });
+// step and stamp every event with the time it happened, so rows can ask what came after what
+function stepT(F, pIn, eIn) { const n0 = F.events.length; E.stepFight(F, DT, pIn, eIn); for (let j = n0; j < F.events.length; j++) F.events[j].t = F.t; }
+// `att` ('e' or 'p') chains cuts at the other, who presses parry once, when `press(F, tHit)` says,
+// tHit being the time of the first hit on the defender; nobody's mind is on
+function chainAt(rank, att, press, secs) {
+  const F = E.newFight(rank, 3); F.p.z = -0.6; F.e.z = 0.6; F.p.hp = F.p.hpMax = F.e.hp = F.e.hpMax = 1e6;
+  const def = att === 'e' ? 'p' : 'e', R = { F, def, tHit: null, pressedAt: null, stAtPress: null };
+  const defIn = F => { if (R.tHit !== null && R.pressedAt === null && press(F, R.tHit)) { R.pressedAt = F.t + DT; R.stAtPress = F[def].st; return IN({ parry: true }); } return IN(); };
+  for (let i = 0; i < Math.round((secs || 2.0) / DT); i++) {
+    stepT(F, att === 'p' ? chainTap(F.p) : defIn(F), att === 'e' ? chainTap(F.e) : defIn(F));
+    if (R.tHit === null) { const h = F.events.find(e => e.type === 'hit' && e.on === def); if (h) R.tHit = h.t; }
+  }
+  return R;
+}
+// every attack row in the table, whatever kinds it holds
+const attackRows = () => Object.keys(E.ATTACKS).flatMap(k => [].concat(E.ATTACKS[k]));
 console.log('-- engine: parry and stagger');
 {
   const F = incoming(1, 'parry', F => untilActive(F) <= 0.08);
@@ -111,6 +129,113 @@ console.log('-- engine: parry and stagger');
   const H = dummy(1); H.e.hp = H.e.hpMax = 1e6; H.e.st = 'stagger'; H.e.t = 0;
   run(H, RULES.stagger, F => (F.p.st === 'free' || (F.p.st === 'atk' && !F.p.queued)) ? IN({ atk: true }) : IN());
   ok('a full five-cut chain fits inside one stagger', evs(H, 'hit', 'p').filter(e => e.crit).length === 5, evs(H, 'hit', 'p').map(e => e.crit));
+}
+console.log('-- engine: a parry only counts before the blade lands');
+{
+  // the CD's case: hit by a chained cut, parry pressed while still reeling, at every point of the flinch
+  const bad = [], seen = [];
+  for (const rank of [1, 5, 10]) for (let k = 1; k <= 7; k++) {
+    const off = 0.03 * k, R = chainAt(rank, 'e', (F, tHit) => F.t - tHit >= off - 1e-9);
+    const later = R.F.events.filter(e => e.t >= R.pressedAt && e.t <= R.pressedAt + 1.0 && e.who === 'p' && (e.type === 'parryStart' || e.type === 'parry'));
+    seen.push(R.stAtPress);
+    if (R.pressedAt === null || R.stAtPress !== 'flinch' || later.length) bad.push({ rank, off, st: R.stAtPress, later: later.map(e => e.type + '@' + (e.t - R.pressedAt).toFixed(3)) });
+  }
+  ok('a parry pressed while reeling from a hit does nothing: no parry starts and no cut is turned in the next 1.0 s (ranks 1, 5, 10; pressed 0.03-0.21 s after the hit)', bad.length === 0 && seen.length === 21, bad);
+}
+{
+  // ...but one pressed once the flinch is over still meets the next cut of the chain, before it lands
+  const bad = [];
+  for (const rank of [1, 5, 10]) {
+    const R = chainAt(rank, 'e', F => F.p.st === 'free');
+    const first = R.F.events.find(e => e.type === 'hit' && e.on === 'p');
+    const par = R.F.events.find(e => e.type === 'parry' && e.who === 'p');
+    const between = R.F.events.filter(e => e.type === 'hit' && e.on === 'p' && e.t > R.tHit && par && e.t <= par.t);
+    if (!first || !par || par.t - R.pressedAt > 0.5 || par.atk === first.atk || between.length) bad.push({ rank, par: par && (par.t - R.pressedAt), between: between.length });
+  }
+  ok('a parry pressed on the first free tick after the flinch turns the next chained cut aside (ranks 1, 5, 10)', bad.length === 0, bad);
+}
+{
+  // a parry held in the buffer from before a hit is lost to it: the player presses parry during its own
+  // wind-up, and the opponent's cut, already swinging, lands first
+  const one = () => {
+    const F = E.newFight(1, 3); F.p.z = -0.6; F.e.z = 0.6;
+    let tHit = null, bufAtHit;
+    for (let i = 0; i < Math.round(1.6 / DT); i++) {
+      stepT(F, IN({ atk: i === 24, parry: i === 30 }), IN({ atk: i === 0 }));
+      if (tHit === null) { const h = F.events.find(e => e.type === 'hit' && e.on === 'p'); if (h) { tHit = h.t; bufAtHit = F.p.buf; } }
+    }
+    const sw = F.events.find(e => e.type === 'swing' && e.who === 'p'), hit = F.events.find(e => e.type === 'hit' && e.on === 'p');
+    return { tHit, bufAtHit, inWind: !!(sw && hit && sw.t < 31 * DT && hit.t > 31 * DT && !F.events.some(e => e.type === 'hit' && e.who === 'p' && e.t < hit.t)),
+      starts: F.events.filter(e => e.type === 'parryStart' && e.who === 'p').length };
+  };
+  const a = one();
+  const keep = E.RULES.buffer; let b;
+  try { E.RULES.buffer = 0.6; b = one(); } finally { E.RULES.buffer = keep; }     // and with a buffer outlasting the flinch
+  ok('a parry held in the buffer is cleared by the hit that flinches its fighter: none starts after the flinch, even when the buffer outlasts it', a.tHit !== null && a.inWind && a.bufAtHit === null && a.starts === 0 && b.tHit !== null && b.inWind && b.bufAtHit === null && b.starts === 0, { a, b });
+}
+{
+  // the same rule for the opponent: the player chains, the opponent's inputs are scripted (no mind).
+  // Kept off the one-tick boundary: the opponent steps second, so 0.21 s is already its last reeling tick
+  const bad = [];
+  for (const rank of [1, 5, 10]) {
+    for (let k = 1; k <= 6; k++) {
+      const off = 0.03 * k, R = chainAt(rank, 'p', (F, tHit) => F.t - tHit >= off - 1e-9);
+      const later = R.F.events.filter(e => e.t >= R.pressedAt && e.t <= R.pressedAt + 1.0 && e.who === 'e' && (e.type === 'parryStart' || e.type === 'parry'));
+      if (R.pressedAt === null || R.stAtPress !== 'flinch' || later.length) bad.push({ rank, off, st: R.stAtPress, later: later.map(e => e.type) });
+    }
+    const R = chainAt(rank, 'p', F => F.e.st === 'free');
+    const first = R.F.events.find(e => e.type === 'hit' && e.on === 'e');
+    const par = R.F.events.find(e => e.type === 'parry' && e.who === 'e');
+    if (!first || !par || par.t - R.pressedAt > 0.5 || par.atk === first.atk) bad.push({ rank, after: par ? par.t - R.pressedAt : null });
+  }
+  ok('the opponent too: its parry while reeling is dropped (0.03-0.18 s after the hit), its parry once free meets the next cut (ranks 1, 5, 10)', bad.length === 0, bad);
+}
+{
+  // each row's own window: the opponent throws the row at a player in reach (1.2 m apart, as dummy());
+  // contact is the first tick of the active window, found by a dry run
+  const throwRow = (row, pressAt) => {
+    const F = E.newFight(1, 3); F.p.z = -0.6; F.e.z = 0.6; F.p.hp = F.p.hpMax = 1e6;
+    let contact = -1;
+    const power = row.kind === 'power'; if (power) F.e.energy = 10;               // a power row is thrown the way a fighter throws it
+    for (let i = 0; i < 300 && (contact < 0 || i <= contact + 5); i++) {         // stop just after contact, the stagger still on
+      if (i === 60 && !power) E.startHit(F, F.e, row.idx, row.kind);
+      stepT(F, IN({ parry: i === pressAt }), IN({ power: power && i === 60 }));
+      if (contact < 0 && F.events.some(e => (e.type === 'hit' && e.on === 'p') || (e.type === 'parry' && e.who === 'p'))) contact = i;
+    }
+    return { F, contact };
+  };
+  const rows = attackRows().filter(r => r.parry), bad = [];
+  for (const row of rows) {
+    const c = throwRow(row, -1).contact, W = Math.round(row.parryWin / DT);
+    const inside = throwRow(row, c - (W - 2)), outside = throwRow(row, c - (W + 2));
+    const turned = inside.F.events.some(e => e.type === 'parry' && e.who === 'p') && inside.F.e.st === 'stagger' && inside.F.p.hp === 1e6;
+    const landed = outside.F.events.some(e => e.type === 'hit' && e.on === 'p') && !outside.F.events.some(e => e.type === 'parry');
+    if (c < 0 || !turned || !landed) bad.push({ row: row.kind + ' ' + row.name, c, W, turned, landed });
+  }
+  ok('every parryable row is judged by its own window: a parry raised parryWin - 2 ticks before contact turns it, parryWin + 2 does not (' + rows.map(r => r.kind + ' ' + r.name).join(', ') + ')', rows.length >= 5 && bad.length === 0, bad);
+}
+{
+  // no swing is resolved twice: none that dealt damage is ever parried, and none hits twice
+  const n = {}; let hits = 0, parries = 0;
+  for (const rank of [1, 5, 10]) for (let s = 1; s <= 4; s++) {
+    const F = E.newFight(rank, s * 7919 + rank), mem = {};
+    for (let i = 0; i < 120 / DT && !F.over; i++) {
+      E.stepFight(F, DT, counter(F, mem), E.aiIntent(F, DT));
+      for (const e of F.events) if (e.type === 'hit' || e.type === 'parry') { const k = rank + ':' + s + ':' + e.atk; n[k] = (n[k] || 0) + 1; if (e.type === 'hit') hits++; else parries++; }
+      F.events.length = 0;
+    }
+  }
+  const twice = Object.keys(n).filter(k => n[k] > 1 || /undefined/.test(k));
+  ok('no swing both hurts and is parried, or lands twice: each attack id meets one hit or one parry at most (AI v counter, ranks 1, 5, 10, four seeds)', hits > 0 && parries > 0 && twice.length === 0, { hits, parries, twice: twice.slice(0, 5) });
+}
+{
+  // the normal rows are today's numbers, copied from the chain as it shipped
+  const TODAY = [
+    ['kesa', 7, 0.16, 0.10, 0.30, 2.0, 2.0, 0.30], ['gyaku', 7, 0.14, 0.10, 0.30, 2.0, 2.0, 0.25], ['yoko', 9, 0.16, 0.12, 0.32, 2.1, 2.6, 0.30],
+    ['tsuki', 10, 0.18, 0.08, 0.34, 2.4, 0.8, 0.60], ['shomen', 15, 0.26, 0.12, 0.45, 2.2, 1.4, 0.45]];
+  const N = E.ATTACKS.normal, keys = ['name', 'dmg', 'wind', 'act', 'rec', 'reach', 'arc', 'lunge'];
+  const same = N.length === 5 && TODAY.every((t, i) => keys.every((k, j) => N[i][k] === t[j]) && N[i].kind === 'normal' && N[i].idx === i && N[i].parry === true && N[i].parryWin === 0.24);
+  ok('the normal attack rows are today\'s chain exactly, each parryable for 0.24 s; the power row is not parryable', same && E.ATTACKS.power.parry === false && E.ATTACKS.power.parryWin === 0, { N, power: E.ATTACKS.power });
 }
 console.log('-- engine: dodge');
 {
