@@ -419,7 +419,7 @@ from **inventing a new facet value**, not filling a hole. Open directions:
   turns. A fifth local-2p title would now want `co-op`, which is still empty.
 - **`art-styles`** (neon-clash first, then turret-builder and star-surge, all
   2026-08-23; combat-simulator joined 2026-11-02 as the first **WebGL** page with styles,
-  realistic and toon, neon to follow) is a player-selectable art direction — a second cel-shaded skin
+  realistic, toon and neon, the last with a bloom) is a player-selectable art direction — a second cel-shaded skin
   over the same simulation, behind a settings cogwheel (`toon` defaults in
   neon-clash and turret-builder; star-surge grew to five styles — including a
   pre-rendered `sprite` mode that bakes the 3D art into sprite frames — and now

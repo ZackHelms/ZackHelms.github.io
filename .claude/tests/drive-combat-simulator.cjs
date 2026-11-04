@@ -17,8 +17,9 @@
  * pausing the duel, the victory and defeat flows and the saved ladder, and the
  * graphics styles (the select, saving and validating the pick, a skin is paint
  * with real frames drawn between the ticks, toon's bands, toon's ink round the
- * fighters and the courtyard and none in realistic, every element drawn in every
- * style with no GL error).
+ * fighters and the courtyard and none in realistic, neon dark and lit in its
+ * palette, you green and them red, no shadow pass in neon, every element drawn
+ * in every style with no GL error).
  *
  *   .claude/scripts/gates.sh games/combat-simulator/index.html
  *
@@ -418,7 +419,7 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
 (async () => {
   let chromium;
   try { ({ chromium } = require('playwright-core')); } catch (e) { console.log('FAIL  playwright-core not resolvable: page checks skipped'); fail++; return finish(); }
-  const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  const browser = await chromium.launch({ executablePath: process.env.SMOKE_CHROMIUM || '/opt/pw-browsers/chromium', args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
   const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
   const page = await ctx.newPage();
   const errors = [];
@@ -604,7 +605,7 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
   // snapped), because the rAF loop keeps drawing between evaluates
   const SKEY = 'combatSimulator.settings.v1';
   const offered = await page.evaluate(() => [...document.querySelectorAll('#style-sel option')].map(o => o.value));
-  ok('the style select offers exactly realistic, toon, in that order', JSON.stringify(offered) === JSON.stringify(['realistic', 'toon']), offered);
+  ok('the style select offers exactly realistic, toon, neon, in that order', JSON.stringify(offered) === JSON.stringify(['realistic', 'toon', 'neon']), offered);
   const pick = await page.evaluate(KEY => {
     __CS.setPaused(true); __CS.setStyle('realistic');
     const F0 = __CS.F, t0 = F0.t;
@@ -711,6 +712,160 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     ink.on.opp - ink.off.opp >= 300 && ink.on.tN > 0 && ink.on.torso <= ink.on.tN * 0.25, { on: ink.on, off: ink.off });
   ok('toon inks round the courtyard: near-black outside both fighters rises with the ink on', ink.on.yard - ink.off.yard >= 1500, { on: ink.on.yard, off: ink.off.yard });
   ok('realistic is untouched by the ink: its frames with FX.ink on and off are byte-identical', ink.same && ink.rOn.yard === ink.rOff.yard, { same: ink.same, rOn: ink.rOn, rOff: ink.rOff });
+  // neon is dark and its light is the palette: one frozen frame per style of the ink rows' scene; mean
+  // luminance, and of the brightest 2% of pixels the share within 25 deg of hue of green, red, blue,
+  // purple or gold, or near-white (the blade, stars)
+  const neonLit = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0;
+    const hueOf = (r, g, b) => { const mx = Math.max(r, g, b), d = mx - Math.min(r, g, b); if (!d) return -1;
+      const h = 60 * (mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4); return h; };
+    const N = __CS.NEON, hues = ['green', 'red', 'blue', 'purple', 'gold'].map(k => hueOf(N[k][0], N[k][1], N[k][2]));
+    const out = { hues: hues.map(h => +h.toFixed(1)) };
+    // neon's palette is read with the bloom off (the light as drawn; the bloom only adds that light back,
+    // blurred); the frame as shipped, bloom on, is measured beside it as 'neonBloom'
+    for (const s of [...__CS.STYLES, 'neonBloom']) {
+      __CS.setStyle(s === 'neonBloom' ? 'neon' : s); __CS.FX.bloom = s !== 'neon';
+      const d = __CS.pixels().d, n = d.length / 4, hist = new Array(256).fill(0), L = new Uint8Array(n);
+      let sum = 0;
+      for (let j = 0; j < n; j++) { const l = 0.299 * d[j * 4] + 0.587 * d[j * 4 + 1] + 0.114 * d[j * 4 + 2]; sum += l; L[j] = Math.round(l); hist[L[j]]++; }
+      let need = Math.ceil(n * 0.02), thr = 255; for (; thr > 0; thr--) { need -= hist[thr]; if (need <= 0) break; }
+      let top = 0, pal = 0, white = 0;
+      for (let j = 0; j < n; j++) { if (L[j] < thr) continue; top++;
+        const r = d[j * 4], g = d[j * 4 + 1], b = d[j * 4 + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        if (mx >= 180 && (mx - mn) / mx < 0.25) { white++; pal++; continue; }
+        const h = hueOf(r, g, b); if (h >= 0 && hues.some(q => Math.min(Math.abs(h - q), 360 - Math.abs(h - q)) <= 25)) pal++; }
+      out[s] = { mean: +(sum / n / 255).toFixed(4), thr, top, white, onPalette: +(pal / top).toFixed(3) };
+    }
+    __CS.FX.bloom = true; __CS.setStyle('realistic');
+    return out;
+  });
+  console.log('     neon light: ' + JSON.stringify(neonLit));
+  // measured at 844x390 (rank 1): neon mean 0.084 with 99.2% of its brightest 2% on the palette (realistic 0.73, toon 0.76).
+  // The hue share is held at 96%, not the plan's 85%: the courtyard tonemapped drifts it to 93.9% (and its mean to 0.23),
+  // so at 85% the hue clause could not fail on its own. With the bloom on (step 5) the mean is 0.096 and the share 96.8%:
+  // the halo's blurred edges sit between hues, so the hue clause reads the bloom-off frame, where it keeps its margin,
+  // and the shipped frame must stay under the same mean
+  ok('neon is dark and its light is the palette: mean luminance under 0.12 (bloom off and on), and 96% of the brightest 2% within 25 deg of a palette hue or near-white',
+    neonLit.neon && neonLit.neon.mean < 0.12 && neonLit.neon.onPalette >= 0.96 && neonLit.neonBloom.mean < 0.12, neonLit);
+  // you are green, they are red: each fighter drawn alone (FX.only) beside a frame with neither, in ONE
+  // evaluate; a fighter's pixels are those that differ inside its box, and the mean colour of the brightest
+  // 10% of them must be its own colour by 1.5x over both other channels. Read with the bloom off (the colours
+  // as drawn) and again with it on (the frame as shipped): the bloom's halo of a fighter's own edges and ground
+  // glow lifts its colour, enough to hide a rim drawn in the wrong colour, so the bloom-off frame is the one that bites
+  const sides = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0; __CS.setStyle('neon');
+    const W = innerWidth, H = innerHeight;
+    const boxOf = (f, r, top) => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      for (const dx of [-r, r]) for (const dz of [-r, r]) for (const y of [0, top]) { const q = project([f.x + dx, y, f.z + dz], W, H); x0 = Math.min(x0, q.x); x1 = Math.max(x1, q.x); y0 = Math.min(y0, q.y); y1 = Math.max(y1, q.y); }
+      return [Math.floor(x0), Math.floor(y0), Math.ceil(x1), Math.ceil(y1)]; };
+    const frame = who => { __CS.FX.only = who; return __CS.pixels(); };
+    const res = {};
+    try { for (const bl of [false, true]) {
+      __CS.FX.bloom = bl;
+      const none = frame('none'), out = {};
+      for (const who of ['p', 'e']) {
+        const fr = frame(who), d = fr.d, w = fr.w, h = fr.h, k = w / W, b = boxOf(F[who], 0.6, 2.0), px = [];
+        for (let gy = 0; gy < h; gy++) for (let gx = 0; gx < w; gx++) {
+          const x = gx / k, y = (h - 1 - gy) / k, i = (gy * w + gx) * 4;
+          if (x < b[0] || x >= b[2] || y < b[1] || y >= b[3]) continue;
+          if (d[i] === none.d[i] && d[i + 1] === none.d[i + 1] && d[i + 2] === none.d[i + 2]) continue;
+          px.push([d[i], d[i + 1], d[i + 2], 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]]);
+        }
+        px.sort((u, v) => v[3] - u[3]);
+        const top = px.slice(0, Math.max(1, Math.ceil(px.length * 0.1))), m = [0, 1, 2].map(c => top.reduce((a, q) => a + q[c], 0) / top.length);
+        out[who] = { n: px.length, mean: m.map(v => Math.round(v)) };
+      }
+      res[bl ? 'bloom' : 'off'] = out;
+    } } finally { __CS.FX.only = null; __CS.FX.bloom = true; __CS.setStyle('realistic'); }
+    return res;
+  });
+  console.log('     neon sides: ' + JSON.stringify(sides));
+  // measured, bloom off: you [63, 244, 34] (green 3.9x red), them [245, 59, 92] (red 2.7x blue); bloom on: you
+  // [64, 228, 52], them [241, 65, 97]. Both rims green reads [166, 129, 72] off (caught) but passes with the bloom on
+  const domi = (m, c) => [0, 1, 2].every(o => o === c || m[c] > 1.5 * m[o]);
+  ok('in neon you are green and they are red: the brightest tenth of each fighter\'s own pixels is its colour by 1.5x, bloom off and on',
+    ['off', 'bloom'].every(k => sides[k] && sides[k].p.n > 200 && sides[k].e.n > 200 && domi(sides[k].p.mean, 1) && domi(sides[k].e.mean, 0)), sides);
+  // neon has no sun shadows: count the draws made into the shadow map's framebuffer during one draw() per style
+  const shadowDraws = await page.evaluate(() => {
+    const g = document.getElementById('gl').getContext('webgl2'), names = ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced', 'bindFramebuffer'];
+    const keep = {}, own = {}; for (const k of names) { keep[k] = g[k]; own[k] = Object.prototype.hasOwnProperty.call(g, k); }
+    let cur = null, n = 0; const out = {};
+    g.bindFramebuffer = (t, fb) => { cur = fb; return keep.bindFramebuffer.call(g, t, fb); };
+    for (const k of names.slice(0, 4)) g[k] = (...a) => { if (cur && cur === __CS.SHADOW.fb) n++; return keep[k].apply(g, a); };
+    try { for (const s of __CS.STYLES) { __CS.setStyle(s); n = 0; cur = null; __CS.draw(); out[s] = n; } }
+    finally { for (const k of names) { if (own[k]) g[k] = keep[k]; else delete g[k]; } __CS.setStyle('realistic'); }
+    return out;
+  });
+  ok('neon draws no shadow pass: nothing goes into the shadow map in neon, two draws in realistic and toon', shadowDraws.neon === 0 && shadowDraws.realistic === 2 && shadowDraws.toon === 2, shadowDraws);
+  // neon's bloom: FX.bloom off and on over ONE frozen frame of the ink rows' scene. The frame's summed
+  // luminance, and, in the ring within 6 px of the bloom-off frame's brightest 2% (those pixels left out),
+  // the count of mid-bright pixels (luminance 0.08-0.4): the halo lifts the dark pixels beside the lines
+  const halo = await page.evaluate(() => {
+    __CS.setPaused(true); __CS.startDuel(1, 99); __CS.tick(1 / 60, 125);
+    const F = __CS.F; F.ai.cd = 1e9; F.p.x = 0; F.p.z = -1.5; F.e.x = 0; F.e.z = 1.5; F.p.st = F.e.st = 'free'; F.p.t = F.e.t = 0;
+    __CS.PARTS.length = 0; __CS.setStyle('neon');
+    let off, on;
+    try { __CS.FX.bloom = false; off = __CS.pixels(); __CS.FX.bloom = true; on = __CS.pixels(); }
+    finally { __CS.FX.bloom = true; __CS.setStyle('realistic'); }
+    const w = off.w, h = off.h, n = w * h, R = 6;
+    const lum = (d, j) => (0.299 * d[j * 4] + 0.587 * d[j * 4 + 1] + 0.114 * d[j * 4 + 2]) / 255;
+    const Lo = new Float32Array(n), Ln = new Float32Array(n); let sOff = 0, sOn = 0;
+    for (let j = 0; j < n; j++) { Lo[j] = lum(off.d, j); Ln[j] = lum(on.d, j); sOff += Lo[j]; sOn += Ln[j]; }
+    const thr = Array.from(Lo).sort((a, b) => b - a)[Math.floor(n * 0.02)];
+    const bright = new Uint8Array(n), near = new Uint8Array(n);
+    for (let j = 0; j < n; j++) if (Lo[j] >= thr && Lo[j] > 0) bright[j] = 1;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (bright[y * w + x])
+      for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) { const X = x + dx, Y = y + dy; if (X >= 0 && Y >= 0 && X < w && Y < h) near[Y * w + X] = 1; }
+    let ring = 0, midOff = 0, midOn = 0;
+    for (let j = 0; j < n; j++) { if (!near[j] || bright[j]) continue; ring++;
+      if (Lo[j] >= 0.08 && Lo[j] <= 0.4) midOff++; if (Ln[j] >= 0.08 && Ln[j] <= 0.4) midOn++; }
+    return { sumOff: Math.round(sOff), sumOn: Math.round(sOn), thr: +thr.toFixed(3), ring, midOff, midOn };
+  });
+  console.log('     bloom halo: ' + JSON.stringify(halo));
+  // measured at 844x390 (rank 1): summed luminance 27,666 -> 31,588 (+14%); mid-bright in the ring 13,097 -> 32,049 (2.4x)
+  ok('neon\'s bloom adds a halo: the frame\'s summed luminance rises by 5% and the mid-bright pixels beside its brightest by half again',
+    halo.sumOn >= halo.sumOff * 1.05 && halo.midOff > 0 && halo.midOn >= halo.midOff * 1.5, halo);
+  // the bloom is neon's alone: realistic and toon frames byte-identical with FX.bloom on and off
+  const bloomOwn = await page.evaluate(() => {
+    __CS.setPaused(true); const out = {};
+    try {
+      for (const s of ['realistic', 'toon']) {
+        __CS.setStyle(s); __CS.FX.bloom = true; const a = __CS.pixels().d; __CS.FX.bloom = false; const b = __CS.pixels().d;
+        let diff = a.length === b.length ? 0 : -1; for (let i = 0; diff >= 0 && i < a.length; i += 4) if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2]) diff++;
+        out[s] = diff;
+      }
+    } finally { __CS.FX.bloom = true; __CS.setStyle('realistic'); }
+    return out;
+  });
+  ok('the bloom is neon\'s alone: realistic and toon frames are byte-identical with FX.bloom on and off', bloomOwn.realistic === 0 && bloomOwn.toon === 0, bloomOwn);
+  // the bloom leaves no state behind: after a neon draw the GL state the next frame starts from is the same
+  // with the bloom as without it, and a realistic frame (and a neon one) drawn straight after a neon frame is
+  // byte-identical to one drawn after a realistic frame
+  const leak = await page.evaluate(() => {
+    const g = document.getElementById('gl').getContext('webgl2');
+    const state = () => { const v = g.getParameter(g.VIEWPORT);
+      return JSON.stringify({ blend: g.isEnabled(g.BLEND), depth: g.isEnabled(g.DEPTH_TEST), mask: g.getParameter(g.DEPTH_WRITEMASK), cull: g.isEnabled(g.CULL_FACE),
+        src: g.getParameter(g.BLEND_SRC_RGB), dst: g.getParameter(g.BLEND_DST_RGB), vp: [v[0], v[1], v[2], v[3]], fb: g.getParameter(g.FRAMEBUFFER_BINDING) === null,
+        unit: g.getParameter(g.ACTIVE_TEXTURE) - g.TEXTURE0, tex0: g.getParameter(g.TEXTURE_BINDING_2D) === __CS.SHADOW.tex, vao: g.getParameter(g.VERTEX_ARRAY_BINDING) === null }); };
+    const same = (a, b) => { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; };
+    __CS.setPaused(true); let out;
+    try {
+      __CS.setStyle('neon'); __CS.FX.bloom = false; __CS.draw(); const sOff = state();
+      __CS.FX.bloom = true; __CS.draw(); const sOn = state();
+      __CS.setStyle('realistic'); __CS.draw(); const rAfterR = __CS.pixels().d;
+      __CS.setStyle('neon'); __CS.draw(); __CS.setStyle('realistic'); const rAfterN = __CS.pixels().d;
+      __CS.setStyle('realistic'); __CS.draw(); __CS.setStyle('neon'); const nAfterR = __CS.pixels().d;
+      const nAfterN = __CS.pixels().d;     // pixels() draws first, so this frame follows the neon one above
+      out = { sOff, sOn, stateSame: sOff === sOn, realistic: same(rAfterR, rAfterN), neon: same(nAfterR, nAfterN) };
+    } finally { __CS.FX.bloom = true; __CS.setStyle('realistic'); }
+    return out;
+  });
+  ok('the bloom leaves no GL state behind: the state after a neon frame is the same with it as without, and the next frame, realistic or neon, draws as it would after a realistic one',
+    leak.stateSame && leak.realistic && leak.neon, leak);
   // every element at once in every style: a power wind-up and its ring, a trail, sparks; no GL error
   const all = await page.evaluate(() => {
     __CS.setPaused(true); __CS.setStyle('realistic'); __CS.startDuel(4, 31); __CS.tick(1 / 60, 125);
@@ -732,6 +887,21 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
   });
   ok('every element at once (power ring, trail, 40 sparks) draws in ' + Object.keys(all.styles).join(', ') + ' with no GL error and a real picture',
     all.trail >= 3 && all.st === 'power' && all.parts === 40 && Object.keys(all.styles).length === STY.length && Object.values(all.styles).every(r => r.err === 0 && !r.mono), all);
+  // the bloom target follows the screen: neon drawn at 844x390, 390x844 and back; after each, no GL error
+  // and the target is a quarter of the drawing buffer each way, rounded up
+  const bloomSizes = [];
+  for (const [vw, vh] of [[844, 390], [390, 844], [844, 390]]) {
+    await page.setViewportSize({ width: vw, height: vh });
+    await page.waitForFunction(([vw, vh]) => innerWidth === vw && innerHeight === vh, [vw, vh], { timeout: 30000 });
+    bloomSizes.push(await page.evaluate(() => {
+      __CS.setPaused(true); __CS.setStyle('neon');
+      try { __CS.draw(); const c = document.getElementById('gl'), B = __CS.BLOOM;
+        return { pw: c.width, ph: c.height, err: __CS.glError(), w: B && B.w, h: B && B.h, ok: B && B.ok }; }
+      finally { __CS.setStyle('realistic'); }
+    }));
+  }
+  ok('the bloom target follows the screen: a quarter of the drawing buffer each way at 844x390, 390x844 and back, with no GL error',
+    bloomSizes.length === 3 && bloomSizes[1].pw < bloomSizes[1].ph && bloomSizes.every(s => s.err === 0 && s.ok && s.w === Math.ceil(s.pw / 4) && s.h === Math.ceil(s.ph / 4)), bloomSizes);
   ok('no page or console errors', errors.length === 0, errors);
   await browser.close();
   finish();

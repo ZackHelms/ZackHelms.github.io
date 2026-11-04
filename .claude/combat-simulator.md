@@ -5,7 +5,7 @@ ladder of ten named masters, in a walled stone courtyard whose light runs from
 mid-morning at rank 1 to a lantern-lit dusk at rank 10. CD commission, 2026-11-01,
 placed on the hub straight after Driving Simulator. Open licence (MIT, the default).
 One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simulator.cjs`
-(89 checks; 32 negative controls on the game and 14 on its graphics styles, all caught). Since
+(96 checks; 32 negative controls on the game and 24 on its graphics styles, all caught). Since
 2026-11-03 (CS-3, CS-4) a parry only counts before the blade lands, and there are three kinds of strike:
 the normal five-cut chain, a **quick** strike (a jab) and a **heavy** strike, each on its own button and key.
 
@@ -69,6 +69,18 @@ the normal five-cut chain, a **quick** strike (a jab) and a **heavy** strike, ea
 | Toon's ink | `#0d0b10` at 1.5 CSS px, the same width on the blade (at the duel's distance the blade is narrower than its two ink edges, so it reads as a dark line with a light core) | The spec's 0.012 m is about 1.5 px at the duel's camera distance |
 | Toon's wall joints | The arena's overlapping wall boxes (each is `hl + 0.02` long) draw a short vertical ink line at every segment joint, so the wall reads as panels | Kept rather than special-cased |
 | Toon's pine rim | The open bottom of a pine's foliage cone shows the shell's bottom ring as a dark band where the camera sees under it | Kept as the rim's own line |
+| Neon is a dark theme in display space | No tonemap and no exposure: every body is `N_BG + vCol * 0.05 * (0.55 + 0.45 N.V)`, lit only a little by facing so a wall's faces still separate; fighters `vCol * 0.06` with no facing term (their rim does that job) | Neon is the site's Neon Arcade palette, whose colours are display values; the CD's playtest decides |
+| Neon's flagstone joints | `N_BLUE` at 85%, a 0.012 half-width line in stone units, antialiased by `fwidth` and faded out where the joints are thinner than a pixel | The far floor would otherwise moire |
+| Neon's lanterns | Flat `N_GOLD`, 0.8-1.0 by facing, no flicker, the same at every rank; they cast no light in neon | The spec's emissive edge lines; a point light would need the tonemap neon dropped |
+| Neon's sky | Horizon `N_PURPLE * 0.14` to `N_BG` by `d.y = 0.5`; stars on a 150-per-radian grid (0.7% of cells, white at 35-85%, faded in from `d.y` 0.08); each mountain range a `fwidth`-wide `N_PURPLE` line with an exponential glow of 0.006 rad, the far one at 60% and the near one at 100%; pure `N_BG` below the near ridge, `N_BG * 1.2` between the ridges; no sun, moon or clouds, at any rank | A night sky in outline, as the walls are |
+| Neon's edges | 2 CSS px; purple for walls, torii and trees, gold for lanterns, `N_BLUE * 0.4` for the paving, purple for any arena material outside the list; flat (no fog); the fighters' edges in their side's colour | The spec's emissive edge lines; 2 CSS px is the plan's width, and nothing was widened for the bloom pass, where they are half a target pixel and still glow |
+| Neon's rim | `pow(1 - N.V, 2.2) * 1.4` in green (you) and red (them); the blade white-hot `(1.0, 0.97, 0.92)` plus the power glow, clamped to 1 | The spec: you green, the opponent red, the blade white-hot |
+| Neon's ground glow | A 0.7 m ring at alpha 0.14 in the side's colour under each fighter, at y 0.02, in the additive flat draw | The spec's faint glow in place of sun shadows; there is no shadow pass in neon |
+| Neon's trails and sparks | Trails in the side's colour (gold for a power cut) at alpha 0.9 at the leading edge; sparks 1.5x as big, in their own colours rather than the palette | The spec's stronger trails and sparks |
+| The bloom's numbers | A quarter-resolution target, a bright-pass at 0.45, the composite at 0.9; one 9-tap blur each way, so the halo reaches about 16 device px; no second, wider level | The plan's numbers. They read well on the rank-1 frame (edges and rims glow, the floor's joints get a soft wash near the fighters, the dark bodies stay dark); the CD's playtest decides |
+| The bloom draws what the screen draws | The quarter-resolution pass is neon exactly as the screen has it: edges at the same CSS width (half a target pixel there), effects included, so a trail and sparks bloom too | One scene routine (`drawScene`) serves both passes |
+| The bloom is neon's alone | At every rank, with no setting of its own (only the test switch `FX.bloom`); the quality select (`SETTINGS.gfx`) does not change it | Realistic and toon must stay byte-identical |
+| The bloom's draw calls | An idle neon frame is 19 draw calls (8 with `FX.bloom` off) and 21 with a trail, a ring and sparks (9 off). The bloom is the scene pass again (8 or 9) plus 3 post passes (two blurs and the composite) | The plan's escalation trigger was "more than neon's own main pass plus four"; the bloom adds 12 with effects against a bound of 13, so it was not escalated. If neon's frame rate is poor on the CD's phone, a cheaper bloom exists: resolve the main pass with `blitFramebuffer` into a full-size texture and downsample from it, with no second scene. Not built (overseer's decision, 2026-11-04) |
 | Ink is flat | Drawn in display space with no tonemap and no fog, so a far pine's outline is as dark as a near one's; it writes depth, so the additive effects depth-test against it | Simplest; screen-constant width already keeps distant lines thin |
 | The HUD in every style | Keeps one look and layout | The spec says only the controls keep their layout; a styled HUD is a separate ask |
 | CS-3 and CS-4, every row below from Parry rows to The help wording | **Signed off by the CD 2026-11-04** after a playtest of both (backlog refinement), except contact, which the CD decided to move (CS-5) | The rows stay as the record of what was built |
@@ -149,7 +161,7 @@ the normal five-cut chain, a **quick** strike (a jab) and a **heavy** strike, ea
   the capsule from A, B, r0, r1), drawn in two instanced calls. One shadow map from the
   key light (sun, or moon at night); four lantern point lights at dusk; additive blade
   trails, ground rings and sparks. About 12 draw calls a frame in realistic. The page has
-  a **Graphics style** selector (realistic, toon) that swaps the shaders and the effects'
+  a **Graphics style** selector (realistic, toon, neon) that swaps the shaders and the effects'
   colours without touching the fight; see Graphics styles below.
 - **HUD** is a 2D canvas over the GL one: the bars and energy ticks, the six buttons
   (attack, dodge, parry, power, and since CS-4 quick and heavy; `LAY.btn`) and their icons, the power ring (inner ring 0-10, closes and flashes at 10; outer ring
@@ -168,15 +180,15 @@ the normal five-cut chain, a **quick** strike (a jab) and a **heavy** strike, ea
 
 The settings' PICTURE section opens with a **Graphics style** select (`#style-sel`, written in
 the HTML and not generated from `STYLES`, so a row that says it offers exactly these is not a
-tautology): `realistic` (the default, the shipped look) and `toon`. It sits above the older
+tautology): `realistic` (the default, the shipped look), `toon` and `neon`. It sits above the older
 `Graphics` quality select (`SETTINGS.gfx`), which is not the style and is unchanged. Choosing
 one fires `change`, sets `SETTINGS.style`, saves, and the next frame uses it: no reload, no
 new duel. **A skin is paint**: the engine never sees the style (the suite checks the engine
 text has no "style"), and a fixed-seed duel steps to byte-identical fighters under every
 style, with real frames drawn between the ticks, and when the style is switched mid-duel.
 
-- **`STYLES = ['realistic', 'toon']`** sits beside `SETTINGS`; a style's index is its GLSL
-  `STYLE` number. `SETTINGS.style` defaults to `'realistic'` and is validated right after the
+- **`STYLES = ['realistic', 'toon', 'neon']`** sits beside `SETTINGS`; a style's index is its GLSL
+  `STYLE` number (GLSL `STYLE 2` is neon). `SETTINGS.style` defaults to `'realistic'` and is validated right after the
   load: a save without the key, or a junk value (`chalk`), reads realistic.
 - **`withStyle(src, n)`** puts `#define STYLE n` straight after the shader's first line. It
   **throws** if the source does not start with `#version 300 es\n`: `#if STYLE == 1` on an
@@ -186,7 +198,7 @@ style, with real frames drawn between the ticks, and when the style is switched 
   use from the same sources: `world`, `limb`, `sky` and `glow` per style, and for a style in
   `INK` the two ink programs. The shadow programs and `flat` are not style-dependent and live in
   `PRG`, shared by every set. `initGL()` builds realistic's set only, so boot cost did not grow
-  and toon compiles on its first frame. In GLSL every difference is an `#if STYLE == 1` block
+  and toon and neon compile on their first frame. In GLSL every difference is an `#if STYLE == 1` block
   with the old code in the `#else`, so realistic compiles from exactly the code it always had;
   that is what the one-off pixel proof relied on (the same sha256 before and after both steps,
   `2ddf4aa3...935729be`).
@@ -238,28 +250,89 @@ style, with real frames drawn between the ticks, and when the style is switched 
   cap ring `[c, 1, s]`. The floor disc and both annuli keep 0 and grow no shell. A missed
   pointer would draw garbage with no GL error; the realistic hash covers the shadow pass,
   which reads the same VAO. The shadow program reads location 0 only.
-- **The `INK` table** (`{ toon: { px: 1.5, col } }`) lists the styles that draw ink, their
-  width in CSS px and colour. `progsFor()` compiles `inkWorld` and `inkLimb` for a style in
+- **The `INK` table** (`{ toon: { px: 1.5, col }, neon: { px: 2, col: NEON.purple, side: SIDE } }`)
+  lists the styles that draw ink, their width in CSS px and colour; `side` marks the style that
+  draws the fighters' hull per fighter, in the side's colour. `progsFor()` compiles `inkWorld` and `inkLimb` for a style in
   it, and `render()` computes `const ink = FX.ink && INK[look]`. Two passes, both through
   `inkSet()`: the arena shell straight after the arena draw (one `drawElements`), and one
-  instanced draw of all the capsules after the fighters' colour draws. **Step 4 (neon)
-  extends this table** and adds a per-fighter colour.
+  instanced draw of all the capsules after the fighters' colour draws (neon draws that hull once
+  per fighter, so each has its own colour).
 - **Hooks** on `window.__CS`: `STYLES`; `setStyle(s)` (sets `SETTINGS.style` and the
   select's value, does not save, so rows that test saving go through the select's `change`);
   `draw()` (renders one frame now, synchronously, with `FRAME_DT` 0, the camera snapped and
   `CAM.shake` 0, so two draws of a state are one picture; it restores `FRAME_DT`);
   `pixels(x, y, w, h)` (`draw()`, then `readPixels` in the same task, because the context keeps
   no drawing buffer; CSS px from the top left, rows come back bottom-up in device px);
-  `glError()`; `PARTS` (the spark list); and `FX = { ink: true, bloom: true }`, test-only
-  switches so a row can toggle a pass in the live page. `render()` reads `FX.ink`; nothing
-  reads `FX.bloom` yet (CS-2). A comparison renders all its variants inside one
+  `glError()`; `PARTS` (the spark list); and `FX = { ink: true, bloom: true, only: null }`, test-only
+  switches so a row can toggle a pass in the live page. `render()` reads `FX.ink` and `FX.bloom`
+  (the bloom is neon's alone). `FX.only` (`'p'`, `'e'`, `'none'` or `null`) makes neon draw only
+  that fighter's colour, edges and ground glow, so a row can find one fighter's own pixels by
+  difference. `NEON`, `SHADOW` (a getter), `BLOOM` (a getter) and `BLOOM_K` are exposed too. A comparison renders all its variants inside one
   `page.evaluate`, because the rAF loop keeps drawing between evaluates. `__CS.tick()` never
   renders, so a paint-invariance row calls `draw()` between ticks. `dprNow()` is the one place
   the device pixel ratio is read.
-- **Draw calls per frame** (`PERF.calls` for one `draw()`): an idle frame (sky, arena, two
-  fighters, two shadow draws) is 6 in realistic and 8 in toon (the two ink passes). With a
-  trail, a power ring and sparks, 8 in realistic and 11 in toon (9 with `FX.ink` off).
-- **Not decided here:** the neon style (CS-2) and its bloom are still open.
+- **Draw calls per frame** (`PERF.calls` for one `draw()`, the rank-4 scene): an idle frame (sky,
+  arena, two fighters, two shadow draws) is 6 in realistic and 8 in toon (the two ink passes). With
+  a trail, a power ring and sparks, 8 in realistic and 11 in toon (9 with `FX.ink` off). Neon has
+  no shadow pass: 8 idle and 9 with effects with the bloom off (sky, arena, arena edges, two
+  fighters, their two edges, one flat draw), 19 and 21 with it on. See the bloom's assumed row.
+
+### Neon
+
+- **Palette.** `NEON` is one table of the site's Neon Arcade colours (the hex values in
+  `games/CLAUDE.md` as 0-1 RGB: `bg`, green, red, blue, purple, gold). It feeds the JS and, as
+  `NEON_GLSL` (`const vec3 N_<NAME>`), the shaders: in `GLSL_COMMON` under `#elif STYLE == 2` and
+  in `FS_INK`'s neon branch. `SIDE = { p: green, e: red }`.
+- **Display space.** `FS_WORLD` (`STYLE == 2`) has no tonemap and no `uExposure`; fog mixes toward
+  `N_BG`. The sky, bodies, joints and lanterns are in the assumed rows; the blade and limbs are in
+  `FS_LIMB` with the **`uRim`** uniform, set per fighter in the colour loop from `SIDE`, so the
+  rim is green on you and red on them.
+- **Emissive edges per material.** `VS_INK_WORLD` under `STYLE == 2` reads `aMat` (location 3) into
+  `flat out int vMat`, and `FS_INK`'s neon branch colours by it (9, 7 and 2 purple, 8 and 4 gold,
+  3 and 6 `N_BLUE * 0.4`, anything else purple). `VS_INK_LIMB` writes `vMat = -1`, which takes
+  `uInkCol`. The fighters' hull is drawn **per fighter** (`ink.side`), `uInkCol` from `SIDE`,
+  through the same per-fighter attribute offsets as the colour loop.
+- **No shadow pass, a ground glow.** `render()` sets `SHADOWS_ON = look === 'neon' ? 0 : 1`,
+  skips the shadow pass's two draws when it is 0 (it still computes `shVP`, which the shaders
+  take), and then sets the depth, blend and cull state the pass used to leave behind for the main
+  pass (nothing else enables `DEPTH_TEST` before it, which the bloom's target needs too).
+  `setCommon` hands `uShadowOn` the flag. A `flatRing` under each fighter joins the additive flat
+  draw.
+- **`drawScene(look, P, R)`** is everything from the sky to the sparks, the per-fighter ink and the
+  ground glow included; the shadow pass stays outside it. `R = { shVP, ph, dpr, caps, nCaps }`
+  carries the frame's locals the body reads. It was cut out of `render()` verbatim as its own
+  commit, with the three frozen-frame hashes unchanged, before any bloom code existed, because the
+  bloom draws the same scene a second time.
+- **The bloom.** `render()` ends with `drawScene(look, P, R)` and then, for neon with `FX.bloom`,
+  `bloom(look, P, R, pw, ph)`. `BLOOM = { w, h, texA, fbA, rbDepth, texB, fbB, ok, made }` comes
+  from `makeBloom(w, h)`: two RGBA8 textures, `fbA` with a depth renderbuffer and `fbB` without,
+  `ok` the two framebuffers' completeness (an incomplete target skips the bloom rather than
+  drawing garbage), `made` counting builds; it is re-made, deleting the old, whenever
+  `ceil(pw / 4)` or `ceil(ph / 4)` changes. `BLOOM_K = { div: 4, thresh: 0.45, gain: 0.9 }` holds
+  the three numbers. `bloom()` draws the scene into `fbA` at the quarter size, blurs `texA -> fbB`
+  across with the bright-pass (`max(c - 0.45, 0) / 0.55` per tap), blurs `texB -> fbA` down without
+  it, then adds `texA * 0.9` onto the screen with `ONE, ONE` blending. `VS_POST` is `VS_SKY`'s
+  triangle at the far depth (`z 0.9999`) on purpose: with the depth test left on, the halo would
+  hide behind everything the scene drew, which makes "the composite disables `DEPTH_TEST`" a
+  load-bearing line a break can remove. The blur and post programs read no `STYLE`, so they are
+  compiled once, on the first neon frame, with the target.
+- **The state the bloom restores.** Afterwards: `DEPTH_TEST` on, `depthMask(true)`, `BLEND` off,
+  the viewport and framebuffer back, the active unit and **unit 0's texture the shadow map** (what
+  `setCommon` left there), the VAO null. No sampled texture is ever attached to the framebuffer
+  being drawn: the scene pass binds the shadow map, each blur reads the other target, the
+  composite reads `texA` into the screen.
+- **Why `bloom-state-leak` needs a GL-state row, not a picture.** Every frame starts by setting the
+  state it draws with (realistic and toon through the shadow pass's own enables, neon through the
+  `if (!SHADOWS_ON)` reset), so a blend left on is undone before anything is drawn and a realistic
+  frame after a neon one still matches. The row reads the state directly (blend, depth test,
+  depth mask, cull, blend func, viewport, framebuffer, active unit, unit 0's texture, VAO) and
+  keeps the pictures for the leaks the resets do not cover.
+- **The palette and green/red rows were restated for the bloom.** The halo blends the palette's
+  hues, which drops the brightest 2%'s hue share from 99.2% to 96.8% and lifts the red in the
+  opponent's brightest pixels past 1.5x even with a green rim, so those clauses read the frame with
+  `FX.bloom` off (the colours as drawn) and a second clause holds the shipped frame, bloom on,
+  under the same mean ceiling (0.096 < 0.12). `neon-rims-same` came back MISSED before this
+  restatement.
 
 ## The ladder, measured
 
@@ -309,7 +382,7 @@ Its a lot so put items in backlog in a combat simulator section and i can run
 "backlog-plan-gen" for them later."
 
 **Planned 2026-11-01** as one six-step arc, CS-1 landing on its own at step 3:
-`.claude/plans/csstyles.selector-toon-neon.md` (the design decided there: one program set
+`.claude/plans/DONE/csstyles.selector-toon-neon.md` (the design decided there: one program set
 per style compiled under a `#define STYLE`, ink by inverted hulls that discard by normal
 rather than cull, a per-vertex `aExt` on the arena, neon in display space with a
 quarter-resolution bloom).
@@ -351,11 +424,9 @@ instead.
 
 ### CS-2 - the neon style
 
-**Open, paused mid step 4** (quota, 2026-11-02): an unvalidated, partly-run WIP is commit
-`85bf3c2` on the remote branch `cs-styles-step4-wip`; the plan's Status line says how to
-resume. The selector and `INK` were built with it in mind; the next steps of the csstyles
-arc add `neon` to `STYLES` and the select, the display-space palette, the emissive ink and
-the bloom.
+**Shipped 2026-11-04**, landed by the csstyles run (its steps 4 to 6; steps 1 to 3 were
+CS-1). What was built is in Graphics styles above (the Neon part) and its look choices are in
+the assumed rows. The spec below is kept as written.
 
 - Added to the selector as `neon`.
 - The site's Neon Arcade palette (`--bg #06060e`, green `#39ff14`, red `#ff2244`,
@@ -506,7 +577,7 @@ heavy, and a higher or lower swing tell.
 The CD's call, 2026-11-04 (backlog refinement), on the csparry follow-up's one open decision: the
 three cuts that deal damage with the blade still well clear of the body should **land on the
 blade**, i.e. damage waits until the blade actually reaches the body. Queued in `TODO.md` § Next
-behind CS-2. Not yet planned: run `/zmh-producer:backlog-plan-gen` for it.
+(CS-2 has landed). Not yet planned: run `/zmh-producer:backlog-plan-gen` for it.
 
 ### CS-5 - a cut lands when the blade reaches the body
 
@@ -541,12 +612,12 @@ behind CS-2. Not yet planned: run `/zmh-producer:backlog-plan-gen` for it.
   sets from measurement (today's worst is 0.327 m). A parry raised before the new contact still
   turns the cut aside, and one raised after it does not. A style is still paint. Each rule gets a
   negative test.
-- **Sequencing**: after CS-2 lands. Both edit `.claude/tests/drive-combat-simulator.cjs` and its
-  counts, and CS-2's WIP cherry-pick (`85bf3c2`) already expects a conflict there.
+- **Sequencing**: CS-2 has landed (2026-11-04), so the suite is 96 checks and the break lists are
+  32 and 24: re-derive any count from those.
 
 ## Tests
 
-`.claude/tests/drive-combat-simulator.cjs`, 89 checks (44 in part 1, 45 in part 2). Part 1 (node, the engine): the
+`.claude/tests/drive-combat-simulator.cjs`, 96 checks (44 in part 1, 52 in part 2). It runs on a Windows box too, given `SMOKE_CHROMIUM` (a Chromium executable) and a `NODE_PATH` holding `playwright-core`. Part 1 (node, the engine): the
 chain cycles 1-5-1, a pause ends it, a whiff breaks the energy count, a full chain pays
 exactly +2; a timed parry staggers with no damage and pays +1, an early parry fails; +10%
 on a staggered target exactly, a staggered fighter cannot parry or dodge, five cuts fit in
@@ -579,9 +650,9 @@ controls' layout at seven sizes (since CS-4, six buttons: atk, dodge, parry, pow
 kind; `KeyU` and `KeyO` do the same; half way through the wind-up the hand key's distance from `POSE.guard` is
 smallest for quick, then normal, then heavy, on all five cuts), the settings pausing the duel (waits on frames), victory
 -> next rank saved, defeat -> retry, light by rank, the FPS counter on/off, no errors.
-**Thirteen of the 89 are the style rows** (one in part 1): the engine text never mentions a
+**Twenty of the 96 are the style rows** (one in part 1; thirteen from CS-1, three from the neon look and four from the bloom): the engine text never mentions a
 style; with nothing stored the style and the select read realistic; the select offers exactly
-realistic and toon in that order; choosing toon through the select sets, saves and changes the
+realistic, toon and neon in that order; choosing toon through the select sets, saves and changes the
 next draw by more than 2,000 px with the same `F` and the same `F.t`; the pick survives a
 reload; a stored object with no style, or with `chalk`, loads realistic; **a skin is paint**
 (1,200 ticks of 1/120 with a cut every 30 and a `draw()` every 4, snapshots byte-identical
@@ -590,17 +661,30 @@ across styles) and **a switch mid-duel changes nothing** (at tick 600); **toon i
 fighter** (near-black rises by at least 300 and stays under 25% of the torso box), **round the
 courtyard** (rises by at least 1,500 outside both fighters) and **realistic is untouched by the
 ink** (frames byte-identical with `FX.ink` on and off); and every element at once (power ring,
-trail, 40 sparks) draws in each style with no GL error and a real picture.
+trail, 40 sparks) draws in each style with no GL error and a real picture. **Neon (3 rows, CS-2):**
+it is dark and its light is the palette (mean luminance under 0.12, and at least 96% of the
+brightest 2% within 25 degrees of the green, red, blue, purple or gold hue or near-white, both
+read with the bloom off; the shipped frame, bloom on, under the same mean ceiling); you are green
+and they are red (the brightest tenth of each fighter's own pixels, found with `FX.only`, over 1.5x
+both other channels, with the bloom off and on); and it draws no shadow pass (the draws made while
+the shadow target is bound: 2 in realistic and toon, 0 in neon). **The bloom (4 rows, CS-2):** it
+adds a halo (summed luminance up 5%, and mid-bright pixels in a 6 px ring round the brightest 2%
+up by half); realistic and toon frames are byte-identical with `FX.bloom` on and off; the target
+follows the screen (211 x 98, 98 x 211, 211 x 98 through 844x390 -> 390x844 -> back, no GL error);
+and the GL state after a neon `draw()` is the same with the bloom on as off, with realistic after
+neon matching realistic after realistic.
 
 **Negative controls** (`negtest-copies.py`, `CS_PAGE` env var points the suite at a
-copy). Two lists. **`.claude/tests/negtests/combat-simulator-styles.json`** (14 breaks, all
+copy). Two lists. **`.claude/tests/negtests/combat-simulator-styles.json`** (24 breaks, all
 caught by their own rows, none by a crash): `style-engine`, `style-render-writes-fighter`,
 `style-default-toon`, `style-option-missing`, `style-not-saved`, `style-needs-reload`,
 `style-junk-kept`, `style-toon-unbanded`, `style-switch-new-duel`, then the ink's
 `ink-off-fighters`, `ink-off-arena`, `ink-in-realistic`, `ink-ext-zero` and
-`ink-cull-not-discard`. Two lessons: a rise-only ink check passes the culled hull that paints
+`ink-cull-not-discard`, then neon's `neon-tonemapped`, `neon-rims-same`, `neon-bright-arena`,
+`neon-option-missing` and `neon-shadows-on`, then the bloom's `bloom-off`, `bloom-everywhere`,
+`bloom-no-resize`, `bloom-depth-on` and `bloom-state-leak`. Three lessons: a rise-only ink check passes the culled hull that paints
 the fighter black, so it also caps the fill; and a break that reads a copy of the style taken
-on the first frame (`style-needs-reload`) is the only way to prove "applies live". The list
+on the first frame (`style-needs-reload`) is the only way to prove "applies live"; and a state leak the next frame resets before it draws (`bloom-state-leak`) can only be seen by reading the state. The list
 for the game itself is `.claude/tests/negtests/combat-simulator.json`: 32 breaks (all 32 run and caught at CS-4 step 5, 2026-11-03), every one caught by its own check: stagger bonus 1.0, no i-frames,
 power parryable (re-pointed in CS-3 to the `ATTACKS.power` row), combo pays at 3 only, power at 9, no cap, a chain of three, a staggered
 fighter that can act, a 1.2 s stagger, no armour, parry/dodge paying nothing, a ring that
