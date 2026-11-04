@@ -1,6 +1,6 @@
 # dsseasons - Driving Simulator: summer, autumn and winter become selectable (DS-3)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-04 (oversee run, branch `ds-seasons`, step commits bfef3b5..a4bdfd6, landed on `main` as one commit; `build 2026-11-04 04:01 UTC`)
 **Drafted on** `main` at `37afb17` (suite 141 checks, break list 57). Every `file:line` below was read
 on `37afb17`; re-grep each anchor before editing, as another session may land first.
 **Requested:** 2026-11-01, the CD (verbatim):
@@ -419,3 +419,20 @@ the CD's eyes and ears (assumed: a phone, the chase view, sound on):
 /compact
 /zmh-producer:oversee-implementation .claude/plans/dsseasons.summer-autumn-winter.md
 ```
+
+## Results (2026-11-04)
+
+- **Step 1** (bfef3b5). Spring's chunks were recorded on the base page by GPU read-back (`COPY_READ_BUFFER`, verified legal for vertex and index buffers with the VAO unbound). Two runs were byte-identical. One chunk per environment: forest 416, fields 1568, suburb 7136, open 8288, town 10688. Rows 141 -> 146.
+- **Step 2** (f773d37). Autumn hue ranges: maple 7.9-19.6, oak 25.7-36.3, birch 48.5-54.4, street trees 37.5-45.4. Forty maples spread 24.1 deg. The picture row's shares:
+
+  | Season | Warm share | Green share |
+  |---|---|---|
+  | Spring | 0.0006 | 0.0929 |
+  | Autumn | 0.0533 | 0.0046 |
+  | Winter | 0.0311 | 0.0061 |
+
+  Rows 146 -> 154. The tree-expert agent reviewed the shots (spawned by the overseer); its tuning landed in step 4 (follow-up file).
+- **Step 3** (629a897). Insects, mean RMS: winter 0 by day and night, spring by night 0.00111, summer by day 0.00328 (cicadas), summer by night 0.00227 (katydids, 2.05x spring). Birds: autumn 0.506x spring's, winter 0.272x. Cicadas vs the engine: mean 0.05x. Rows 154 -> 157.
+- **Step 4** (a4bdfd6). The tree tuning; 19 breaks added (list 57 -> 76), all caught by their named rows. Frame cost is in `.claude/driving-simulator.md` § Measured: winter has 1.12x the triangles, a season adds no draw calls, and a switch into winter takes 120 ms.
+- **Step 5.** Badge `build 2026-11-04 04:01 UTC`. After merging main's CS-3 into the branch, the final gate run was GREEN: 157 passed, 0 failed.
+- Follow-up file: `.claude/plans/DONE/dsseasons.summer-autumn-winter.follow-up.md`.
