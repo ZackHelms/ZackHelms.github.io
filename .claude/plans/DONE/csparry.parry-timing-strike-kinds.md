@@ -1,6 +1,6 @@
 # csparry - Combat Simulator: a parry only counts before the blade lands (CS-3), and quick and heavy strikes (CS-4) (plan arc)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-04. Steps 1-5 committed `d81704a..0bbbd4e` on `claude/combat-simulator-arcade-2uzwxr`; CS-3 landed on `main` 2026-11-03 as `149a95a` (Pages `success`), CS-4 landed on `main` 2026-11-04 by `land-on-main.sh` (see `DONE.md`). Follow-up: `csparry.parry-timing-strike-kinds.follow-up.md` (archived beside this plan).
 **Requested:** 2026-11-03. The CD, verbatim: "fix the parry timing so that I (or enemy) can only parry
 prior to the opponents Sword making contact and dealing damage. Currently, I can parry successfully
 during a small time Window after opponent Sword makes contact and deals damage. This needs to be
@@ -204,9 +204,9 @@ Plans). One task per arc step; each is one session's work and one commit on the 
 |---|---|---|
 | 1 | CS-3 engine, rows, breaks, the blade-at-contact measurement | done |
 | 2 | CS-3 docs, land, Pages | done (docs and badge; the overseer lands) |
-| 3 | CS-4 engine | open |
-| 4 | CS-4 page | open |
-| 5 | Docs final, break list, land, Pages | open |
+| 3 | CS-4 engine | done |
+| 4 | CS-4 page | done |
+| 5 | Docs final, break list, land, Pages | done (docs, break run and badge; the overseer lands) |
 
 ### Step 1 - CS-3: one attack table, the parry judged against it, no parry from a flinch
 
@@ -482,6 +482,116 @@ Docs only, plus one help sentence and the badge. Not landed (the overseer lands 
 - `.claude/tests/README.md`: the `drive-combat-simulator.cjs` row (81 checks, the style rows 13 of 81, the seven parry rows, 24 breaks).
 - `TODO.md`: the CS-3/CS-4 entry stays, with CS-3 shipped and the badge. `DONE.md`: a CS-3 line.
 - Badge stamped: `build 2026-11-03 20:43 UTC`.
+
+### Step 3 (2026-11-03)
+
+**What changed** (`games/combat-simulator/index.html`, the `ENGINE` block only; the page needs nothing yet):
+- `RULES.kinds = { quick: { wind: 0.5, rec: 0.8, dmg: 0.6 }, heavy: { wind: 2.0, rec: 1.3, dmg: 1.6 } }`. `ATTACKS.quick` and
+  `ATTACKS.heavy` are built from `RULES.chain` by a loop over `RULES.kinds` (so a new kind is one entry): `wind`, `rec`, `dmg`
+  scaled, every other field the chain row's, `kind`, `idx`, `parry: true`, `parryWin = Math.min(RULES.parry.win * K.wind,
+  RULES.parry.total - 0.10)`, i.e. 0.12 s and 0.40 s.
+- `ACTIONS = ['power', 'dodge', 'parry', 'heavy', 'quick', 'atk']`; `STRIKE = { atk: 'normal', quick: 'quick', heavy: 'heavy' }`.
+- `begin()`: any `STRIKE` action takes the next chain index by the grace rule and starts its own kind.
+- `stepFighter()`: the queue stores the kind (`f.queued = STRIKE[f.buf]`, a truthy string; `startHit()` still resets it to
+  `false`), a chained cut starts with `f.queued` as its kind, the non-strike branch tests `!STRIKE[f.buf]`, and a queue left at
+  the end of recovery goes back in the buffer as its own action (`'atk'` for normal, else the kind).
+- `rankParams()` gains `quickP: lerp(0.05, 0.30, t)` and `heavyP: lerp(0.25, 0.15, t)`.
+- `newFight()` makes `F.krng = mulberry32((((seed >>> 0) || 1) ^ 0x5bd1e995) >>> 0)`. A new `aiStrike(F)` rolls `F.krng` once per
+  cut and returns `'quick'`, `'heavy'` or `'atk'`; `aiIntent()` uses it for the cut it starts and the cut it chains. `F.rng` is
+  drawn exactly as before. The stagger punish still presses `atk` (normal cuts).
+- The word "style" is still absent from the engine; it stays DOM-free.
+
+**Rows** (`.claude/tests/drive-combat-simulator.cjs`, part 1, section "quick and heavy strikes"):
+1. the quick and heavy rows are the chain with wind-up, recovery and damage x0.5/0.8/0.6 and x2.0/1.3/1.6, parryable for 0.12 s and 0.40 s
+2. attack, quick and heavy each start a cut whose swing carries its kind; on the same cut quick does 0.6x and heavy 1.6x normal's damage, quick winds up in half the time
+3. quick and heavy strikes mix into the chain: atk, quick, heavy, atk, quick are cuts 1-5 of one chain, and the combo pays at 3 and 5
+4. the opponent throws all three kinds (rank 5), quick more often at rank 10 than at rank 1 and heavy more often at rank 1 than at rank 10 (AI v counter, four seeds, 60 s)
+5. a telegraph matters to the opponent: at rank 5 it parries more of 40 heavies than of 40 quicks, each a first cut from free
+
+**Restated** (same claim, new detail; none removed):
+- Step 1's row 5 ("every parryable row is judged by its own window") now iterates 15 rows and names them
+  (`15 rows: normal, quick, heavy x kesa, gyaku, yoko, tsuki, shomen`); it requires at least 15 rows and all three kinds.
+- The `counter` persona answers a cut at `until <= Math.min(0.13, 0.9 * E.specOf(e).parryWin)` (a player who reads the
+  telegraph); a power attack is still dodged at 0.13 as before.
+
+**Suite:** 81 -> **86** passed, 0 failed (part 1 39 -> 44, part 2 42 unchanged, the paint row "a skin is paint" green);
+`gates.sh games/combat-simulator/index.html` GREEN.
+
+**Ladder, re-measured** (rows unedited, all green): `masher rank 1 1, rank 10 0; counter rank 5 1, rank 10 1`, the same as
+step 1's `masher rank 1 1, rank 10 0; counter rank 5 1, rank 10 1`. No tuning was needed.
+
+**Measured kind shares** (row 4's scenario, the opponent's swings): rank 1 quick 0.054 / heavy 0.214 (56 swings), rank 5
+0.225 / 0.188 (80), rank 10 0.104 / 0.041 (193). Rank 10's quick share is below `quickP` (0.30) because about half its swings
+there are the stagger punish, which stays normal. Row 5's split at rank 5: heavies parried 10 of 40, quicks 0 of 40 (a quick
+winds up before a rank-5 mind can answer).
+
+**Breaks** (`negtests/combat-simulator.json`, 24 -> 28 entries; run with `negtest-copies.py --jobs 2 --only ...`):
+- `parry-window-global` (`tryHit()` reads `RULES.parry.win` again): **caught** by step 1's row 5 (restated).
+- `quick-not-quick` (quick's `wind` factor 1): **caught** by rows 1 and 2.
+- `kinds-break-chain` (a quick or heavy always starts at index 0): **caught** by row 3.
+- `ai-never-quick` (`quickP` 0): **caught** by row 4.
+- `chain-of-three`, **re-pointed** (its line now passes `f.queued` to `startHit`; same break, `f.chain < 2`): **caught** by "a
+  whiffed cut breaks the combo count" and "a full five-cut chain fits inside one stagger".
+- All 5 caught. Both lists dry-apply, every `old` found exactly once: `combat-simulator.json` 28,
+  `combat-simulator-styles.json` 14. No other break needed re-pointing.
+
+**Assumed choices (step 3):**
+- `ATTACKS.quick` / `.heavy` are built by a loop over `RULES.kinds`, not two literal rows, so a new kind is one `RULES.kinds` entry.
+- A queue left at the end of recovery goes back in the buffer as `'atk'` for a normal cut and as the kind's own action otherwise.
+- The AI's kind roll is a helper, `aiStrike(F)`, one `F.krng()` draw per cut started or chained.
+- The `counter` persona keeps 0.13 for a power attack (it dodges those; a power row has `parryWin` 0).
+- Row 4 seeds are `s * 104729 + rank` with both fighters' hp set to 1e6 so every duel runs the full 60 s; row 5 seeds are
+  `7000 + s`, and a trial ends at the first hit, parry, dodge or player whiff.
+
+### Step 4 (2026-11-03)
+
+**What changed** (`games/combat-simulator/index.html`, page code only; the `ENGINE` block, shaders, `render()`, `STYLES` and the styles break list untouched):
+- `layout()` adds `quick` at 3.4 R / 22.5 deg and `heavy` at 3.4 R / 67.5 deg, `r: 0.6 * R`; the four existing buttons did not move.
+- `KEYMAP` adds `KeyU: 'quick'`, `KeyO: 'heavy'`; `playerIntent()` passes `quick` and `heavy`; `update()`'s first-tick clear zeroes them too
+  (the `INPUT.press = {}` clears already cover them). `drawHUD()` draws all six buttons.
+- `icon()`: quick is a short straight blade with a hilt stroke and three speed lines; heavy is the katana under a thick double arc.
+- `poseOf()`: the wind-up key is `mixKey(POSE.guard, C.wind, 0.55)` for quick and `mixKey(POSE.guard, C.wind, 1.25)` for heavy (pelvis `drop` 0.14),
+  the normal cut's `C.wind` as before; sweep and follow-through unchanged. `POSE` is exposed on `__CS`.
+- `SND.tell(kind)`: quick a 0.06 s noise burst sweeping 1500 to 800 Hz, heavy a 0.22 s burst sweeping 500 to 200 Hz at a slightly higher level,
+  anything else the old 0.1 s, 900 to 400 Hz. `onEvents()` passes `ev.kind`.
+- Help (HOW TO FIGHT): a Quick and heavy strikes paragraph before Dodge (less or more damage, shorter or longer wind-up and parry window, either one is any
+  cut of the chain, the opponent throws them too) and `U quick strike, O heavy strike` on the Keyboard line. Plain ASCII, opt-in.
+
+**Rows** (`.claude/tests/drive-combat-simulator.cjs`, part 2, 86 -> **89**):
+1. a CDP touch on the quick button and on the heavy button each gives `F.p.st === 'atk'` and `F.p.kind` of the button (one row, both buttons).
+2. `KeyU` and `KeyO`, one tick each, do the same (one row, both keys).
+3. half way through the same cut's wind-up, the hand key's distance from `POSE.guard` is smallest for quick, then normal, then heavy, on all five chain indices.
+
+**Restated** (none removed): the layout row now checks six buttons at the seven sizes and its label and detail name them
+(`the six controls (atk, dodge, parry, power, quick, heavy) fit ...`, requiring six names); the paint scenario `duelUnder` presses `quick` at
+`i % 90 === 30` and `heavy` at `i % 90 === 60` beside `atk` every 30, and still proves the fighters byte-identical under every style (15 cuts landed).
+
+**Suite:** 86 -> **89** passed, 0 failed; `gates.sh games/combat-simulator/index.html` GREEN.
+
+**Breaks** (`negtests/combat-simulator.json`, 28 -> 32; styles list untouched at 14; both dry-apply, every `old` found exactly once; no existing break was re-pointed):
+- `quick-button-missing` (no `quick` in `LAY.btn`): **caught** by row 1 (and the suite crashed in `drawHUD`, a second catch).
+- `keys-no-heavy` (no `KeyO`): **caught** by row 2.
+- `heavy-overlaps-power` (heavy at 45 deg): **caught** by the layout row at 390x844 and 844x390, and by the power ring row (8 fails).
+- `kind-pose-ignored` (`poseOf()` ignores the kind): **caught** by row 3.
+
+**Assumed choices (step 4):** the tells' pitches and lengths above; the icon strokes (quick: 4.5 blade, 6 hilt, three 2.6 speed lines fading, the middle one longer;
+heavy: 4.5 blade and two 4.5 arcs of radius 24 and 33 at 100% and 60% alpha, all in units of r/46); the help paragraph's wording; the layout row's label now
+names the six buttons at each size; rows 1 and 2 each cover both buttons or keys in one row, to hit the plan's count of 3.
+
+### Step 5 (2026-11-03, resumed 2026-11-04)
+
+Docs, the whole break run and the badge. Not landed (the overseer lands it and verifies Pages). The run was paused once at 16 of 32 (the CD, before the usage limit) and resumed from a restarted container; the 16 already caught were not re-run (HEAD only moved by a plan-only commit, nothing they target changed).
+
+**Break run** (`negtest-copies.py --jobs 2 --only <2 names>`, foreground chunks of 2, about 6.5 min each; `NODE_PATH=/opt/node-tools/node_modules`): **32 of 32 caught, 0 missed**, each `NEGCOPIES: GREEN caught=2/2`.
+- Every one of the 32 breaks in `negtests/combat-simulator.json`, including the pre-step-1 nineteen (stagger-bonus, no-iframes, power-parryable, combo-energy-3-only, power-at-9, no-energy-cap, chain-of-three, stagger-can-act, stagger-short, no-hyper-armour, parry-no-energy, dodge-no-energy, ring-never-closes, ring-no-flash, menu-no-pause, buttons-crowded, ladder-no-advance, ai-slower-at-top, multitouch-one-role), the five CS-3 breaks, the four step 3 breaks and the four step 4 breaks. Failing rows per break ranged from 1 to 17 (`swing-resolves-twice` 17, `buttons-crowded` and `heavy-overlaps-power` 8).
+- Dry-apply, every `old` found exactly once: `combat-simulator.json` 32, `combat-simulator-styles.json` 14 (not run; nothing it targets changed).
+
+**Docs changed:**
+- `.claude/combat-simulator.md`: CS-4 marked shipped and the CD's three answers marked built; 13 new Assumed rows (the `RULES.kinds` factors, the parry window per kind, `quickP` / `heavyP`, `F.krng`, the 0.10 s cap, the `counter` persona, the queued kind, keys U / O, 3.4 R at 22.5 / 67.5 deg, the pose blends 0.55 / 1.25 with drop 0.14, the tell pitches and lengths, the icons, the help wording); Architecture for `ATTACKS` (with the kinds loop), `STRIKE`, `f.kind`, `f.queued` as a kind string, `F.krng` with `aiStrike()`, the six buttons and `POSE` on `__CS`; the ladder line after step 3 and the opponent's measured kind shares; Tests (89 = 44 + 45, the eight new rows, 32 breaks); How to add "an attack kind" with the note that the six-button cluster has no room for a seventh at 360 x 640 without a new layout; the summary lines at the top.
+- `.claude/tests/README.md` (the `drive-combat-simulator.cjs` row: 89 checks, 13 of the 89, the quick / heavy rows, 32 breaks), `games/CLAUDE.md` (the Combat Simulator paragraph: quick and heavy strikes and the parry rule, 89 checks, 32 + 14), `CLAUDE.md` (one clause in the Combat Simulator row), `.claude/plans/csstyles.selector-toon-neon.md` (Status: csparry landed, re-derive counts).
+- `TODO.md`: the CS-3/CS-4 entry removed from Now. `DONE.md`: a CS-4 line.
+
+**Badge stamped:** `build 2026-11-04 06:25 UTC` (read back from the file).
 
 ## Handoff
 

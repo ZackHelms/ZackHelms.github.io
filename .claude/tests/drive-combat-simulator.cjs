@@ -212,7 +212,9 @@ console.log('-- engine: a parry only counts before the blade lands');
     const landed = outside.F.events.some(e => e.type === 'hit' && e.on === 'p') && !outside.F.events.some(e => e.type === 'parry');
     if (c < 0 || !turned || !landed) bad.push({ row: row.kind + ' ' + row.name, c, W, turned, landed });
   }
-  ok('every parryable row is judged by its own window: a parry raised parryWin - 2 ticks before contact turns it, parryWin + 2 does not (' + rows.map(r => r.kind + ' ' + r.name).join(', ') + ')', rows.length >= 5 && bad.length === 0, bad);
+  const kinds = [...new Set(rows.map(r => r.kind))], names = [...new Set(rows.map(r => r.name))];
+  ok('every parryable row is judged by its own window: a parry raised parryWin - 2 ticks before contact turns it, parryWin + 2 does not (' + rows.length + ' rows: ' + kinds.join(', ') + ' x ' + names.join(', ') + ')',
+    rows.length >= 15 && ['normal', 'quick', 'heavy'].every(k => kinds.includes(k)) && bad.length === 0, bad);
 }
 {
   // no swing is resolved twice: none that dealt damage is ever parried, and none hits twice
@@ -236,6 +238,86 @@ console.log('-- engine: a parry only counts before the blade lands');
   const N = E.ATTACKS.normal, keys = ['name', 'dmg', 'wind', 'act', 'rec', 'reach', 'arc', 'lunge'];
   const same = N.length === 5 && TODAY.every((t, i) => keys.every((k, j) => N[i][k] === t[j]) && N[i].kind === 'normal' && N[i].idx === i && N[i].parry === true && N[i].parryWin === 0.24);
   ok('the normal attack rows are today\'s chain exactly, each parryable for 0.24 s; the power row is not parryable', same && E.ATTACKS.power.parry === false && E.ATTACKS.power.parryWin === 0, { N, power: E.ATTACKS.power });
+}
+console.log('-- engine: quick and heavy strikes');
+{
+  // the kind rows: the chain, with wind-up, recovery and damage scaled, and a parry window that scales with the telegraph
+  const F = { quick: [0.5, 0.8, 0.6, 0.12], heavy: [2.0, 1.3, 1.6, 0.40] }, bad = [];
+  for (const k of Object.keys(F)) {
+    const [w, r, d, win] = F[k], rows = E.ATTACKS[k] || [];
+    if (rows.length !== RULES.chain.length) bad.push({ k, n: rows.length });
+    RULES.chain.forEach((c, i) => {
+      const x = rows[i] || {};
+      const okRow = Math.abs(x.wind - c.wind * w) < 1e-12 && Math.abs(x.rec - c.rec * r) < 1e-12 && Math.abs(x.dmg - c.dmg * d) < 1e-12 &&
+        ['name', 'act', 'reach', 'arc', 'lunge'].every(f => x[f] === c[f]) && x.kind === k && x.idx === i && x.parry === true && Math.abs(x.parryWin - win) < 1e-12;
+      if (!okRow) bad.push({ k, i, x });
+    });
+  }
+  ok('the quick and heavy rows are the chain with wind-up, recovery and damage x0.5/0.8/0.6 and x2.0/1.3/1.6, parryable for 0.12 s and 0.40 s', bad.length === 0, bad.slice(0, 3));
+}
+{
+  // each strike starts a cut of its own kind; landed on the same cut of the chain, it does its kind's damage
+  const got = {};
+  for (const act of ['atk', 'quick', 'heavy']) {
+    const F = dummy(1); F.e.hp = F.e.hpMax = 1e6;
+    run(F, 1.0, (F, i) => IN({ [act]: i === 0 }));
+    const sw = evs(F, 'swing', 'p'), h = evs(F, 'hit', 'p');
+    got[act] = { n: sw.length, kind: sw[0] && sw[0].kind, idx: sw[0] && sw[0].idx, hidx: h[0] && h[0].idx, dmg: h[0] && h[0].dmg, w: sw[0] && E.ATTACKS[sw[0].kind] && E.ATTACKS[sw[0].kind][0].wind };
+  }
+  const n = got.atk.dmg, okKinds = got.atk.kind === 'normal' && got.quick.kind === 'quick' && got.heavy.kind === 'heavy' && ['atk', 'quick', 'heavy'].every(a => got[a].n === 1 && got[a].idx === 0 && got[a].hidx === 0);
+  ok('attack, quick and heavy each start a cut whose swing carries its kind; on the same cut quick does 0.6x and heavy 1.6x normal\'s damage, quick winds up in half the time',
+    okKinds && n > 0 && Math.abs(got.quick.dmg / n - 0.6) < 1e-9 && Math.abs(got.heavy.dmg / n - 1.6) < 1e-9 && Math.abs(got.quick.w / got.atk.w - 0.5) < 1e-9, got);
+}
+{
+  // mixed into the chain: atk, quick, heavy, atk, quick, each tapped once the cut before is half wound
+  const F = dummy(1); F.e.hp = F.e.hpMax = 1e6;
+  const seq = ['atk', 'quick', 'heavy', 'atk', 'quick'];
+  let k = 0;
+  run(F, 4.0, (F, i) => {
+    const p = F.p;
+    if (k >= seq.length) return IN();
+    if (k === 0 && p.st === 'free') return IN({ [seq[k++]]: true });
+    if (k > 0 && p.st === 'atk' && !p.queued && p.chain === k - 1 && p.t >= E.phasesOf(p, E.specOf(p)).w * RULES.chainQueue) return IN({ [seq[k++]]: true });
+    return IN();
+  });
+  const sw = evs(F, 'swing', 'p').slice(0, 5), pays = evs(F, 'energy', 'p').filter(e => /combo/.test(e.why)).map(e => e.why);
+  const want = ['normal', 'quick', 'heavy', 'normal', 'quick'];
+  ok('quick and heavy strikes mix into the chain: atk, quick, heavy, atk, quick are cuts 1-5 of one chain, and the combo pays at 3 and 5',
+    sw.length === 5 && sw.every((e, i) => e.idx === i && e.kind === want[i]) && evs(F, 'hit', 'p').length >= 5 && pays.slice(0, 2).join() === 'combo3,combo5', { sw: sw.map(e => e.idx + e.kind), pays });
+}
+{
+  // the opponent throws all three, jabbing more as the ranks climb and leaning on heavies low down
+  const share = {};
+  for (const rank of [1, 5, 10]) {
+    const c = { normal: 0, quick: 0, heavy: 0 };
+    for (let s = 1; s <= 4; s++) {
+      const F = E.newFight(rank, s * 104729 + rank), mem = {};
+      F.p.hp = F.p.hpMax = F.e.hp = F.e.hpMax = 1e6;
+      for (let i = 0; i < 60 / DT; i++) {
+        E.stepFight(F, DT, counter(F, mem), E.aiIntent(F, DT));
+        for (const e of F.events) if (e.type === 'swing' && e.who === 'e') c[e.kind]++;
+        F.events.length = 0;
+      }
+    }
+    const n = c.normal + c.quick + c.heavy || 1;
+    share[rank] = { n, quick: +(c.quick / n).toFixed(3), heavy: +(c.heavy / n).toFixed(3), c };
+  }
+  console.log('     opponent cuts by kind (quick / heavy share): rank 1 ' + share[1].quick + ' / ' + share[1].heavy + ', rank 5 ' + share[5].quick + ' / ' + share[5].heavy + ', rank 10 ' + share[10].quick + ' / ' + share[10].heavy);
+  ok('the opponent throws all three kinds (rank 5), quick more often at rank 10 than at rank 1 and heavy more often at rank 1 than at rank 10 (AI v counter, four seeds, 60 s)',
+    share[5].c.normal > 0 && share[5].c.quick > 0 && share[5].c.heavy > 0 && share[10].quick > share[1].quick && share[1].heavy > share[10].heavy, share);
+}
+{
+  // a telegraph matters to the opponent's mind: at rank 5 it parries more of a player's heavies than of their quicks
+  const parried = { quick: 0, heavy: 0 }, N = 40;
+  for (const act of ['quick', 'heavy']) for (let s = 1; s <= N; s++) {
+    const F = E.newFight(5, 7000 + s); F.p.z = -0.6; F.e.z = 0.6;
+    for (let i = 0; i < 1.5 / DT; i++) {
+      E.stepFight(F, DT, IN({ [act]: i === 0 }), E.aiIntent(F, DT));
+      if (F.events.some(e => (e.type === 'hit' && e.who === 'p') || e.type === 'parry' || e.type === 'dodged' || (e.type === 'whiff' && e.who === 'p'))) break;
+    }
+    if (evs(F, 'parry', 'e').length) parried[act]++;
+  }
+  ok('a telegraph matters to the opponent: at rank 5 it parries more of 40 heavies than of 40 quicks, each a first cut from free', parried.heavy > parried.quick, parried);
 }
 console.log('-- engine: dodge');
 {
@@ -303,7 +385,8 @@ function counter(F, mem) {
   const p = F.p, e = F.e, dx = e.x - p.x, dz = e.z - p.z, d = Math.hypot(dx, dz) || 1, inp = IN();
   if (e.st === 'atk' || e.st === 'power') {
     const until = E.phasesOf(e, E.specOf(e)).w - e.t;
-    if (until > 0 && until <= 0.13 && mem.ans !== e.atkId) { mem.ans = e.atkId; if (e.st === 'power') { inp.dodge = true; inp.mx = -dz / d; inp.mz = dx / d; } else inp.parry = true; }
+    const lead = e.st === 'power' ? 0.13 : Math.min(0.13, 0.9 * E.specOf(e).parryWin);   // a cut's lead from its row; a power attack is dodged, as before
+    if (until > 0 && until <= lead && mem.ans !== e.atkId) { mem.ans = e.atkId; if (e.st === 'power') { inp.dodge = true; inp.mx = -dz / d; inp.mz = dx / d; } else inp.parry = true; }
     return inp;
   }
   if (e.st === 'stagger') { if (d > 1.8) { inp.mx = dx / d; inp.mz = dz / d; } if (RULES.stagger - e.t > 0.2) inp.atk = true; return inp; }
@@ -382,7 +465,45 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     ok('the ' + k + ' button ' + k + 's', s === k, s);
     await page.evaluate(() => __CS.tick(1 / 60, 60));
   }
-  await page.evaluate(() => { __CS.F.p.energy = 10; });
+  // the two strike-kind buttons: a touch on each starts a cut of that kind (CS-4)
+  const byBtn = [];
+  for (const [k, kind] of [['quick', 'quick'], ['heavy', 'heavy']]) {
+    await page.evaluate(() => { const F = __CS.F; F.p.st = 'free'; F.p.t = 0; F.p.buf = null; F.p.queued = false; F.p.grace = 0; });
+    const hasBtn = !!L.btn[k];
+    if (hasBtn) { await touch('touchStart', [[L.btn[k].x, L.btn[k].y, 5]]); await touch('touchEnd', [[L.btn[k].x, L.btn[k].y, 5]]); }
+    await page.evaluate(() => __CS.tick(1 / 60, 1));
+    const s = await page.evaluate(() => ({ st: __CS.F.p.st, kind: __CS.F.p.kind }));
+    byBtn.push([k, hasBtn, s.st, s.kind, hasBtn && s.st === 'atk' && s.kind === kind]);
+    await page.evaluate(() => __CS.tick(1 / 60, 90));
+  }
+  ok('a touch on the quick button throws a quick strike and on the heavy button a heavy one', byBtn.length === 2 && byBtn.every(r => r[4]), byBtn);
+  // and the keys U and O do the same, one tick each
+  const byKey = [];
+  for (const [code, kind] of [['KeyU', 'quick'], ['KeyO', 'heavy']]) {
+    await page.evaluate(() => { const F = __CS.F; F.p.st = 'free'; F.p.t = 0; F.p.buf = null; F.p.queued = false; F.p.grace = 0; });
+    await page.keyboard.press(code);
+    await page.evaluate(() => __CS.tick(1 / 60, 1));
+    const s = await page.evaluate(() => ({ st: __CS.F.p.st, kind: __CS.F.p.kind }));
+    byKey.push([code, s.st, s.kind, s.st === 'atk' && s.kind === kind]);
+    await page.evaluate(() => __CS.tick(1 / 60, 90));
+  }
+  ok('U throws a quick strike and O a heavy one, one tick each', byKey.length === 2 && byKey.every(r => r[3]), byKey);
+  // the telegraph you can see: half way through the same cut's wind-up, a quick strike's hand has drawn back the least and a heavy's the most
+  const pose = await page.evaluate(() => {
+    const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]), out = [];
+    for (let idx = 0; idx < 5; idx++) {
+      const d = {};
+      for (const kind of ['quick', 'normal', 'heavy']) {
+        const f = Object.assign({}, __CS.F.p, { st: 'atk', chain: idx, kind });
+        f.t = phasesOf(f, specOf(f)).w / 2;
+        d[kind] = dist(__CS.poseOf(f).key.H, __CS.POSE.guard.H);
+      }
+      out.push([idx, +d.quick.toFixed(3), +d.normal.toFixed(3), +d.heavy.toFixed(3)]);
+    }
+    return out;
+  });
+  ok('half way through a wind-up the hand has drawn back least for a quick strike and most for a heavy one, on all five cuts', pose.every(r => r[1] < r[2] && r[2] < r[3]), pose);
+  await page.evaluate(() => { __CS.F.p.st = 'free'; __CS.F.p.t = 0; __CS.F.p.buf = null; __CS.F.p.queued = false; __CS.F.p.energy = 10; });
   await touch('touchStart', [[L.btn.power.x, L.btn.power.y, 4]]); await touch('touchEnd', [[L.btn.power.x, L.btn.power.y, 4]]);
   await page.evaluate(() => __CS.tick(1 / 60, 1));
   ok('the power button throws the power attack', await page.evaluate(() => __CS.F.p.st === 'power'));
@@ -433,9 +554,9 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
       const set = document.getElementById('set-btn').getBoundingClientRect();
       if (L.barTop - 17 < set.bottom + 4) out.push('bars-under-chrome');       // the label's cap height above the bar
       for (const [k, b] of B) if (b.y - b.r * 1.3 < L.barTop + 40) out.push('under-bars:' + k);
-      return out;
+      return { names: B.map(e => e[0]), out };
     });
-    ok('controls fit, clear of each other, the stick and the bars at ' + w + 'x' + h, r.length === 0, r);
+    ok('the six controls (' + r.names.join(', ') + ') fit, clear of each other, the stick and the bars at ' + w + 'x' + h, r.names.length === 6 && r.out.length === 0, r);
   }
   await page.setViewportSize({ width: 844, height: 390 });
   await page.waitForTimeout(150);
@@ -512,6 +633,8 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     for (let i = 0; i < 1200; i++) {
       if (then && i === at) __CS.setStyle(then);
       if (i % 30 === 0) __CS.press('atk');
+      if (i % 90 === 30) __CS.press('quick');
+      if (i % 90 === 60) __CS.press('heavy');
       __CS.tick(1 / 120, 1);
       if (i % 4 === 0) __CS.draw();
     }

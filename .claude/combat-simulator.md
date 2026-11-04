@@ -5,7 +5,9 @@ ladder of ten named masters, in a walled stone courtyard whose light runs from
 mid-morning at rank 1 to a lantern-lit dusk at rank 10. CD commission, 2026-11-01,
 placed on the hub straight after Driving Simulator. Open licence (MIT, the default).
 One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simulator.cjs`
-(74 checks; 19 negative controls on the game and 14 on its graphics styles, all caught).
+(89 checks; 32 negative controls on the game and 14 on its graphics styles, all caught). Since
+2026-11-03 (CS-3, CS-4) a parry only counts before the blade lands, and there are three kinds of strike:
+the normal five-cut chain, a **quick** strike (a jab) and a **heavy** strike, each on its own button and key.
 
 ## The CD's brief (verbatim)
 
@@ -74,6 +76,19 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
 | A buffered parry meets a hit (assumed) | A parry already in the buffer is **cleared** when its fighter is flinched or staggered. The stagger clear has no check of its own (a 1.5 s stagger outlasts the 0.22 s buffer, so it cannot show in play) | Belt and braces, so the rule holds if `RULES.buffer` ever outgrows the flinch |
 | The opponent's parry lead (assumed) | `aiIntent()` schedules its parry `Math.min(0.10, 0.8 * parryWin)` before contact; 0.10 s for every row today | A shorter-window row would otherwise be asked for a parry that cannot land |
 | Contact left where it is (assumed, default) | `tryHit()` still runs on the first in-reach tick of the active window; three of ten cuts deal damage with the blade over 0.25 m from the body (table under "CS-3 as built") | Moving it changes every timing the ladder was measured on; the CD's call |
+| Strike kinds (CS-4, 2026-11-03) | `RULES.kinds`: quick `wind` x0.5, `rec` x0.8, `dmg` x0.6; heavy `wind` x2.0, `rec` x1.3, `dmg` x1.6, applied to every row of the chain; `act`, `reach`, `arc` and `lunge` are the chain row's | The plan's numbers, picked for the CD to playtest; quick and heavy are the same five cuts timed differently, so the chain's poses and reach still read |
+| A kind's parry window (the CD: scales with the telegraph) | `parryWin = min(0.24 * K.wind, 0.50 - 0.10)`: quick 0.12 s, heavy 0.40 s (0.48 capped), the normal chain 0.24 s at every rank. The factor is the kind's, never the rank's `windMul` | "Scale with the telegraph" read as the kind's wind-up factor; a parry always ends with 0.10 s still open |
+| The opponent's strike mix (assumed) | `quickP` = lerp(0.05, 0.30) and `heavyP` = lerp(0.25, 0.15) from rank 1 to 10; each cut it starts or chains rolls once on `F.krng`; the stagger punish stays normal cuts | Low ranks lean on readable heavies, high ranks on jabs. Measured shares below the ladder |
+| A second random stream (assumed) | `F.krng = mulberry32((seed || 1) ^ 0x5bd1e995)`, drawn only by `aiStrike()`; `F.rng` is drawn exactly as before | A kind roll must not shift the draws the ladder was measured on |
+| The 0.10 s parry cap (assumed) | The AI's parry lead is `min(0.10, 0.8 * parryWin)`: 0.10 s for the normal and heavy rows, 0.096 s for quick (0.8 x 0.12) | A quick row's 0.12 s window would otherwise be asked for a parry that cannot land |
+| The `counter` persona reads the telegraph (assumed, test only) | It parries at `until <= min(0.13, 0.9 * parryWin)`, so against a quick it presses 0.108 s ahead; a power attack is still dodged at 0.13 | A player who reads the row's own window; the ladder's rank-10 rate stayed 1 |
+| A queued strike keeps its kind (assumed) | `f.queued` holds the kind string (`'normal'`, `'quick'`, `'heavy'`), truthy, and `startHit()` resets it to false; a queue left at the end of recovery goes back in the buffer as its own action (`atk`, `quick`, `heavy`) | The queue was a boolean; a mix-in needs the kind |
+| Keys U and O (assumed) | `U` quick, `O` heavy, beside J K L I | Same row of the keyboard, next to attack |
+| Where the two buttons sit (assumed) | On an arc of **3.4 R** round attack, quick at **22.5 deg** (low, by the thumb's rest) and heavy at **67.5 deg** (high), radius 0.6 R; the four old buttons did not move | Checked at all seven swept sizes with zero safe insets: inside the viewport, clear of the power ring at 1.3 r, clear of the stick by 8 px, below the bars + 40. 3.2 R overlaps power. See "How to add" for the limit |
+| The telegraph you can see (assumed) | In the wind-up, quick's hand key is `mixKey(POSE.guard, C.wind, 0.55)` (a short backswing) and heavy's `mixKey(POSE.guard, C.wind, 1.25)` with the pelvis `drop` 0.14 (a big one); the normal cut's `C.wind` as before; sweep and follow-through the same for all | Timing already follows the row; only the size of the backswing is new |
+| The telegraph you can hear (assumed) | `SND.tell(kind)`: quick a 0.06 s noise burst sweeping 1500 to 800 Hz; heavy a 0.22 s burst sweeping 500 to 200 Hz at a slightly higher level; any other kind the old 0.1 s, 900 to 400 Hz | Quick shorter and higher, heavy longer and lower |
+| The icons (assumed) | In units of r/46: quick is a 4.5 blade, a 6 hilt stroke and three 2.6 speed lines fading, the middle one longer; heavy is the 4.5 katana under two 4.5 arcs of radius 24 and 33 at 100% and 60% alpha | Quick reads fast, heavy reads big |
+| The help wording (assumed) | HOW TO FIGHT gains a "Quick and heavy strikes" paragraph before Dodge (less or more damage, a shorter or longer wind-up and parry window, either is any cut of the chain, the opponent throws them too), `U quick strike, O heavy strike` on the Keyboard line, and (CS-3) "A parry pressed while you reel from a hit does nothing." under Parry | Opt-in text in the settings, so the discovery rule allows it |
 | Music | Koto and shakuhachi on the in-sen scale, taiko during the fight; wind and birds by day, crickets at dusk | Every game here has music |
 
 ## Architecture
@@ -88,14 +103,24 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
   `windMul` / `recMul`; the active window is the same for all). **`tryHit()` is the one
   place a blade meets a body**: in reach and arc, then dodge (i-frames), parry (judged by the
   attacker's `ATTACKS` row: `H.parry && d.st === 'parry' && d.t < H.parryWin`; the row comes
-  from `specOf()`, `ATTACKS.normal[chain]` or `ATTACKS.power`), else hit (+10% on a staggered target, flinch unless staggered or
+  from `specOf()`: `ATTACKS[f.kind][f.chain]` or `ATTACKS.power`), else hit (+10% on a staggered target, flinch unless staggered or
   armoured, the combo count, the knockout).
-- **One attack table, `ATTACKS`** (built once after `RULES` from `RULES.chain` and `RULES.power`,
-  which stay the source): a row carries `name, kind, idx, dmg, wind, act, rec, reach, arc, lunge,
-  parry, parryWin`. A fighter has a `kind` (`normal` today), `startHit(F, f, idx, kind)` sets it
-  and the `swing` event carries it, and `specOf(f)` reads the row, so `phasesOf()`, the AI, the
-  pose and the swish all follow it. `hit` and `parry` events carry `atk` (the swing's id). A new
-  kind of strike is a row, with no parry code.
+- **One attack table, `ATTACKS`** (built once after `RULES` from `RULES.chain`, `RULES.power` and
+  `RULES.kinds`, which stay the source): a row carries `name, kind, idx, dmg, wind, act, rec, reach,
+  arc, lunge, parry, parryWin`. `ATTACKS.normal` is the chain as it always was, `ATTACKS.power` is
+  the power row (`parry: false`, `idx: -1`), and **a loop over `RULES.kinds` builds `ATTACKS.quick`
+  and `ATTACKS.heavy`**: the chain with `wind`, `rec` and `dmg` scaled and `parryWin = min(0.24 *
+  K.wind, 0.40)`. A fighter has a `kind` (`f.kind`, `normal` by default), `startHit(F, f, idx, kind)`
+  sets it and the `swing` event carries it, and `specOf(f)` reads the row, so `phasesOf()`, the AI,
+  the pose and the swish all follow it. `hit` and `parry` events carry `atk` (the swing's id). A new
+  kind of strike is a `RULES.kinds` entry, with no parry code.
+- **`STRIKE`** maps the actions that cut to the kind each throws: `{ atk: 'normal', quick: 'quick',
+  heavy: 'heavy' }`; `ACTIONS` lists the actions in the order the first pressed wins (`power, dodge,
+  parry, heavy, quick, atk`). `begin()` takes the next chain index by the grace rule for any `STRIKE`
+  action and starts its own kind, so quick and heavy mix into the five-cut chain and every landed cut
+  counts for the 3rd/5th energy, whatever its kind. **`f.queued` is a kind string**, never `=== true`:
+  a tap in the second half of a wind-up stores `STRIKE[f.buf]`, the chained cut starts with it, and
+  every use elsewhere is a truthiness test.
 - **Input is buffered** (`buf`, 0.22 s): a press made while busy fires when the fighter
   can act. **Two exceptions for the parry** (CS-3): a parry pressed while the fighter is
   flinching or staggered is **dropped**, never buffered (the input loop in `stepFighter()`); and
@@ -106,7 +131,10 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
   decides then to parry or dodge it, answering no sooner than its `react` time; so a slow
   mind cannot parry your fast first cut and a fast one can. It punishes your stagger with
   a full chain, throws a power attack when it has 10, otherwise circles at 2.5-3.3 m and
-  steps in for chains of up to its rank's `maxChain`.
+  steps in for chains of up to its rank's `maxChain`. **It throws all three kinds**: `aiStrike(F)`
+  rolls once per cut it starts or chains and returns `quick`, `heavy` or `atk` by the rank's `quickP`
+  and `heavyP`, on **`F.krng`**, a second random stream seeded from the fight's seed, so a kind roll
+  never shifts a draw of `F.rng`. The stagger punish keeps normal cuts.
 - **The rig** (`rigFighter`): poses are **hand position + blade direction keys** in the
   fighter's local frame (`POSE`: guard, five cuts each as wind / sweep / follow, parry,
   stagger, the power spin...), timed by the engine state alone (`poseOf()`). The right arm
@@ -122,14 +150,14 @@ One self-contained file (~1,800 lines). Suite: `.claude/tests/drive-combat-simul
   trails, ground rings and sparks. About 12 draw calls a frame in realistic. The page has
   a **Graphics style** selector (realistic, toon) that swaps the shaders and the effects'
   colours without touching the fight; see Graphics styles below.
-- **HUD** is a 2D canvas over the GL one: the bars and energy ticks, the four buttons
-  and their icons, the power ring (inner ring 0-10, closes and flashes at 10; outer ring
+- **HUD** is a 2D canvas over the GL one: the bars and energy ticks, the six buttons
+  (attack, dodge, parry, power, and since CS-4 quick and heavy; `LAY.btn`) and their icons, the power ring (inner ring 0-10, closes and flashes at 10; outer ring
   10-20), the floating numbers, the combo count, banners. `LAY` holds the layout.
 - **Sound** (`SND`): WebAudio only; three buses (music, ambient, sfx) under a master,
   a slider each. Karplus-Strong koto baked per pitch. The opponent's wind-up has a quiet
-  scrape (`tell`) and every cut's swish starts on its first active frame: both are
+  scrape (`tell`, which takes the swing's kind: a jab's is short and high, a heavy's long and low) and every cut's swish starts on its first active frame: both are
   timing cues for parrying.
-- **Test hook** `window.__CS`: `setPaused`, `tick(dt, n)`, `press(k)`, `stick(x, y)`,
+- **Test hook** `window.__CS`: `POSE` (CS-4: so a row can measure a wind-up's backswing), `setPaused`, `tick(dt, n)`, `press(k)`, `stick(x, y)`,
   `startDuel(rank, seed)`, `hud()` (draw the HUD now), `F`, `LAY`, `SKY`, `APP` (with a
   `frames` counter: wait on frames, never wall time, under SwiftShader), and for the
   styles `STYLES`, `setStyle(s)`, `draw()`, `pixels(x, y, w, h)`, `glError()`, `PARTS` and
@@ -249,6 +277,15 @@ counter rank 5 1, rank 10 1`, against `1, 0; 1, 0.875` before. The counter perso
 rose from 0.875 to 1 because the opponent can no longer parry the persona's stagger punish straight
 out of a flinch. No ladder row was edited.
 
+**Re-measured with CS-4 step 3 (2026-11-03)**: the same line, `masher rank 1 1, rank 10 0; counter rank 5 1,
+rank 10 1`, with the `counter` persona restated to read the row's own window and the opponent throwing all
+three kinds. No tuning was needed, and no shipped `rankParams` field or `RULES` timing moved. **The
+opponent's measured kind shares** (the suite's row 4 scenario, AI v counter, four seeds, 60 s, the
+opponent's swings): rank 1 quick 0.054 / heavy 0.214 (56 swings), rank 5 0.225 / 0.188 (80), rank 10 0.104 /
+0.041 (193). Rank 10's quick share is below `quickP` (0.30) because about half its swings there are the
+stagger punish, which stays normal. At rank 5 the opponent parried 10 of 40 heavies and 0 of 40 quicks
+thrown as first cuts from free (a quick winds up before a rank-5 mind can answer).
+
 So mashing gets you through the first few, parrying is the skill the ladder teaches, and
 the last two cost even a frame-perfect parrier.
 
@@ -344,7 +381,7 @@ feature or together with the parry timing debug & fix item."
 
 Taken as two siblings planned as one arc: CS-3 (the fix, and parry judged against each
 attack's own timing) lands first; CS-4 (quick and heavy strikes) builds on it and is the
-test of it. **Planned 2026-11-03:** `.claude/plans/csparry.parry-timing-strike-kinds.md`
+test of it. **Planned 2026-11-03:** `.claude/plans/DONE/csparry.parry-timing-strike-kinds.md` (implemented 2026-11-04)
 (one attack table `ATTACKS` built from `RULES.chain` and `RULES.power`, the parry judged
 against the attacker's row, CS-3 landing on its own at step 2).
 
@@ -426,7 +463,10 @@ already late, which the CD may feel as the same complaint.
 
 ### CS-4 - quick and heavy strikes
 
-**Open; planned (csparry steps 3-5). Depends on CS-3.**
+**Shipped 2026-11-03** (csparry steps 3-5, commits `d2606b5` engine and `728de4b` page; the docs and break
+run in step 5; badge in `DONE.md`). All three of the CD's answers below are built. What was built and the
+numbers picked are the Assumed rows (strike kinds ... the help wording), Architecture (`ATTACKS`, `STRIKE`,
+`F.krng`) and Tests. Left for the CD: the playtest of the numbers. The spec below is kept as written.
 
 Two new attack buttons beside the normal attack, each a row in CS-3's table:
 - **Quick strike**: a jab. Lower damage and a much shorter telegraph, so it is hard to
@@ -438,7 +478,7 @@ Two new attack buttons beside the normal attack, each a row in CS-3's table:
 
 **The CD's answers at plan time (2026-11-03):**
 
-| Question | CD's answer |
+| Question | CD's answer (all three built) |
 |---|---|
 | Does the parry window stay 0.24 s for every kind, or scale with the telegraph? | **Scale with the telegraph**: each kind's window is a share of its wind-up. Planned as 0.24 s times the kind's wind-up factor: quick 0.12 s, heavy 0.40 s (0.48 capped so a parry always ends with 0.10 s open); the normal chain keeps 0.24 s at every rank. |
 | Do quick and heavy break, continue or start the chain? | **Mix into the chain**: each counts as the chain's next cut and keeps the 3rd/5th-hit energy. |
@@ -459,7 +499,7 @@ heavy, and a higher or lower swing tell.
 
 ## Tests
 
-`.claude/tests/drive-combat-simulator.cjs`, 81 checks (39 in part 1, 42 in part 2). Part 1 (node, the engine): the
+`.claude/tests/drive-combat-simulator.cjs`, 89 checks (44 in part 1, 45 in part 2). Part 1 (node, the engine): the
 chain cycles 1-5-1, a pause ends it, a whiff breaks the energy count, a full chain pays
 exactly +2; a timed parry staggers with no damage and pays +1, an early parry fails; +10%
 on a staggered target exactly, a staggered fighter cannot parry or dodge, five cuts fit in
@@ -474,13 +514,25 @@ buffer always times out first); the same two for the opponent; every parryable r
 judged by its own window (`parryWin` minus 2 ticks turns it, plus 2 does not; iterates the table, so a
 new row joins unedited); no swing both hurts and is parried or lands twice (AI v counter, ranks 1, 5,
 10, four seeds); and the normal rows equal a literal copy of the old chain with `parryWin` 0.24, the
-power row not parryable. Part 2 (Chromium, SwiftShader): boot and badge,
+power row not parryable. **Five rows since CS-4 step 3** ("quick and heavy strikes", part 1): the quick and heavy rows
+are the chain with `wind`, `rec` and `dmg` x0.5/0.8/0.6 and x2.0/1.3/1.6 and parryable for 0.12 s
+and 0.40 s; `atk`, `quick` and `heavy` each start a cut whose `swing` carries its kind, quick
+dealing 0.6x and heavy 1.6x on the same cut; the kinds mix into one chain (`atk, quick, heavy,
+atk, quick` are cuts 1-5 and the combo pays at 3 and 5); the opponent throws all three (rank 5; quick
+more at rank 10 than rank 1, heavy more at rank 1 than rank 10; seeds `s * 104729 + rank`, both hp
+1e6 so every duel runs 60 s); and the opponent parries more of 40 heavies than of 40 quicks at rank 5
+(seeds `7000 + s`, a trial ends at the first hit, parry, dodge or whiff). The parry-window row
+(row 5 above) was restated to cover 15 rows (normal, quick, heavy x the five cuts) and the `counter`
+persona restated to read the row. Part 2 (Chromium, SwiftShader): boot and badge,
 the intro (stepped, not waited for), real multi-touch over CDP (stick held while a second
 thumb cuts; dodge, parry, power buttons), the power ring filling, closing at 10 (the ten
 gaps between its segments turn gold), the second ring past 10 and the flash, the
-controls' layout at seven sizes, the settings pausing the duel (waits on frames), victory
+controls' layout at seven sizes (since CS-4, six buttons: atk, dodge, parry, power, quick, heavy),
+**three rows since CS-4 step 4** (a touch on the quick button and on the heavy button each starts a cut of that
+kind; `KeyU` and `KeyO` do the same; half way through the wind-up the hand key's distance from `POSE.guard` is
+smallest for quick, then normal, then heavy, on all five cuts), the settings pausing the duel (waits on frames), victory
 -> next rank saved, defeat -> retry, light by rank, the FPS counter on/off, no errors.
-**Thirteen of the 81 are the style rows** (one in part 1): the engine text never mentions a
+**Thirteen of the 89 are the style rows** (one in part 1): the engine text never mentions a
 style; with nothing stored the style and the select read realistic; the select offers exactly
 realistic and toon in that order; choosing toon through the select sets, saves and changes the
 next draw by more than 2,000 px with the same `F` and the same `F.t`; the pick survives a
@@ -502,12 +554,12 @@ caught by their own rows, none by a crash): `style-engine`, `style-render-writes
 `ink-cull-not-discard`. Two lessons: a rise-only ink check passes the culled hull that paints
 the fighter black, so it also caps the fill; and a break that reads a copy of the style taken
 on the first frame (`style-needs-reload`) is the only way to prove "applies live". The list
-for the game itself is `.claude/tests/negtests/combat-simulator.json`: 24 breaks, every one caught by its own check: stagger bonus 1.0, no i-frames,
+for the game itself is `.claude/tests/negtests/combat-simulator.json`: 32 breaks (all 32 run and caught at CS-4 step 5, 2026-11-03), every one caught by its own check: stagger bonus 1.0, no i-frames,
 power parryable (re-pointed in CS-3 to the `ATTACKS.power` row), combo pays at 3 only, power at 9, no cap, a chain of three, a staggered
 fighter that can act, a 1.2 s stagger, no armour, parry/dodge paying nothing, a ring that
 never closes, a ring that does not flash, a menu that does not pause, crowded buttons, a
 ladder that does not advance, an opponent slower at the top, a second thumb ignored while
-the stick is held, and the five CS-3 breaks: `parry-buffered-through-flinch` (rows 1 and 4), `flinch-keeps-buffered-parry` (row 3), `drop-only-player` (row 4), `parry-window-wide` (row 7 only: row 5 judges a row by its own `parryWin`, so widening it moves both; it is the row that will catch a window shared by every kind) and `swing-resolves-twice` (row 6). Three of them first "passed" for the wrong reason and were fixed in
+the stick is held, and the five CS-3 breaks: `parry-buffered-through-flinch` (rows 1 and 4), `flinch-keeps-buffered-parry` (row 3), `drop-only-player` (row 4), `parry-window-wide` (row 7 only: row 5 judges a row by its own `parryWin`, so widening it moves both; it is the row that will catch a window shared by every kind) and `swing-resolves-twice` (row 6), then the four CS-4 engine breaks `parry-window-global` (`tryHit()` reads the shared window again: row 5 on the quick rows), `quick-not-quick` (rows 1 and 2), `kinds-break-chain` (row 3) and `ai-never-quick` (row 4), and the four CS-4 page breaks `quick-button-missing` (the touch row, and a crash in `drawHUD`), `keys-no-heavy` (the key row), `heavy-overlaps-power` (heavy at 45 deg: the layout row and the power ring row) and `kind-pose-ignored` (the pose row); `chain-of-three` was re-pointed in step 3 to the line that now passes `f.queued`. Three of them first "passed" for the wrong reason and were fixed in
 the suite: the ring check counted gold that the lit icon supplied (it now samples the
 gaps between segments); the pause and FPS checks read stale frames because SwiftShader
 under parallel load draws a frame every few hundred ms (they now wait on `APP.frames` or
@@ -518,6 +570,15 @@ draw the HUD synchronously through `__CS.hud()`).
 - **A cut**: a row in `RULES.chain` (timings, reach, arc, lunge) and a matching
   `POSE.cuts` entry (wind, sweep keys, follow). Keep consecutive sweep keys under 90
   degrees apart: directions are lerped and normalised.
+- **An attack kind** (a quick or heavy strike, a feint...): one `RULES.kinds` entry
+  (`wind`, `rec`, `dmg` factors; the loop after `RULES` builds its five `ATTACKS` rows with the
+  parry window `min(0.24 * wind, 0.40)`), an action in `ACTIONS` and `STRIKE`, a button in
+  `layout()` and `drawHUD()`, a key in `KEYMAP` and `playerIntent()`, an icon in `icon()`, a
+  backswing in `poseOf()` and a tell in `SND.tell()`; the opponent's share is a `rankParams()`
+  field read by `aiStrike()`. The parry code, the queue and the AI's answer need nothing, and the
+  suite's window row iterates the table so the new rows join it unedited. **Layout limit: the
+  six-button cluster has no room for a seventh at 360 x 640 without a new layout** (3.4 R was the
+  tightest arc that cleared the power ring at all seven sizes).
 - **An opponent**: a row in `LADDER` (name, title, colours); tuning stays in
   `rankParams()`.
 - **A move**: a state in `stepFighter`, its buffer rules in `begin()`, its pose in
