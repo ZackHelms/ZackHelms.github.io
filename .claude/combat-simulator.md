@@ -71,11 +71,12 @@ the normal five-cut chain, a **quick** strike (a jab) and a **heavy** strike, ea
 | Toon's pine rim | The open bottom of a pine's foliage cone shows the shell's bottom ring as a dark band where the camera sees under it | Kept as the rim's own line |
 | Ink is flat | Drawn in display space with no tonemap and no fog, so a far pine's outline is as dark as a near one's; it writes depth, so the additive effects depth-test against it | Simplest; screen-constant width already keeps distant lines thin |
 | The HUD in every style | Keeps one look and layout | The spec says only the controls keep their layout; a styled HUD is a separate ask |
+| CS-3 and CS-4, every row below from Parry rows to The help wording | **Signed off by the CD 2026-11-04** after a playtest of both (backlog refinement), except contact, which the CD decided to move (CS-5) | The rows stay as the record of what was built |
 | Parry rows (CS-3, 2026-11-03) | The parry is judged against the attacker's `ATTACKS` row (`parry`, `parryWin`); the normal rows are today's chain with `parryWin` 0.24 s, the power row is `parry: false`, `parryWin: 0`, `idx: -1` | The plan's one-table design; the old numbers are unchanged |
 | A parry from a flinch (assumed: not asked in these words) | A parry pressed while flinching or staggered is **dropped**, never buffered, for both fighters; attack, dodge and power presses are still buffered | The traced cause: a buffered parry fired the instant the flinch ended and caught the next chained cut |
 | A buffered parry meets a hit (assumed) | A parry already in the buffer is **cleared** when its fighter is flinched or staggered. The stagger clear has no check of its own (a 1.5 s stagger outlasts the 0.22 s buffer, so it cannot show in play) | Belt and braces, so the rule holds if `RULES.buffer` ever outgrows the flinch |
 | The opponent's parry lead (assumed) | `aiIntent()` schedules its parry `Math.min(0.10, 0.8 * parryWin)` before contact; 0.10 s for every row today | A shorter-window row would otherwise be asked for a parry that cannot land |
-| Contact left where it is (assumed, default) | `tryHit()` still runs on the first in-reach tick of the active window; three of ten cuts deal damage with the blade over 0.25 m from the body (table under "CS-3 as built") | Moving it changes every timing the ladder was measured on; the CD's call |
+| Contact left where it is (**decided 2026-11-04: move it**, CS-5) | `tryHit()` still runs on the first in-reach tick of the active window; three of ten cuts deal damage with the blade over 0.25 m from the body (table under "CS-3 as built") | Left as the default because moving it changes every timing the ladder was measured on; the CD chose "land on the blade" at backlog refinement, specified as CS-5 |
 | Strike kinds (CS-4, 2026-11-03) | `RULES.kinds`: quick `wind` x0.5, `rec` x0.8, `dmg` x0.6; heavy `wind` x2.0, `rec` x1.3, `dmg` x1.6, applied to every row of the chain; `act`, `reach`, `arc` and `lunge` are the chain row's | The plan's numbers, picked for the CD to playtest; quick and heavy are the same five cuts timed differently, so the chain's poses and reach still read |
 | A kind's parry window (the CD: scales with the telegraph) | `parryWin = min(0.24 * K.wind, 0.50 - 0.10)`: quick 0.12 s, heavy 0.40 s (0.48 capped), the normal chain 0.24 s at every rank. The factor is the kind's, never the rank's `windMul` | "Scale with the telegraph" read as the kind's wind-up factor; a parry always ends with 0.10 s still open |
 | The opponent's strike mix (assumed) | `quickP` = lerp(0.05, 0.30) and `heavyP` = lerp(0.25, 0.15) from rank 1 to 10; each cut it starts or chains rolls once on `F.krng`; the stagger punish stays normal cuts | Low ranks lean on readable heavies, high ranks on jabs. Measured shares below the ladder |
@@ -283,7 +284,8 @@ three kinds. No tuning was needed, and no shipped `rankParams` field or `RULES` 
 opponent's measured kind shares** (the suite's row 4 scenario, AI v counter, four seeds, 60 s, the
 opponent's swings): rank 1 quick 0.054 / heavy 0.214 (56 swings), rank 5 0.225 / 0.188 (80), rank 10 0.104 /
 0.041 (193). Rank 10's quick share is below `quickP` (0.30) because about half its swings there are the
-stagger punish, which stays normal. At rank 5 the opponent parried 10 of 40 heavies and 0 of 40 quicks
+stagger punish, which stays normal (**the CD, 2026-11-04: leave it as built**; rank 10 does not need to
+jab more). At rank 5 the opponent parried 10 of 40 heavies and 0 of 40 quicks
 thrown as first cuts from free (a quick winds up before a rank-5 mind can answer).
 
 So mashing gets you through the first few, parrying is the skill the ladder teaches, and
@@ -459,14 +461,16 @@ radius):
 while the blade is still more than 0.25 m from the body; shomen's tip is still overhead (y 2.34-2.38
 m) when it does. Contact was **not moved**: it changes every timing the ladder was measured on, so
 it is the CD's call. Inferred, not confirmed: a parry pressed as such a cut looks about to land is
-already late, which the CD may feel as the same complaint.
+already late, which the CD may feel as the same complaint. **Decided 2026-11-04 (backlog
+refinement): land on the blade**, specified below as CS-5.
 
 ### CS-4 - quick and heavy strikes
 
 **Shipped 2026-11-03** (csparry steps 3-5, commits `d2606b5` engine and `728de4b` page; the docs and break
 run in step 5; badge in `DONE.md`). All three of the CD's answers below are built. What was built and the
 numbers picked are the Assumed rows (strike kinds ... the help wording), Architecture (`ATTACKS`, `STRIKE`,
-`F.krng`) and Tests. Left for the CD: the playtest of the numbers. The spec below is kept as written.
+`F.krng`) and Tests. **Playtested and signed off by the CD 2026-11-04** (backlog refinement), with the
+rank-10 kind shares left as built. The spec below is kept as written.
 
 Two new attack buttons beside the normal attack, each a row in CS-3's table:
 - **Quick strike**: a jab. Lower damage and a much shorter telegraph, so it is hard to
@@ -496,6 +500,49 @@ heavy, and a higher or lower swing tell.
   telegraph gives the opponent's mind time to answer at ranks where it cannot answer a
   quick one; the new buttons inside the viewport and overlapping nothing at every swept
   size; a style is still paint with the new swings on screen.
+
+## Backlog (blade at contact), specified for plan-gen
+
+The CD's call, 2026-11-04 (backlog refinement), on the csparry follow-up's one open decision: the
+three cuts that deal damage with the blade still well clear of the body should **land on the
+blade**, i.e. damage waits until the blade actually reaches the body. Queued in `TODO.md` § Next
+behind CS-2. Not yet planned: run `/zmh-producer:backlog-plan-gen` for it.
+
+### CS-5 - a cut lands when the blade reaches the body
+
+- **What is wrong, measured** (the "Blade at contact" table under "CS-3 as built"; the opponent
+  cutting the player from 1.2 m): `tryHit()` resolves a swing on the **first tick of its active
+  window** where the defender is within `reach + RULES.body` and inside the cut's arc. That tests
+  the two fighters' distance and angle and never looks at the blade, so yoko at rank 1 (0.255 m),
+  shomen at rank 1 (0.290 m) and shomen at rank 10 (0.327 m, the tip still overhead at y
+  2.34-2.38 m) deal damage before the blade gets there.
+- **The rule** (every row of `ATTACKS`: the five normal cuts, quick, heavy and power; both
+  fighters): a swing resolves (dodge, parry or hit) on the first tick at which its blade has
+  reached the defender's body, and not before. It still resolves once (`a.resolved`) and only
+  inside its active window. A swing whose blade never reaches the body is a whiff, as now.
+- **The design question for the plan** (the CD did not decide it): the engine is DOM-free and does
+  not know where the blade is. Poses live on the page side (`poseOf()`, `rigFighter()`, after
+  `/*ENGINE:END*/`). Two ways to resolve it, inferred and not chosen: **(a)** give each `ATTACKS`
+  row a contact moment inside its active window, measured once from the rig and kept in the
+  table, so the engine stays DOM-free and a new attack is still one row; or **(b)** move enough of
+  the pose maths into the engine to test the blade segment against the body every tick. Lean
+  (a), because it keeps the one-table rule CS-3 set up. Under (a) the contact moment also depends
+  on range (the CS-3 measure is from 1.2 m only), so measure across the reach, not at one distance.
+- **What follows contact and must move with it**: the parry is judged against the new contact
+  moment (`parryWin` counts back from it; the CS-3 rule that a parry only counts before contact
+  stands); the opponent's parry lead (`min(0.10, 0.8 * parryWin)` before contact) and the
+  `counter` persona both read it. The swish still starts on the first active frame; whether it
+  should move too is for the plan to check by ear, not assumed here.
+- **The ladder**: moving contact later shifts timings the ladder's pace was signed off on
+  (2026-11-03). Re-measure part 1's ladder line. If it moves, report the change rather than
+  retune silently (the CS-3 rule); the plan says whether to restore it in `rankParams()`.
+- **Checks**: the CS-3 one-off blade-at-contact measure becomes a suite row. For every `ATTACKS`
+  row at ranks 1 and 10, the blade-to-body gap at the `hit` event is at or below a bound the plan
+  sets from measurement (today's worst is 0.327 m). A parry raised before the new contact still
+  turns the cut aside, and one raised after it does not. A style is still paint. Each rule gets a
+  negative test.
+- **Sequencing**: after CS-2 lands. Both edit `.claude/tests/drive-combat-simulator.cjs` and its
+  counts, and CS-2's WIP cherry-pick (`85bf3c2`) already expects a conflict there.
 
 ## Tests
 

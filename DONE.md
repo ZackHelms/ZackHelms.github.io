@@ -1,5 +1,14 @@
 # DONE — done log
 
+- 2026-11-04 [combat-sim] **The parry fix and quick/heavy strikes signed off; contact decided**
+  (backlog refinement). The CD playtested CS-3 (a parry only counts before the blade lands) and
+  CS-4 (quick and heavy strikes) and passed both as built. That closes the playtest left in the
+  csparry follow-up. Its two open questions were decided: the three cuts that deal damage
+  with the blade still clear of the body will **land on the blade** (new item CS-5, `TODO.md`
+  § Next, behind CS-2), and rank 10's low quick share (0.10 against `quickP` 0.30, because its
+  stagger punish stays normal cuts) is **left as built**. Detail: `.claude/combat-simulator.md`
+  § Assumed, the ladder, and CS-5.
+
 - 2026-11-04 [driving-sim] **The radio's test rows no longer depend on the frame rate** (dsradio; the
   CD, 2026-11-03: the radio "sounds fine to me", so a test-only fix). Section 9's sound windows and the
   stations row now hold the frame loop and step the sound scheduler on a 50 ms timer with `Math.random`

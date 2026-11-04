@@ -8,6 +8,7 @@
   overhead). Contact was not moved, per the plan's decision default: moving it shifts every timing
   the ladder was measured on. Your call whether contact should land later in the sweep. Numbers:
   the plan's Step 1 Results; `.claude/combat-simulator.md` section CS-3 as built.
+  *Decided 2026-11-04 (backlog refinement): land on the blade. Now CS-5 in `TODO.md` § Next.*
 
 ## Decisions made on your behalf - review
 
@@ -39,6 +40,7 @@
 
 - **Opponent kind shares sit below `quickP` at rank 10** (measured 0.104 quick vs `quickP` 0.30):
   about half its swings at rank 10 are the stagger punish, which stays normal. Fine as built;
-  playtest whether rank 10 should jab more.
+  playtest whether rank 10 should jab more. *Decided 2026-11-04 (backlog refinement), after the
+  CD's playtest passed CS-3 and CS-4: leave it as built.*
 - More strike kinds: one `RULES.kinds` entry plus a button, key and icon each, but the six-button
   cluster has no room for a seventh at 360x640 without a new layout.

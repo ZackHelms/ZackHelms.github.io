@@ -19,8 +19,9 @@ in `.claude/<game>.md`.
   torii, fighters as dark bodies with green and red rims, a white-hot blade, stronger trails,
   a cheap bloom). A style is paint: the engine never reads it. **Paused mid step 4 for quota
   (2026-11-02)**: unvalidated, partly-run WIP is `85bf3c2` on `cs-styles-step4-wip`; the
-  plan's Status line says how to pick it up. Spec and checks: `.claude/combat-simulator.md`
-  § Backlog, CS-2. Resume with:
+  plan's Status line says how to pick it up. Nothing blocks it now: the plan's run-after-csparry
+  gate cleared when CS-3 and CS-4 landed (2026-11-03/04), so re-derive its counts from 89 checks
+  and 32 breaks. Spec and checks: `.claude/combat-simulator.md` § Backlog, CS-2. Resume with:
   `/zmh-producer:oversee-implementation .claude/plans/csstyles.selector-toon-neon.md`
 
 ## Needs Zack
@@ -201,6 +202,16 @@ in `.claude/<game>.md`.
   none today), or keep it as a prompt in the tests README?
 
 ## Next
+
+- [combat-sim] **A cut lands when the blade reaches the body** (CS-5; *Decided 2026-11-04,
+  backlog refinement: "land on the blade"*). Today `tryHit()` deals damage on the first in-reach
+  tick of the active window, so three of ten cuts land with the blade 0.26-0.33 m clear of the
+  body (shomen's tip still overhead). Every attack row, both fighters; the parry and the AI's
+  parry lead follow the new contact; re-measure the signed-off ladder and report any change. Open
+  design question for the plan: a contact moment per `ATTACKS` row (lean) vs blade maths in the
+  engine. **After CS-2 (Now)**: both edit the suite and its counts. Spec and checks:
+  `.claude/combat-simulator.md` § Backlog (blade at contact), CS-5. Plan-shaped: draft via
+  `/zmh-producer:backlog-plan-gen`.
 
 - [phasic] Endless launch-board weighting: endless (73+) never draws the
   launch template (block-8 curriculum only, by construction). Decide a
