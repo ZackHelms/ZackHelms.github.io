@@ -1,5 +1,16 @@
 # DONE — done log
 
+- 2026-11-04 [driving-sim] **Summer, autumn and winter, each as Raleigh looks and sounds** (DS-3; the
+  CD, 2026-11-01: "other seasons are visible but not selectable (yet)"). All four seasons are selectable and saved; choosing
+  one puts the calendar on its middle date (the sky follows) and rebuilds the road around the car in its look, with the car
+  and the traffic untouched. Spring is byte for byte as shipped, proven against GPU read-backs recorded before any edit.
+  Summer is a deeper green, autumn colours each tree from its position (maples red to orange, oaks russet, birches and
+  street trees yellow), and winter shows bare trunks and limbs with grey bark; conifers never change. The grass goes to
+  straw, and the bushes and distant treeline follow. Summer adds cicadas by day and katydids at night, autumn has fewer
+  birds, and winter has a few birds and no insects. The tree-expert agent reviewed the trees and its tuning was adopted.
+  Suite 141 -> 157, break list 57 -> 76, all 19 new breaks caught. build 2026-11-04 04:01 UTC. Detail:
+  `.claude/driving-simulator.md` DS-3; plan `.claude/plans/DONE/dsseasons.summer-autumn-winter.md`.
+
 - 2026-11-03 [combat-sim] **Quick and heavy strikes** (CS-4; the CD: "a quick strike ... like a jab in
   boxing" and a heavy strike with a longer telegraph, as buttons, for testing the parry). Three kinds of
   strike now share one attack table: the normal five-cut chain, a quick strike (0.6x damage, half the

@@ -397,5 +397,138 @@
   "file": "games/driving-simulator/index.html",
   "old": "    for (const k of VOL_KEYS) ch[k].gain.setTargetAtTime(level(k), t, 0.03);",
   "new": "    for (const k of VOL_KEYS) ch[k].gain.setTargetAtTime(level(k === 'traffic' ? 'tyres' : k), t, 0.03); /* @negtest */"
+ },
+ {
+  "name": "ds3-seasons-spring-only",
+  "row": "the season is selectable and saved (summer, autumn, winter, spring on #season-sel; a reload in winter boots in winter)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = SEASONS;",
+  "new": "const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring']; /* @negtest */"
+ },
+ {
+  "name": "ds3-apply-no-rebuild",
+  "row": "nothing moves across a season switch (every loaded chunk rebuilt)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  LOOK = SEASON_LOOK[v] || SEASON_LOOK.spring; lookSeason = SEASON_LOOK[v] ? v : 'spring';\n  for (const ch of CHUNKS.values()) { freeMesh(ch.baseMesh); freeMesh(ch.propMesh); }\n  CHUNKS.clear();\n  updateChunks(99);\n",
+  "new": "  LOOK = SEASON_LOOK[v] || SEASON_LOOK.spring; lookSeason = SEASON_LOOK[v] ? v : 'spring'; /* @negtest */\n"
+ },
+ {
+  "name": "ds3-switch-through-teleport",
+  "row": "nothing moves across a season switch (the player and the traffic unchanged)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  CHUNKS.clear();\n  updateChunks(99);\n}\n\n// ---------------------------------------------------------------- sun, moon, sky",
+  "new": "  CHUNKS.clear();\n  teleport(PLAYER.s); /* @negtest */\n}\n\n// ---------------------------------------------------------------- sun, moon, sky"
+ },
+ {
+  "name": "ds3-summer-in-spring",
+  "row": "spring is as shipped",
+  "file": "games/driving-simulator/index.html",
+  "old": "  spring: { crown: 'leaf', bark: C.bark, leaf: C.leaf, bush: C.leaf, bushR: 1, treeline: C.leaf, grassField: C.grassField,",
+  "new": "  spring: { crown: 'leaf', bark: C.bark, leaf: C.leaf, bush: C.leaf, bushR: 1, treeline: C.leaf, grassField: lin3([64, 94, 36]) /* @negtest */,"
+ },
+ {
+  "name": "ds3-winter-skips-seeds",
+  "row": "the same trees in the same places",
+  "file": "games/driving-simulator/index.html",
+  "old": "    for (const b of T.canopy) bareLimb(mb, x, y, z, b, scale, th, tr, bark, rnd.int(0, 1e9));",
+  "new": "    for (const b of T.canopy) bareLimb(mb, x, y, z, b, scale, th, tr, bark, 7); /* @negtest */"
+ },
+ {
+  "name": "ds3-autumn-from-rnd",
+  "row": "the same trees in the same places",
+  "file": "games/driving-simulator/index.html",
+  "old": "    : crown === 'autumn' ? autumnLeaf(LOOK.autumn, T.id, x + ox, z + oz).map(v => v * lv) : null;",
+  "new": "    : crown === 'autumn' ? autumnLeaf(LOOK.autumn, T.id, rnd.next() * 1e4, 0).map(v => v * lv) : null; /* @negtest */"
+ },
+ {
+  "name": "ds3-one-maple-colour",
+  "row": "a forest is never one colour",
+  "file": "games/driving-simulator/index.html",
+  "old": "  const p = hr.next(), t = hr.next(), sp = A[id] || A.street;",
+  "new": "  const p = 0.1, t = 0.5, sp = A[id] || A.street; /* @negtest */"
+ },
+ {
+  "name": "ds3-winter-keeps-canopy",
+  "row": "bare in winter (no leaf vertex)",
+  "file": "games/driving-simulator/index.html",
+  "old": "    for (const b of T.canopy) bareLimb(mb, x, y, z, b, scale, th, tr, bark, rnd.int(0, 1e9));",
+  "new": "    for (const b of T.canopy) { const sd = rnd.int(0, 1e9); bareLimb(mb, x, y, z, b, scale, th, tr, bark, sd); mb.blob(x + b.x * scale, y + b.y * scale, z + b.z * scale, b.radius * scale, 0.85, C.leaf, MAT.LEAF, sd); } /* @negtest */"
+ },
+ {
+  "name": "ds3-conifers-by-season",
+  "row": "conifers never change",
+  "file": "games/driving-simulator/index.html",
+  "old": "  const leaf = conifer ? [C.conifer[0] * lv, C.conifer[1] * lv, C.conifer[2] * lv]",
+  "new": "  const leaf = conifer ? C.conifer.map(v => v * lv * (LOOK.crown === 'bare' ? 1.25 : 1)) /* @negtest */"
+ },
+ {
+  "name": "ds3-limb-inside-out",
+  "row": "bare in winter (every bark triangle faces out)",
+  "file": "games/driving-simulator/index.html",
+  "old": "    for (let k = 0; k < seg; k++) { const b = base + k * 2; this.quad(b, b + 1, b + 3, b + 2); }",
+  "new": "    for (let k = 0; k < seg; k++) { const b = base + k * 2; this.quad(b, b + 2, b + 3, b + 1); } /* @negtest */"
+ },
+ {
+  "name": "ds3-bare-no-collider",
+  "row": "bare in winter (the same collider as in spring)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (colliders) colliders.circ.push({ x: x + ox, z: z + oz, r: tr + 0.15 });",
+  "new": "  if (colliders && (conifer || crown !== 'bare')) colliders.circ.push({ x: x + ox, z: z + oz, r: tr + 0.15 }); /* @negtest */"
+ },
+ {
+  "name": "ds3-grass-winter-unchanged",
+  "row": "grass by season",
+  "file": "games/driving-simulator/index.html",
+  "old": "    grassField: lin3([150, 128, 84]), grassDry: lin3([166, 142, 98]), grassForest: lin3([96, 80, 60]), lawn: lin3([128, 118, 74]) },",
+  "new": "    grassField: C.grassField, grassDry: C.grassDry, grassForest: C.grassForest, lawn: C.lawn }, /* @negtest */"
+ },
+ {
+  "name": "ds3-treeline-winter-unchanged",
+  "row": "bushes and the treeline follow (the fields treeline in winter)",
+  "file": "games/driving-simulator/index.html",
+  "old": "bushR: 0.7, treeline: lin3([110, 98, 90]),",
+  "new": "bushR: 0.7, treeline: C.leaf /* @negtest */,"
+ },
+ {
+  "name": "ds3-insects-in-winter",
+  "row": "no insects in winter",
+  "file": "games/driving-simulator/index.html",
+  "old": "  winter: { birds: 0.3, birdLv: 1, day: null, night: null, level: 0 },",
+  "new": "  winter: { birds: 0.3, birdLv: 1, day: null, night: 'cricket', level: 1 }, /* @negtest */"
+ },
+ {
+  "name": "ds3-no-cicadas",
+  "row": "summer's insects (cicadas by day)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  summer: { birds: 1, birdLv: 1, day: 'cicada', night: 'katydid', level: 1.5 },",
+  "new": "  summer: { birds: 1, birdLv: 1, day: null, night: 'katydid', level: 1.5 }, /* @negtest */"
+ },
+ {
+  "name": "ds3-boot-ignores-saved-season",
+  "row": "the season is selectable and saved (summer, autumn, winter, spring on #season-sel; a reload in winter boots in winter)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  LOOK = SEASON_LOOK[SETTINGS.season]; lookSeason = SETTINGS.season;",
+  "new": "  LOOK = SEASON_LOOK.spring; lookSeason = 'spring'; /* @negtest */"
+ },
+ {
+  "name": "ds3-winter-bushes-full-size",
+  "row": "bushes and the treeline follow (winter's bushes 0.65-0.75x)",
+  "file": "games/driving-simulator/index.html",
+  "old": "bushR: 0.7, treeline: lin3([110, 98, 90]),",
+  "new": "bushR: 1 /* @negtest */, treeline: lin3([110, 98, 90]),"
+ },
+ {
+  "name": "ds3-winter-birds-unthinned",
+  "row": "autumn and winter thin the birds",
+  "file": "games/driving-simulator/index.html",
+  "old": "  winter: { birds: 0.3, birdLv: 1, day: null, night: null, level: 0 },",
+  "new": "  winter: { birds: 1, birdLv: 1, day: null, night: null, level: 0 }, /* @negtest */"
+ },
+ {
+  "name": "ds3-winter-bark-on-conifers",
+  "row": "conifers never change",
+  "file": "games/driving-simulator/index.html",
+  "old": "  const bark = birch ? C.birchBark : (conifer ? C.bark : LOOK.bark).map(v => v * rnd.range(0.8, 1.15));",
+  "new": "  const bark = birch ? C.birchBark : LOOK.bark.map(v => v * rnd.range(0.8, 1.15)); /* @negtest */"
  }
 ]

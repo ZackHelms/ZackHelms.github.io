@@ -347,6 +347,227 @@ const AE = {
     && dateUI.after.mjd === MAY5 + 1 && dateUI.after.shown === 'Wed May 6' && dateUI.after.shown === dateUI.after.want
     && dateUI.slide.hour === 10 && dateUI.slide.mjd === MAY5 + 1 && dateUI.slide.shown === 'Wed May 6' && dateUI.slide.clock === '10:00 AM', dateUI);
 
+  // ---- 3b, the seasons (DS-3, dsseasons step 1): all four selectable and saved, each on its own calendar, nothing moved by a
+  // switch, and spring held byte for byte. The measured side is the GPU's own buffers: a chunk's baseMesh and propMesh vertex
+  // and index buffers read back through COPY_READ_BUFFER (WebGL 2 section 5.1: a buffer once bound to ELEMENT_ARRAY_BUFFER may
+  // be bound only to that target and the two copy targets; verified here, gl.getError() stays NO_ERROR), with the VAO unbound
+  // and the VAO and COPY_READ_BUFFER bindings put back; FNV-1a over the bytes. A null propMesh (an empty builder) hashes as no
+  // bytes, never a skip. SPRING_BEFORE was recorded by this code on the base page (81d0c48, before any season edit), twice,
+  // identical: one chunk per environment of the first 12 km, keyed by the s at the chunk's centre, its environment, then
+  // "vb:bytes ib:bytes" for the base mesh and the same for the props. `__dsAway` teleports with a stand-in traffic dice and puts
+  // the player, the traffic (cars, ids and the dice) and the chase camera back after, so the later rows see the sim as it was.
+  const SPRING_BEFORE = { 416: ['forest', '996e50ed:94224 e4ef3ec0:41472 33a5329d:366816 3450e72b:129888'], 1568: ['fields', '1ec9a4a7:149520 af23621d:48384 337c2ba4:27168 b3aeef1c:7344'],
+    7136: ['suburb', '813f6696:142320 7e4a1854:46080 cf530416:24960 b6c96558:4440'], 8288: ['open', 'f6dc1102:94224 e4ef3ec0:41472 9c6f9cfe:38016 2c625bf9:12816'],
+    10688: ['town', '3579b155:142320 7e4a1854:46080 f5222b36:97824 394e74c0:21816'] };
+  const SPRING_S = Object.keys(SPRING_BEFORE).map(Number);
+  const SEASON_MID = { spring: MAY5, summer: MJD(2026, 8, 6), autumn: MJD(2026, 11, 6), winter: MJD(2027, 2, 4) };
+  const installHash = pg => pg.evaluate(() => {
+    const W = window;
+    W.__dsMeshHash = m => { const g = document.getElementById('gl').getContext('webgl2');
+      const fnv = b => { let h = 0x811c9dc5; for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+      const vao = g.getParameter(g.VERTEX_ARRAY_BINDING), cr = g.getParameter(g.COPY_READ_BUFFER_BINDING); g.bindVertexArray(null);
+      const read = buf => { g.bindBuffer(g.COPY_READ_BUFFER, buf); const b = new Uint8Array(g.getBufferParameter(g.COPY_READ_BUFFER, g.BUFFER_SIZE)); g.getBufferSubData(g.COPY_READ_BUFFER, 0, b); return fnv(b) + ':' + b.length; };
+      const out = m ? [read(m.vb), read(m.ib)] : [fnv([]) + ':0', fnv([]) + ':0'];
+      g.bindBuffer(g.COPY_READ_BUFFER, cr); g.bindVertexArray(vao);
+      return out; };
+    W.__dsChunkHash = ch => [...W.__dsMeshHash(ch.baseMesh), ...W.__dsMeshHash(ch.propMesh)].join(' ');
+    W.__dsLoaded = () => Object.fromEntries([...W.__DS.CHUNKS].sort((a, b) => a[0] - b[0]).map(([k, ch]) => [k, W.__dsChunkHash(ch)]));
+    W.__dsAway = (sList, fn) => { const D = W.__DS, P = Object.assign({}, D.PLAYER), cars = D.TRAFFIC.cars.slice(), id = D.TRAFFIC.nextId, rnd = D.TRAFFIC.rnd, chase = D.CAM.chase;
+      D.TRAFFIC.rnd = rngFor('suite-away');
+      const out = {}; for (const s of sList) { D.teleport(s); out[s] = fn(D.CHUNKS.get(chunkOf(s)), s); }
+      D.TRAFFIC.rnd = rnd; D.TRAFFIC.nextId = id; D.TRAFFIC.cars.length = 0; D.TRAFFIC.cars.push(...cars); Object.assign(D.PLAYER, P); D.CAM.chase = chase; updateChunks(99);
+      return out; };
+  });
+  await installHash(page);
+  // row: each season chosen by a change event on #season-sel is the season, on its middle date, both saved; a reload in winter boots in winter
+  const picked = await page.evaluate(() => {
+    const D = window.__DS, el = document.getElementById('season-sel'), K = 'drivingSimulator.settings.v1', out = [];
+    const choose = v => { el.value = v; el.dispatchEvent(new Event('change')); const st = JSON.parse(localStorage.getItem(K) || '{}');
+      return { v, sel: el.value, season: D.SETTINGS.season, look: D.lookSeason, mjd: D.SKY.mjd, date: D.SETTINGS.date, stored: [st.season, st.date] }; };
+    for (const v of ['summer', 'autumn', 'winter', 'spring']) out.push(choose(v));
+    const w = choose('winter');
+    return { out, w, loaded: window.__dsLoaded() };
+  });
+  const pw = await ctx.newPage(); pw.on('pageerror', e => errors.push(String(e)));
+  await pw.goto(PAGE); await pw.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
+  await pw.evaluate(() => window.__DS.setPaused(true));
+  await installHash(pw);
+  // the dropdown shows the saved season once the menu opens (syncSettingsUI), as every setting does
+  const reW = await pw.evaluate(() => { const D = window.__DS; D.openSettings(); const sel = document.getElementById('season-sel').value; D.closeSettings();
+    return { season: D.SETTINGS.season, look: D.lookSeason, mjd: D.SKY.mjd, sel, loaded: window.__dsLoaded() }; });
+  await pw.close();
+  const back = await page.evaluate(MAY5 => { const D = window.__DS, el = document.getElementById('season-sel'); el.value = 'spring'; el.dispatchEvent(new Event('change'));
+    const r = { season: D.SETTINGS.season, look: D.lookSeason, mjd: D.SKY.mjd, stored: JSON.parse(localStorage.getItem('drivingSimulator.settings.v1') || '{}').season };
+    D.SKY.hour = 6.25; D.setDate(MAY5); return r; }, MAY5);
+  const common = Object.keys(reW.loaded).filter(k => k in picked.loaded), diffW = common.filter(k => reW.loaded[k] !== picked.loaded[k]);
+  ok('the season is selectable and saved: summer, autumn, winter and spring, each chosen on #season-sel, are the season on its middle date (Aug 6, Nov 6, Feb 4, May 5), both saved; a reload in winter boots in winter on Feb 4 with its loaded chunks hashing as before the reload; then back to spring',
+    picked.out.length === 4 && picked.out.every(r => r.sel === r.v && r.season === r.v && r.look === r.v && r.mjd === SEASON_MID[r.v] && r.date === r.mjd && r.stored[0] === r.v && r.stored[1] === r.mjd)
+    && picked.w.season === 'winter' && reW.season === 'winter' && reW.look === 'winter' && reW.sel === 'winter' && reW.mjd === SEASON_MID.winter
+    && common.length >= 12 && diffW.length === 0 && back.season === 'spring' && back.look === 'spring' && back.mjd === MAY5 && back.stored === 'spring',
+    { pick: picked.out.map(r => [r.v, r.season, r.look, r.mjd, r.stored]), reload: { season: reW.season, look: reW.look, mjd: reW.mjd, sel: reW.sel }, common: common.length, diffW, back });
+  // row: a switch rebuilds the road where it stands and moves nothing (never through teleport, which resets the car and the traffic)
+  const still = await page.evaluate(() => {
+    const D = window.__DS, P = D.PLAYER, vx0 = P.vx; P.vx = 17;
+    const snap = () => ({ p: [P.s, P.u, P.x, P.z, P.yaw, P.vx].join(), cars: D.TRAFFIC.cars.map(c => [c.id, c.s, c.lane].join(':')).join(), n: D.TRAFFIC.cars.length });
+    const meshes = () => new Set([...D.CHUNKS.values()].map(c => c.baseMesh)), fresh = (x, y) => [...y].every(m => !x.has(m));
+    const a = snap(), m0 = meshes(); D.setSeason('winter'); const b = snap(), m1 = meshes(); D.setSeason('spring'); const c = snap(), m2 = meshes();
+    P.vx = vx0;
+    return { a, b, c, rebuilt: fresh(m0, m1) && fresh(m1, m2), n: [m0.size, m1.size, m2.size], season: D.SETTINGS.season };
+  });
+  ok('nothing moves across a season switch: the player\'s s, u, x, z, yaw and speed and every traffic car\'s id, s and lane unchanged, spring -> winter -> spring, while every loaded chunk is rebuilt (each a new mesh)',
+    still.a.n >= 10 && still.a.p === still.b.p && still.b.p === still.c.p && still.a.cars === still.b.cars && still.b.cars === still.c.cars && still.rebuilt && still.n.every(k => k >= 12) && still.season === 'spring',
+    { p: [still.a.p, still.b.p, still.c.p], cars: still.a.n, sameCars: still.a.cars === still.b.cars && still.b.cars === still.c.cars, rebuilt: still.rebuilt, n: still.n });
+  // row: spring's chunks hash as recorded on the base page, before and after a round trip through winter
+  const spr = await page.evaluate(S => { const D = window.__DS, W = window, g = document.getElementById('gl').getContext('webgl2');
+    while (g.getError() !== g.NO_ERROR) { /* drain */ }
+    const h = () => W.__dsAway(S, (ch, s) => [D.sectionAt(s).env, W.__dsChunkHash(ch)]);
+    const first = h(); D.setSeason('winter'); D.setSeason('spring'); const again = h();
+    return { first, again, err: g.getError(), look: D.lookSeason }; }, SPRING_S);
+  const sprBad = SPRING_S.filter(s => JSON.stringify(spr.first[s]) !== JSON.stringify(SPRING_BEFORE[s]) || JSON.stringify(spr.again[s]) !== JSON.stringify(SPRING_BEFORE[s]));
+  ok('spring is as shipped: one chunk of each environment (forest 416, fields 1568, suburb 7136, open 8288, town 10688) hashes, base and props, vertices and indices, as recorded on the base page, and again after spring -> winter -> spring',
+    sprBad.length === 0 && spr.err === 0 && spr.look === 'spring' && new Set(SPRING_S.map(s => SPRING_BEFORE[s][0])).size === 5,
+    { bad: sprBad.map(s => ({ s, want: SPRING_BEFORE[s], first: spr.first[s], again: spr.again[s] })), err: spr.err });
+  // row: sunrise and sunset on each season's middle date, the page's sun found as the clock row finds it, on the season's own clock
+  const NOAA = { spring: [6 + 18 / 60, 20 + 5 / 60, -4], summer: [6 + 27 / 60, 20 + 14 / 60, -4], autumn: [6 + 42 / 60, 17 + 14 / 60, -5], winter: [7 + 12 / 60, 17 + 45 / 60, -5] };
+  const rise = await page.evaluate(MAY5 => { const D = window.__DS, out = {};
+    for (const v of ['summer', 'autumn', 'winter', 'spring']) { D.SKY.hour = 13; D.setSeason(v); const r = { mjd: D.SKY.mjd, dst: D.SKY.dst };
+      const alt = h => { D.SKY.hour = h; D.updateSky(); return Math.asin(D.SKY.sun[1]) * 180 / Math.PI; };
+      const ev = []; let prev = alt(0);
+      for (let m = 1; m <= 1440; m++) { const a = alt(m / 60); if ((prev < -0.833) !== (a < -0.833)) ev.push({ h: (m - 1 + (-0.833 - prev) / (a - prev)) / 60, up: a > prev }); prev = a; }
+      r.ev = ev; out[v] = r; }
+    D.SKY.hour = 6.25; D.setDate(MAY5);
+    return out; }, MAY5);
+  const riseCmp = Object.keys(NOAA).map(v => { const r = rise[v], [up, dn, off] = NOAA[v], own = ownRiseSet(SEASON_MID[v], off), e = r.ev;
+    const okv = r.mjd === SEASON_MID[v] && r.dst === (off === -4) && e.length === 2 && e[0].up && !e[1].up && own.length === 2
+      && Math.abs(e[0].h - up) < 10 / 60 && Math.abs(e[1].h - dn) < 10 / 60 && Math.abs(e[0].h - own[0].h) < 10 / 60 && Math.abs(e[1].h - own[1].h) < 10 / 60;
+    return { v, ok: okv, dst: r.dst, page: e.map(x => hm(x.h)), noaa: [hm(up), hm(dn)], own: own.map(x => hm(x.h)) }; });
+  ok('sunrise and sunset on each season\'s middle date within 10 min of NOAA (06:18 / 20:05 EDT May 5, 06:27 / 20:14 EDT Aug 6, 06:42 / 17:14 EST Nov 6, 07:12 / 17:45 EST Feb 4) and of the suite\'s own, with the clock on EDT or EST as the season\'s',
+    riseCmp.every(c => c.ok), riseCmp);
+  // row: each season's sky: Orion high in the south at 22:00 EST on Feb 4, 2027; under the horizon at 22:00 EDT on Aug 6, 2026
+  const ssky = await page.evaluate(([MAY5, hip]) => { const D = window.__DS, o = {}, idx = h => D.SKY_DATA.stars.rows.findIndex(r => r[0] === h);
+    for (const v of ['winter', 'summer']) { D.setSeason(v); D.SKY.hour = 22; D.updateSky();
+      o[v] = { mjd: D.SKY.mjd, dst: D.SKY.dst, Betelgeuse: D.starDir(idx(hip.Betelgeuse)), Rigel: D.starDir(idx(hip.Rigel)) }; }
+    D.setSeason('spring'); D.SKY.hour = 6.25; D.setDate(MAY5);
+    o.season = D.SETTINGS.season; return o; }, [MAY5, { Betelgeuse: SIMBAD.Betelgeuse[0], Rigel: SIMBAD.Rigel[0] }]);
+  const orion = ['winter', 'summer'].map(v => { const jd = jdOf(SEASON_MID[v], 22, v === 'winter' ? -5 : -4);
+    return { v, mjd: ssky[v].mjd, dst: ssky[v].dst, stars: ['Betelgeuse', 'Rigel'].map(n => { const own = ownStar(n, jd), a = altAzOf(ssky[v][n]);
+      return { n, alt: +a.alt.toFixed(2), az: +a.az.toFixed(2), ownAlt: +own.alt.toFixed(2), ownAz: +own.az.toFixed(2), off: +angDeg(ssky[v][n], own.v).toFixed(4) }; }) }; });
+  const [ow, os] = orion;
+  ok('each season\'s sky: at 22:00 EST on Feb 4, 2027 Betelgeuse and Rigel within 0.05 deg of the suite\'s own precessed places, Betelgeuse over 50 deg up and both at azimuth 180-230 (Orion high in the south); at 22:00 EDT on Aug 6, 2026 both under the horizon',
+    ow.mjd === SEASON_MID.winter && ow.dst === false && ow.stars.every(s => s.off < 0.05 && s.az > 180 && s.az < 230) && ow.stars[0].alt > 50
+    && os.mjd === SEASON_MID.summer && os.dst === true && os.stars.every(s => s.alt < 0 && s.ownAlt < 0) && ssky.season === 'spring', orion);
+
+  // ---- 3b, the seasons' look (DS-3, dsseasons step 2): trees, grass, bushes and the treeline by season. A colour is the
+  // stored linear vertex colour taken to sRGB by the standard transfer function (IEC 61966-2-1, the suite's own), then HSV;
+  // the hue bands are the season's words (green, red-orange, russet, yellow, straw, olive-orange). The measured side is the
+  // page's own builder through __DS.treeTest (one tree with a fixed stream at a world position), the GPU's chunk buffers read
+  // back as above, or rendered pixels; never SEASON_LOOK echoed back. A hue is the circular mean of the vertices' hues.
+  await page.evaluate(() => {
+    const W = window;
+    W.__dsMeshRead = m => { if (!m) return { v: new Float32Array(0), i: new Uint32Array(0) };
+      const g = document.getElementById('gl').getContext('webgl2'), vao = g.getParameter(g.VERTEX_ARRAY_BINDING), cr = g.getParameter(g.COPY_READ_BUFFER_BINDING); g.bindVertexArray(null);
+      const rd = (buf, T) => { g.bindBuffer(g.COPY_READ_BUFFER, buf); const a = new T(g.getBufferParameter(g.COPY_READ_BUFFER, g.BUFFER_SIZE) / 4); g.getBufferSubData(g.COPY_READ_BUFFER, 0, a); return a; };
+      const out = { v: rd(m.vb, Float32Array), i: rd(m.ib, Uint32Array) }; g.bindBuffer(g.COPY_READ_BUFFER, cr); g.bindVertexArray(vao); return out; };
+    const enc = c => { c = Math.min(1, Math.max(0, c)); return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+    W.__dsHSV = (r, g, b) => { r = enc(r); g = enc(g); b = enc(b); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+      if (d > 1e-9) h = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+      return [(h + 360) % 360, mx > 0 ? d / mx : 0, mx]; };
+    // mean hue (circular, reported in -60..300 so a red sits near 0), saturation and value over the vertices of one material
+    W.__dsStats = (v, mat, keep) => { let c = 0, s = 0, sat = 0, val = 0, n = 0;
+      for (let o = 0; o < v.length; o += 12) { if (Math.round(v[o + 9]) !== mat || (keep && !keep(o))) continue;
+        const [h, S, V] = W.__dsHSV(v[o + 6], v[o + 7], v[o + 8]); c += Math.cos(h * Math.PI / 180); s += Math.sin(h * Math.PI / 180); sat += S; val += V; n++; }
+      if (!n) return { n: 0 }; let h = Math.atan2(s, c) * 180 / Math.PI; if (h < -60) h += 360;
+      return { n, h: +h.toFixed(2), s: +(sat / n).toFixed(3), v: +(val / n).toFixed(4) }; };
+    W.__dsFnvF = a => { const b = new Uint8Array(new Float32Array(a).buffer); let h = 0x811c9dc5; for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+  });
+  const BROAD = ['tree-1', 'tree-2', 'tree-3', 'oak-1', 'birch-1', 'maple-1', 'sapling-1'], SEAS = ['spring', 'summer', 'autumn', 'winter'];
+  const TPOS = [[123.4, -56.7], [-812.2, 40.1], [15.5, 990.3], [402.9, -311.6], [-77.7, -77.7], [2000.1, 3.3], [650.4, 12.8], [-1500.6, 707.2]];
+  const trees = await page.evaluate(([BROAD, SEAS, TPOS]) => { const D = window.__DS, W = window, M = D.MAT, out = {};
+    for (const id of BROAD.concat(['fir-1', 'pine-1'])) { out[id] = {};
+      for (const sn of SEAS) { out[id][sn] = TPOS.map(([x, z]) => { const t = D.treeTest(id, sn, x, z), v = t.v; let bark = 0, tris = 0, bad = 0;
+        for (let o = 0; o < v.length; o += 12) if (Math.round(v[o + 9]) === M.BARK) bark++;
+        for (let k = 0; k < t.i.length; k += 3) { const q = [t.i[k], t.i[k + 1], t.i[k + 2]].map(j => j * 12); if (!q.every(o => Math.round(v[o + 9]) === M.BARK)) continue;
+          const P = q.map(o => [v[o], v[o + 1], v[o + 2]]), e1 = [0, 1, 2].map(c => P[1][c] - P[0][c]), e2 = [0, 1, 2].map(c => P[2][c] - P[0][c]);
+          const fn = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+          if (Math.hypot(...fn) < 1e-10) continue; tris++;
+          const vn = [0, 1, 2].map(c => v[q[0] + 3 + c] + v[q[1] + 3 + c] + v[q[2] + 3 + c]); if (fn[0] * vn[0] + fn[1] * vn[1] + fn[2] * vn[2] <= 0) bad++; }
+        return { leaf: W.__dsStats(v, M.LEAF), bark, tris, bad, col: JSON.stringify(t.col), spheres: t.spheres, hash: W.__dsFnvF(v) + ':' + W.__dsFnvF(t.i) }; }); } }
+    out.maples = []; for (let k = 0; k < 40; k++) out.maples.push(W.__dsStats(D.treeTest('maple-1', 'autumn', -2000 + 97.3 * k, 311.7 - 53.9 * k).v, M.LEAF).h);
+    out.look = D.lookSeason; return out; }, [BROAD, SEAS, TPOS]);
+  // row: canopies by season
+  const AUT_BAND = { 'maple-1': [0, 35], 'sapling-1': [0, 35], 'oak-1': [18, 45], 'birch-1': [42, 60], 'tree-1': [30, 52], 'tree-2': [30, 52], 'tree-3': [30, 52] };
+  const canopy = BROAD.map(id => { const T = trees[id], inB = (x, [a, b]) => x >= a && x <= b;
+    const greens = ['spring', 'summer'].every(sn => T[sn].every(r => r.leaf.n > 0 && inB(r.leaf.h, [95, 135])));
+    const darker = T.summer.every((r, k) => r.leaf.v <= 0.9 * T.spring[k].leaf.v);
+    const aut = T.autumn.every(r => r.leaf.n > 0 && inB(r.leaf.h, AUT_BAND[id]) && (id !== 'oak-1' || inB(r.leaf.s, [0.45, 0.8])));
+    return { id, ok: greens && darker && aut, spring: T.spring.map(r => r.leaf.h), summer: T.summer.map(r => r.leaf.h), vRatio: +(T.summer[0].leaf.v / T.spring[0].leaf.v).toFixed(3),
+      autumn: T.autumn.map(r => r.leaf.h), autumnS: id === 'oak-1' ? T.autumn.map(r => r.leaf.s) : undefined }; });
+  ok('canopies by season: every broadleaf kit tree (tree-1..3, oak, birch, maple, sapling) at 8 places, its leaves\' mean hue 95-135 deg in spring and summer with summer\'s value at most 0.9x spring\'s; in autumn maple and sapling 0-35, oak 18-45 at saturation 0.45-0.8, birch 42-60, the street trees 30-52',
+    trees.look === 'spring' && canopy.every(c => c.ok), canopy.filter(c => !c.ok).concat(canopy.filter(c => c.ok).map(c => ({ id: c.id, vRatio: c.vRatio, autumn: [Math.min(...c.autumn), Math.max(...c.autumn)] }))));
+  // row: bare in winter (its chunk colliders checked with the chunks, below)
+  const bare = BROAD.map(id => { const T = trees[id];
+    return { id, ok: T.winter.every((r, k) => r.leaf.n === 0 && r.bark - T.spring[k].bark >= r.spheres * 12 && r.col === T.spring[k].col && r.tris > 0 && r.bad === 0) && T.spring.every(r => r.bad === 0),
+      extraBark: T.winter[0].bark - T.spring[0].bark, spheres: T.winter[0].spheres, tris: T.winter[0].tris, bad: T.winter.reduce((a, r) => a + r.bad, 0) }; });
+  ok('bare in winter: every broadleaf kit tree at 8 places has no leaf vertex, at least one limb per kit canopy sphere (bark vertices over spring\'s by spheres x 12 or more), the same collider as in spring, and every bark triangle wound to face out (its winding\'s normal agrees with its vertex normals)',
+    bare.every(b => b.ok), bare);
+  // row: conifers never change
+  const conif = ['fir-1', 'pine-1'].map(id => ({ id, same: TPOS.every((p, k) => SEAS.every(sn => trees[id][sn][k].hash === trees[id].spring[k].hash)), leaf: trees[id].winter[0].leaf.n, h: trees[id].winter[0].leaf.h }));
+  ok('conifers never change: fir-1 and pine-1 hash the same, vertices and indices, in all four seasons at 8 places', conif.every(c => c.same && c.leaf > 0), conif);
+  // row: a forest is never one colour
+  const mh = trees.maples, mBins = new Set(mh.filter(h => h >= 0 && h < 36).map(h => Math.floor(h / 6))), mSpread = Math.max(...mh) - Math.min(...mh);
+  ok('a forest is never one colour: 40 maples at different places in autumn spread their hues over 15 deg or more and fall in at least 3 of 6 equal bins of 0-36 deg',
+    mh.length === 40 && mh.every(h => h >= 0 && h < 36) && mSpread >= 15 && mBins.size >= 3, { spread: +mSpread.toFixed(2), bins: [...mBins].sort(), hues: mh });
+  // the recorded chunks in each season, read back off the GPU: trees, colliders, props hash, grass, treeline and the town's yard bushes
+  const looks = await page.evaluate(([S, SEAS, MAY5]) => { const D = window.__DS, W = window, M = D.MAT, out = {};
+    const bushes = ch => { const { v } = W.__dsMeshRead(ch.propMesh), idx = []; for (let o = 0, k = 0; o < v.length; o += 12, k++) if (Math.round(v[o + 9]) === M.LEAF) idx.push(k);
+      const runs = []; for (const k of idx) { const r = runs[runs.length - 1]; if (r && r[r.length - 1] === k - 1) r.push(k); else runs.push([k]); }
+      const blobs = []; for (const r of runs) for (let j = 0; j + 18 <= r.length; j += 18) blobs.push(r.slice(j, j + 18));
+      const A = ch.anchor, list = [];
+      for (const b of blobs) { let cx = 0, cz = 0; for (const k of b) { cx += v[k * 12]; cz += v[k * 12 + 2]; } cx /= 18; cz /= 18;
+        if (ch.trees.some(t => Math.hypot(t.x - (cx + A[0]), t.z - (cz + A[2])) < 1.6)) continue;
+        let r = 0; for (const k of b) r = Math.max(r, Math.hypot(v[k * 12] - cx, v[k * 12 + 2] - cz)); list.push({ r, k0: b[0] }); }
+      const keepSet = new Set(list.flatMap(l => Array.from({ length: 18 }, (_, j) => l.k0 + j)));
+      return { n: list.length, r: list.length ? list.reduce((a, l) => a + l.r, 0) / list.length : 0, runs: runs.map(r => r.length % 18), col: W.__dsStats(v, M.LEAF, o => keepSet.has(o / 12)) }; };
+    for (const sn of SEAS) { D.setSeason(sn);
+      out[sn] = W.__dsAway(S, (ch, s) => { const b = W.__dsMeshRead(ch.baseMesh), lf = []; for (let o = 0; o < b.v.length; o += 12) if (Math.round(b.v[o + 9]) === M.LEAF) for (let j = 0; j < 12; j++) lf.push(b.v[o + j]);
+        return { env: ch.env, trees: JSON.stringify(ch.trees), nTrees: ch.trees.length, broad: ch.trees.filter(t => !['fir-1', 'pine-1'].includes(t.id)).length, col: JSON.stringify(ch.col),
+          props: W.__dsMeshHash(ch.propMesh).join(' '), grass: W.__dsStats(b.v, M.GRASS), tl: W.__dsStats(b.v, M.LEAF), tlHash: W.__dsFnvF(lf) + ':' + lf.length,
+          bush: ch.env === 'town' ? bushes(ch) : null }; }); }
+    D.setSeason('spring'); D.SKY.hour = 6.25; D.setDate(MAY5);
+    out.look = D.lookSeason; out.season = D.SETTINGS.season; return out; }, [SPRING_S, SEAS, MAY5]);
+  // row: the same trees in the same places
+  const sameT = SPRING_S.map(s => { const L = SEAS.map(sn => looks[sn][s]);
+    return { s, env: L[0].env, trees: L[0].nTrees, broad: L[0].broad, sameTrees: L.every(x => x.trees === L[0].trees), sameCol: L.every(x => x.col === L[0].col), winterProps: looks.winter[s].props !== looks.spring[s].props }; });
+  ok('the same trees in the same places: each recorded chunk (forest, fields, suburb, open, town) has the same trees list and the same colliders, circles and boxes, in all four seasons, and its props buffer in winter differs from spring\'s wherever it has a broadleaf tree (the rebuild happened)',
+    sameT.every(x => x.sameTrees && x.sameCol && (x.broad === 0 || x.winterProps)) && sameT.filter(x => x.broad > 0).length >= 4 && looks.look === 'spring' && looks.season === 'spring', sameT);
+  // row: grass by season
+  const gF = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][1568].grass])), gW = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][416].grass]));
+  const inR = (x, a, b) => x >= a && x <= b;
+  ok('grass by season: the fields chunk\'s grass in summer at mean hue 60-100 deg with mean value at most 0.92x spring\'s, in autumn 36-62, in winter 28-48 at mean saturation 0.2-0.55; the forest floor in autumn and winter 25-45 (leaf litter)',
+    gF.spring.n > 100 && inR(gF.summer.h, 60, 100) && gF.summer.v <= 0.92 * gF.spring.v && inR(gF.autumn.h, 36, 62) && inR(gF.winter.h, 28, 48) && inR(gF.winter.s, 0.2, 0.55)
+    && gW.autumn.n > 100 && inR(gW.autumn.h, 25, 45) && inR(gW.winter.h, 25, 45), { fields: gF, forest: gW, vRatio: +(gF.summer.v / gF.spring.v).toFixed(3) });
+  // row: bushes and the treeline follow
+  const bsh = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][10688].bush])), tlF = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][1568].tl])), tlW = SEAS.map(sn => looks[sn][416].tlHash);
+  const bR = bsh.spring.r ? bsh.winter.r / bsh.spring.r : 0;
+  ok('bushes and the treeline follow: a town chunk\'s yard bushes in autumn browner than spring\'s (hue under 60 deg) and in winter smaller (bounding radius 0.65-0.75x spring\'s, the same bushes); the fields treeline in autumn at hue 25-50 deg, in winter at saturation under 0.3; a forest\'s treeline (conifer) unchanged',
+    bsh.spring.n >= 3 && bsh.winter.n === bsh.spring.n && bsh.spring.col.h > 60 && bsh.autumn.col.h < 60 && bR >= 0.65 && bR <= 0.75
+    && tlF.spring.n > 0 && inR(tlF.autumn.h, 25, 50) && tlF.winter.s < 0.3 && tlW.every(h => h === tlW[0]) && !tlW[0].endsWith(':0'),
+    { bushes: { n: [bsh.spring.n, bsh.winter.n], hue: SEAS.map(sn => bsh[sn].col.h), ratio: +bR.toFixed(3) }, treeline: tlF, forestTreeline: tlW });
+  // row: the picture follows. One frame of the forest at teleport(400), 13:00, chase view, drawn by the page's own updateCamera()
+  // and renderFrame() and read straight back; warm = hue 0-50 deg at saturation over 0.3, green = hue 75-150 at over 0.25 (8-bit sRGB pixels)
+  const pic = await page.evaluate(([MAY5]) => { const D = window.__DS, W = window, out = {}, mode = D.CAM.mode;
+    const shares = () => { const c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height;
+      D.CAM.mode = 1; D.CAM.chase = null; updateCamera(0); renderFrame();
+      const px = new Uint8Array(w * h * 4); g.readPixels(0, 0, w, h, g.RGBA, g.UNSIGNED_BYTE, px); let warm = 0, green = 0, n = 0;
+      for (let i = 0; i < px.length; i += 4) { const r = px[i] / 255, gg = px[i + 1] / 255, b = px[i + 2] / 255, mx = Math.max(r, gg, b), mn = Math.min(r, gg, b), d = mx - mn, s = mx > 0 ? d / mx : 0;
+        let hh = 0; if (d > 1e-9) hh = mx === r ? 60 * (((gg - b) / d) % 6) : mx === gg ? 60 * ((b - r) / d + 2) : 60 * ((r - gg) / d + 4); hh = (hh + 360) % 360;
+        if (hh <= 50 && s > 0.3) warm++; if (hh >= 75 && hh <= 150 && s > 0.25) green++; n++; }
+      return { warm: +(warm / n).toFixed(4), green: +(green / n).toFixed(4) }; };
+    W.__dsAway([400], () => { for (const sn of ['spring', 'autumn', 'winter']) { D.setSeason(sn); D.SKY.hour = 13; D.updateSky(); out[sn] = shares(); } D.setSeason('spring'); });
+    D.CAM.mode = mode; D.CAM.chase = null; D.SKY.hour = 6.25; D.setDate(MAY5); out.look = D.lookSeason; return out; }, [MAY5]);
+  ok('the picture follows: the forest at 400 m, 13:00, chase view, in spring, autumn and winter: autumn\'s share of warm pixels (hue 0-50, saturation over 0.3) at least 3x spring\'s, winter\'s share of green pixels (hue 75-150, saturation over 0.25) under 0.5x spring\'s',
+    pic.spring.green > 0.02 && pic.autumn.warm >= 3 * pic.spring.warm && pic.autumn.warm > 0.01 && pic.winter.green < 0.5 * pic.spring.green && pic.look === 'spring', pic);
+
   // ---- 3c. the sky from zmh-sky: the spliced block, one sun, the moon in its real place, the planets ----
   // The fixed moment is May 5, 2026 at 22:00 EDT = 2026-05-06 02:00 UT, the kit's golden instant.
   const pageFile = COPY ? process.env.DS_PAGE : path.join(process.cwd(), 'games', 'driving-simulator', 'index.html');
@@ -735,11 +956,17 @@ const AE = {
   await page.click('#set-close');
   ok('settings open on the cog and offer the day length (2.4 min selected)', panel.open && panel.cyc === '144', panel);
   ok('changing the day length in settings takes effect', cyc600 === 600, cyc600);
-  const season = await page.evaluate(() => { const el = document.getElementById('season-sel');
-    return { v: el.value, saved: window.__DS.SETTINGS.season, opts: [...el.options].map(o => [o.value, o.disabled]), section: el.closest('.row').previousElementSibling.querySelector('select')?.id };
+  // restated at dsseasons step 1 (DS-3), which opens the other three: was "spring selected, summer, autumn and winter listed but not selectable"
+  const season = await page.evaluate(() => { const el = document.getElementById('season-sel'), D = window.__DS, K = 'drivingSimulator.settings.v1', d0 = D.SKY.mjd, h0 = D.SKY.hour;
+    const o = { v: el.value, saved: D.SETTINGS.season, opts: [...el.options].map(o => [o.value, o.disabled]), section: el.closest('.row').previousElementSibling.querySelector('select')?.id, each: [] };
+    for (const v of ['summer', 'autumn', 'winter', 'spring']) { el.value = v; el.dispatchEvent(new Event('change')); const st = JSON.parse(localStorage.getItem(K) || '{}');
+      o.each.push([v, D.SETTINGS.season === v && st.season === v && st.date === D.SKY.mjd]); }
+    D.SKY.hour = h0; D.setDate(d0);
+    return o;
   });
-  ok('a season dropdown in TIME: spring selected, summer, autumn and winter listed but not selectable', season.v === 'spring' && season.saved === 'spring' && season.section === 'cycle-sel'
-    && JSON.stringify(season.opts) === JSON.stringify([['spring', false], ['summer', true], ['autumn', true], ['winter', true]]), season);
+  ok('a season dropdown in TIME: spring by default, all four selectable, each saved', season.v === 'spring' && season.saved === 'spring' && season.section === 'cycle-sel'
+    && JSON.stringify(season.opts) === JSON.stringify([['spring', false], ['summer', false], ['autumn', false], ['winter', false]])
+    && season.each.length === 4 && season.each.every(e => e[1]), season);
 
   // ---- 8. pixels: a real picture, and night is darker than day ----
   const lum = async () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => {
@@ -1551,6 +1778,64 @@ const AE = {
   ok('the radio slider at 0 silences the music bus and nothing else', lvOff.music < 0.002 && lvOff.sfx > 0.02, lvOff);
   ok('the engine slider at 0 silences the engine while tyres, wind and radio play on', engOff.engine < 0.0005 && engOff.tyres > 0.005 && engOff.wind > 0.005 && engOff.music > 0.01, engOff);
   ok('the engine slider half way is a quarter of the level (a squared taper)', Math.abs(engHalf.engine / lvOn.engine - 0.25) < 0.08, [engHalf.engine, lvOn.engine]);
+
+  // ---- 9a. the ambient by season (DS-3, dsseasons step 3): birds and insects measured off their own probes ----
+  // The rows do not depend on the frame rate. For each window the live loop is held (requestAnimationFrame swallowed, so no
+  // frame draws a die or calls the scheduler; the scheduler queues only 0.3 s ahead and a frame here can take a second),
+  // SND.update(0) is driven from a 50 ms setInterval in the page, Math.random is held to one seeded generator (every
+  // season hears the same dice), and the schedule starts afresh (SND.ambRestart: the first voice 0.5 s in). Before each
+  // window the bed is stopped (the ambient slider at 0, so nothing is scheduled) until both probes are silent, so nothing
+  // left from the window before is measured. The radio is at 0 throughout (its noise draws dice too). Each probe's RMS is
+  // read every 50 ms and the window's figure is the plain mean of those reads (proportional to how many voices sing, so a
+  // bird rate of 0.5 reads about 0.5x); `pk` is the loudest read. The view is the chase view at a cruise (section 9's setup).
+  const AMB_SEED = 20261103;
+  const ambWin = (season, hour, secs) => page.evaluate(async ([season, hour, secs, seed]) => {
+    const W = window, D = W.__DS, S = D.SND, sleep = ms => new Promise(r => setTimeout(r, ms));
+    // the bed stopped: nothing new is queued, and what was (at most 0.3 s ahead) is let finish: 0.5 s of unbroken silence on
+    // both probes, longer than any gap inside a voice, so a quiet moment between two crickets never reads as the end
+    D.SETTINGS.vols.ambient = 0; S.apply();
+    for (let i = 0, quiet = 0; i < 600 && quiet < 10; i++) { await sleep(50); quiet = (S.rms('birds') || 0) > 1e-6 || (S.rms('insects') || 0) > 1e-6 ? 0 : quiet + 1; }
+    if (D.lookSeason !== season) D.applySeason(season);
+    D.SKY.hour = hour; D.updateSky();
+    const raf = W.requestAnimationFrame; let held = null;
+    W.requestAnimationFrame = f => { held = f; return 0; };
+    for (let i = 0; i < 200 && !held; i++) await sleep(25);      // the frame already queued runs once, then holds
+    const rnd = Math.random; let a = seed >>> 0;
+    Math.random = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const keys = ['birds', 'insects', 'engine'], sum = {}, pk = {}; for (const k of keys) { sum[k] = 0; pk[k] = 0; }
+    const n = Math.round(secs * 20); let iv = null;
+    try {
+      D.SETTINGS.vols.ambient = 100; S.apply(); S.ambRestart(); S.update(0);
+      iv = setInterval(() => S.update(0), 50);
+      for (let i = 0; i < n; i++) { await sleep(50); for (const k of keys) { const v = S.rms(k) || 0; sum[k] += v; pk[k] = Math.max(pk[k], v); } }
+    } finally {
+      clearInterval(iv); Math.random = rnd; W.requestAnimationFrame = raf; if (held) raf(held);
+    }
+    const out = { season, hour, look: D.lookSeason, day: D.SKY.day, night: D.SKY.night, n, pk };
+    for (const k of keys) out[k] = sum[k] / n;
+    return out;
+  }, [season, hour, secs, AMB_SEED]);
+  const amb0 = await page.evaluate(() => { const D = window.__DS, k = { look: D.lookSeason, music: D.SETTINGS.vols.music, ambient: D.SETTINGS.vols.ambient, hour: D.SKY.hour };
+    D.SETTINGS.vols.music = 0; D.SND.apply(); return k; });
+  const AW = {};
+  for (const [k, se, h] of [['winterDay', 'winter', 13], ['winterNight', 'winter', 1], ['springNight', 'spring', 1], ['springDay', 'spring', 13],
+    ['autumnNight', 'autumn', 1], ['autumnDay', 'autumn', 13], ['summerNight', 'summer', 1], ['summerDay', 'summer', 13]]) AW[k] = await ambWin(se, h, 8);
+  await page.evaluate(k => { const D = window.__DS; D.applySeason(k.look); D.SETTINGS.vols.music = k.music; D.SETTINGS.vols.ambient = k.ambient; D.SND.apply();
+    D.SKY.hour = k.hour; D.updateSky(); }, amb0);
+  const rA = x => +(+x).toPrecision(3);
+  console.log('  .. ambient by season: ' + JSON.stringify(Object.fromEntries(Object.entries(AW).map(([k, v]) => [k, { look: v.look, birds: rA(v.birds), insects: rA(v.insects), insPk: rA(v.pk.insects), engine: rA(v.engine) }]))));
+  const ambLooks = Object.entries(AW).every(([k, v]) => k.startsWith(v.look) && (v.hour === 13 ? v.day > 0.9 : v.night > 0.9));
+  ok('no insects in winter: by day (13:00) and by night (01:00), 8 s each with the ambient at 100, the insects\' RMS under 1e-5; spring by night over 1e-4 (crickets)',
+    ambLooks && AW.winterDay.insects < 1e-5 && AW.winterNight.insects < 1e-5 && AW.springNight.insects > 1e-4,
+    { ambLooks, winterDay: AW.winterDay.insects, winterNight: AW.winterNight.insects, springNight: AW.springNight.insects });
+  const katy = AW.summerNight.insects / AW.springNight.insects, cic = AW.summerDay.insects / AW.summerDay.engine;
+  ok('summer\'s insects: cicadas by day (insects over 1e-4 at 13:00, spring\'s under 1e-5), katydids by night at 1.3-2.5x spring\'s night insects, the cicadas under 0.6x the engine at a cruise in the chase view',
+    ambLooks && AW.summerDay.insects > 1e-4 && AW.springDay.insects < 1e-5 && katy >= 1.3 && katy <= 2.5 && cic < 0.6 && AW.summerDay.engine > 0.02,
+    { summerDay: AW.summerDay.insects, springDay: AW.springDay.insects, katydidVsCricket: katy, cicadaVsEngine: cic, peakVsEngine: AW.summerDay.pk.insects / AW.summerDay.engine, engine: AW.summerDay.engine });
+  const thinA = AW.autumnDay.birds / AW.springDay.birds, thinW = AW.winterDay.birds / AW.springDay.birds;
+  ok('autumn and winter thin the birds: at 13:00 over 8 s autumn\'s birds under 0.7x spring\'s and winter\'s under 0.5x; autumn by night has crickets (over 1e-4)',
+    ambLooks && AW.springDay.birds > 1e-4 && thinA < 0.7 && thinW < 0.5 && AW.autumnNight.insects > 1e-4,
+    { spring: AW.springDay.birds, autumn: thinA, winter: thinW, autumnNight: AW.autumnNight.insects });
 
   // ---- 9b. other cars (DS-2): six voices, panned off the camera's own right, pitched by Doppler, measured off the analysers ----
   // The oracles are the suite's own, typed from the spec: the equal-power pan law on p = 0.8 sin(bearing), the bearing measured

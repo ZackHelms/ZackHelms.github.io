@@ -12,20 +12,6 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **Summer, autumn and winter become selectable** in the Season
-  dropdown. The dropdown shipped 2026-11-01 with spring selected and the other three
-  greyed out, as asked ("other seasons are visible but not selectable (yet)"). Each
-  season becomes Raleigh at its date: the sun, moon, planets and stars (zmh-sky, from DS-1's dates), the
-  broadleaf trees (deeper green, autumn colours, bare in winter; conifers unchanged),
-  grass from fresh green to dormant straw, insects and birds; switching rebuilds the
-  chunks in place. Its defaults were chosen and can be overruled at plan review (the plan's
-  Design lists every colour). Five steps: the switch and the sky with spring held byte for byte,
-  the trees, grass, bushes and treeline (with the tree-expert review of the bare winter trees
-  inside the step), the ambient by season, the break list and docs, the ship. Spec and checks:
-  `.claude/driving-simulator.md` § Backlog, DS-3.
-  **Plan ready (2026-11-03)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/dsseasons.summer-autumn-winter.md`
-
 - [combat-sim] **The neon graphics style** (CS-2; the CD, 2026-11-01: "All three with
   selector in settings menu. Default to realistic webgl"). Realistic and toon are live (CS-1,
   signed off by the CD 2026-11-03); neon is the third option in the `Graphics style` select:
@@ -244,7 +230,10 @@ in `.claude/<game>.md`.
   (`index.html` about line 3843), so at about 1 s a frame beats drop and the radio measures quiet.
   On a phone the queue never runs dry. Fix the measurement (for example step the scheduler on a
   timer while the rows sample), not the radio. Detail: `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`
-  step 7 Results.
+  step 7 Results. DS-3 (2026-11-04) built the pattern: its season sound rows drive `SND.update(0)` on a
+  50 ms timer with `Math.random` seeded (suite section 9a). Test-only: the page is not edited.
+  **Plan ready (2026-11-04)** - run:
+  `/zmh-producer:oversee-implementation .claude/plans/dsradio.frame-rate-free-sound-rows.md`
 
 ## Icebox
 
