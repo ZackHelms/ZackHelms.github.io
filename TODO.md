@@ -246,7 +246,9 @@ in `.claude/<game>.md`.
   On a phone the queue never runs dry. Fix the measurement (for example step the scheduler on a
   timer while the rows sample), not the radio. Detail: `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`
   step 7 Results. DS-3 (2026-11-04) built the pattern: its season sound rows drive `SND.update(0)` on a
-  50 ms timer with `Math.random` seeded (suite section 9a); ready for a plan-gen re-sweep.
+  50 ms timer with `Math.random` seeded (suite section 9a). Test-only: the page is not edited.
+  **Plan ready (2026-11-04)** - run:
+  `/zmh-producer:oversee-implementation .claude/plans/dsradio.frame-rate-free-sound-rows.md`
 
 ## Icebox
 
