@@ -95,7 +95,7 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Proof that nothing was drawn (dsradio) | `lvT` counts calls to its `requestAnimationFrame` stub (`frames`) and also checks that `PERF.k` and `PERF.t0` did not move (`drawn`), an independent witness that no frame ran by any path. The method row fails on either | A hold that silently fails falls back to the old measurement and stays green on a fast box; a second, separate witness is cheap |
 | The method row needs nine windows (dsradio) | The row `the sound windows of section 9 and the stations ran with the frame loop held ...` collects exactly 9 windows (`lvOn`, `lvOff`, `engOff`, `engFull`, `engHalf`, four stations) and fails on any other count, on `frames > 0`, on `drawn`, or on fewer than 15 steps a second | A window that was skipped must fail, not pass for lack of evidence (`games/CLAUDE.md`, "A check that can skip"); 15 a second is three quarters of the 20 a second asked for, enough to refill a 0.4 s queue |
 | The hold is inside the `try` (dsradio) | `lvT` swaps `requestAnimationFrame` and waits for the held frame inside the `try`, with the restore, the re-queue of the held frame and the cleared interval in the `finally` | A hold that times out must not leave the stub in place and starve every later section of frames |
-| The squared-taper row's windows (dsradio, the overseer's decision; the CD reviews it) | The row compares two `lvT` windows back to back, `engFull` at engine 100 then `engHalf` at 50, each a whole number of the engine's beat periods (two beats, about 10.98 s at rpm 789; never under 10 s). Its band and its wording are unchanged (0.25 +- 0.08) | The engine's two oscillators beat (see the engine beat in Testing), so a 2 s window reads anywhere from 0.17 to 0.37 of another 2 s window by phase alone: under `lvT` the old pairing read 0.361 once and failed, and the old `lv` read the taper at 0.283-0.288 for the same reason. Whole beats average the phase out (0.2487 / 0.2503 / 0.2501 measured) |
+| The squared-taper row's windows (dsradio, the overseer's decision; the CD reviews it) | The row compares two `lvT` windows back to back, `engFull` at engine 100 then `engHalf` at 50, each a whole number of the engine's beat periods (two beats, about 10.98 s at rpm 789; never under 10 s). Its band and its wording are unchanged (0.25 +- 0.08) | The engine's two oscillators beat (see the engine beat in Testing), so a 2 s engine window swings about +-20% by phase alone (0.052-0.078 at engine 100), and a 2 s window at 50 read 0.17 to 0.37 of a 2 s window at 100 where 0.25 is right: under `lvT` the old pairing read 0.361 once and failed, and the old `lv` read the taper at 0.283-0.288 for the same reason. Whole beats average the phase out (0.2487 / 0.2503 / 0.2501 measured) |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
 
@@ -1296,7 +1296,8 @@ break "caught" only by it is not caught.
 **The engine beats (traced to the page).** `SND.update` sets the engine's two oscillators to
 `f = rpm / 60 * 2` and `f * 1.007` (`eng.o2.frequency.setTargetAtTime(f * 1.007, ...)`), so the
 engine's level beats at 0.007 f: about 0.18 Hz, a period of about 5.4 s at rpm 789. A 2 s engine
-window therefore reads anywhere from 0.17 to 0.37 of another 2 s window by phase alone, and any
+window therefore swings about +-20% by phase alone (0.052-0.078 at engine 100, measured), and a 2 s
+window at 50 read 0.17 to 0.37 of a 2 s window at 100 where 0.25 is right, and any
 ratio built on one moves run to run (the radio/engine and ambient/engine figures below). The
 squared-taper row compares two windows of whole beat periods for that reason; `lvOn`'s 2 s engine
 window still falls anywhere on the beat, which the radio and ambient bands are wide enough for.

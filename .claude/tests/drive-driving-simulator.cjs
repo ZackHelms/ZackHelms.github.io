@@ -1804,7 +1804,7 @@ const AE = {
   // the squared taper (dsradio step 1): two like windows back to back, the engine at 100 then at 50, each a whole number of the
   // engine's beat periods long (at least 10 s). The page sets o1 to f = rpm / 60 * 2 and o2 to f * 1.007 (index.html, SND.update:
   // `eng.o2.frequency.setTargetAtTime(f * 1.007, ...)`), so the engine's level swells and fades every 1 / (0.007 f) s (about 5.4 s
-  // at section 9's 789 rpm), and a 2 s window read it anywhere from 0.17 to 0.37 of another 2 s window's level by phase alone.
+  // at section 9's 789 rpm), and by phase alone a 2 s window at 50 read 0.17 to 0.37 of a 2 s window at 100, where 0.25 is right.
   // The period comes from the page's own rpm at measure time; the band is unchanged.
   const beatT = await page.evaluate(() => 1 / (0.007 * window.__DS.PLAYER.rpm / 60 * 2));
   const engSecs = Math.max(1, Math.ceil(10 / beatT - 1e-9)) * beatT;

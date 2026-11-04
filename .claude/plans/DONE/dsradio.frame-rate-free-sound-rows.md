@@ -1,6 +1,6 @@
 # dsradio - Driving Simulator: the radio's test rows stop depending on the frame rate
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-04 (commits 2675716, 40e785c and the ship commit; landed on `main` as one commit)
 **Drafted on** `main` at `ab33aed` (suite 157 checks, break list 76). Every `file:line` below was read
 on `ab33aed`; re-grep each anchor before editing, as another session may land first.
 **Requested:** 2026-11-03, the CD, on the radio rows flapping in the dssky ship step (verbatim):
@@ -230,6 +230,29 @@ section Plans). One task per step; each is one commit on the plan's branch.
 in step 1 (old samplers red, `lvT` green five of five, the unbroken page green); the three breaks in
 step 2 caught by their named rows, on the unbroken harness and on the slow one. No playtest: nothing
 the player hears or sees changes.
+
+## Results (2026-11-04)
+
+- **Baseline** (`da3f84c`, gates alone): GREEN, 157/0. The sound rows happened to be green on a quiet box.
+- **Step 1** (`2675716`): `lvT` beside `lv`; lvOn, lvOff, engOff and the four station windows converted;
+  `AMB_SEED` moved to section 9's head; the method row added (158). **One escalation, resolved by the
+  overseer:** the squared-taper row failed once on the unbroken page under `lvT` (0.361). Traced to the
+  engine's `f` / `f * 1.007` oscillators, which beat about every 5.4 s, so the row now compares two
+  whole-beat windows (engine 100, then 50), band and wording unchanged (follow-up file).
+- **Slow-frame proof** (900 ms busy-wait at the top of `frame()`; 1500 ms not needed; harness = the
+  suite's boot and section 9 through the method row, copied verbatim, plus an audio unlock and, for the
+  slow runs, 9b left out):
+  - The old samplers went red on "the radio sits near it" (music 0.0054 against engine 0.065, 0.083x)
+    and on the engine-slider-at-0 row.
+  - `lvT` went green five runs of five: taper 0.249-0.252, radio/engine 0.78-0.81, stations spread
+    1.066-1.082.
+  - On the unbroken page `lvT` went green three of three: taper 0.2487-0.2503, radio/engine
+    0.86-1.10, ambient/engine 0.13-0.145, stations 0.0510-0.0544 (spread 1.036-1.070).
+  - Every window held, with 0 frames drawn.
+- **Step 2** (`40e785c`): the breaks `radio-unscheduled`, `radio-quiet` and `station-untrimmed` were
+  all caught by their rows (79). `radio-unscheduled` and `station-untrimmed` were also caught on the
+  slow copy. The docs restate the traced cause and the measured levels.
+- **Step 3:** gates alone GREEN, 158/0. No badge (no game file changed). Landed with `land-on-main.sh`.
 
 ## Follow-ups
 
