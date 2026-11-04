@@ -12,15 +12,21 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **Weather: rain, fog and snow** (DS-8; *Decided 2026-11-04, backlog
-  refinement*: weather is next for Driving Simulator, over junctions with signals and a
-  destination). All three in the first pass. A **Weather dropdown** in settings: **Auto**
-  (changes by itself, weighted by season, **snow only in winter**) or a fixed Clear / Rain /
-  Fog / Snow, saved like Season. A wet, shiny road, rain on the windscreen with wipers, rain
-  sound, fog that shortens the view, and snow that settles in winter. Open for the plan: Auto's
-  weights and how long a spell lasts, grip in the wet, and keeping DS-7's horizon fix intact
-  under fog. Spec: `.claude/driving-simulator.md` § Backlog (refinement, 2026-11-04), DS-8.
-  Plan-shaped: draft via `/zmh-producer:backlog-plan-gen driving-sim`.
+- [driving-sim] **Weather: rain, fog and snow, with DS-11's green winter lawns** (DS-8 +
+  DS-11; *Decided 2026-11-04, backlog refinement*: weather is next for Driving Simulator, over
+  junctions with signals and a destination). All three in the first pass. A **Weather
+  dropdown** in settings: **Auto** (changes by itself, weighted by season, **snow only in
+  winter**) or a fixed Clear / Rain / Fog / Snow, saved like Season. *Decided 2026-11-04,
+  plan-gen*: **real-world grip** (wet about 0.7x, packed snow about 0.3x; traffic slows to
+  match); **light to heavy rain, no thunderstorms**; the manual **Snow pick is winter only**;
+  settled snow by road class, the CD verbatim: "treat 2 lane roads more like back roads that dont
+  get salt treated and scraped so they whiten with markings fading under snow and darker tire
+  tracks in the lanes [...]. 4 lane and 6 lane roads get treated and scraped." Bundled: DS-11,
+  town and suburb lawns stay fescue green in winter (the snow step touches the same winter
+  look). Clear stays byte-identical. Spec: `.claude/driving-simulator.md` § Backlog
+  (refinement, 2026-11-04), DS-8 and DS-11.
+  **Plan ready (2026-11-04)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/dsweather.rain-fog-snow.md`
 
 ## Needs Zack
 
@@ -225,22 +231,20 @@ in `.claude/<game>.md`.
   kit paints the page already carries; the default stays the blue sedan so old saves look the
   same. Open for the plan: whether each body brings its own physics (handling was signed off on
   the sedan) and its own cockpit eye point. **After DS-8**: every driving-sim item edits the page
-  and the suite, so they run one at a time. Spec: `.claude/driving-simulator.md` DS-9.
-
-- [driving-sim] **Green lawns in winter** (DS-11; *Decided 2026-11-04*: town and suburb lawns
-  are tall fescue and stay green; fields and verges stay straw). One `SEASON_LOOK.winter.lawn`
-  row plus its suite rows. Small enough to ride along with another driving-sim plan. Spec:
-  `.claude/driving-simulator.md` DS-11.
+  and the suite, and weather changes the grip and the cockpit this would cite, so plan this once
+  dsweather lands. Spec: `.claude/driving-simulator.md` DS-9.
 
 - [driving-sim] **A median on the 6-lane road** (DS-10; *Decided 2026-11-04*: "add a median",
   overruling the first build's undivided `highway6`). A grass median (rural 65 mph class, no
   kerbs), opening and closing over the class change. Open for the plan: its width, and a
-  page-side constant vs a zmh-3d road-kit field. Spec: `.claude/driving-simulator.md` DS-10.
+  page-side constant vs a zmh-3d road-kit field. **After DS-8**: weather's snow reads the road
+  class in the shader, so plan this once dsweather lands. Spec: `.claude/driving-simulator.md` DS-10.
 
 - [driving-sim] **Trees: the structure pass** (DS-12; *Decided 2026-11-04*: tree-expert items
   1-3 only). A twig shell on winter crowns, more limbs at staggered heights, and a tapered leader
   on street trees. Spring stays byte-identical, and the tree-expert agent re-reviews the
-  after-shots. Spec: `.claude/driving-simulator.md` DS-12.
+  after-shots. **After DS-8**: weather's snow settles on the limbs, so plan this once dsweather
+  lands. Spec: `.claude/driving-simulator.md` DS-12.
 
 - [phasic] Endless launch-board weighting: endless (73+) never draws the
   launch template (block-8 curriculum only, by construction). Decide a

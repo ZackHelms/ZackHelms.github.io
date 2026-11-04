@@ -841,9 +841,11 @@ which a little dither in the sky pass would hide. Noted here, not planned.
 The CD's answers at backlog refinement on 2026-11-04, each a pick from offered
 options (the option text is what was decided; nothing else was asked). Every item
 edits `index.html` and the suite, so they run **one at a time**, never as parallel
-oversee runs. None has a plan yet: draft them with
-`/zmh-producer:backlog-plan-gen driving-sim`. Anything below marked *chosen* is a
-default set when the item was written, and plan review may overrule it.
+oversee runs. DS-8 and DS-11 have one plan (below); the rest wait until it lands,
+because weather changes the grip, the road shader and the winter look they would
+cite. Then draft them with `/zmh-producer:backlog-plan-gen driving-sim`. Anything below
+marked *chosen* is a default set when the item was written, and plan review may
+overrule it.
 
 ### DS-8. Weather: rain, fog and snow (`TODO.md` § Now)
 
@@ -855,13 +857,24 @@ default set when the item was written, and plan review may overrule it.
 - **Offered as the shape, not itemised by the CD:** a wet, shiny road, rain on the
   windscreen with wipers, and the sound of rain; fog that shortens the view; falling
   snow that **settles in winter**.
-- **Open for plan-gen:** Auto's weights and how long a spell of weather lasts; what
-  a fixed Snow does outside winter (the CD's "snow only in winter" was about Auto);
-  whether the car grips less in the wet or snow (handling was signed off dry, open
-  question 1); how settled snow meets DS-11's green lawns and DS-12's twig crowns;
-  whether the sky's sliders and `SKY` dim under overcast. The page already has a fog
-  term: weather's fog must not bring back DS-7's column (fog samples `skyBase()`
-  only).
+- **Decided at plan-gen (2026-11-04), picks from offered options unless quoted:**
+  - **Real-world grip:** wet asphalt about 0.7x dry, packed snow about 0.3x; the
+    traffic slows to match.
+  - **Light to heavy rain, no thunderstorms** (storms are a later item).
+  - **The manual Snow pick is winter only**, greyed out in the other seasons, as the
+    seasons were before DS-3.
+  - **Settled snow by road class**, the CD verbatim: "treat 2 lane roads more like
+    back roads that dont get salt treated and scraped so they whiten with markings
+    fading under snow and darker tire tracks in the lanes [...]. 4 lane and 6 lane
+    roads get treated and scraped."
+  - And: "stop spelling it "tyre", use "tire" instead." Player-facing labels change;
+    saved keys and identifiers keep `tyre`.
+- **Planned (2026-11-04):** `.claude/plans/dsweather.rain-fog-snow.md`, nine steps,
+  with DS-11 riding in its snow step. Its Design answers what was left open here:
+  Auto's weights and spells (*chosen*: a pure function of the date, on its own seeded
+  stream), the overcast sky and the light under it, fog by visibility, the windscreen
+  and the wipers, snow on the limbs as a shader term (no conflict with DS-12's
+  geometry), and DS-7's rule kept (fog samples `skyBase()` only).
 
 ### DS-9. The player picks their car and its colour (`TODO.md` § Next)
 
@@ -887,14 +900,14 @@ default set when the item was written, and plan review may overrule it.
   has no median field, so decide between a page-side constant and a zmh-3d road-kit
   change. The CD's brief says to improve the plugin where the game can.
 
-### DS-11. Green lawns in winter (`TODO.md` § Next)
+### DS-11. Green lawns in winter (bundled into DS-8's plan, `dsweather` step 5)
 
 - **Decided:** **town and suburb lawns stay fescue green in winter**; fields and verges
   stay dormant straw. The fescue premise was checked by the CD's pick, not against a
   source.
 - One row of `SEASON_LOOK` (winter's `lawn`, today `lin3([128, 118, 74])`) plus its
-  suite rows. *Chosen:* a slightly dulled spring lawn. Small enough to ride along with
-  another driving-sim plan.
+  suite rows. *Chosen:* a slightly dulled spring lawn, about sRGB (70, 98, 50) in the
+  plan. It rides in dsweather's snow step, which touches the same winter look.
 
 ### DS-12. The trees' structure pass, tree-expert items 1-3 (`TODO.md` § Next)
 
