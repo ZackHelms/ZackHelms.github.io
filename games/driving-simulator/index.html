@@ -53,7 +53,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-03 13:38 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-04 04:01 UTC</div>
 <canvas id="gl"></canvas>
 <canvas id="hud"></canvas>
 <a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
@@ -76,7 +76,7 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
       <option value="0">stopped</option>
     </select></div>
   <div class="row"><label for="season-sel">Season</label>
-    <select id="season-sel"><option value="spring">spring</option><option value="summer" disabled>summer</option><option value="autumn" disabled>autumn</option><option value="winter" disabled>winter</option></select></div>
+    <select id="season-sel"><option value="spring">spring</option><option value="summer">summer</option><option value="autumn">autumn</option><option value="winter">winter</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
   <div class="row" id="date-row"><span class="lbl">Date</span><span id="date-val">---</span></div>
   <h3>SKY</h3>
@@ -1161,8 +1161,9 @@ const VOL_KEYS = ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'ski
 // lobe and its light); moon: the moon's disc, its glow and its light with its share of the ambient; earthshine: its dark part.
 const SKY_KEYS = ['stars', 'planets', 'mw', 'sun', 'moon', 'earthshine'];
 // perf: 2 = FPS and the other performance numbers, 1 = FPS only, 0 = none
-// season: only spring is selectable so far (the calendar runs Raleigh's spring, Mar 20 - Jun 20, 2026); the others are listed, greyed out
-const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = ['spring'];
+// season: spring by default, all four selectable (DS-3). SETTINGS.season runs the calendar; the look of the road is LOOK
+// (below), set only by applySeason(), so a row that moves the calendar by writing SETTINGS.season never changes the look
+const SEASONS = ['spring', 'summer', 'autumn', 'winter'], SEASONS_OPEN = SEASONS;
 
 // ---------------------------------------------------------------- the calendar
 // The game keeps a date: an integer MJD (Modified Julian Date at 0h UT; May 5, 2026 is 61165).
@@ -1454,6 +1455,24 @@ class MB {
       for (let k = 0; k < seg; k++) this.tri(ctr, rim[k + 1], rim[k]);
     }
   }
+  // A frustum between two points (a limb), radius r0 at p0 and r1 at p1, no caps. Rings in an orthonormal frame round
+  // the axis with e1 x e2 = -axis, the same handedness as cyl() (whose y axis, x and z, it reduces to), so the same quad
+  // order winds counter-clockwise seen from outside: the world pass culls back faces, the shadow pass does not.
+  limb(p0, p1, r0, r1, seg, c, mat) {
+    const d = [p1[0] - p0[0], p1[1] - p0[1], p1[2] - p0[2]], L = Math.hypot(d[0], d[1], d[2]);
+    if (L < 1e-6) return;
+    const a = [d[0] / L, d[1] / L, d[2] / L];
+    const e1 = norm3(cross3(a, Math.abs(a[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), e2 = cross3(e1, a);
+    const slope = (r0 - r1) / L, base = this.n;
+    for (let k = 0; k <= seg; k++) {
+      const t = k / seg * TAU, ca = Math.cos(t), sa = Math.sin(t);
+      const q = [e1[0] * ca + e2[0] * sa, e1[1] * ca + e2[1] * sa, e1[2] * ca + e2[2] * sa];
+      const n = norm3([q[0] + a[0] * slope, q[1] + a[1] * slope, q[2] + a[2] * slope]);
+      this.vert(p0[0] + q[0] * r0, p0[1] + q[1] * r0, p0[2] + q[2] * r0, ...n, c, mat, k / seg, 0);
+      this.vert(p1[0] + q[0] * r1, p1[1] + q[1] * r1, p1[2] + q[2] * r1, ...n, c, mat, k / seg, 1);
+    }
+    for (let k = 0; k < seg; k++) { const b = base + k * 2; this.quad(b, b + 1, b + 3, b + 2); }
+  }
   // A lumpy sphere (foliage, boulders): an octahedron subdivided once (32 faces), displaced.
   blob(cx, cy, cz, r, sy, c, mat, seed, lump = 0.22) {
     const geo = BLOB_GEO;
@@ -1538,6 +1557,26 @@ const C = {
   grassField: lin3([78, 108, 46]), grassDry: lin3([128, 122, 72]), grassForest: lin3([56, 76, 40]), lawn: lin3([62, 96, 42]),
   conifer: lin3([38, 66, 44]), birchBark: lin3([214, 210, 198]),
 };
+// Every colour that changes with the season, one row per season (linear RGB). The builders read LOOK, the current row,
+// never SETTINGS.season. Spring's row is the shipped C values themselves. `crown` says what a broadleaf tree wears:
+// 'leaf' (LOOK.leaf, with the tree's own lv and hue), 'autumn' (a colour per tree from AUTUMN_LEAF, picked by a hash of
+// its world position, times lv) or 'bare' (limbs, no canopy). `bushR` scales a yard bush's radius. Conifers never read it.
+// Autumn's colours by kit id: `pick` = [colour, weight] chosen by the hash's first number, `lerp` = two colours mixed by its second.
+const AUTUMN_LEAF = (() => {
+  const maple = { pick: [[lin3([178, 48, 30]), 0.4], [lin3([204, 84, 30]), 0.35], [lin3([214, 128, 36]), 0.25]] };
+  return { 'maple-1': maple, 'sapling-1': maple, 'oak-1': { lerp: [lin3([140, 78, 40]), lin3([150, 112, 52])] },
+    'birch-1': { lerp: [lin3([232, 196, 60]), lin3([196, 186, 70])] }, street: { lerp: [lin3([218, 180, 54]), lin3([222, 150, 44])] } };
+})();
+const SEASON_LOOK = {
+  spring: { crown: 'leaf', bark: C.bark, leaf: C.leaf, bush: C.leaf, bushR: 1, treeline: C.leaf, grassField: C.grassField, grassDry: C.grassDry, grassForest: C.grassForest, lawn: C.lawn },
+  summer: { crown: 'leaf', bark: C.bark, leaf: lin3([46, 82, 42]), bush: lin3([46, 82, 42]), bushR: 1, treeline: lin3([46, 82, 42]),
+    grassField: lin3([64, 94, 36]), grassDry: lin3([112, 112, 58]), grassForest: lin3([48, 68, 34]), lawn: lin3([54, 86, 36]) },
+  autumn: { crown: 'autumn', bark: C.bark, autumn: AUTUMN_LEAF, leaf: null, bush: lin3([120, 96, 48]), bushR: 1, treeline: lin3([138, 104, 52]),
+    grassField: lin3([112, 108, 58]), grassDry: lin3([150, 128, 80]), grassForest: lin3([92, 74, 46]), lawn: lin3([84, 98, 48]) },
+  winter: { crown: 'bare', bark: lin3([100, 92, 82]), leaf: null, bush: lin3([104, 88, 70]), bushR: 0.7, treeline: lin3([110, 98, 90]),
+    grassField: lin3([150, 128, 84]), grassDry: lin3([166, 142, 98]), grassForest: lin3([96, 80, 60]), lawn: lin3([128, 118, 74]) },
+};
+let LOOK = SEASON_LOOK.spring, lookSeason = 'spring';
 
 // ---------------------------------------------------------------- signs
 // Every sign along the road, derived from the sections (so a chunk can find its own).
@@ -1665,9 +1704,12 @@ function addTree(mb, T, x, y, z, scale, rnd, colliders, ox = 0, oz = 0) {
   const conifer = CONIFERS.has(T.id);
   const birch = T.id.startsWith('birch');
   const th = T.trunkHeight * scale, tr = T.trunkRadius * scale;
-  const bark = birch ? C.birchBark : C.bark.map(v => v * rnd.range(0.8, 1.15));
+  const bark = birch ? C.birchBark : (conifer ? C.bark : LOOK.bark).map(v => v * rnd.range(0.8, 1.15));   // the same draw in every season
   const lv = rnd.range(0.75, 1.2), hue = rnd.range(-0.06, 0.06);
-  const leaf = conifer ? [C.conifer[0] * lv, C.conifer[1] * lv, C.conifer[2] * lv] : [C.leaf[0] * lv * (1 + hue * 2), C.leaf[1] * lv, C.leaf[2] * lv * (1 - hue)];
+  const crown = conifer ? 'conifer' : LOOK.crown;
+  const leaf = conifer ? [C.conifer[0] * lv, C.conifer[1] * lv, C.conifer[2] * lv]
+    : crown === 'leaf' ? [LOOK.leaf[0] * lv * (1 + hue * 2), LOOK.leaf[1] * lv, LOOK.leaf[2] * lv * (1 - hue)]
+    : crown === 'autumn' ? autumnLeaf(LOOK.autumn, T.id, x + ox, z + oz).map(v => v * lv) : null;
   const top = conifer ? (T.canopy[T.canopy.length - 1].y + T.canopy[T.canopy.length - 1].radius) * scale : th;
   mb.cyl(x, y - 0.3, z, y + (conifer ? top * 0.75 : th + 0.4), tr * 1.15, tr * 0.6, 6, bark, MAT.BARK, false);
   if (conifer) {
@@ -1676,10 +1718,49 @@ function addTree(mb, T, x, y, z, scale, rnd, colliders, ox = 0, oz = 0) {
       const b = bl[k], r = b.radius * scale * 1.15;
       mb.cone(x, y + (b.y - b.radius * 0.6) * scale, z, y + (b.y + b.radius * 1.5) * scale, r, 7, leaf, MAT.LEAF, rnd.int(0, 1e9));
     }
+  } else if (crown === 'bare') {
+    // winter: each canopy sphere's seed is still drawn, so the stream never shifts; it seeds that sphere's limb instead of a blob
+    for (const b of T.canopy) bareLimb(mb, x, y, z, b, scale, th, tr, bark, rnd.int(0, 1e9));
   } else {
     for (const b of T.canopy) mb.blob(x + b.x * scale, y + b.y * scale, z + b.z * scale, b.radius * scale, 0.85, leaf, MAT.LEAF, rnd.int(0, 1e9));
   }
   if (colliders) colliders.circ.push({ x: x + ox, z: z + oz, r: tr + 0.15 });
+}
+// An autumn colour for one tree, from a hash of its world position (never from the chunk's stream): the hash's first number
+// picks (maples), its second mixes (the rest).
+function autumnLeaf(A, id, wx, wz) {
+  const hr = mulberry32(hashSeed(WORLD_SEED, 'leaf-' + Math.round(wx * 10) + ',' + Math.round(wz * 10)));
+  const p = hr.next(), t = hr.next(), sp = A[id] || A.street;
+  if (sp.pick) { let acc = 0; for (const [c, w] of sp.pick) { acc += w; if (p < acc) return c.slice(); } return sp.pick[sp.pick.length - 1][0].slice(); }
+  return sp.lerp[0].map((v, k) => lerp(v, sp.lerp[1][k], t));
+}
+// One scaffold limb for one kit canopy sphere, and its order-2 branches, all jittered by that sphere's own seed. The limb
+// runs from the trunk at 0.7 of its height to the sphere's centre pushed out by half its radius, away from the attach point;
+// a sphere straight over the trunk is the leader, to the sphere's top. Branches at 35%, 55%, 70% and 85% of the limb, turned off it.
+// Tuned twice. Step 2, by reading the zmhstudio tree KB: r0 0.6 -> 0.45 tr and 2 -> 3 order-2 branches a limb. Step 4, the
+// tree-expert review of the winter shots (2026-11-03): attach 0.9 -> 0.7 (at 0.9 the street trees' sphere centres sat below
+// the split, so limbs drooped into a candelabra; at 0.7 every centre is above it and the scaffolds leave at 36-65 deg, inside
+// architecture.md's decurrent 30-70), r0 0.45 -> 0.40 tr (da Vinci's rule: 4 limbs at 0.4 tr carry 0.64 tr^2, the trunk's area
+// at that height), 3 -> 4 order-2 branches (oak 4, birch 4, maple 5), and winter bark a greyer (100, 92, 82) in LOOK.bark.
+const LIMB = { attach: 0.7, push: 0.5, leaderOff: 0.2, r0: 0.40, r1: 0.15, rMin: 0.02, seg: 5, at: [0.35, 0.55, 0.7, 0.85], turn: [35, 50], lift: 0.3, len: [0.55, 0.7], rB: 0.6, rTip: 0.015, segB: 4 };
+function bareLimb(mb, x, y, z, b, scale, th, tr, bark, seed) {
+  const jr = mulberry32(seed), K = LIMB;
+  const A = [x, y + K.attach * th, z], R = b.radius * scale;
+  const C0 = [x + b.x * scale, y + b.y * scale, z + b.z * scale];
+  let E;
+  if (Math.hypot(b.x, b.z) < K.leaderOff) E = [x, C0[1] + R, z];
+  else { const u = norm3([C0[0] - A[0], C0[1] - A[1], C0[2] - A[2]]); E = [C0[0] + u[0] * R * K.push, C0[1] + u[1] * R * K.push, C0[2] + u[2] * R * K.push]; }
+  const r0 = K.r0 * tr, r1 = Math.max(K.rMin, K.r1 * tr);
+  mb.limb(A, E, r0, r1, K.seg, bark, MAT.BARK);
+  const d = [E[0] - A[0], E[1] - A[1], E[2] - A[2]], L = Math.hypot(d[0], d[1], d[2]), ax = d.map(v => v / L);
+  const e1 = norm3(cross3(ax, Math.abs(ax[1]) < 0.9 ? [0, 1, 0] : [1, 0, 0])), e2 = cross3(e1, ax);
+  for (const f of K.at) {
+    const P = [A[0] + d[0] * f, A[1] + d[1] * f, A[2] + d[2] * f], rP = lerp(r0, r1, f);
+    const az = jr.range(0, TAU), ang = jr.range(K.turn[0], K.turn[1]) * Math.PI / 180, len = L * jr.range(K.len[0], K.len[1]);
+    const w = [e1[0] * Math.cos(az) + e2[0] * Math.sin(az), e1[1] * Math.cos(az) + e2[1] * Math.sin(az), e1[2] * Math.cos(az) + e2[2] * Math.sin(az)];
+    const dir = norm3([ax[0] * Math.cos(ang) + w[0] * Math.sin(ang), ax[1] * Math.cos(ang) + w[1] * Math.sin(ang) + K.lift, ax[2] * Math.cos(ang) + w[2] * Math.sin(ang)]);
+    mb.limb(P, [P[0] + dir[0] * len, P[1] + dir[1] * len, P[2] + dir[2] * len], K.rB * rP, K.rTip, K.segB, bark, MAT.BARK);
+  }
 }
 
 // ---------------------------------------------------------------- chunks
@@ -1691,10 +1772,10 @@ function addTree(mb, T, x, y, z, scale, rnd, colliders, ox = 0, oz = 0) {
 const TERRAIN_D = [0, 0.5, 1.5, 2.5, 3.5, 4.5, 7, 11, 17, 26, 38, 55, 80, 110, 150, 200, 255];
 function grassColor(env, x, z) {
   const n = vnoise(x / 37, z / 37) * 0.6 + vnoise(x / 9, z / 9) * 0.4;
-  if (env === 'forest') return C.grassForest.map((v, k) => v * (0.85 + 0.25 * n) + (k === 0 ? 0.01 : 0));
-  if (env === 'town' || env === 'suburb') return C.lawn.map(v => v * (0.9 + 0.2 * n));
+  if (env === 'forest') return LOOK.grassForest.map((v, k) => v * (0.85 + 0.25 * n) + (k === 0 ? 0.01 : 0));
+  if (env === 'town' || env === 'suburb') return LOOK.lawn.map(v => v * (0.9 + 0.2 * n));
   const t = clamp(0.5 + 0.7 * vnoise(x / 180 + 7, z / 180 - 3), 0, 1);
-  return C.grassField.map((v, k) => lerp(v, C.grassDry[k], t * 0.8) * (0.9 + 0.2 * n));
+  return LOOK.grassField.map((v, k) => lerp(v, LOOK.grassDry[k], t * 0.8) * (0.9 + 0.2 * n));
 }
 function buildChunk(ci) {
   const i0 = ci * CHUNK_STEPS, i1 = i0 + CHUNK_STEPS;
@@ -1702,7 +1783,7 @@ function buildChunk(ci) {
   ensureSamples(s1 + STEP * 4); ensureSigns(s1);
   const A = at(s0), ax = A.x, ay = A.y, az = A.z;
   const base = new MB(), props = new MB();
-  const lights = [], glows = [], col = { circ: [], box: [] };
+  const lights = [], glows = [], col = { circ: [], box: [] }, trees = [];   // trees: [{ id, x, z }] (world), metadata only, in no mesh
   const sOff = Math.floor(s0 / (STD.dashLength + STD.dashGap)) * (STD.dashLength + STD.dashGap);
   const P = [];
   for (let i = i0; i <= i1; i++) P.push(at(S_MIN + i * STEP));
@@ -1748,7 +1829,7 @@ function buildChunk(ci) {
           const t2 = k === 0 ? [ga[0] - q[0], ga[1] - q[1], ga[2] - q[2]] : [q[0] - gb[0], q[1] - gb[1], q[2] - gb[2]];
           n = norm3(cross3(t2, w)); if (n[1] < 0) n = n.map(v => -v);
         }
-        const gcol = P[k].curb && j < 3 ? C.lawn : j <= 5 && TERRAIN_D[j] > 0.4 && !P[k].curb ? grassColor(env, g[0], g[2]).map(v => v * 0.9) : grassColor(env, g[0], g[2]);
+        const gcol = P[k].curb && j < 3 ? LOOK.lawn : j <= 5 && TERRAIN_D[j] > 0.4 && !P[k].curb ? grassColor(env, g[0], g[2]).map(v => v * 0.9) : grassColor(env, g[0], g[2]);
         r.push(base.vert(g[0] - ax, g[1] - ay, g[2] - az, n[0], n[1], n[2], gcol, MAT.GRASS, 0, TERRAIN_D[j]));
       }
       idx.push(r);
@@ -1782,7 +1863,7 @@ function buildChunk(ci) {
       const gy = groundAt(p, u, wx, wz);
       const hgt = 12 + 7 * vnoise(wx / 23, wz / 23) + 2.5 * vnoise(wx / 5, wz / 5);
       const [bx, bz] = worldAt(p, u + side * 9);
-      const c0 = env === 'forest' ? C.conifer : C.leaf;
+      const c0 = env === 'forest' ? C.conifer : LOOK.treeline;
       const nv = norm3([p.tz * side, 0.35, -p.tx * side]);
       const lo = base.vert(wx - ax, gy - 1 - ay, wz - az, ...nv, c0.map(v => v * 0.55), MAT.LEAF);
       const hi = base.vert(lerp(wx, bx, 0.4) - ax, gy + hgt - ay, lerp(wz, bz, 0.4) - az, 0, 1, 0, c0.map(v => v * 0.9), MAT.LEAF);
@@ -1816,6 +1897,7 @@ function buildChunk(ci) {
         const pl = place(ss, side * (p.Rr + d + rnd.range(0, treeCfg.dd * 0.8)));
         const T = rnd.pick(treeCfg.pool);
         addTree(props, T, pl.x - ax, pl.y - ay, pl.z - az, rnd.range(0.85, 1.35), rnd, d < 30 ? col : null, ax, az);
+        trees.push({ id: T.id, x: pl.x - ax + ax, z: pl.z - az + az });
       }
     }
   }
@@ -1858,7 +1940,7 @@ function buildChunk(ci) {
       if (env === 'town') for (let b = 0; b < 3; b++) {
         const bu = TOWN_KIT.bushes[b % TOWN_KIT.bushes.length];
         const bp = place(s + lr.range(-B.width / 2, B.width / 2), side * (d - B.depth / 2 - lr.range(1.0, 2.0)));
-        props.blob(bp.x - ax, bp.y + bu.height * 0.4 - ay, bp.z - az, bu.radius * 1.1, bu.height / bu.radius * 0.6, C.leaf.map(v => v * lr.range(0.7, 1.1)), MAT.LEAF, lr.int(0, 1e9), 0.3);
+        props.blob(bp.x - ax, bp.y + bu.height * 0.4 - ay, bp.z - az, bu.radius * 1.1 * LOOK.bushR, bu.height / bu.radius * 0.6, LOOK.bush.map(v => v * lr.range(0.7, 1.1)), MAT.LEAF, lr.int(0, 1e9), 0.3);
       }
       if (B.porch && B.porch.lit) { const lp = place(s, side * (d - B.depth / 2 - 0.3)); glows.push([lp.x, lp.y + 2.5, lp.z, 1.0, 0.75, 0.45, 0.35]); }
     }
@@ -1869,7 +1951,9 @@ function buildChunk(ci) {
     if (lr.next() < 0.35) continue;
     const p = at(s); if (!p.curb) continue;
     const pl = place(s, side * (p.Rr + 2.6));
-    addTree(props, lr.pick(kitTrees), pl.x - ax, pl.y - ay, pl.z - az, lr.range(1.0, 1.3), lr, col, ax, az);
+    const T = lr.pick(kitTrees);
+    addTree(props, T, pl.x - ax, pl.y - ay, pl.z - az, lr.range(1.0, 1.3), lr, col, ax, az);
+    trees.push({ id: T.id, x: pl.x - ax + ax, z: pl.z - az + az });
   }
   // Boulders in the forest.
   if (env === 'forest' || env === 'open') for (let k = 0; k < 3; k++) {
@@ -1917,7 +2001,7 @@ function buildChunk(ci) {
       [fx - rx * w - facing[0] * 0.02, by + h1, fz - rz * w - facing[1] * 0.02], [fx + rx * w - facing[0] * 0.02, by + h1, fz + rz * w - facing[1] * 0.02], C.pole, MAT.METAL);
     col.circ.push({ x: pl.x, z: pl.z, r: 0.12 });
   }
-  return { ci, s0, s1, anchor: [ax, ay, az], base, props, lights, glows, col, env };
+  return { ci, s0, s1, anchor: [ax, ay, az], base, props, lights, glows, col, env, trees };
 }
 
 // ---------------------------------------------------------------- vehicles (from the road kit)
@@ -2994,6 +3078,14 @@ function updateChunks(budget) {
   order.sort((a, b) => Math.abs(a - c) - Math.abs(b - c));
   for (let n = 0; n < Math.min(budget, order.length); n++) makeChunk(order[n]);
 }
+// The season's look: every loaded chunk rebuilt in its colours where it stands. The player and the traffic are never
+// touched (never through teleport(), which resets both); the meshes are pure functions of WORLD_SEED, the chunk and LOOK.
+function applySeason(v) {
+  LOOK = SEASON_LOOK[v] || SEASON_LOOK.spring; lookSeason = SEASON_LOOK[v] ? v : 'spring';
+  for (const ch of CHUNKS.values()) { freeMesh(ch.baseMesh); freeMesh(ch.propMesh); }
+  CHUNKS.clear();
+  updateChunks(99);
+}
 
 // ---------------------------------------------------------------- sun, moon, sky
 // SKY.day is the daylight factor (0-1), not the date: the date is SKY.mjd (the calendar, above).
@@ -3763,6 +3855,17 @@ const TRAFFIC_GAIN = 0.75;          // the voices' overall level, measured: a ca
 const TV_N = 6, TV_RANGE = 150, TV_C = 343, TV_REF = 5;    // voices, reach (m), speed of sound (m/s), reference distance (m)
 const TV_SHIFT = [1300, 2600];      // a calm driver's down- and up-shift points (rpm)
 const KIND_PITCH = { boxTruck: 0.7, pickup: 0.85, suv: 0.95, sedan: 1.0, minivan: 1.0, hatchback: 1.15 };
+// The ambient by season (DS-3), keyed off lookSeason (the season the road looks like), never SETTINGS.season (which the
+// calendar rows move on their own). birds: the share of spring's birds that sing by day (spread evenly; a bird skipped keeps its
+// gap and its dice, so the rate is exactly this share); birdLv: their level (amb.birdG); day / night: the insect by day and by night, or null;
+// level: the insects' level (amb.insG). Spring is the shipped bed: the same rates and levels, routed through gains of 1.
+const AMB_SEASON = {
+  spring: { birds: 1, birdLv: 1, day: null, night: 'cricket', level: 1 },
+  summer: { birds: 1, birdLv: 1, day: 'cicada', night: 'katydid', level: 1.5 },
+  autumn: { birds: 0.5, birdLv: 1, day: null, night: 'cricket', level: 1 },
+  winter: { birds: 0.3, birdLv: 1, day: null, night: null, level: 0 },
+};
+const CICADA_GAIN = 0.4, KATYDID_GAIN = 0.2;   // the voices' peaks before the season's level: measured, see the suite's season rows
 const SND = (() => {
   let ac = null, master, sfx, music, eng = null, noiseBuf = null, hornNodes = null, nextBeat = 0, beat = 0, radioOut = null, amb = null, trafF = null, trafG = null;
   const ch = {}, probes = {}, voices = [];
@@ -3802,7 +3905,11 @@ const SND = (() => {
     const breezeF = ac.createBiquadFilter(); breezeF.type = 'bandpass'; breezeF.frequency.value = 650; breezeF.Q.value = 0.5;
     const breezeG = ac.createGain(); breezeG.gain.value = 0;
     nz.connect(breezeF); breezeF.connect(breezeG); breezeG.connect(ambF);
-    amb = { ambF, breezeG, next: 0, cricket: 0 };
+    // the birds and the insects each through a gain of their own (the season's level), each with a probe (below)
+    const A0 = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
+    const birdG = ac.createGain(); birdG.gain.value = A0.birdLv; birdG.connect(ambF);
+    const insG = ac.createGain(); insG.gain.value = A0.level; insG.connect(ambF);
+    amb = { ambF, breezeG, birdG, insG, season: lookSeason, next: 0, ins: 0, birdK: 0 };
     o1.start(); o2.start(); o3.start(); nz.start();
     eng = { o1, o2, o3, lp, eg, tyreG, tyreF, windG, skidG };
     // other cars: the glass of the cockpit on the whole channel, then a fixed pool of voices. Nothing here is ever
@@ -3828,7 +3935,7 @@ const SND = (() => {
       voices.push({ v1, v2, v3, vlp, veg, src, vtf, vtg, air, dg, gL, gR, car: null, id: null, freeAt: 0, gi: -1, fresh: false, d: 0, L: 0, R: 0, k: 1, f: 0, want: 0 });
     }
     // level probes (no ears in a test container): RMS of each bus and of each channel
-    for (const [k, node] of [['sfx', sfx], ['music', music], ...VOL_KEYS.filter(k => k !== 'music').map(k => [k, ch[k]])]) {
+    for (const [k, node] of [['sfx', sfx], ['music', music], ...VOL_KEYS.filter(k => k !== 'music').map(k => [k, ch[k]]), ['birds', amb.birdG], ['insects', amb.insG]]) {
       const a = ac.createAnalyser(); node.connect(a); probes[k] = a;
     }
     // an analyser downmixes to mono, so each side of the other cars' channel gets its own off a splitter
@@ -3860,12 +3967,29 @@ const SND = (() => {
     amb.ambF.frequency.setTargetAtTime(inside ? 1500 : 16000, t, 0.1);
     const muff = inside ? 0.5 : 1;
     amb.breezeG.gain.setTargetAtTime(0.045 * muff * (0.7 + 0.3 * Math.sin(t * 0.37) * Math.sin(t * 0.23)), t, 0.4);
+    // the season's birds and insects (DS-3): its levels set once when the look changes, never per frame
+    const A = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
+    if (amb.season !== lookSeason) {
+      amb.season = lookSeason;
+      amb.birdG.gain.setTargetAtTime(A.birdLv, t, 0.05); amb.insG.gain.setTargetAtTime(A.level, t, 0.05);
+    }
     if (level('ambient') > 0 && !SETTINGS.muted) {
       if (amb.next < t) amb.next = t + 0.5;
       while (amb.next < t + 0.3) {
-        if (SKY.day > 0.35 && Math.random() < SKY.day) { bird(amb.next, muff); amb.next += 1.4 + Math.random() * 3.2; }
-        else if (SKY.night > 0.35) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
+        // the season sings A.birds of spring's birds, spread evenly (a running count, no die): one it skips draws the
+        // same dice and keeps its gap, so the rate is exactly A.birds of spring's and spring's draws are as shipped
+        if (SKY.day > 0.35 && Math.random() < SKY.day) {
+          const k = amb.birdK++, sing = Math.floor((k + 1) * A.birds) > Math.floor(k * A.birds);
+          bird(amb.next, muff, !sing); amb.next += 1.4 + Math.random() * 3.2;
+        }
+        else if (SKY.night > 0.35 && A.night === 'katydid') { katydid(amb.next, muff); amb.next += 0.8 + Math.random() * 0.7; }
+        else if (SKY.night > 0.35 && A.night) { cricket(amb.next, muff); amb.next += 0.45 + Math.random() * 0.4; }
         else amb.next += 1.5;
+      }
+      // the day insect on a line of its own (cicadas swell for seconds, under the birds)
+      if (A.day && SKY.day > 0.6) {
+        if (amb.ins < t) amb.ins = t + 0.5;
+        while (amb.ins < t + 0.3) amb.ins += cicada(amb.ins, muff) + 1 + Math.random() * 3;
       }
     }
     updateTraffic(t, inside);
@@ -4013,21 +4137,67 @@ const SND = (() => {
     beat = 0; nextBeat = t + 0.3;
     noiseHit(t, 0.3, 'bandpass', 2600, 0.12, ch.music, 0.7);
   };
-  function bird(t, muff) {
-    const n = 2 + Math.floor(Math.random() * 4), f0 = 2600 + Math.random() * 1800, pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
-    let dest = amb.ambF; if (pan) { pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(amb.ambF); dest = pan; }
+  // a bird: 2-5 falling notes. `quiet` (a bird the season skips) draws the same dice and makes no node, so a thinned
+  // season hears exactly a subset of spring's birds, the rest of the schedule unmoved
+  function bird(t, muff, quiet) {
+    const n = 2 + Math.floor(Math.random() * 4), f0 = 2600 + Math.random() * 1800, pv = ac.createStereoPanner ? Math.random() * 1.6 - 0.8 : 0;
+    const pan = !quiet && ac.createStereoPanner ? ac.createStereoPanner() : null;
+    let dest = amb.birdG; if (pan) { pan.pan.value = pv; pan.connect(amb.birdG); dest = pan; }
     for (let i = 0; i < n; i++) {
-      const s = t + i * (0.09 + Math.random() * 0.05), dur = 0.05 + Math.random() * 0.06;
+      const s = t + i * (0.09 + Math.random() * 0.05), dur = 0.05 + Math.random() * 0.06, fa = f0 * (1 + (Math.random() - 0.5) * 0.2), fb = f0 * (0.75 + Math.random() * 0.6);
+      if (quiet) continue;
       const o = ac.createOscillator(), g = ac.createGain();
-      o.frequency.setValueAtTime(f0 * (1 + (Math.random() - 0.5) * 0.2), s); o.frequency.exponentialRampToValueAtTime(f0 * (0.75 + Math.random() * 0.6), s + dur);
+      o.frequency.setValueAtTime(fa, s); o.frequency.exponentialRampToValueAtTime(fb, s + dur);
       g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.055 * muff, s + 0.01); g.gain.exponentialRampToValueAtTime(0.0005, s + dur);
       o.connect(g); g.connect(dest); o.start(s); o.stop(s + dur + 0.02);
     }
   }
   function cricket(t, muff) {
     const f = 4400 + Math.random() * 400;
-    for (let i = 0; i < 3; i++) tone(t + i * 0.045, f, 0.03, 'sine', 0.03 * muff, amb.ambF, 0.004);
+    for (let i = 0; i < 3; i++) tone(t + i * 0.045, f, 0.03, 'sine', 0.03 * muff, amb.insG, 0.004);
   }
+  // a pan for one voice, or the insects' gain where the browser has no StereoPanner
+  function insPan() {
+    const pan = ac.createStereoPanner ? ac.createStereoPanner() : null;
+    if (!pan) return amb.insG;
+    pan.pan.value = Math.random() * 1.6 - 0.8; pan.connect(amb.insG); return pan;
+  }
+  // summer by day: a cicada, noise band-passed near 5 kHz and pulsed at 30-60 Hz, swelling over 2-6 s and fading.
+  // Six nodes for seconds of sound; returns how long it sings. `quick` is the slider's preview: the same voice, shorter.
+  function cicada(t, muff, quick) {
+    const rise = quick ? 0.7 : 2 + Math.random() * 4, fall = quick ? 0.5 : 1 + Math.random() * 1.5, end = t + rise + fall;
+    const f = 4700 + Math.random() * 600, rate = 30 + Math.random() * 30, dest = insPan();
+    const s = ac.createBufferSource(); s.buffer = noiseBuf; s.loop = true;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.Q.value = 4;
+    bp.frequency.setValueAtTime(f * 0.93, t); bp.frequency.linearRampToValueAtTime(f, t + rise);
+    const pulse = ac.createGain(); pulse.gain.value = 0.5;                  // 0.5 +- 0.5: fully pulsed
+    const lfo = ac.createOscillator(); lfo.type = 'triangle'; lfo.frequency.value = rate;
+    const depth = ac.createGain(); depth.gain.value = 0.5;
+    const env = ac.createGain(); env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(CICADA_GAIN * muff, t + rise); env.gain.linearRampToValueAtTime(0, end);
+    lfo.connect(depth); depth.connect(pulse.gain);
+    s.connect(bp); bp.connect(pulse); pulse.connect(env); env.connect(dest);
+    s.start(t, Math.random() * 1.5); s.stop(end + 0.05); lfo.start(t); lfo.stop(end + 0.05);
+    return end - t;
+  }
+  // summer by night: a katydid, "ka-ty-did", a rasp of 2-4 pulses of noise band-passed near 3-4 kHz. Four nodes a call.
+  function katydid(t, muff) {
+    const n = 2 + Math.floor(Math.random() * 3), f = 3000 + Math.random() * 1000, step = 0.12 + Math.random() * 0.05, len = 0.05 + Math.random() * 0.025;
+    const dest = insPan(), a = KATYDID_GAIN * muff;
+    const s = ac.createBufferSource(); s.buffer = noiseBuf;
+    const bp = ac.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = 5;
+    const g = ac.createGain(); g.gain.setValueAtTime(0, t);
+    for (let i = 0; i < n; i++) {
+      const p = t + i * step;
+      g.gain.setValueAtTime(0, p); g.gain.linearRampToValueAtTime(a, p + 0.006);
+      g.gain.setValueAtTime(a, p + len - 0.012); g.gain.linearRampToValueAtTime(0, p + len);
+    }
+    s.connect(bp); bp.connect(g); g.connect(dest);
+    s.start(t, Math.random()); s.stop(t + n * step + 0.05);
+  }
+  // for checks: start the ambient's schedule afresh at the next update (the next bird or insect 0.5 s on), so a
+  // measurement window is not handed a gap left by whatever played before it
+  S.ambRestart = () => { if (amb) { amb.next = 0; amb.ins = 0; amb.birdK = 0; } };
   S.crash = (k) => {
     if (!ac) return;
     const t = ac.currentTime;
@@ -4072,7 +4242,11 @@ const SND = (() => {
     else if (k === 'skid') noiseHit(t, 0.5, 'bandpass', 1100, 0.9, ch.skid, 9);
     else if (k === 'tyres') noiseHit(t, 0.8, 'bandpass', 520, 0.12, ch.tyres, 0.6);
     else if (k === 'wind') noiseHit(t, 0.8, 'highpass', 900, 0.08, ch.wind);
-    else if (k === 'ambient') { if (SKY.night > 0.5) cricket(t, 1); else bird(t, 1); }
+    else if (k === 'ambient') {   // the season's own voice (winter's night, with no insects, a bird)
+      const A = AMB_SEASON[lookSeason] || AMB_SEASON.spring;
+      if (SKY.night > 0.5) { if (A.night === 'katydid') katydid(t, 1); else if (A.night) cricket(t, 1); else bird(t, 1); }
+      else if (A.day) cicada(t, 1, true); else bird(t, 1);
+    }
   };
   S.suspend = (yes) => { if (!ac) return; if (yes) ac.suspend(); else ac.resume(); };
   return S;
@@ -4109,9 +4283,16 @@ $('set-btn').addEventListener('click', openSettings);
 $('set-close').addEventListener('click', closeSettings);
 setPanel.addEventListener('click', e => { if (e.target === setPanel) closeSettings(); });
 $('cycle-sel').addEventListener('change', e => { SETTINGS.cycle = +e.target.value; saveSettings(); });
-$('season-sel').addEventListener('change', e => { const v = e.target.value;
-  if (!SEASONS_OPEN.includes(v)) { e.target.value = SETTINGS.season; return; }
-  if (v !== SETTINGS.season) { SETTINGS.season = v; setDate(SEASON_DATES[v][2]); } else saveSettings(); });
+// a season chosen: the road around the car in its look, and the calendar on its middle date (both saved); the hook's setSeason is this path
+function setSeason(v) {
+  if (!SEASONS_OPEN.includes(v)) return false;
+  const moved = v !== SETTINGS.season;
+  SETTINGS.season = v;
+  if (v !== lookSeason) applySeason(v);
+  if (moved) setDate(SEASON_DATES[v][2]); else saveSettings();
+  return true;
+}
+$('season-sel').addEventListener('change', e => { if (!setSeason(e.target.value)) e.target.value = SETTINGS.season; });
 $('traffic-sel').addEventListener('change', e => { SETTINGS.traffic = +e.target.value; saveSettings(); });
 $('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); if (booted) drawGauges(); });
 $('gfx-sel').addEventListener('change', e => { SETTINGS.gfx = +e.target.value; saveSettings(); resize(); makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
@@ -4240,6 +4421,7 @@ function boot() {
   SKY.hour = 13; SKY.mjd = SETTINGS.date; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4;
   resetPlayer();
   updateSky();
+  LOOK = SEASON_LOOK[SETTINGS.season]; lookSeason = SETTINGS.season;   // a saved season boots in its own look: before the first chunk
   updateChunks(99);
   // a road already in use: traffic spread through the window in both directions
   for (const dir of [1, -1]) {
@@ -4259,7 +4441,19 @@ function teleport(s) {
     spawnCar(q + TRAFFIC.rnd.range(-30, 30), dir, TRAFFIC.rnd.int(0, Math.floor(at(q).L + 0.02)));
   }
 }
-window.__DS = { SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+// Test hook: one tree of a kit id built with the page's own addTree into a fresh MB, in a season's look, at a world position,
+// with a fixed stream (so seasons and positions differ only by the look and the position). LOOK is put back after.
+function treeTest(id, season, x, z) {
+  const T = TOWN_KIT.trees.concat(TOWN_KIT.forest).find(t => t.id === id);
+  if (!T || !SEASON_LOOK[season]) return null;
+  const keep = LOOK; LOOK = SEASON_LOOK[season];
+  try {
+    const mb = new MB(), col = { circ: [], box: [] };
+    addTree(mb, T, 0, 0, 0, 1, rngFor('tree-test'), col, x, z);
+    return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
+  } finally { LOOK = keep; }
+}
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

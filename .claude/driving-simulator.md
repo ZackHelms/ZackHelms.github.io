@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (141 checks).
+`.claude/tests/drive-driving-simulator.cjs` (157 checks).
 
 ## The CD's brief (verbatim)
 
@@ -41,7 +41,7 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Observer (DS-1) | `OBS = { lat: 35.7796, lon: -78.6382 }`; the kit's `OBS_SKY` has `heightM: 0` | The kit's own Raleigh observer. Raleigh is about 100 m up, which moves the moon's parallax by far under 0.001 deg |
 | Season dates (DS-1) | The astronomical seasons: spring Mar 20 - Jun 20, 2026; summer Jun 21 - Sep 22; autumn Sep 23 - Dec 20; winter Dec 21, 2026 - Mar 19, 2027. `SEASON_DATES` rows are `[first, last, middle]` as MJDs | DS-3 cites them; the DST rows use autumn and winter |
 | Start date (DS-1) | A first visit is the season's middle date at 1 pm: **Tue May 5, 2026** in spring. The hour always starts at 1 pm; the date is saved. A missing, broken or out-of-season saved date becomes the middle date | The CD chose a day per game day; the middle of spring shows a typical spring sky |
-| Date steps (DS-1) | At each midnight the date steps by one; past the season's last day (or before its first, through the hook only) it goes to the first day. `setDate()` saves, as a midnight does. Choosing another open season moves the date to its middle date (unreachable while only spring is open) | One rule for the midnight and the wrap |
+| Date steps (DS-1) | At each midnight the date steps by one; past the season's last day (or before its first, through the hook only) it goes to the first day. `setDate()` saves, as a midnight does. Choosing another season moves the date to its middle date (DS-3: `setSeason()`, the dropdown's path) | One rule for the midnight and the wrap |
 | Daylight saving (DS-1) | `SKY.dst` is state. On the fall-back day the clock goes 02:00 -> 01:00 once; on the spring-forward day 02:00 -> 03:00. At boot, a date step and the time-of-day slider `dst` is re-derived by the rule (`utcOffset`), with the repeated hour reading as EDT and the missing hour (02:00-02:59 on the spring day) as EDT. At a date step `dst` is derived for 00:00 of the new date | Raleigh's clock; pure (date, hour) is ambiguous in the repeated hour. Spring never meets a transition: only the hook reaches them |
 | Magnitude cut (DS-1) | The splice's `--mag 5`: 1,627 stars | Naked-eye under a light-polluted sky; one flag to change it |
 | `STAR_GAIN = 3.2` (DS-1; *superseded by DS-5: 4.0*) | The star pass's gain after the tonemap, times `SKY.exposure` and `SKY.night` | Read off pixels at 22:00 on May 5: at 1.6 Spica (mag 0.97) peaked at luminance 118, not white; at 3.2 it reads 209 and Arcturus saturates |
@@ -76,6 +76,20 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | A voice's engine and tyres (DS-2) | Engine gain 0.08 (the player's is 0.05-0.12 with throttle); its lowpass at `500 + rpm * 0.12` Hz, Q 2.5; tyre roar band-passed at `380 + v * 6` Hz, Q 0.6, at `min(0.12, v * 0.004)`, as the player's. Doppler goes on the oscillators and the tyre source's `playbackRate`; the tyre band is not moved | The player's shapes with the throttle taken out (no car's throttle is known); the plan names `playbackRate` only |
 | Where a car sounds from (DS-2) | 0.5 m above its road position (`c.y + 0.5`), for its distance, bearing and Doppler | About the height of an engine and a tyre's contact patch averaged |
 | Fades (DS-2) | A voice whose car leaves the six fades with a 0.027 s time constant (about 80 ms) and is free 0.12 s later; a new car's pitches and pan are set at once (the voice is silent then) and its level rises with a 0.05 s constant; pitch and pan follow with 0.03 s, the air filter with 0.05 s, the tyres with 0.1 s | The plan's 80 ms; the rest the player's engine's constants |
+| The season switch's rebuild (DS-3) | `applySeason()` rebuilds every loaded chunk (about 16) at once, inside the `change` handler, while the menu (which pauses the game) is open; nothing is spread over frames | The plan's `updateChunks(99)`; measured at step 4 (SwiftShader, 16 chunks, finished on the GPU): 46-52 ms into spring, summer or autumn and 120 ms into winter, behind the open menu |
+| The look's keys (DS-3) | `SEASON_LOOK[season]` = `{ crown, bark, leaf, autumn, bush, bushR, treeline, grassField, grassDry, grassForest, lawn }`; spring's row is the shipped `C` arrays themselves (byte-identical). `crown` is `'leaf'` (spring, summer: `LOOK.leaf` with the tree's `lv` and `hue`), `'autumn'` (a colour per tree from `AUTUMN_LEAF`, times `lv`, no `hue`) or `'bare'` (winter); `bushR` scales a yard bush's radius (0.7 in winter; its height ratio is kept, so the whole bush is 0.7x); `bark` is the trunk and limbs of a non-birch broadleaf tree, `C.bark` (96, 70, 50) in spring, summer and autumn and a greyer (100, 92, 82) in winter (step 4, the tree-expert review: the KB's oak bark midpoint, lighter for red maple, inferred), with the same 0.8-1.15 draw in every season; birch and conifer bark never change | The plan names the table and `LOOK`, not the keys; `C.conifer` and `C.birchBark` stay in `C` (they never change) |
+| Autumn by kit id (DS-3) | `AUTUMN_LEAF`: maple-1 and sapling-1 share the maple pick; oak-1, birch-1 their lerps; every other broadleaf id (tree-1..3) the street trees' lerp. The position hash's first number picks, its second mixes | The plan's colours and weights; the "street" fallback rather than three named rows keeps a new kit tree from having no autumn colour |
+| `MB.limb` (DS-3) | A frustum with its ring frame `e1 = norm(axis x up)` (`x [1,0,0]` when the axis is within 26 deg of vertical), `e2 = e1 x axis`, so `e1 x e2 = -axis`, the handedness of `cyl()` (which it reduces to on a vertical axis) and the same quad order; normals tilted by the taper as `cyl()`'s are | The plan asks for outward normals and CCW from outside; matching `cyl()` makes one winding rule for every bark mesh. The suite checks every bark triangle's winding against its vertex normals |
+| The bare tree's numbers (DS-3) | `LIMB`: attach at **0.7 th**, push 0.5 R, leader when the sphere is under 0.2 m (kit units) off the trunk, limb radius **0.40 tr** to max(0.02, 0.15 tr), 5 segments; **four** order-2 branches at **35, 55, 70 and 85%** of the limb, turned 35-50 deg at a random azimuth, +0.3 lift, 0.55-0.7 of the limb's length, 0.6x the limb's radius there to 0.015 m, 4 segments; jitter from `mulberry32(sphere seed)` in the order azimuth, angle, length; winter bark `LOOK.bark` | The plan said attach 0.9, 0.6 tr and two branches at 55 and 75%. Tuned twice. Step 2, by reading the KB: 0.6 -> 0.45 tr and three branches at 40/60/80%. Step 4, the tree-expert agent's review of the step-2 shots (2026-11-03), which read winter as dead and snag-like: at 0.9 th the street trees' sphere centres sat below the split, so their limbs drooped from a candelabra node; at 0.7 every centre is above it and the scaffolds leave at 36-65 deg from vertical, inside `architecture.md`'s decurrent 30-70; 0.40 tr is da Vinci's rule (four limbs carry 4 x 0.16 = 0.64 tr^2, the trunk's area at that height); four order-2 branches a limb is the KB's count (oak 4, birch 4, maple 5). Forest chunk at 416 m: 16,220 triangles in winter vs 14,280 in spring (1.14x; 14,668 before the step-4 tuning), `buildChunk()` 4.7-5.1 ms vs 7-8.8 ms in spring (median of 10, SwiftShader: no slower), well inside the plan's 1.6x / 2x triggers |
+| The chunk's tree list and `treeTest` (DS-3) | `buildChunk` returns `trees: [{ id, x, z }]` (world position) for every tree it places, forest grid and town verge alike, colliders or not; `makeChunk` keeps it (spread). `__DS.treeTest(id, season, x, z)` builds one tree at scale 1 with `rngFor('tree-test')` at local (0, 0, 0) and world offset (x, z), and returns `{ v, i, n, col, spheres, conifer }` | The plan names both; scale 1 and a fixed stream so two seasons or two places differ only by the look and the position hash |
+| Season hue measured how (DS-3) | The suite takes each vertex's stored linear colour to sRGB by IEC 61966-2-1 (the page's own `srgb()` is a 2.2 power: the two differ by under 1 deg of hue here), then HSV, and averages hue as a circular mean | The plan says "the standard transfer function"; a circular mean keeps a red that straddles 0 deg from averaging to cyan |
+| Winter's treeline (DS-3) | The fields' and open land's treeline sheet is `LOOK.treeline` with its shipped shading (0.55 / 0.9 / 0.75 by vertex); there is no gap or thinning to show sky through bare crowns | A sheet with holes would be geometry, outside this step; grey-brown at saturation 0.19 reads as distant bare wood in the shots |
+| Look and calendar kept apart (DS-3) | `lookSeason` names the season `LOOK` was built for. `setSeason(v)` (the handler's path and `__DS.setSeason`) sets `SETTINGS.season`, calls `applySeason(v)` when `v` is not `lookSeason`, and moves the date to `SEASON_DATES[v][2]` only when `v` is not the season already in `SETTINGS.season` (otherwise it just saves). An unknown season returns false and the dropdown goes back | The DST rows write `SETTINGS.season` directly to move the calendar; choosing that season afterwards must still give its look without a second date jump |
+| The ambient follows the look (DS-3) | `AMB_SEASON[lookSeason]`, never `SETTINGS.season`: the birds and insects are the season the road looks like. Its gains (`amb.birdG`, `amb.insG`) are set when `lookSeason` changes (a 0.05 s time constant), never per frame | The plan says "per season"; the DST rows write `SETTINGS.season` to move the calendar and must not change what is heard any more than what is seen |
+| Birds thinned evenly (DS-3) | `birds` is a share sung by a running count (`amb.birdK`; the season sings a bird when `floor((k+1)b)` passes `floor(kb)`: autumn every other bird, winter 3 in 10), not a die. A bird skipped is `bird(t, muff, true)`: it draws the same dice and keeps its gap, makes no node. `birdLv` is 1 in every season | A die per bird (the first build) shifted the stream, so autumn's 8 s could hold more birds than spring's (1.76x on one seed); this way a thinned season hears exactly a subset of spring's birds and the rate is exact. Measured on six seeds: autumn 0.29-0.56x spring, winter 0-0.27x |
+| The insects' voices and levels (DS-3) | `level` is the insects' gain: spring 1, summer 1.5, autumn 1, winter 0. **Cicada** (by day when `SKY.day > 0.6`, on a line of its own beside the birds): noise, a bandpass Q 4 at 4.7-5.3 kHz rising 7% over the swell, pulsed fully by a triangle LFO at 30-60 Hz, an exponential swell over 2-6 s and a linear fade over 1-2.5 s, 1-4 s between; `CICADA_GAIN = 0.4`. **Katydid** (by night): 2-4 pulses of 50-75 ms every 120-170 ms, noise through a bandpass Q 5 at 3-4 kHz, 0.8-1.5 s between calls; `KATYDID_GAIN = 0.2`. Both panned like a bird, both through the ambient's glass (in the cockpit its 1.5 kHz lowpass all but silences them, as it does the crickets) | Measured, not by ear: katydids at 0.3 read 3.4x spring's crickets, at 0.16 1.25-2.07x over six seeds, at 0.2 2.05x at the suite's seed (band 1.3-2.5). Cicadas at 0.4: a mean of 0.05x the engine at a cruise in the chase view and a loudest read of 0.30x (under 0.6x) |
+| The ambient slider's preview (DS-3) | By night the season's night insect (winter, with none, a bird); by day summer's cicada shortened to a 0.7 s swell and a 0.5 s fade, any other season a bird | "The season's own voice"; a 3-8 s cicada is too long for a preview, and a winter night with no voice would leave the slider silent |
+| The season sound rows' method (DS-3) | Section 9a: per window the live loop is held (`requestAnimationFrame` swallowed), `SND.update(0)` runs from a 50 ms `setInterval`, `Math.random` is a mulberry32 at seed 20261103, `SND.ambRestart()` (a hook for checks) starts the schedule afresh, the radio is at 0; before it the bed is stopped until both probes read silent for 0.5 s unbroken. Every window is 8 s (the plan said 4 s for the winter and night rows) and its figure is the plain mean of the 50 ms RMS reads; cicadas vs the engine compare means (the peak is logged) | Holding the loop takes the frame rate out entirely; 0.5 s of unbroken silence because a gap between two crickets read as silence and let a queued one leak into the next window (0.0001 in spring by day); 8 s so a night window holds six or more katydid calls rather than three or four (over six seeds the ratio still ran 1.25-2.07x at 0.19); the seed is fixed, so the suite's figures repeat |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
 
@@ -429,6 +443,10 @@ file.
 
 ### DS-3. Summer, autumn and winter become selectable
 
+**Built (dsseasons steps 1-4, 2026-11-03/04).** As specified below; the choices beyond it are the
+"Assumed, not decided" rows marked DS-3, the checks are in § Testing, and the bare winter tree was
+tuned by the tree-expert agent's review (the row "The bare tree's numbers").
+
 Comes after DS-1, which supplies the calendar and the sun and stars from the
 date.
 
@@ -641,8 +659,8 @@ a paler column does the same under the rising moon. DS-5 to DS-7 are in `TODO.md
 **Plans (2026-11-02).** DS-7, DS-5, DS-4 and DS-6 are one seven-step arc,
 `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`, landed 2026-11-03 (in that order; DS-7 and DS-5 land on
 `main` at step 2; DS-6 goes after DS-4 so its Earthshine row exists). DS-2 is
-`.claude/plans/DONE/dssound.traffic-stereo-doppler.md`, landed 2026-11-03 after the arc. DS-3 is not
-planned yet: re-sweep now that both have landed.
+`.claude/plans/DONE/dssound.traffic-stereo-doppler.md`, landed 2026-11-03 after the arc. DS-3 was
+planned on 2026-11-03 as `dsseasons` and built the same night (above).
 
 ### DS-5. Brighter stars
 
@@ -809,11 +827,31 @@ which a little dither in the sky pass would hide. Noted here, not planned.
 
 ## Follow-ups not yet done
 
-- **Trees have not had a tree-expert review.** zmhstudio's `tree-expert` agent
-  is meant to see any tree render a human should find realistic; the trees here
-  are the town kit's species drawn as low-poly blobs and cones (conifers by id:
-  `fir-1`, `pine-1`), with a ragged treeline sheet for distant forest. Run it on
-  a forest shot (`teleport(400)`, chase view) before tuning the foliage.
+- **Trees: the tree-expert review is done for the seasons** (zmhstudio's `tree-expert` agent,
+  2026-11-03, on the dsseasons step-2 shots of the forest at `teleport(400)` in all four seasons and
+  a town street in autumn and winter). It tuned the bare winter tree (see the row "The bare tree's
+  numbers"). Its verdicts: spring reads as mature summer green, summer acceptable (barely darker:
+  do not darken further), autumn the right colours but too maple-heavy for the Piedmont, winter
+  dead and snag-like before the tuning. Its structural items, ranked, are follow-ups for the CD:
+  1. **Winter crown mass**: a twig layer, a sparse grey-brown shell of about (110, 98, 90) at about
+     0.85 R, or alpha cards; bare limbs alone read thin up close.
+  2. **More scaffolds than canopy spheres**, at staggered attach heights (one limb per kit sphere
+     is the kit's count, not a tree's).
+  3. **Leaderless street trees**: the trunk's flat top shows above the split in winter; end the
+     trunk at the split and add a tapered leader.
+  4. **Spring as fresh May yellow-green**, about (84, 124, 56): needs the "spring is as shipped"
+     byte-identity lifted, the CD's call.
+  5. **Marcescent oaks and saplings** (tan leaves held into winter, about (150, 118, 76)) and a
+     holly understory.
+  6. **Raleigh species fidelity**: loblolly pine for `fir-1`, river birch bark, willow oak street
+     trees, an oak-hickory and pine weighting in place of the maple-heavy pool. The KB has no
+     articles yet for loblolly pine, red maple, willow oak, river birch, sweetgum or tulip poplar:
+     write those first (zmhstudio `templates/design/trees/species/`).
+- **The look follows the calendar within a season** (leaf-out in late March and April, colour
+  peaking in late October, leaves down by December): an option the DS-3 backlog names, not built.
+- **Snow and weather**: a weather item of its own.
+- **Fescue lawns**: Raleigh lawns are often tall fescue, which stays green in winter (inferred,
+  not checked against a source); DS-3 browns them as the backlog chose. The CD may want them greener.
 
 ## Architecture (one file, banner-commented sections)
 
@@ -917,8 +955,38 @@ which a little dither in the sky pass would hide. Noted here, not planned.
   streetlights, signs; drawn inside the graphics setting's props distance).
   Buildings sit on a **global lot grid** keyed by s, so neighbouring chunks never
   overlap. Each chunk also carries its colliders (circles and boxes), its
-  streetlight lamp positions and its glow sprites. One chunk is built per frame
+  streetlight lamp positions, its glow sprites and its `trees` list (`{ id, x, z }`,
+  world position, metadata in no mesh). One chunk is built per frame
   (~5-13 ms); 3 behind and 12 ahead are kept.
+- **Seasons (DS-3).** A chunk's colours are baked into its meshes, so a season is
+  a rebuild. `SEASON_LOOK[season]` holds every colour that changes (linear RGB:
+  `crown`, `bark`, `leaf`, `autumn`, `bush`, `bushR`, `treeline`, the four grasses);
+  spring's row is the shipped `C` values themselves. The builders read `LOOK`, the
+  current row, never `SETTINGS.season` (the DST rows write that to move the
+  calendar). `applySeason(v)` sets `LOOK` and `lookSeason`, frees every chunk's
+  meshes and calls `updateChunks(99)`; it never moves the player or the traffic
+  (never through `teleport()`). `setSeason(v)` is the dropdown's path (also
+  `__DS.setSeason`): `SETTINGS.season`, `applySeason` when the look differs, the
+  middle date when the season changes. Boot sets `LOOK` from the saved season before
+  the first chunk. **Every season draws the same numbers in the same order** from
+  `rnd` and every `lr`, which is what keeps spring byte-identical and the forest in
+  place: a winter tree still draws one `rnd.int(0, 1e9)` per canopy sphere and uses
+  it as that sphere's limb seed; anything new that varies per tree (the autumn
+  colour, `autumnLeaf()`) comes from a hash of the tree's world position.
+- **Trees by season.** `addTree()`: conifers (`CONIFERS`) are identical in every
+  season. A broadleaf tree's `crown` is `'leaf'` (`LOOK.leaf` with its `lv` and
+  `hue`), `'autumn'` (`AUTUMN_LEAF` by kit id, picked or mixed by the position hash,
+  times `lv`) or `'bare'`: the trunk as always, then `bareLimb()` per kit sphere, a
+  scaffold limb from the trunk at `LIMB.attach` of its height to the sphere's centre
+  pushed out by half its radius (or, over the trunk, the leader to its top) and four
+  order-2 branches turned off it, all as `MB.limb(p0, p1, r0, r1, seg, c, mat)`, a
+  frustum between two points wound counter-clockwise from outside like `cyl()` (the
+  world pass culls back faces and the shadow pass does not, so a limb wound inside
+  out is invisible yet casts a shadow). Bushes take `LOOK.bush` at `LOOK.bushR`,
+  the fields' and open land's treeline `LOOK.treeline` (a forest's stays
+  `C.conifer`), and `grassColor()` and the kerb strip the season's grasses.
+  `__DS.treeTest(id, season, x, z)` builds one tree with the page's own `addTree`
+  for checks.
 - **Signs** are derived from the sections by `ensureSigns()` (speed limit each
   way, W4-2 "lane ends" 160 m before every drop in each direction), drawn from a
   canvas atlas.
@@ -979,6 +1047,16 @@ which a little dither in the sky pass would hide. Noted here, not planned.
   music bus. Every sound has its own channel gain (a slider each) and an
   analyser: `SND.rms(name)` reads `sfx`, `music` or any channel. Muffled in the
   cockpit.
+- **The ambient by season (DS-3).** `AMB_SEASON[lookSeason]` (the season the road
+  looks like, never `SETTINGS.season`): `birds`, the share of spring's birds that sing
+  by day (autumn 0.5, winter 0.3, by a running count so a skipped bird keeps its dice
+  and gap), and the day and night insects with their level. The birds go through
+  `amb.birdG` and the insects through `amb.insG`, both built once in `S.unlock()`,
+  set only when the look changes, each with a probe (`birds`, `insects`). Spring:
+  crickets at night, as shipped; summer: **cicadas** by day (noise band-passed near
+  5 kHz, pulsed at 30-60 Hz, swelling over seconds) and **katydids** at night (2-4
+  rasps near 3-4 kHz); autumn: crickets, half the birds; winter: no insects, three
+  birds in ten. The ambient slider's preview plays the season's own voice.
 - **Other cars' voices** (DS-2, `updateTraffic()` inside `SND`): a pool of six built once in
   `S.unlock()` and never added to or disconnected. A voice is the player's engine shape (two
   saws and a square through a lowpass) and its own looping `BufferSource` on the shared noise
@@ -998,7 +1076,7 @@ which a little dither in the sky pass would hide. Noted here, not planned.
 - **Settings** (cog): day length (24 s / 1 min / **2.4 min** / 10 min / 24 min /
   1 h / real time / stopped), time of day, traffic, units, graphics
   (resolution scale, shadows, props distance), mirror, performance stats, the
-  season (spring only so far; the rest listed, greyed out: backlog DS-3), the
+  season (spring by default; all four selectable since DS-3, each saved), the
   radio station, all sound and a slider per sound, and the how-to and road
   notes. Opening it pauses the game. Persisted in `drivingSimulator.settings.v1`.
 - **Performance stats** (`PERF`): see the second brief. The draw-call counter
@@ -1123,6 +1201,57 @@ by range; the cockpit not muffled by the level (cockpit ratio); the traffic chan
 the tyres slider by the slider row. None caught only by a timed row. The 47 earlier breaks touch no
 `SND` code and were not rerun.
 
+**The seasons (DS-3, dsseasons, 16 rows; the suite 141 -> 157).** Section 3b (step 1, 5 rows):
+the season selectable and saved (each chosen by a `change` on `#season-sel` is the season on its
+middle date, both saved; a reload in winter boots in winter on Feb 4 with its loaded chunks hashing
+as before the reload), nothing moves across a switch (the player's s, u, x, z, yaw and speed and
+every car's id, s and lane, spring -> winter -> spring, every loaded chunk a new mesh), spring is as
+shipped (one chunk of each environment, forest 416, fields 1568, suburb 7136, open 8288, town 10688,
+base and props, vertices and indices read back off the GPU through `COPY_READ_BUFFER` and hashed,
+against `SPRING_BEFORE` recorded on the base page `81d0c48` before any edit, and again after a round
+trip), sunrise and sunset on each season's middle date (NOAA and the suite's own `ownRiseSet`, within
+10 min, on EDT or EST as the season's), each season's sky (Orion high in the south at 22:00 EST on
+Feb 4, 2027, within 0.05 deg of the suite's own precessed places; under the horizon on Aug 6). The
+dropdown row is restated ("spring by default, all four selectable, each saved"). Section 3b, the
+look (step 2, 8 rows, hues are the stored linear colour taken to sRGB by IEC 61966-2-1, then HSV, a
+circular mean): canopies by season (seven broadleaf ids at eight places: spring and summer 95-135
+deg, summer at most 0.9x spring's value; autumn maple and sapling 0-35, oak 18-45 at saturation
+0.45-0.8, birch 42-60, street trees 30-52), bare in winter (no leaf vertex, a limb per sphere, the
+same collider, every bark triangle wound outward), conifers never change (hashes in all four
+seasons), a forest is never one colour (40 autumn maples over 15 deg and 3 of 6 bins), the same trees
+in the same places (each recorded chunk's trees list and colliders in all four seasons, winter's
+props rebuilt), grass by season, bushes and the treeline follow, and the picture follows (one frame
+of the forest at 400 m, 13:00, chase: autumn's warm share at least 3x spring's, winter's green under
+0.5x). Section 9a (step 3, 3 rows): no insects in winter, summer's insects (cicadas by day, katydids
+by night 1.3-2.5x spring's crickets, cicadas under 0.6x the engine), autumn and winter thin the
+birds. Those rows hold the live loop, drive `SND.update(0)` from a 50 ms timer and seed
+`Math.random` (20261103), so they measure the season and not the frame rate; on that seed the
+harness read katydids 2.05x the crickets, cicadas 0.052x the engine, autumn's birds 0.51x and
+winter's 0.25x spring's.
+
+**The break list, DS-3 (2026-11-04, 19 breaks; the list now 76).** Run on copies with
+`negtest-copies.py --jobs 1` in foreground chunks of three or four, through a harness built from
+the suite's own boot, sections 3b (both parts), the restated dropdown row, section 9's sound setup
+and section 9a, copied verbatim (glue: a real click on the cog and its close, the gesture that
+unlocks the audio as section 7 does, and section 3's `hm` helper), since the whole suite takes about
+8 minutes here. The harness was run first on the unbroken page: 18 passed, 0 failed, 1 m 45 s. Every
+break caught by the row its `row` field names; none missed, none caught only by a timed row, no row
+added. The plan's 16: `SEASONS_OPEN` spring-only (selectable and saved), `applySeason` not
+rebuilding (nothing moves: rebuilt), the switch through `teleport` (nothing moves: the player and
+the traffic), a summer grass in spring's row (spring is as shipped), winter skipping the blob seeds
+(the same trees), the autumn colour from `rnd` (the same trees, and the forest's colour), one colour
+for every maple (a forest is never one colour), winter keeping a canopy over its limbs (bare in
+winter), the conifers paler in winter (conifers never change), a limb wound inside out (bare in
+winter: winding), the bare tree without its collider (bare in winter: collider, and the same trees),
+grass unchanged in winter (grass by season, and the picture), the treeline unchanged in winter
+(bushes and the treeline), insects on in winter (no insects in winter), no cicadas in summer
+(summer's insects), boot ignoring a saved season (selectable and saved: the reload). Three more:
+winter bushes at full size (bushes and the treeline), winter's birds unthinned (thin the birds; the
+row is close to trivial on many seeds, where winter hears no bird in 8 s, but on the suite's seed
+it holds one at 0.25x and an unthinned winter reads near 1x) and winter's greyer bark put on the
+conifers too (conifers never change). The tree tuning itself (the attach height back at 0.9) has no
+break: it is cosmetic, and the rows bound the tree's structure, not its proportions.
+
 **A known flake (untraced hypothesis):** under machine load (two suites at
 once, or the gates beside a break run) the sound rows (the engine and radio
 levels, the engine slider, the four stations within 25%) and the perf block's
@@ -1137,6 +1266,19 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
 (300-800 ms a frame), so it says nothing about phone frame rate.
 
 ## Measured (2026-11-01)
+
+- **The seasons' frame cost (dsseasons step 4, 2026-11-04, SwiftShader, 844x390).** The forest at
+  `teleport(400)`, 13:00, paused, one `renderFrame()` with the counters reset: chase 83 draw calls
+  in every season, 227,065 triangles in spring, summer and autumn and 254,295 in winter (1.12x);
+  cockpit 136 calls, 320,140 / 358,700 triangles (1.12x). A season changes no draw call (the limbs
+  are in the props mesh). Live loop, paused, median rAF delta: chase 467 / 450 / 433 / 500 ms and
+  cockpit 467 / 450 / 450 / 517 ms (spring / summer / autumn / winter): winter perhaps 5-10% dearer,
+  near SwiftShader's noise. `buildChunk()` (median of 10 per chunk, then the mean over the 16 loaded
+  chunks): spring 3.4 ms (max 7.7), summer 2.3 (3.5), autumn 2.4 (3.4), winter 4.3 (9.2); the forest
+  chunk at 416 m alone 2.7-8.8 ms across the seasons, winter 4.7-5.1 (its triangles 16,220 against
+  14,280, 1.14x). The whole switch, `applySeason()` finished on the GPU (median of 5): 46 ms into
+  spring or summer, 52 into autumn, 120 into winter. The plan's escalation triggers (winter over 2x
+  slower or 1.6x the triangles) are far off.
 
 - **Other cars' sound cost (dssound, 2026-11-03, SwiftShader).** `SND.update()` with heavy traffic
   (1.8) on a three-lane-a-side stretch, six cars in reach, 5 x 400 calls: median 0.022 ms a call on
