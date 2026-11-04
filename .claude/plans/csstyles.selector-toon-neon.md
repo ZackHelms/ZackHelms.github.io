@@ -1,6 +1,6 @@
 # csstyles - Combat Simulator: a Graphics style selector, the toon style and the neon style (plan arc)
 
-**Status:** PARTIALLY IMPLEMENTED. Steps 1-3 (CS-1, the selector and toon) landed on `main` 2026-11-02 as `7a3e760`, Pages deploy `success`. **Step 4 (the neon look) is done** (2026-11-04, on the overseer's branch after csparry; see Step 4 results): the suite is 92 checks, `negtests/combat-simulator.json` has 32 breaks and `combat-simulator-styles.json` 19. **Step 5 (the bloom) is next**; re-derive its counts from 92 (step 5 takes it to 95).
+**Status:** PARTIALLY IMPLEMENTED. Steps 1-3 (CS-1, the selector and toon) landed on `main` 2026-11-02 as `7a3e760`, Pages deploy `success`. **Steps 4 (the neon look) and 5 (the bloom) are done** (2026-11-04, on the overseer's branch after csparry; see their Results): the suite is 96 checks (step 5 added 4: the plan's 3 plus one for `bloom-state-leak`), `negtests/combat-simulator.json` has 32 breaks and `combat-simulator-styles.json` 24. **Step 6 (docs final, both break lists, land, Pages) is next**; read Step 5 results for the draw-call reading the overseer must settle first.
 **Requested:** 2026-11-01. The CD answered the build's Look question with: "All three with selector in
 settings menu. Default to realistic webgl. Its a lot so put items in backlog in a combat simulator
 section and i can run "backlog-plan-gen" for them later." Realistic shipped (d92baba). The other two
@@ -279,7 +279,7 @@ Tools:
 | 2 | Toon ink | DONE 2026-11-02 |
 | 3 | CS-1 docs, land, Pages | DONE 2026-11-02 (landed `7a3e760`, Pages success) |
 | 4 | Neon look | DONE 2026-11-04 |
-| 5 | Bloom | open |
+| 5 | Bloom | DONE 2026-11-04 |
 | 6 | Docs final, break lists, land, Pages | open |
 
 ### Step 1 - the selector, program sets per style, toon shading, the hooks
@@ -871,6 +871,168 @@ Step 5's escalation bound is therefore "neon's own main pass plus four": 9 + 4 =
 - Row 1's mean luminance is measured without bloom; the bloom will raise it. Step 5 should
   re-measure row 1 with `FX.bloom` on (or take row 1's frame with `FX.bloom` off) rather than
   loosen 0.12 blindly, and keep the hue share at 96% or say why not.
+
+### Step 5 results
+
+Built on `058a0bf`, as two commits: the refactor alone (`refactor(combat-simulator): drawScene()`),
+then the bloom. The `ENGINE` span (`index.html:103-425`) is byte-identical to `bec4bfc`'s (md5
+`aa8b98ba...` both) after each. `gates.sh games/combat-simulator/index.html`, run alone, is GREEN,
+and the suite is **92 + 4 = 96 passed, 0 failed**: the plan's 3 rows plus one extra
+(`the bloom leaves no GL state behind`, the plan's remedy for `bloom-state-leak`, which no other row
+could see; see below), and step 4's palette row restated. Run on the Windows box (SwiftShader
+through `SMOKE_CHROMIUM`), like step 4.
+
+**The refactor, proved alone.** `render()`'s main pass, from `// sky` through the sparks and the
+closing `depthMask(true)` / `disable(BLEND)` / `bindVertexArray(null)` (the neon per-fighter edge
+loop and the ground glow included), moved verbatim, as a line-for-line cut, into
+`drawScene(look, P, R)`; `render()` keeps the rig, the shadow pass, the framebuffer bind, the
+viewport, the state reset and the clear, then calls it. `R = { shVP, ph, dpr, caps, nCaps }`
+carries the frame's locals the body reads (a third argument beside the plan's two: the body needs
+them and must not recompute them). On the refactor alone, step 1's frozen-frame procedure gave the
+same three hashes as `058a0bf` (realistic `2ddf4aa3cb07bfa35de7a863a0a2bb9630fcba19f0f7206702a04321935729be`,
+toon `e10f0c03499e5494924e6ae1ee20817c314abb1b984a1f1f2d945353c25295c9`, neon
+`75b71cc5ec117dd660b86ef479cc07f8f803cce0f45b1f20eef5ae55790b80f0`), the same draw calls per style
+(6 / 8 / 8 idle, 8 / 11 / 9 with effects), and the suite 92 passed, 0 failed. Committed as `c04fdff`
+before any bloom code existed.
+
+**The hashes after the bloom:** realistic `2ddf4aa3...935729be` and toon `e10f0c03...c25295c9`,
+unchanged; neon `ac0811283788cb5f1363882ee1ab8bc21455568aeade09db688b269ea5320ebf` with the bloom
+(`75b71cc5...` is still what neon draws with `FX.bloom` false, since the bloom code is gated
+off whole).
+
+**How the bloom is built:**
+- `VS_POST`: `VS_SKY`'s triangle from `gl_VertexID` (no attributes, drawn through `SKYVAO`),
+  writing `vUV = p * 0.5 + 0.5`, at the sky's far depth (`z 0.9999`). That depth is deliberate:
+  with the depth test left on, the composite would hide behind everything the scene drew, which
+  is what makes "the composite disables `DEPTH_TEST`" a load-bearing line a break can remove.
+- `FS_BLUR`: a 9-tap gaussian (weights 0.2270, 0.1946, 0.1216, 0.0541, 0.0162, summing to 1) along
+  `uStep` (one texel); with `uThresh > 0` each tap is bright-passed first, `max(c - 0.45, 0) / 0.55`.
+  `FS_POST`: `texture(uTex, vUV).rgb * uGain`. Neither reads `STYLE`, so both are compiled once,
+  into `PRG.blur` and `PRG.post`, **on the first neon frame** (with the target), so the boot cost
+  does not grow.
+- `BLOOM = { w, h, texA, fbA, rbDepth, texB, fbB, ok, made }`, from `makeBloom(w, h)`: two RGBA8
+  textures (`texStorage2D`, LINEAR, CLAMP_TO_EDGE), `fbA` = `texA` + a `DEPTH_COMPONENT24`
+  renderbuffer, `fbB` = `texB` alone; `ok` is both framebuffers' `checkFramebufferStatus` (a target
+  that is not complete skips the bloom rather than drawing garbage; SwiftShader reports both
+  complete), `made` counts builds. `BLOOM_K = { div: 4, thresh: 0.45, gain: 0.9 }` holds the
+  plan's three numbers. Re-made (the old objects deleted) whenever `ceil(pw / 4)` or `ceil(ph / 4)`
+  changes.
+- `render()` ends `const R = {...}; drawScene(look, P, R); if (look === 'neon' && FX.bloom)
+  bloom(look, P, R, pw, ph);`. `bloom()`: bind `fbA`, viewport `(w, h)`, the main pass's starting
+  state (`DEPTH_TEST` on, `BLEND` and `CULL_FACE` off), clear, `drawScene()`; `DEPTH_TEST` and
+  `BLEND` off; blur `texA -> fbB` across with the threshold, `texB -> fbA` down without it; bind the
+  screen, full viewport, `BLEND` on with `ONE, ONE`, add `texA * 0.9`; then back: `DEPTH_TEST` on,
+  `depthMask(true)`, `BLEND` off, the shadow map rebound on unit 0 (what `setCommon` left there
+  before the bloom), VAO null. No sampled texture is ever attached to the bound framebuffer: the
+  scene pass's `setCommon` binds the shadow map (not `texA`), the blurs read the other target, the
+  composite reads `texA` into the screen.
+- The ink width inside the quarter-res pass is the same formula (`px * 2 tan(fov/2) / (ph / dpr)`,
+  a fraction of the screen height), so neon's 2 CSS px edges are half a target pixel there; they
+  still bloom visibly (checked by eye on PNGs of the frame with the bloom on and off), so nothing
+  was widened for the bloom pass.
+- `__CS.BLOOM` (a getter) and `__CS.BLOOM_K`.
+
+**Row 1 of step 4, re-measured (restated).** With the bloom on, neon's mean is 0.096 (was 0.084) and
+the hue share of its brightest 2% is 96.8% (was 99.2%): the blurred halo sits between the palette
+hues. 0.8 points over the 96% bar is too thin to trust for a clause meant to bite, so the hue clause
+and the first mean clause now read the frame with `FX.bloom` **off** (the palette as drawn: 0.0841,
+99.2%, step 4's values exactly, so `neon-tonemapped`'s 93.9% still fails it by two points), and a
+second clause requires the shipped frame, bloom on, to stay under the same mean ceiling (0.096 <
+0.12). The ceiling did not move.
+
+**Row 2 of step 4, restated the same way.** `neon-rims-same` (both rims green) came back **MISSED**
+on the first run with the bloom on: the bloom's halo of the opponent's own red edges and red ground
+glow lifts the red of its brightest pixels past 1.5x even with a green rim. The row now reads both
+frames, the bloom off (the colours as drawn: you [63, 244, 34], them [245, 59, 92], step 4's values)
+and on (you [64, 228, 52], them [241, 65, 97]), and each must pass; the bloom-off frame is the one
+that catches the break.
+
+**The 4 rows** (part 2; the first three use the ink rows' scene, `startDuel(1, 99)`, `F.p` at z -1.5
+and `F.e` at z 1.5, both free, sparks cleared; every comparison inside one evaluate):
+1. **Bloom adds a halo**: neon with `FX.bloom` off and on. The frame's summed luminance (0-1 per
+   pixel) must rise by 5%: measured 27,666 -> 31,588 (+14%). The bloom-off frame's brightest 2%
+   (luminance >= 0.507) are dilated by 6 px; in that ring, those pixels left out (49,431 px), the
+   count with luminance 0.08-0.4 must rise by half: measured 13,097 -> 32,049 (2.4x).
+2. **Bloom is neon's alone**: realistic and toon frames byte-identical with `FX.bloom` true and
+   false (0 pixels differ in each).
+3. **The target follows the screen** (last before the console row): neon drawn at 844x390, then
+   390x844, then 844x390 again (`setViewportSize`, then wait for `innerWidth`/`innerHeight`); after
+   each `glError() === 0`, `BLOOM.ok`, and `BLOOM` is `ceil(pw / 4) x ceil(ph / 4)` of the canvas's
+   drawing buffer (211 x 98, 98 x 211, 211 x 98).
+4. **The bloom leaves no GL state behind** (extra row): the GL state after a neon `draw()` (blend
+   and depth test enabled, depth mask, cull face, blend func, viewport, framebuffer binding, active
+   unit, unit 0's texture is the shadow map, VAO) is the same with `FX.bloom` on as off; and a
+   realistic frame drawn straight after a neon one is byte-identical to one drawn after a realistic
+   one, and a neon frame after neon to neon after realistic.
+
+**`bloom-state-leak`, and why it needed its own row.** The plan's break leaves blending on after the
+composite, expecting the next frame's arena to suffer. On this page it cannot: every frame starts by
+setting the state it draws with (realistic and toon through the shadow pass's own
+`enable(DEPTH_TEST)` / `disable(BLEND)` / `disable(CULL_FACE)`, neon through step 4's
+`if (!SHADOWS_ON)` reset), so a blend left on is undone before anything is drawn, and the plan's
+remedy row (a realistic frame after neon against one after realistic) passes with the break in.
+Row 4 therefore reads the state directly as well as drawing the two pictures, and it is what catches
+the break; the pictures stay in it for the leaks the frame-start resets do not cover (a depth mask
+left off would stop the next clear, and a quarter-res viewport or a bound `fbA` would draw or read
+the wrong target).
+
+**Breaks** (appended to `combat-simulator-styles.json`: 24 in all, 5 from this step; every anchor
+matches exactly once and every `new` carries `/* @negtest */`; run two at a time with `--jobs 2`,
+alone on the box; none caught by a crash):
+
+| break | caught by | measured |
+|---|---|---|
+| `bloom-off` (`if (false && ...)`) | row 1, row 3 | summed luminance 27,666 on and off; `BLOOM` never made (`w` null) |
+| `bloom-everywhere` (the gate is `FX.bloom` alone) | row 2, and step 1's row 9 and step 2's rows 1-2 | realistic 329,129 and toon 329,113 px differ with the bloom; toon's ink washed out (courtyard 0 near-black), torso levels 33 / 28 |
+| `bloom-no-resize` (made once, never re-made) | row 3 | still 211 x 98 at 390x844 |
+| `bloom-depth-on` (the composite enables `DEPTH_TEST`) | row 1, both clauses | summed luminance +3.3% (< 5%), ring mid-bright 13,097 -> 18,089 (1.38x < 1.5x): the halo is left only over the sky |
+| `bloom-state-leak` (the composite leaves `BLEND` on) | row 4, its state clause | `blend: true` after the bloom, `false` without; both pictures identical (see above) |
+
+Re-run on the final page, because the refactor moved their anchors into `drawScene()` (all three
+still match once, unchanged) or because the bloom changes the rows they hit:
+
+| break | caught by |
+|---|---|
+| `ink-off-fighters` | step 2's row 1 (opponent box 300 vs 186) |
+| `ink-off-arena` | step 2's row 2 (courtyard 0 vs 0), and row 1 of this step (less to bloom) |
+| `ink-cull-not-discard` | step 2's row 1, its fill clause (torso 475 of 480) |
+| `neon-tonemapped` | step 4's rows 1 and 2, and row 1 of this step |
+| `neon-bright-arena` | step 4's rows 1 and 2, and row 1 of this step |
+| `neon-rims-same` | step 4's row 2 as restated (its bloom-off clause); **MISSED** before the restatement, see above |
+
+The other 13 breaks in the list (steps 1-4) have anchors outside the moved span and rows the bloom
+does not touch; they were not re-run here and are step 6's full run.
+
+**Draw calls per frame** (`PERF.calls` for one `draw()`, the rank-4 scene of step 1's row 10):
+
+| | realistic | toon | neon, bloom on | neon, `FX.bloom` off |
+|---|---|---|---|---|
+| idle | 6 | 8 | 19 | 8 |
+| trail, power ring, sparks | 8 | 11 | 21 | 9 |
+
+Neon with `FX.ink` off and effects: 15 (6 + 6 + 3). The bloom adds exactly **neon's own main pass
+again (8 idle, 9 with effects) plus 3** (the two blurs and the composite), because the plan's design
+draws the same scene a second time into the quarter-res target. **Read against the plan's trigger**
+("the bloom adds more draw calls than neon's own main pass plus four") that is under the bound by
+one. **Read as step 4's Results did** ("9 + 4 = 13 with effects", a ceiling on the whole frame), it
+is over (21 > 13), and no build of the plan's design could meet that reading, since the second
+scene pass alone is 8-9 calls. I took the plan's wording, whose design needs the second pass, and
+flag the disagreement for the overseer rather than settle it here. If the frame rate on the CD's
+phone says otherwise, the alternative with no second scene is to resolve the finished main pass
+with `blitFramebuffer` into a full-size texture (a multisampled source can only be blitted at the
+same size) and downsample from it, at the cost of a full-size target; or the bloom pass could skip
+the draws that never pass the threshold. Neither is built.
+
+**Assumed look choices, for step 6 to write into `.claude/combat-simulator.md`:**
+- The plan's numbers, unchanged: a quarter-resolution target, the bright-pass at 0.45, the
+  composite at 0.9. They read well on the rank-1 frame (the edges and rims glow, the floor's blue
+  joints get a soft wash near the fighters, the dark bodies stay dark); the CD's playtest decides.
+- One blur radius: a single 9-tap pass each way at a quarter resolution, so the halo reaches about
+  16 device px. No second, wider level.
+- The quarter-res pass draws neon exactly as the screen does, edges at the same CSS width (half a
+  target pixel), effects included, so a trail and sparks bloom too.
+- The bloom is drawn in neon only and at every rank; it has no setting of its own (only the test
+  switch `FX.bloom`), and the quality select (`SETTINGS.gfx`) does not change it.
 
 ## Handoff
 

@@ -112,5 +112,35 @@
   "file": "games/combat-simulator/index.html",
   "old": "  SHADOWS_ON = look === 'neon' ? 0 : 1;",
   "new": "  SHADOWS_ON = 1; /* @negtest */"
+ },
+ {
+  "name": "bloom-off",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (look === 'neon' && FX.bloom) bloom(look, P, R, pw, ph);",
+  "new": "  if (false && look === 'neon' && FX.bloom) bloom(look, P, R, pw, ph); /* @negtest */"
+ },
+ {
+  "name": "bloom-everywhere",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (look === 'neon' && FX.bloom) bloom(look, P, R, pw, ph);",
+  "new": "  if (FX.bloom) bloom(look, P, R, pw, ph); /* @negtest */"
+ },
+ {
+  "name": "bloom-no-resize",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (!BLOOM || BLOOM.w !== w || BLOOM.h !== h) makeBloom(w, h);",
+  "new": "  if (!BLOOM) makeBloom(w, h); /* @negtest */"
+ },
+ {
+  "name": "bloom-depth-on",
+  "file": "games/combat-simulator/index.html",
+  "old": "  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);\n  gl.useProgram(PRG.post.p);",
+  "new": "  gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE); gl.enable(gl.DEPTH_TEST); /* @negtest */\n  gl.useProgram(PRG.post.p);"
+ },
+ {
+  "name": "bloom-state-leak",
+  "file": "games/combat-simulator/index.html",
+  "old": "  gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.BLEND);",
+  "new": "  gl.enable(gl.DEPTH_TEST); gl.depthMask(true); /* @negtest */"
  }
 ]
