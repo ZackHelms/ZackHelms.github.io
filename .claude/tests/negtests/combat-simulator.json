@@ -38,8 +38,8 @@
  {
   "name": "chain-of-three",
   "file": "games/combat-simulator/index.html",
-  "old": "        if (!power && f.queued && f.chain < RULES.chain.length - 1) { startHit(F, f, f.chain + 1); break; }",
-  "new": "        if (!power && f.queued && f.chain < 2) { startHit(F, f, f.chain + 1); break; } /* @negtest */"
+  "old": "        if (!power && f.queued && f.chain < RULES.chain.length - 1) { startHit(F, f, f.chain + 1, f.queued); break; }",
+  "new": "        if (!power && f.queued && f.chain < 2) { startHit(F, f, f.chain + 1, f.queued); break; } /* @negtest */"
  },
  {
   "name": "stagger-can-act",
@@ -142,5 +142,53 @@
   "file": "games/combat-simulator/index.html",
   "old": "  a.resolved = true;\n  const at = [",
   "new": "  /* @negtest */\n  const at = ["
+ },
+ {
+  "name": "parry-window-global",
+  "file": "games/combat-simulator/index.html",
+  "old": "  if (H.parry && d.st === 'parry' && d.t < H.parryWin) {",
+  "new": "  if (H.parry && d.st === 'parry' && d.t < RULES.parry.win) { /* @negtest */"
+ },
+ {
+  "name": "quick-not-quick",
+  "file": "games/combat-simulator/index.html",
+  "old": "    quick: { wind: 0.5, rec: 0.8, dmg: 0.6 },",
+  "new": "    quick: { wind: 1, rec: 0.8, dmg: 0.6 }, /* @negtest */"
+ },
+ {
+  "name": "kinds-break-chain",
+  "file": "games/combat-simulator/index.html",
+  "old": "  setSt(f, 'atk'); f.chain = idx; f.kind = kind || 'normal'; if (idx === 0) f.landed = 0;",
+  "new": "  if (kind && kind !== 'normal') idx = 0; /* @negtest */ setSt(f, 'atk'); f.chain = idx; f.kind = kind || 'normal'; if (idx === 0) f.landed = 0;"
+ },
+ {
+  "name": "ai-never-quick",
+  "file": "games/combat-simulator/index.html",
+  "old": "    quickP: lerp(0.05, 0.30, t),                // the share of its cuts thrown quick, and heavy",
+  "new": "    quickP: 0, /* @negtest */"
+ },
+ {
+  "name": "quick-button-missing",
+  "file": "games/combat-simulator/index.html",
+  "old": "    quick: { x: ax - 3.4 * R * Math.cos(Math.PI / 8), y: ay - 3.4 * R * Math.sin(Math.PI / 8), r: 0.6 * R },\n",
+  "new": "    /* @negtest */\n"
+ },
+ {
+  "name": "keys-no-heavy",
+  "file": "games/combat-simulator/index.html",
+  "old": ", KeyU: 'quick', KeyO: 'heavy' };",
+  "new": ", KeyU: 'quick' /* @negtest */ };"
+ },
+ {
+  "name": "heavy-overlaps-power",
+  "file": "games/combat-simulator/index.html",
+  "old": "heavy: { x: ax - 3.4 * R * Math.cos(3 * Math.PI / 8), y: ay - 3.4 * R * Math.sin(3 * Math.PI / 8), r: 0.6 * R },",
+  "new": "heavy: { x: ax - 3.4 * R * Math.cos(Math.PI / 4), y: ay - 3.4 * R * Math.sin(Math.PI / 4), r: 0.6 * R }, /* @negtest */"
+ },
+ {
+  "name": "kind-pose-ignored",
+  "file": "games/combat-simulator/index.html",
+  "old": "const wk = power ? C.wind : f.kind === 'quick' ?",
+  "new": "const wk = true || power ? C.wind /* @negtest */ : f.kind === 'quick' ?"
  }
 ]

@@ -12,21 +12,6 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [combat-sim] **A parry only counts before the blade lands, then quick and heavy strikes**
-  (CS-3 and CS-4; the CD, 2026-11-03: "I can parry successfully during a small time Window
-  after opponent Sword makes contact and deals damage", and a quick strike "like a jab in
-  boxing" and a heavy strike with a longer telegraph, as buttons, for testing it). Traced in
-  the engine: the cut that hurt you is never parried, but a parry pressed while flinching
-  from it is buffered, fires when the flinch ends, and catches the next chained cut before
-  its wind-up has even started. One attack table for every strike, the parry judged against
-  the attacker's own row, for both fighters; CS-3 lands on its own at step 2 of 5.
-  **CS-3 shipped 2026-11-03** (build 2026-11-03 20:43 UTC); CS-4 (quick and heavy strikes) is still open.
-  *Decided 2026-11-03:* the parry window scales with each kind's telegraph; quick and heavy
-  mix into the five-cut chain; the opponent throws them too. Spec and checks:
-  `.claude/combat-simulator.md` section Backlog (parry timing and strike kinds), CS-3 and CS-4.
-  **Plan ready (2026-11-03)** - run:
-  `/zmh-producer:oversee-implementation .claude/plans/csparry.parry-timing-strike-kinds.md`
-
 - [combat-sim] **The neon graphics style** (CS-2; the CD, 2026-11-01: "All three with
   selector in settings menu. Default to realistic webgl"). Realistic and toon are live (CS-1,
   signed off by the CD 2026-11-03); neon is the third option in the `Graphics style` select:

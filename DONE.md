@@ -11,6 +11,16 @@
   Suite 141 -> 157, break list 57 -> 76, all 19 new breaks caught. build 2026-11-04 04:01 UTC. Detail:
   `.claude/driving-simulator.md` DS-3; plan `.claude/plans/DONE/dsseasons.summer-autumn-winter.md`.
 
+- 2026-11-03 [combat-sim] **Quick and heavy strikes** (CS-4; the CD: "a quick strike ... like a jab in
+  boxing" and a heavy strike with a longer telegraph, as buttons, for testing the parry). Three kinds of
+  strike now share one attack table: the normal five-cut chain, a quick strike (0.6x damage, half the
+  wind-up, a 0.12 s parry window) and a heavy strike (1.6x, twice the wind-up, a 0.40 s window), each on
+  its own button (an outer arc round attack) and key (U, O), each usable as any cut of the chain, with its
+  own backswing, icon and tell, and thrown by the opponent too (quick more often at high ranks, heavy at
+  low). The CD's three answers built as given. Suite 81 -> 89, eight new breaks (32 in all, every one run
+  and caught); the ladder line is unchanged. build 2026-11-04 06:25 UTC. Detail:
+  `.claude/combat-simulator.md` CS-4.
+
 - 2026-11-03 [combat-sim] **A parry only counts before the blade lands** (CS-3; the CD: "I can
   parry successfully during a small time Window after opponent Sword makes contact and deals
   damage"). Traced: the cut that hurt you was never parried, but a parry pressed while flinching

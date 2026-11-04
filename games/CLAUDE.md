@@ -1171,8 +1171,12 @@ A third-person katana duel in **WebGL2** (CD commission 2026-11-01, placed after
 Simulator on the hub; open MIT): you against one AI swordsman at a time up a ladder of ten
 named masters, in a walled stone courtyard lit from mid-morning at rank 1 to a
 lantern-lit dusk at rank 10, with a Graphics style selector: realistic, toon. A floating stick at the bottom left; attack, dodge, parry and
-power attack buttons at the bottom right. Taps chain a **five-cut combo** that starts over
-after the fifth; a **parry** inside a 0.24 s window staggers the attacker (no parry or
+power attack buttons at the bottom right, with a **quick** strike (a jab: less damage, half the
+telegraph, a 0.12 s parry window) and a **heavy** strike (more damage, twice the telegraph, 0.40 s) on
+an outer arc and keys U and O, both mixing into the chain and thrown by the opponent too. Taps chain a **five-cut combo** that starts over
+after the fifth; a **parry** inside the attacker's own window (0.24 s for a normal cut) staggers
+the attacker, but only before the blade lands: it is judged by the attacker's row of `ATTACKS`, and a
+parry pressed while reeling from a hit is dropped, for both fighters (no parry or
 dodge for 1.5 s, +10% damage taken); a **dodge** has invincible frames you can dash
 through a blade with; slipped cuts, parries and the 3rd and 5th landed cut of a run each
 add 1 **energy**, and at 10 the power button's ring closes and flashes: a spinning power
@@ -1180,7 +1184,7 @@ attack that can be dodged, never parried, and that cannot be flinched out of. 20
 two. The opponent fills the same meter by the same rules. The fight is a DOM-free
 `ENGINE` block (fixed 120 Hz); fighters are instanced tapered capsules posed by hand and
 blade keys with two-bone IK for both arms and planted feet. Suite:
-`.claude/tests/drive-combat-simulator.cjs` (74 checks, 19 + 14 negative controls). Detailed
+`.claude/tests/drive-combat-simulator.cjs` (89 checks, 32 + 14 negative controls). Detailed
 context: `.claude/combat-simulator.md`.
 ---
 
