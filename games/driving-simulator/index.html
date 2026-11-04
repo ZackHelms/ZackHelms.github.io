@@ -2335,6 +2335,7 @@ uniform vec4 uLP[${MAXL}]; uniform vec4 uLD[${MAXL}]; uniform vec3 uLC[${MAXL}];
 uniform vec3 uLamp;            // head lamps on, brake, cabin night glow
 uniform sampler2DShadow uShadow; uniform sampler2D uSigns, uGauge, uMirror;
 uniform float uLaneW;
+uniform float uWet;            // how wet the ground is, 0-1 (DS-8, WX.wet): 0 when dry, where every term it touches is skipped
 out vec4 frag;
 float shadowAt(vec4 sp, float ndl){
   if (uShadowOn < 0.5) return 1.0;
@@ -2388,6 +2389,18 @@ void main(){
     alb = mix(alb, mc, mark);
     retro = mark * 1.5;
     spec = 0.03;
+    // Wet (DS-8): the water gathers first in the wheel paths and in low patches (puddles, from a slow noise), so a damp road
+    // is wet there before it is wet between; wet asphalt darkens (albedo up to 0.4x, paint less), goes smooth and glossy
+    // (rough toward 0.15, puddles 0.05) and takes the sky (refl up to 0.35, puddles 0.7) and every light's specular.
+    if (uWet > 0.0) {
+      float pud = smoothstep(0.58, 0.72, vn(P.xz * 0.23 + 17.0)) * step(au, edgeU);
+      float g = max(paths * 0.8 * step(au, edgeU), pud);
+      float wl = smoothstep(0.0, 1.0, uWet * (1.0 + 0.9 * g));
+      alb *= mix(1.0, mix(0.4, 0.8, mark), wl);
+      rough = mix(rough, mix(0.15, 0.05, pud), wl);
+      refl = wl * mix(0.35, 0.7, pud);
+      spec = mix(spec, 0.5, wl);
+    }
   } else if (m == 1) {
     float n = vn(P.xz * 0.9) * 0.5 + vn(P.xz * 4.0) * 0.3 + vn(P.xz * 0.06) * 0.4;
     alb = vCol * (0.75 + 0.45 * n);
@@ -2432,6 +2445,11 @@ void main(){
   else if (m == 18) { rough = 0.9; spec = 0.04; }
   else if (m == 19) { vec3 g = pow(texture(uGauge, vUV).rgb, vec3(2.2)); alb = g * 0.25; emis = g * (0.35 + 1.2 * uNight); }
   else if (m == 20) { frag = vec4(texture(uMirror, vUV).rgb * 0.92, 1.0); return; }   // already tonemapped
+  // wet (DS-8), beside the road: concrete, roofs, the walls (not their windows) and dirt darken up to 0.75x, grass 0.9x
+  if (uWet > 0.0) {
+    if (m == 7 || m == 4 || m == 21 || ((m == 2 || m == 3) && refl == 0.0)) alb *= 1.0 - 0.25 * uWet;
+    else if (m == 1) alb *= 1.0 - 0.1 * uWet;
+  }
   float ndl = max(dot(N, uSunDir), 0.0);
   float sh = ndl > 0.0 ? shadowAt(vSh, ndl) : 0.0;
   if (m == 6) { ndl = ndl * 0.75 + 0.25 * max(dot(-N, uSunDir), 0.0); }
@@ -2619,6 +2637,80 @@ const FS_BLOB = `#version 300 es
 precision mediump float;
 in vec2 vQ; uniform float uK; out vec4 o;
 void main(){ float r = length(vQ * vec2(1.0, 1.0)); float a = smoothstep(1.0, 0.3, r) * uK; o = vec4(0.0, 0.0, 0.0, a); }`;
+// The precipitation pass (DS-8): one instanced draw of camera-facing quads with no vertex data at all. Each instance is a drop
+// placed in the vertex shader from gl_InstanceID by an integer hash (exact on every GPU, so a test can know the field): a
+// point in a box PRECIP_BOX (24 m) on a side that falls at its own speed and wraps by mod round the eye, so the field stays put
+// in the world while the eye moves through it. Every fall speed is a whole number of decimetres a second and uT wraps at
+// 1200 s, so speed * 1200 is a whole number of boxes and the wrap is seamless (a snow wobble must keep a period that divides
+// 1200 s). uMode picks the kind: 0 rain (a thin streak along the drop's velocity relative to the camera, uStreakT long: two
+// frames at 60 fps, the eye's persistence, so it slants as you drive); snow joins as another mode. Lit per vertex, at the drop:
+// the sky behind it (a drop is a small lens), the ambient, the sun and the moon (already dimmed under cloud) and the first four
+// local lights (the headlights first), fogged like the world, and tonemapped here. A drop is faded in from 0.8-3 m (no streak
+// through the eye) and out from 0.36-0.48 of the box (its wrap unseen). A drop whose streak meets the player's car box
+// (uCarO/X/Y/Z/H: its centre eye-relative, its axes, its half extents plus 0.1 m) is moved off screen, in every view, so nothing
+// falls through the roof or inside the cockpit. uField 1 (the suite's only) places every drop inside that box instead, which the
+// cull must then remove; uField 2 the same field beside the box, to show it would be seen.
+const PRECIP_BOX = 24;
+const VS_PRECIP = `#version 300 es
+precision highp float;
+${GLSL_COMMON}
+uniform mat4 uVP; uniform vec3 uEyeM, uVel, uAmbSky; uniform float uT, uMode, uStreakT, uWidth, uExposure, uFog, uField;
+uniform vec2 uPx;
+uniform vec3 uCarO, uCarX, uCarY, uCarZ, uCarH;
+uniform vec4 uLP[4]; uniform vec4 uLD[4]; uniform vec3 uLC[4]; uniform int uNL;
+out vec3 vC; out float vA, vQ;
+const float BOX = ${PRECIP_BOX.toFixed(1)};   // the field's box (m); uEyeM is the eye modulo it
+uint hu(uint x){ x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+float hf(uint x){ return float(hu(x) >> 8) / 16777216.0; }
+vec3 boxL(vec3 p){ vec3 d = p - uCarO; return vec3(dot(d, uCarX), dot(d, uCarY), dot(d, uCarZ)); }
+bool segBox(vec3 a, vec3 b){
+  vec3 d = b - a; float t0 = 0.0, t1 = 1.0;
+  for (int k = 0; k < 3; k++) {
+    if (abs(d[k]) < 1e-6) { if (abs(a[k]) > uCarH[k]) return false; }
+    else { float u = (-uCarH[k] - a[k]) / d[k], v = (uCarH[k] - a[k]) / d[k]; t0 = max(t0, min(u, v)); t1 = min(t1, max(u, v)); }
+  }
+  return t0 <= t1;
+}
+void main(){
+  uint id = uint(gl_InstanceID) * 4u;
+  vec3 h3 = vec3(hf(id), hf(id + 1u), hf(id + 2u));
+  float speed = 6.0 + 0.1 * floor(hf(id + 3u) * 20.999);           // rain: 6.0-8.0 m/s
+  vec3 head;
+  if (uField > 0.5) head = uCarO + mat3(uCarX, uCarY, uCarZ) * ((h3 * 2.0 - 1.0) * uCarH * 0.98 + vec3(uField > 1.5 ? 2.0 * uCarH.x + 0.3 : 0.0, 0.0, 0.0));
+  else head = mod(h3 * BOX - vec3(0.0, mod(speed * uT, BOX), 0.0) - uEyeM + BOX * 0.5, BOX) - BOX * 0.5;
+  vec3 vRel = vec3(0.0, -speed, 0.0) - uVel;
+  vec3 tail = head - vRel * uStreakT;
+  float dist = length(head);
+  vA = 0.6 * smoothstep(0.8, 3.0, dist) * (1.0 - smoothstep(BOX * 0.36, BOX * 0.48, dist));
+  vec4 c0 = uVP * vec4(tail, 1.0), c1 = uVP * vec4(head, 1.0);
+  int k = gl_VertexID % 6;
+  float side = (k == 0 || k == 1 || k == 3) ? -1.0 : 1.0, end = (k == 1 || k == 2 || k == 4) ? 1.0 : 0.0;
+  vQ = side;
+  if (vA <= 0.0 || c0.w < 0.05 || c1.w < 0.05 || segBox(boxL(tail), boxL(head))) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); vA = 0.0; return; }
+  vec2 s0 = c0.xy / c0.w * uPx * 0.5, s1 = c1.xy / c1.w * uPx * 0.5, d = s1 - s0;
+  float l = length(d); vec2 dir = l > 1e-3 ? d / l : vec2(0.0, 1.0), nrm = vec2(-dir.y, dir.x);
+  vec2 sp = mix(s0, s1, end) + nrm * side * uWidth * 0.5 + dir * (end * 2.0 - 1.0) * 0.5;
+  float w = mix(c0.w, c1.w, end), z = mix(c0.z / c0.w, c1.z / c1.w, end);
+  gl_Position = vec4(sp / (uPx * 0.5) * w, z * w, w);
+  // light at the drop: a drop is a little lens that shows the sky behind it (a little under the sky's own light), plus the sun
+  // and the moon and the local lights it catches
+  vec3 V = head / max(dist, 1e-3);
+  vec3 col = 0.8 * skyBase(normalize(vec3(V.x, 0.25, V.z))) + 0.15 * (uAmbSky + uSunCol + uMoonCol);
+  for (int i = 0; i < 4; i++) {
+    if (i >= uNL) break;
+    vec3 Lv = uLP[i].xyz - head; float d2 = dot(Lv, Lv), ld = sqrt(d2); vec3 Ld = Lv / ld;
+    float range = uLP[i].w, att = 1.0 / (1.0 + d2) * smoothstep(range, range * 0.6, ld), cone = 1.0;
+    if (uLD[i].w > -1.5) cone = smoothstep(uLD[i].w, uLD[i].w + 0.08, dot(-Ld, uLD[i].xyz));
+    col += uLC[i] * att * cone * 0.8;
+  }
+  vec3 fc = skyBase(normalize(vec3(V.x, max(V.y, 0.0) * 0.4 + 0.02, V.z)));
+  col = mix(col, fc, 1.0 - exp(-dist * uFog));
+  vC = tonemap(col * uExposure);
+}`;
+const FS_PRECIP = `#version 300 es
+precision mediump float;
+in vec3 vC; in float vA, vQ; out vec4 o;
+void main(){ o = vec4(vC, vA * (1.0 - abs(vQ))); }`;
 
 function compile(vs, fs, name) {
   const mk = (type, src) => {
@@ -2652,6 +2744,8 @@ function upload(mb) {
 function freeMesh(m) { if (!m) return; gl.deleteVertexArray(m.vao); gl.deleteBuffer(m.vb); gl.deleteBuffer(m.ib); }
 
 let PRG = null, SHADOW = null, MIRROR = null, TEX = {}, QUAD = null, GLOWBUF = null;
+// the precipitation pass's state: its empty VAO, and its field (0; 1 and 2 are the suite's, for the cull's row: VS_PRECIP)
+const PRECIP = { vao: null, field: 0 };
 function texFromCanvas(cv, mip) {
   const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, cv);
@@ -2689,8 +2783,9 @@ function initGL() {
   PRG = {
     world: compile(VS_WORLD, FS_WORLD, 'world'), shadow: compile(VS_SHADOW, FS_SHADOW, 'shadow'),
     sky: compile(VS_SKY, FS_SKY, 'sky'), glow: compile(VS_GLOW, FS_GLOW, 'glow'), blob: compile(VS_BLOB, FS_BLOB, 'blob'),
-    stars: compile(VS_STARS, FS_STARS, 'stars'),
+    stars: compile(VS_STARS, FS_STARS, 'stars'), precip: compile(VS_PRECIP, FS_PRECIP, 'precip'),
   };
+  PRECIP.vao = gl.createVertexArray();   // no attributes: the precipitation pass builds its quads from gl_VertexID and gl_InstanceID
   initStars();
   TEX.signs = texFromCanvas(makeSignAtlas(), true);
   TEX.gauge = texFromCanvas(gaugeCv, false);
@@ -3674,6 +3769,7 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   gl.uniform1f(wp.U.uFog, fogSigma());
   gl.uniform1f(wp.U.uShadowOn, opt.shadows ? 1 : 0);
   gl.uniform1f(wp.U.uLaneW, LANE_W);
+  gl.uniform1f(wp.U.uWet, WX.wet);
   gl.uniform1f(wp.U.uWind, now);
   const L = gatherLights(eye, recs);
   if (!opt.mirrorPass) PERF.lights = L.n;
@@ -3695,6 +3791,9 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
     m = M4.mul(m, rotZ(-PLAYER.steer * 15));
     drawMesh(wp, CABIN.wheelMesh, m);
   }
+  // rain and snow (DS-8): after the world and the cabin, before the contact shadows; nothing at all when nothing falls
+  const pn = precipCount();
+  if (pn > 0) drawPrecip(vp, eye, w, h, L, opt, pn);
   // contact shadows under the cars (they also stand in for night, when there is no shadow map)
   gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
   const bp = PRG.blob; gl.useProgram(bp.p); gl.uniformMatrix4fv(bp.U.uVP, false, vp);
@@ -3724,11 +3823,47 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   gl.disable(gl.BLEND); gl.depthMask(true);
   gl.bindVertexArray(null);
 }
+// precip: the precipitation pass's count scale (DS-8, chosen)
 const GFX = [
-  { scale: 0.6, propDist: 380, shadows: false },
-  { scale: 0.85, propDist: 560, shadows: true },
-  { scale: 1.0, propDist: 820, shadows: true },
+  { scale: 0.6, propDist: 380, shadows: false, precip: 0.35 },
+  { scale: 0.85, propDist: 560, shadows: true, precip: 0.65 },
+  { scale: 1.0, propDist: 820, shadows: true, precip: 1.0 },
 ];
+// The precipitation pass's instance count (DS-8): at intensity 1, 5,000 rain streaks times the graphics row's scale, times how
+// much is falling (WX.precip, the spell's ramp) and its intensity. 0 under Clear and Fog, where the pass does not draw.
+// A page global, so a check can swap it for one frame (() => 0 is the frame with the pass off).
+const PRECIP_MAX = { rain: 5000 };
+function precipCount() {
+  const g = GFX[SETTINGS.gfx] || GFX[1], k = PRECIP_MAX[WX.kind] || 0;
+  return k > 0 ? Math.round(k * g.precip * WX.precip * WX.intensity) : 0;
+}
+// One instanced draw of n drops. The world pass culls back faces; this one must not (a quad can face away), and it leaves
+// CULL_FACE on, BLEND off and the depth mask on, as renderScene had them here.
+function drawPrecip(vp, eye, w, h, L, opt, n) {
+  const pp = PRG.precip, U = pp.U, P = PLAYER;
+  gl.useProgram(pp.p); setFrameUniforms(pp, eye);
+  gl.uniformMatrix4fv(U.uVP, false, vp);
+  const bx = PRECIP_BOX;
+  gl.uniform3f(U.uEyeM, eye[0] - Math.floor(eye[0] / bx) * bx, eye[1] - Math.floor(eye[1] / bx) * bx, eye[2] - Math.floor(eye[2] / bx) * bx);
+  // the camera moves with the car (the chase camera follows it, the cockpit and the mirror ride in it): its world velocity
+  const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), lx = Math.cos(P.yaw), lz = -Math.sin(P.yaw);
+  gl.uniform3f(U.uVel, fx * P.vx + lx * P.vy, 0, fz * P.vx + lz * P.vy);
+  gl.uniform3fv(U.uAmbSky, SKY.ambSky);
+  gl.uniform1f(U.uT, now % 1200); gl.uniform1f(U.uMode, 0); gl.uniform1f(U.uStreakT, 1 / 30);
+  gl.uniform1f(U.uWidth, 2.5 * (opt.mirrorPass ? 1 : RSCALE)); gl.uniform1f(U.uFog, fogSigma()); gl.uniform1f(U.uField, PRECIP.field);
+  gl.uniform2f(U.uPx, w, h);
+  // the player's car box, in every view (the mirror's camera sits inside it too)
+  const B = playerBasis(), V = P.V;
+  gl.uniform3fv(U.uCarO, rel(toWorld(B, [0, V.height / 2, 0]), eye));
+  gl.uniform3fv(U.uCarX, B.X); gl.uniform3fv(U.uCarY, B.Y); gl.uniform3fv(U.uCarZ, B.Z);
+  gl.uniform3f(U.uCarH, V.width / 2 + 0.1, V.height / 2 + 0.1, V.length / 2 + 0.1);
+  gl.uniform4fv(U.uLP, L.LP.subarray(0, 16)); gl.uniform4fv(U.uLD, L.LD.subarray(0, 16)); gl.uniform3fv(U.uLC, L.LC.subarray(0, 12)); gl.uniform1i(U.uNL, Math.min(L.n, 4));
+  gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  gl.bindVertexArray(PRECIP.vao);
+  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
+  gl.bindVertexArray(null);
+  gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
+}
 function renderFrame() {
   const g = GFX[SETTINGS.gfx] || GFX[1];
   const recs = carRecords();
@@ -4652,7 +4787,7 @@ function treeTest(id, season, x, z) {
     return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
   } finally { LOOK = keep; }
 }
-window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, GFX, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

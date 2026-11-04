@@ -454,6 +454,141 @@ const install = p => p.evaluate(() => {
     ['rain', 'fog', 'snow'].every(k => lampRun[k].kind === k && !lampRun[k].lights && lit(lampRun[k])) && lampRun.clear.kind === 'clear' && !lampRun.clear.lights && same(lampRun.clear),
     Object.fromEntries(Object.entries(lampRun).map(([k, r]) => [k, { on: [r.on.player, r.on.car], off: [r.off.player, r.off.car], gap: r.gap, kind: r.kind, lights: r.lights }])));
 
+  // ---- 3g. rain falls, and the road gets wet (DS-8, dsweather step 3) ----
+  // Step 3's helpers. __wxDiff(a, b): the share of pixels where two frames differ by 3 levels or more in any channel, and the mask
+  // of them. __wxDraws(fn): fn() run with every drawArraysInstanced counted by program, and PERF.calls for it. __wxOff(fn): fn()
+  // with the precipitation pass off (precipCount swapped to 0 for it). __wxTensor(D, x0, x1): the structure tensor of a
+  // difference image over the columns x0..x1, as the line orientation's angle off vertical in degrees (the lower end
+  // to the left, "/", is negative; the image's rows run upward, as readPixels gives them).
+  await page.evaluate(() => {
+    const W = window;
+    W.__wxDiff = (a, b) => { const m = new Uint8Array(a.w * a.h); let n = 0;
+      for (let i = 0, j = 0; i < a.px.length; i += 4, j++) if (Math.max(Math.abs(a.px[i] - b.px[i]), Math.abs(a.px[i + 1] - b.px[i + 1]), Math.abs(a.px[i + 2] - b.px[i + 2])) >= 3) { m[j] = 1; n++; }
+      return { share: n / (a.w * a.h), n, m }; };
+    W.__wxDraws = fn => { const g = document.getElementById('gl').getContext('webgl2'), orig = g.drawArraysInstanced, c = { precip: 0, other: 0 };
+      g.drawArraysInstanced = function (...a) { if (g.getParameter(g.CURRENT_PROGRAM) === PRG.precip.p) c.precip++; else c.other++; return orig.apply(this, a); };
+      try { W.__DS.PERF.calls = 0; const F = fn(); c.calls = W.__DS.PERF.calls; c.F = F; } finally { g.drawArraysInstanced = orig; } return c; };
+    W.__wxOff = fn => { const keep = precipCount; precipCount = () => 0; try { return fn(); } finally { precipCount = keep; } };
+    W.__wxTensor = (A, B, x0, x1) => { const L = (F, x, y) => F.L(x, y), d = (x, y) => Math.abs(L(A, x, y) - L(B, x, y));
+      let jxx = 0, jyy = 0, jxy = 0;
+      for (let y = 1; y < A.h - 1; y++) for (let x = Math.max(1, x0); x < Math.min(A.w - 1, x1); x++) {
+        const gx = (d(x + 1, y) - d(x - 1, y)) / 2, gy = (d(x, y + 1) - d(x, y - 1)) / 2; jxx += gx * gx; jyy += gy * gy; jxy += gx * gy; }
+      // the gradients' dominant direction, from the x axis; the lines run across it, so it is also the lines' angle off vertical
+      return +(0.5 * Math.atan2(2 * jxy, jxx - jyy) * 180 / Math.PI).toFixed(2); };
+    // __wxVert(xf, w, h): the world's vertical as the page's camera (CAM, as last set) draws it at column xf of the width and
+    // mid-height, in the same measure (degrees off the screen's vertical, "/" negative): a camera that looks down leans it
+    W.__wxVert = (xf, w, h) => { const C = W.__DS.CAM, f = C.fwd, up = [0, 1, 0], t = Math.tan(C.fov / 2), asp = w / h;
+      const cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      const s0 = cr(f, up), sl = Math.hypot(...s0), sv = s0.map(v => v / sl), u = cr(sv, f), xn = (xf * 2 - 1) * t * asp;
+      const p = [0, 1, 2].map(i => (f[i] + xn * sv[i]) * 10), q = [p[0], p[1] + 0.1, p[2]], sc = r => [dt(r, sv) / dt(r, f) / (t * asp) * w / 2, dt(r, u) / dt(r, f) / t * h / 2];
+      const a = sc(p), b = sc(q); return +(Math.atan2(-(b[0] - a[0]), b[1] - a[1]) * 180 / Math.PI).toFixed(2); };
+  });
+
+  // row: it rains where you look. Under Rain at intensity 1, 13:00, the chase view (the page's own frame): the pass is one
+  // instanced draw (the frame's call count the same frame's with the pass off plus one), and the frame differs from the same
+  // frame with the pass off on 0.5-15% of its pixels; under Clear the precipitation program draws nothing and the call count
+  // is the same as with the pass off.
+  const rains = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {}, view = () => W.__wxView(1);
+    for (const [k, I] of [['clear'], ['rain', 1]]) { W.__wxPick(k, I); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0);
+      const on = W.__wxDraws(view), off = W.__wxOff(() => W.__wxDraws(view));
+      o[k] = { n: precipCount(), precip: on.precip, calls: on.calls, offCalls: off.calls, offPrecip: off.precip, share: +W.__wxDiff(on.F, off.F).share.toFixed(4) }; }
+    W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  ok('it rains where you look: under Rain at 13:00 (intensity 1) the chase view draws the pass as one instanced draw, and the frame differs from the same frame with the pass off on 0.5-15% of its pixels; under Clear the pass does not draw (the call count is the same with it off)',
+    rains.rain.n > 0 && rains.rain.precip === 1 && rains.rain.calls === rains.rain.offCalls + 1 && rains.rain.offPrecip === 0 && rains.rain.share >= 0.005 && rains.rain.share <= 0.15
+    && rains.clear.n === 0 && rains.clear.precip === 0 && rains.clear.calls === rains.clear.offCalls && rains.clear.share === 0, rains);
+
+  // row: streaks follow the relative wind. The chase view under Rain at intensity 1, the difference frame (the pass on less the
+  // pass off), its structure tensor's orientation in the left and right thirds of the screen: at rest both within 5 deg of the
+  // vertical (the world's, as the camera draws it in that third: the chase camera looks a little down, which leans a falling
+  // line by several degrees toward the middle, so the screen's own vertical would not do); with the car at 30 m/s (its speed
+  // set, the frame drawn, nothing stepped) the left third's streaks lean with their lower end to the left ("/") and the right
+  // third's to the right ("\"), each more than 10 deg off the screen's vertical: they fan out from the road's vanishing point,
+  // toward the screen's edges.
+  const lean = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    W.__wxPick('rain', 1); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0);
+    for (const v of [0, 30]) { D.PLAYER.vx = v; const on = W.__wxView(1), off = W.__wxOff(() => W.__wxView(1)), t = on.w / 3;
+      o['v' + v] = { left: W.__wxTensor(on, off, 0, Math.round(t)), right: W.__wxTensor(on, off, Math.round(2 * t), on.w), share: +W.__wxDiff(on, off).share.toFixed(4),
+        vertL: W.__wxVert(1 / 6, on.w, on.h), vertR: W.__wxVert(5 / 6, on.w, on.h) }; }
+    D.PLAYER.vx = 0; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  ok('streaks follow the relative wind: in the chase view under Rain the streaks\' orientation (the difference frame\'s structure tensor) is within 5 deg of the vertical in the left and right thirds at rest, and at 30 m/s the two thirds lean opposite ways, each more than 10 deg off vertical with the lower end toward the screen\'s edge',
+    Math.abs(lean.v0.left - lean.v0.vertL) <= 5 && Math.abs(lean.v0.right - lean.v0.vertR) <= 5 && lean.v30.left <= -10 && lean.v30.right >= 10 && lean.v0.share > 0 && lean.v30.share > 0, lean);
+
+  // row: no rain inside the car. In the cockpit (the page's own frame, the mirror's own pass held off so its glass shows one
+  // picture throughout: rain seen in the mirror is rain outside) under Rain at intensity 1: the cabin's own pixels (where the
+  // frame with the cabin differs from the same frame without it, the pass off, less a pixel at its edges, where the antialiasing
+  // mixes in the world beyond) are the same with the pass on and off. Then the field the suite alone uses (PRECIP.field 1: every
+  // drop placed inside the player's car box) is culled whole: the cockpit frame and a chase camera's (9 m behind and 3 m over the car, looking at it) are the same with the pass on
+  // and off, the car's own pixels included, while the same field beside the box (field 2) is seen from both.
+  const cabin = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    W.__wxPick('rain', 1); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0);
+    const mir = D.SETTINGS.mirror; D.SETTINGS.mirror = 0;
+    const cock = () => W.__wxView(0);
+    const noCab = () => { const keep = D.CAM.mode; let F; try { D.CAM.mode = 0; D.CAM.chase = null; const k = now; now = 100; frameNo = 0; drawGauges(); updateCamera(0);
+      const g = GFX[SETTINGS.gfx] || GFX[1], recs = carRecords(), shadows = g.shadows && (SKY.sun[1] > 0.02); if (shadows) renderShadow(recs);
+      gl.viewport(0, 0, glc.width, glc.height); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+      renderScene(CAM.eye, CAM.fwd, CAM.up, CAM.fov, CAM.near, glc.width, glc.height, { propDist: g.propDist, shadows, hidePlayer: false, cabin: false }, recs);
+      F = W.__dsPx(); now = k; } finally { D.CAM.mode = keep; } return F; };
+    const offC = W.__wxOff(cock), offN = W.__wxOff(noCab), mask = W.__wxDiff(offC, offN).m;
+    const onC = cock(), dm = W.__wxDiff(onC, offC).m;
+    const w = offC.w, inner = i => { const x = i % w; if (x < 1 || x >= w - 1 || i < w || i >= mask.length - w) return false;
+      for (const k of [-w - 1, -w, -w + 1, -1, 1, w - 1, w, w + 1]) if (!mask[i + k]) return false; return true; };
+    let cab = 0, hit = 0; for (let i = 0; i < mask.length; i++) if (mask[i] && inner(i)) { cab++; if (dm[i]) hit++; }
+    o.cockpit = { cabinPx: cab, changed: hit, frameShare: +W.__wxDiff(onC, offC).share.toFixed(4) };
+    // the box field, in the cockpit and from a chase camera
+    const P = D.PLAYER, B = playerBasis(), V = P.V, recs = carRecords(), noP = recs.filter(r => !r.player);
+    const eye = toWorld(B, [0, 3, -9]), tg = toWorld(B, [0, V.height * 0.5, 0]);
+    const chase = rr => { const k = now; now = 100; try { return W.__wxCam(eye, tg, rr, []); } finally { now = k; } };
+    const carM = W.__wxDiff(W.__wxOff(() => chase(recs)), W.__wxOff(() => chase(noP))).m;
+    const field = f => { const keep = D.PRECIP.field; D.PRECIP.field = f; try { const c1 = cock(), c0 = W.__wxOff(cock), h1 = chase(recs), h0 = W.__wxOff(() => chase(recs)), dc = W.__wxDiff(c1, c0), dh = W.__wxDiff(h1, h0);
+      let car = 0, carHit = 0; for (let i = 0; i < carM.length; i++) if (carM[i]) { car++; if (dh.m[i]) carHit++; }
+      return { cockpit: dc.n, chase: dh.n, carPx: car, carChanged: carHit }; } finally { D.PRECIP.field = keep; } };
+    o.inBox = field(1); o.beside = field(2);
+    D.SETTINGS.mirror = mir; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  ok('no rain inside the car: under Rain in the cockpit the cabin\'s own pixels (dash, headliner, pillars) are the same with the pass on and off; every drop placed inside the car\'s box is culled, so the cockpit frame and a chase camera\'s (the car\'s own pixels included) are unchanged, while the same field beside the box is seen from both',
+    cabin.cockpit.cabinPx > 1000 && cabin.cockpit.changed === 0 && cabin.cockpit.frameShare > 0
+    && cabin.inBox.cockpit === 0 && cabin.inBox.chase === 0 && cabin.inBox.carPx > 1000 && cabin.inBox.carChanged === 0
+    && cabin.beside.cockpit > 50 && cabin.beside.chase > 50, cabin);
+
+  // row: the road is wet. Under Rain with the pass off (only the ground compared), the same frame with wet 0 and wet 1. At 13:00
+  // a camera 3 m over the right lane of a straight, level stretch aimed down it (the fog row's __wxRoad): the lane's middle half
+  // (0.9-2.7 m off the centre line, both wheel paths), 8-25 m on, has a mean luminance (linear: the tonemap undone, as the fog
+  // row does) 0.4-0.75x dry's. At 21:00 on a town street, a camera 3 m over the right lane 25 m short of a streetlight, aimed at
+  // the road under it: the brightest pixel of the road's asphalt (both lanes between their lines, 3-35 m on: a lamp's highlight
+  // on a wet road lies between the lamp and the eye) is brighter wet than dry, by at least 5 levels.
+  const WD = [8, 10, 12, 15, 20, 25];
+  const wetRun = await page.evaluate(([MAY5, WD]) => { const W = window, D = W.__DS, o = {};
+    let s0 = null;
+    for (let s = 1000; s < 40000 && s0 === null; s += 50) { const a = D.at(s), b = D.at(s + 340); let okS = true;
+      for (let d = 0; d <= 340 && okS; d += 10) { const p = D.at(s + d); if (Math.abs(p.th - a.th) > 0.5 * Math.PI / 180 || Math.abs(p.y - (a.y + (b.y - a.y) * d / 340)) > 0.6) okS = false; }
+      if (okS) s0 = s; }
+    o.s = s0; if (s0 === null) return o;
+    W.__wxPick('rain', 1); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(s0); D.TRAFFIC.cars.length = 0;
+    for (const w of [0, 1]) { D.WX.wet = w; o['day' + w] = W.__wxOff(() => W.__wxRoad(s0, null, WD)).flatMap(r => r.px); }
+    // the town street: the first lamp on the road 40 m or more past the street's start, the camera 25 m short of its foot
+    const ts = W.__wxTown(); D.SKY.hour = 21; D.setDate(MAY5); W.__wxPlace(ts); D.TRAFFIC.cars.length = 0;
+    let lamp = null; for (const ch of D.CHUNKS.values()) for (const l of ch.lights) { const q = D.project(l[0], l[2], ts); if (q.s > ts + 40 && q.s < ts + 300 && (!lamp || q.s < lamp.s)) lamp = { s: q.s, u: q.u }; }
+    o.lamp = lamp && { s: +lamp.s.toFixed(1), u: +lamp.u.toFixed(2) };
+    if (lamp) { const sc = lamp.s - 25;
+      const peak = () => { const keep = now; now = 100; let m = 0; try {
+        const pt = (q, u) => { const p = D.at(q), xz = worldAt(p, u); return [xz[0], D.groundAt(p, u, xz[0], xz[1]), xz[1]]; };
+        const e = pt(sc, 1.8); e[1] += 3; const ds = []; for (let d = 3; d <= 35; d += 0.25) ds.push(d);
+        const U = [[-3.2, -0.3], [0.3, 3.2]], F = W.__wxCam(e, pt(lamp.s, 0), [], ds.flatMap(d => U.flatMap(([u0, u1]) => [pt(sc + d, u0), pt(sc + d, u1)])));
+        for (let i = 0; i < F.at.length; i += 2) { const a = F.at[i], b = F.at[i + 1], y = Math.round((a.y + b.y) / 2); if (y < 0 || y >= F.h) continue;
+          for (let x = Math.max(0, Math.round(Math.min(a.x, b.x))); x <= Math.min(F.w - 1, Math.round(Math.max(a.x, b.x))); x++) m = Math.max(m, F.L(x, y)); }
+      } finally { now = keep; } return +m.toFixed(1); };
+      for (const w of [0, 1]) { D.WX.wet = w; o['night' + w] = W.__wxOff(peak); } }
+    D.WX.wet = 0; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [MAY5, WD]);
+  const linLum = px => px.length ? px.reduce((a, p) => a + 0.2126 * unTone(p[0]) + 0.7152 * unTone(p[1]) + 0.0722 * unTone(p[2]), 0) / px.length : NaN;
+  const lev = px => px.length ? px.reduce((a, p) => a + 0.2126 * p[0] + 0.7152 * p[1] + 0.0722 * p[2], 0) / px.length : NaN;
+  const wet = wetRun.day0 ? { lin: +(linLum(wetRun.day1) / linLum(wetRun.day0)).toFixed(3), level: +(lev(wetRun.day1) / lev(wetRun.day0)).toFixed(3), n: wetRun.day0.length,
+    dry: +lev(wetRun.day0).toFixed(1), wet: +lev(wetRun.day1).toFixed(1), night: [wetRun.night0, wetRun.night1], lamp: wetRun.lamp, s: wetRun.s } : { s: null };
+  ok('the road is wet: with wet 1 at 13:00 the lane\'s asphalt (8-25 m on, a straight level road) has a mean luminance 0.4-0.75x dry\'s; at 21:00 on a town street the road\'s brightest pixel under a streetlight is brighter wet than dry',
+    wetRun.s !== null && wet.lin >= 0.4 && wet.lin <= 0.75 && wet.n > 200 && !!wetRun.lamp && wetRun.night1 >= wetRun.night0 + 5, wet);
+
   const tail = await page.evaluate(() => ({ weather: window.__DS.SETTINGS.weather, look: window.__DS.lookSeason }));
   ok('no page errors; the suite booted under its Clear pin (nothing stored, so the pin wrote Clear) and leaves the page under Clear in spring',
     errors.length === 0 && boot.weather === 'clear' && boot.kind === 'clear' && tail.weather === 'clear' && tail.look === 'spring', { errors: errors.slice(0, 5), boot, tail });
