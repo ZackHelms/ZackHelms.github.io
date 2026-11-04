@@ -77,6 +77,8 @@ body{font-family:'Share Tech Mono',monospace;color:var(--white);user-select:none
     </select></div>
   <div class="row"><label for="season-sel">Season</label>
     <select id="season-sel"><option value="spring">spring</option><option value="summer">summer</option><option value="autumn">autumn</option><option value="winter">winter</option></select></div>
+  <div class="row"><label for="weather-sel">Weather</label>
+    <select id="weather-sel"><option value="auto">Auto</option><option value="clear">Clear</option><option value="rain">Rain</option><option value="fog">Fog</option><option value="snow">Snow</option></select></div>
   <div class="row"><label for="tod">Time of day</label><input id="tod" type="range" min="0" max="1439" step="1"><span id="tod-val">--:--</span></div>
   <div class="row" id="date-row"><span class="lbl">Date</span><span id="date-val">---</span></div>
   <h3>SKY</h3>
@@ -1211,7 +1213,9 @@ function utcOffset(mjd, hour) {
   return -5;
 }
 
-const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2, season: 'spring',
+// weather: 'auto' (a pure function of the date and hour, by the look's season) or a fixed 'clear' | 'rain' | 'fog' | 'snow' (DS-8);
+// a missing or unknown value reads 'auto', and 'snow' outside winter reads 'auto' at boot (the look is known there)
+const SETTINGS = { cycle: 144, traffic: 1, units: 'mph', gfx: 1, mirror: 1, station: 0, vol: 70, view: 0, muted: false, perf: 2, season: 'spring', weather: 'auto',
   date: null, vols: Object.fromEntries(VOL_KEYS.map(k => [k, 100])), sky: Object.fromEntries(SKY_KEYS.map(k => [k, 100])) };
 try {
   const saved = JSON.parse(localStorage.getItem(SET_KEY) || '{}') || {};
@@ -1224,6 +1228,7 @@ try {
 } catch (e) { /* private mode */ }
 delete SETTINGS.radio;
 if (!SEASONS_OPEN.includes(SETTINGS.season)) SETTINGS.season = 'spring';
+if (!['auto', 'clear', 'rain', 'fog', 'snow'].includes(SETTINGS.weather)) SETTINGS.weather = 'auto';
 // the saved date (an MJD) comes back on the next visit; a missing one, or one outside the season, starts on its middle date
 { const sd = SEASON_DATES[SETTINGS.season];
   if (!(Number.isInteger(SETTINGS.date) && SETTINGS.date >= sd[0] && SETTINGS.date <= sd[1])) SETTINGS.date = sd[2]; }
@@ -3085,6 +3090,142 @@ function applySeason(v) {
   for (const ch of CHUNKS.values()) { freeMesh(ch.baseMesh); freeMesh(ch.propMesh); }
   CHUNKS.clear();
   updateChunks(99);
+  wxLook();
+}
+
+// ---------------------------------------------------------------- weather (DS-8)
+// WX is the weather now: kind (clear | rain | fog | snow) and intensity (0-1, the edges' ramps included), and what follows
+// from them: cloud (0-1, the overcast), fog (the weather's extinction coefficient sigma, 1/m; 0 under clear) and mor (the
+// meteorological optical range, 3.0 / sigma, m), precip (0-1, how much of the spell's strength is falling: the ramp). wet
+// (0-1) and snow (0-1, the settled cover) accumulate. Auto is wxAt(), a pure function of the date, the hour and the look's
+// season: each game day draws its own spell from its own stream, never TRAFFIC.rnd and never Math.random. A fixed pick is
+// that kind at WX_FIXED's intensity. Nothing here is drawn or heard by itself: the shaders, the car and the sound read WX.
+const WX_KINDS = ['clear', 'rain', 'fog', 'snow'], WX_MODES = ['auto', 'clear', 'rain', 'fog', 'snow'];
+// The share of the look's days with a spell of each kind (chosen, DS-8; summer's rain starts in the afternoon). Real Raleigh
+// snow is nearer 0.05 of winter days; 0.15 is chosen so a player sees it within about a week of game days.
+const WX_SEASON = {
+  spring: { rain: 0.30, fog: 0.10, snow: 0 },
+  summer: { rain: 0.35, fog: 0.05, snow: 0, rainStart: [13, 19] },
+  autumn: { rain: 0.25, fog: 0.15, snow: 0 },
+  winter: { rain: 0.25, fog: 0.10, snow: 0.15 },
+};
+// A spell: its start hour (local clock), its length (game hours) and its intensity, each drawn in these ranges
+const WX_SPELL = { rain: { start: [0, 24], len: [2, 10], I: [0.2, 1] }, fog: { start: [4, 10], len: [3, 7], I: [0.2, 1] }, snow: { start: [0, 24], len: [3, 12], I: [0.3, 1] } };
+const WX_FIXED = { clear: 0, rain: 0.7, fog: 0.8, snow: 0.7 };   // a fixed pick's intensity
+const WX_MOR = { rain: [8000, 1000], fog: [400, 150], snow: [1500, 400] };   // the optical range (m) at intensity 0.2 and 1.0
+// game hours: the edges' ramp, wetting (while rain or snow falls), drying by day / night, snow settling (at intensity 1),
+// melting by day / night; wxHistory's memory and step
+const WX_T = { ramp: 0.5, wet: 20 / 60, dryDay: 2, dryNight: 5, snow: 1.5, meltDay: 8, meltNight: 24, hist: 48, step: 1 / 6 };
+const WX = { mode: 'auto', kind: 'clear', intensity: 0, cloud: 0, fog: 0, mor: Infinity, precip: 0, wet: 0, snow: 0 };
+const WX_CACHE = new Map();
+// a day's spell under a look: { kind, start, end, I } or null (a dry day); four draws a day whatever the kind
+function wxSpell(mjd, look) {
+  const key = look + ':' + mjd;
+  if (WX_CACHE.has(key)) return WX_CACHE.get(key);
+  const W = WX_SEASON[look] || WX_SEASON.spring, r = mulberry32(hashSeed(WORLD_SEED, 'wx-' + mjd));
+  const x = r.next(), a = r.next(), b = r.next(), c = r.next();
+  const kind = x < W.rain ? 'rain' : x < W.rain + W.fog ? 'fog' : x < W.rain + W.fog + W.snow ? 'snow' : null;
+  let sp = null;
+  if (kind) {
+    const S = WX_SPELL[kind], st = kind === 'rain' && W.rainStart ? W.rainStart : S.start, start = lerp(st[0], st[1], a);
+    sp = { kind, start, end: start + lerp(S.len[0], S.len[1], b), I: lerp(S.I[0], S.I[1], c) };
+  }
+  WX_CACHE.set(key, sp);
+  return sp;
+}
+const wxCloudOf = I => Math.min(1, 0.7 + 0.5 * I);   // a spell's overcast at full strength (chosen): 0.8 at 0.2, 1 from 0.6
+// Auto's weather at a date and local hour: today's spell, or yesterday's running past midnight (the stronger if both)
+function wxAt(mjd, hour, look = lookSeason) {
+  let best = { kind: 'clear', intensity: 0, cloud: 0, precip: 0 };
+  for (const [m, h] of [[mjd, hour], [mjd - 1, hour + 24]]) {
+    const sp = wxSpell(m, look);
+    if (!sp || h <= sp.start || h >= sp.end) continue;
+    const ramp = clamp((h - sp.start) / WX_T.ramp, 0, 1) * clamp((sp.end - h) / WX_T.ramp, 0, 1), I = sp.I * ramp;
+    if (I > best.intensity) best = { kind: sp.kind, intensity: I, cloud: ramp * wxCloudOf(sp.I), precip: sp.kind === 'fog' ? 0 : ramp };
+  }
+  return best;
+}
+// the weather the mode asks for at a date and hour (a fixed pick ignores both)
+function wxNow(mjd, hour) {
+  const m = SETTINGS.weather;
+  if (m === 'auto' || !WX_FIXED.hasOwnProperty(m)) return wxAt(mjd, hour);
+  if (m === 'clear') return { kind: 'clear', intensity: 0, cloud: 0, precip: 0 };
+  return { kind: m, intensity: WX_FIXED[m], cloud: wxCloudOf(WX_FIXED[m]), precip: m === 'fog' ? 0 : 1 };
+}
+// the daylight the drying and melting go by (0 night, 1 day): the sun's rise and set from a cosine declination and Raleigh's
+// latitude and longitude, ramped over an hour. An approximation of its own (no equation of time, no refraction), and pure, so
+// the stepped weather and wxHistory() go by the same light.
+function wxDayAt(mjd, hour) {
+  const c = civilOf(mjd), doy = mjd - mjdOf(c.y, 1, 1), DRw = Math.PI / 180;
+  const dec = -23.44 * Math.cos(TAU * (doy + 10) / 365) * DRw, la = OBS.lat * DRw;
+  const H0 = Math.acos(clamp(-Math.tan(la) * Math.tan(dec), -1, 1)) / DRw / 15, noon = 12 - OBS.lon / 15 + utcOffset(mjd, hour);
+  return smooth(-0.5, 0.5, H0 - Math.abs(hour - noon));
+}
+// sigma (1/m) for a kind at an intensity: the optical range interpolated in log between 0.2 and 1.0, and sigma faded to 0 below 0.2
+function wxSigma(kind, I) {
+  const M = WX_MOR[kind];
+  if (!M || !(I > 0)) return 0;
+  const t = clamp((I - 0.2) / 0.8, 0, 1), mor = Math.exp(lerp(Math.log(M[0]), Math.log(M[1]), t));
+  return 3.0 / mor * Math.min(1, I / 0.2);
+}
+// one step of the accumulation over dt game hours, in place on st { wet, snow }: each a linear ODE stepped exactly,
+// d/dt x = a (1 - x) - b x, with the weather w and the daylight day held over the step. Snow lies only in a winter look.
+function wxIntegrate(st, w, day, dt, winter) {
+  const ex = (x, a, b) => { const k = a + b; if (!(k > 0)) return x; const xe = a / k; return xe + (x - xe) * Math.exp(-k * dt); };
+  const p = w.kind === 'rain' || w.kind === 'snow' ? w.precip : 0;
+  st.wet = ex(st.wet, p / WX_T.wet, (1 - p) * lerp(1 / WX_T.dryNight, 1 / WX_T.dryDay, day));
+  if (!winter) { st.snow = 0; return st; }
+  const ps = w.kind === 'snow' ? w.precip : 0;
+  st.snow = ex(st.snow, w.kind === 'snow' ? w.intensity / WX_T.snow : 0, (1 - ps) * lerp(1 / WX_T.meltNight, 1 / WX_T.meltDay, day));
+  return st;
+}
+// Auto's wet and snow at a date and hour, from nothing 48 game hours before, stepped in 10-minute steps (288) on wxAt at each
+// step's middle: the state a jump of the clock lands in
+function wxHistory(mjd, hour, look = lookSeason) {
+  const st = { wet: 0, snow: 0 }, n = Math.round(WX_T.hist / WX_T.step), winter = look === 'winter';
+  for (let k = 0; k < n; k++) {
+    const t = hour - WX_T.hist + (k + 0.5) * WX_T.step, dd = Math.floor(t / 24), m = mjd + dd, h = t - dd * 24;
+    wxIntegrate(st, wxAt(m, h, look), wxDayAt(m, h), WX_T.step, winter);
+  }
+  return st;
+}
+// WX's kind and what follows from it, from a weather w
+function wxSet(w) {
+  WX.mode = SETTINGS.weather; WX.kind = w.kind; WX.intensity = w.intensity; WX.cloud = w.cloud; WX.precip = w.precip;
+  WX.fog = wxSigma(w.kind, w.intensity); WX.mor = WX.fog > 0 ? 3.0 / WX.fog : Infinity;
+  if (lookSeason !== 'winter') WX.snow = 0;
+}
+function wxRefresh() { wxSet(wxNow(SKY.mjd, SKY.hour)); }
+// a jump (boot, setDate, the time-of-day slider, a season switch, a pick of Auto): Auto's state from its history; a fixed
+// pick's from its steady state (clear and fog dry, rain wet, snow wet and white)
+function wxDerive() {
+  const m = SETTINGS.weather;
+  if (m === 'auto') Object.assign(WX, wxHistory(SKY.mjd, SKY.hour));
+  else { WX.wet = m === 'rain' || m === 'snow' ? 1 : 0; WX.snow = m === 'snow' && lookSeason === 'winter' ? 1 : 0; }
+  wxRefresh();
+}
+// one tick: dtH game hours (0 with the clock stopped, so a stopped clock stops the weather)
+function stepWeather(dtH) {
+  const w = wxNow(SKY.mjd, SKY.hour);
+  if (dtH > 0) wxIntegrate(WX, w, wxDayAt(SKY.mjd, SKY.hour), dtH, lookSeason === 'winter');
+  wxSet(w);
+}
+// the dropdown's path and the hook's: a pick refused if it is not a mode, or Snow outside a winter look. A fixed pick made
+// live keeps wet and snow where they are and lets them move from there; Auto re-derives them from its history.
+function setWeather(v) {
+  if (!WX_MODES.includes(v) || (v === 'snow' && lookSeason !== 'winter')) return false;
+  SETTINGS.weather = v; saveSettings();
+  if (v === 'auto') wxDerive(); else wxRefresh();
+  const el = document.getElementById('weather-sel'); if (el) el.value = v;
+  return true;
+}
+// the look changed (applySeason, boot): Snow offered only in winter, a Snow pick outside it becomes Auto, and the state re-derived
+function wxLook() {
+  const el = document.getElementById('weather-sel'), sn = el && el.querySelector('option[value="snow"]');
+  if (sn) sn.disabled = lookSeason !== 'winter';
+  if (SETTINGS.weather === 'snow' && lookSeason !== 'winter') { SETTINGS.weather = 'auto'; saveSettings(); }
+  if (el) el.value = SETTINGS.weather;
+  wxDerive();
 }
 
 // ---------------------------------------------------------------- sun, moon, sky
@@ -4269,6 +4410,7 @@ $('sky-rows').innerHTML = SKY_KEYS.map(k => `<div class="row"><label for="sky-${
 $('station-sel').innerHTML = STATIONS.map((st, i) => `<option value="${i}">${st.name}</option>`).join('');
 function syncSettingsUI() {
   $('cycle-sel').value = String(SETTINGS.cycle); $('traffic-sel').value = String(SETTINGS.traffic); $('season-sel').value = SETTINGS.season;
+  $('weather-sel').querySelector('option[value="snow"]').disabled = lookSeason !== 'winter'; $('weather-sel').value = SETTINGS.weather;
   $('units-sel').value = SETTINGS.units; $('gfx-sel').value = String(SETTINGS.gfx); $('mirror-sel').value = String(SETTINGS.mirror);
   $('perf-sel').value = String(SETTINGS.perf); $('station-sel').value = String(SETTINGS.station); $('vol').value = String(SETTINGS.vol);
   for (const k of VOL_KEYS) $('vol-' + k).value = String(SETTINGS.vols[k]);
@@ -4293,6 +4435,7 @@ function setSeason(v) {
   return true;
 }
 $('season-sel').addEventListener('change', e => { if (!setSeason(e.target.value)) e.target.value = SETTINGS.season; });
+$('weather-sel').addEventListener('change', e => { if (!setWeather(e.target.value)) e.target.value = SETTINGS.weather; });
 $('traffic-sel').addEventListener('change', e => { SETTINGS.traffic = +e.target.value; saveSettings(); });
 $('units-sel').addEventListener('change', e => { SETTINGS.units = e.target.value; saveSettings(); if (booted) drawGauges(); });
 $('gfx-sel').addEventListener('change', e => { SETTINGS.gfx = +e.target.value; saveSettings(); resize(); makeShadow([1024, 2048, 2048][SETTINGS.gfx]); });
@@ -4308,7 +4451,7 @@ for (const el of document.querySelectorAll('input.chan')) {
   el.addEventListener('input', e => { SETTINGS.vols[e.target.dataset.k] = +e.target.value; saveSettings(); SND.apply(); });
   el.addEventListener('change', e => SND.preview(e.target.dataset.k));
 }
-$('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4; $('tod-val').textContent = clockText(); updateSky(); if (booted) drawGauges(); });
+$('tod').addEventListener('input', e => { SKY.hour = +e.target.value / 60; SKY.dst = utcOffset(SKY.mjd, SKY.hour) === -4; $('tod-val').textContent = clockText(); wxDerive(); updateSky(); if (booted) drawGauges(); });
 
 // ---------------------------------------------------------------- boot + loop
 let RSCALE = 1;   // the main pass's render scale (framebuffer pixels per CSS pixel); the star pass sizes points by it
@@ -4353,12 +4496,14 @@ function nextDate() {
 function setDate(mjd) {
   SKY.mjd = mjd; SKY.dst = utcOffset(mjd, SKY.hour) === -4;
   SETTINGS.date = mjd; saveSettings();
+  wxDerive();
   updateSky();
 }
 function tick(dt) {
   now += dt;
   stepInput(dt);
   advanceClock(dt);
+  stepWeather(SETTINGS.cycle > 0 ? dt * 24 / SETTINGS.cycle : 0);
   updateSky();
   stepPlayer(dt);
   stepTraffic(dt);
@@ -4422,6 +4567,7 @@ function boot() {
   resetPlayer();
   updateSky();
   LOOK = SEASON_LOOK[SETTINGS.season]; lookSeason = SETTINGS.season;   // a saved season boots in its own look: before the first chunk
+  wxLook();   // the weather (DS-8): Snow offered only in winter (a saved Snow outside it reads Auto), the state derived for the hour
   updateChunks(99);
   // a road already in use: traffic spread through the window in both directions
   for (const dir of [1, -1]) {
@@ -4453,7 +4599,7 @@ function treeTest(id, season, x, z) {
     return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
   } finally { LOOK = keep; }
 }
-window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>

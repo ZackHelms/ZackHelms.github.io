@@ -24,6 +24,11 @@ const PAGE = 'file://' + (process.env.DS_PAGE || path.join(process.cwd(), 'games
 const TAIL = COPY ? ' (copy)' : '';
 let pass = 0, fail = 0;
 function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail++; console.log('FAIL  ' + n + (x !== undefined ? '  -> ' + JSON.stringify(x) : '')); } }
+// The Clear pin (DS-8, dsweather): every context's pages boot under a fixed Clear unless a weather is already stored, so every row
+// here runs under the clear sky it was written for (Auto, the page's default, would rain on some dates). The weather's own rows
+// live in drive-driving-simulator-weather.cjs, which carries the same pin.
+const CLEAR_PIN = () => { try { const k = 'drivingSimulator.settings.v1', s = JSON.parse(localStorage.getItem(k) || '{}') || {};
+  if (!('weather' in s)) { s.weather = 'clear'; localStorage.setItem(k, JSON.stringify(s)); } } catch (e) { /* private mode */ } };
 
 // ---- the suite's own calendar and sun (never the page's) ----
 // MJD from the UTC calendar; the sun is the Astronomical Almanac's low-precision sun, turned to
@@ -132,6 +137,7 @@ const AE = {
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
   const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  await ctx.addInitScript(CLEAR_PIN);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -1715,6 +1721,7 @@ const AE = {
   // px, STAR_GAIN 4.0) Polaris min 207, iota Leo min 88, 9 in the patch, so the row asks for 7 (9 less 20%, floored).
   const JD22p = jdOf(MAY5, 22, -4);
   const ctxP = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+  await ctxP.addInitScript(CLEAR_PIN);
   const pageP = await ctxP.newPage();
   pageP.on('pageerror', e => errors.push('phone: ' + String(e)));
   await pageP.goto(PAGE);
