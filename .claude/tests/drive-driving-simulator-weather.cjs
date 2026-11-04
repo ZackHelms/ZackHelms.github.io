@@ -47,6 +47,12 @@ const TRAFFIC_BEFORE = [[1, 2992.3123, 0, 0], [22, 2983.4432, 0, 0], [24, 2978.6
   [67, 3998.5304, 1, 20.1416], [68, 2646.0846, 1, 26.3067], [69, 4043.9736, 0, 19.2795]];
 // The chosen weights (the plan's Design, typed here, never read from the page): the share of the look's days with a spell of each kind
 const WEIGHTS = { spring: { rain: 0.30, fog: 0.10, snow: 0 }, summer: { rain: 0.35, fog: 0.05, snow: 0 }, autumn: { rain: 0.25, fog: 0.15, snow: 0 }, winter: { rain: 0.25, fog: 0.10, snow: 0.15 } };
+// SPRING_BEFORE: the main suite's own (section 3b, recorded on the page before the seasons, 81d0c48), copied: one chunk per
+// environment, keyed by the s at its centre, its environment, then "vb:bytes ib:bytes" for the base mesh and the props. Step 5's
+// lawn row reads it: DS-11's green winter lawn is baked, and must leave spring's bytes where they were.
+const SPRING_BEFORE = { 416: ['forest', '996e50ed:94224 e4ef3ec0:41472 33a5329d:366816 3450e72b:129888'], 1568: ['fields', '1ec9a4a7:149520 af23621d:48384 337c2ba4:27168 b3aeef1c:7344'],
+  7136: ['suburb', '813f6696:142320 7e4a1854:46080 cf530416:24960 b6c96558:4440'], 8288: ['open', 'f6dc1102:94224 e4ef3ec0:41472 9c6f9cfe:38016 2c625bf9:12816'],
+  10688: ['town', '3579b155:142320 7e4a1854:46080 f5222b36:97824 394e74c0:21816'] };
 
 // the in-page helpers: __dsPx and __dsAimed copied from the main suite's section 8b, then this suite's own aims
 const install = p => p.evaluate(() => {
@@ -705,6 +711,203 @@ const install = p => p.evaluate(() => {
   ok('the wipers follow the rain: over 30 s of ticks, cycles counted from the swept arc\'s drop count falling: intermittent at 0.25 (4-7), low at 0.5 (19-26), high at 0.9 (28-37)',
     [['0.25', 'int', 4, 7], ['0.5', 'low', 19, 26], ['0.9', 'high', 28, 37]].every(([I, r, a, b]) => { const x = rateRow['I' + I]; return x.rate === r && x.px > 300 && x.cycles >= a && x.cycles <= b; }),
     rateRow);
+
+  // ---- 3i. snow, the white roads and the green lawns (DS-8, DS-11, dsweather step 5) ----
+  // Step 5's helpers. __wxWinter(kind, I, hour): the winter look (setSeason, which moves the date to Feb 4), the fixed pick at
+  // intensity I, the hour set and the date re-derived, so a fixed Snow stands at its steady state (cover 1, wet 1) and Clear at
+  // none. __wxPt(s, u): the ground at (s, u). __wxProbe(eye, target, pts): three frames from a camera, with the fog off and the
+  // precipitation pass off (only the ground compared): the frame, the white reference (WORLD_PROBE 1: every surface a white diffuse
+  // one in the same light) and the probe's material pass (2: r the material, g the normal's y); each point's pixel as { lin: the
+  // frame's linear luminance (the tonemap undone), wht: the white reference's, m, ny }, null off screen; and, with `whole`, the same
+  // over every pixel whose 8 neighbours share its material (antialiased edges left out). A surface's reflectance is lin / wht: its
+  // whiteness in the light it stands in, so a snowy overcast noon and a clear one compare. __wxBlobs(mask, w, h): the centroids of
+  // a mask's 8-connected pieces. The copies of the main suite's section 3b readers (__dsMeshRead, __dsStats, __dsAway, the hashes)
+  // read a chunk's buffers back off the GPU.
+  await page.evaluate(() => {
+    const W = window;
+    W.__wxWinter = (kind, I, hour) => { const D = W.__DS; if (D.lookSeason !== 'winter') D.setSeason('winter'); W.__wxPick(kind, I); D.SKY.hour = hour; D.setDate(D.SKY.mjd); };
+    W.__wxPt = (s, u) => { const D = W.__DS, p = D.at(s), xz = worldAt(p, u); return [xz[0], D.groundAt(p, u, xz[0], xz[1]), xz[1]]; };
+    const unT = v => { const Y = Math.pow(Math.min(v, 254.5) / 255, 2.2), A = 2.51 - 2.43 * Y, B = 0.03 - 0.59 * Y; return (-B + Math.sqrt(B * B + 4 * A * 0.14 * Y)) / (2 * A); };
+    W.__wxLin = (px, i) => 0.2126 * unT(px[i]) + 0.7152 * unT(px[i + 1]) + 0.0722 * unT(px[i + 2]);
+    W.__wxProbe = (eye, target, pts, whole) => { const D = W.__DS, keepF = fogSigma, keepP = precipCount, k = now, fr = [];
+      fogSigma = () => 0; precipCount = () => 0; now = 100;
+      try { for (const m of [0, 1, 2]) { D.WORLD_PROBE.mode = m; fr.push(W.__wxCam(eye, target, [], pts)); } } finally { D.WORLD_PROBE.mode = 0; fogSigma = keepF; precipCount = keepP; now = k; }
+      const [F, R, M] = fr, w = F.w, h = F.h, at = i => ({ lin: W.__wxLin(F.px, i * 4), wht: W.__wxLin(R.px, i * 4), m: M.px[i * 4], ny: M.px[i * 4 + 1] / 255 });
+      const out = { pts: F.at.map(a => { const x = Math.round(a.x), y = Math.round(a.y); return x < 1 || y < 1 || x >= w - 1 || y >= h - 1 ? null : Object.assign(at(y * w + x), { dist: a.dist }); }) };
+      if (whole) { out.px = []; for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, m = M.px[i * 4]; let same = true;
+        for (const d of [-w - 1, -w, -w + 1, -1, 1, w - 1, w, w + 1]) if (M.px[(i + d) * 4] !== m || Math.abs(M.px[(i + d) * 4 + 1] - M.px[i * 4 + 1]) > 40) { same = false; break; }
+        if (same) out.px.push(Object.assign(at(i), { r: F.px[i * 4], g: F.px[i * 4 + 1], b: F.px[i * 4 + 2] })); } }
+      return out; };
+    W.__wxBlobs = (m, w, h) => { const lab = new Int32Array(w * h), out = []; let id = 0;
+      for (let i = 0; i < m.length; i++) if (m[i] && !lab[i]) { id++; const st = [i]; lab[i] = id; let sx = 0, sy = 0, n = 0;
+        while (st.length) { const j = st.pop(), x = j % w, y = (j / w) | 0; sx += x; sy += y; n++;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue;
+            const q = yy * w + xx; if (m[q] && !lab[q]) { lab[q] = id; st.push(q); } } }
+        out.push([sx / n, sy / n, n]); }
+      return out; };
+    // the main suite's section 3b readers, copied
+    W.__dsMeshHash = m => { const g = document.getElementById('gl').getContext('webgl2');
+      const fnv = b => { let h = 0x811c9dc5; for (let i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 16777619) >>> 0; } return h.toString(16).padStart(8, '0'); };
+      const vao = g.getParameter(g.VERTEX_ARRAY_BINDING), cr = g.getParameter(g.COPY_READ_BUFFER_BINDING); g.bindVertexArray(null);
+      const read = buf => { g.bindBuffer(g.COPY_READ_BUFFER, buf); const b = new Uint8Array(g.getBufferParameter(g.COPY_READ_BUFFER, g.BUFFER_SIZE)); g.getBufferSubData(g.COPY_READ_BUFFER, 0, b); return fnv(b) + ':' + b.length; };
+      const out = m ? [read(m.vb), read(m.ib)] : [fnv([]) + ':0', fnv([]) + ':0'];
+      g.bindBuffer(g.COPY_READ_BUFFER, cr); g.bindVertexArray(vao);
+      return out; };
+    W.__dsChunkHash = ch => [...W.__dsMeshHash(ch.baseMesh), ...W.__dsMeshHash(ch.propMesh)].join(' ');
+    W.__dsAway = (sList, fn) => { const D = W.__DS, P = Object.assign({}, D.PLAYER), cars = D.TRAFFIC.cars.slice(), id = D.TRAFFIC.nextId, rnd = D.TRAFFIC.rnd, chase = D.CAM.chase;
+      D.TRAFFIC.rnd = rngFor('suite-away');
+      const out = {}; for (const s of sList) { D.teleport(s); out[s] = fn(D.CHUNKS.get(chunkOf(s)), s); }
+      D.TRAFFIC.rnd = rnd; D.TRAFFIC.nextId = id; D.TRAFFIC.cars.length = 0; D.TRAFFIC.cars.push(...cars); Object.assign(D.PLAYER, P); D.CAM.chase = chase; updateChunks(99);
+      return out; };
+    W.__dsMeshRead = m => { if (!m) return { v: new Float32Array(0), i: new Uint32Array(0) };
+      const g = document.getElementById('gl').getContext('webgl2'), vao = g.getParameter(g.VERTEX_ARRAY_BINDING), cr = g.getParameter(g.COPY_READ_BUFFER_BINDING); g.bindVertexArray(null);
+      const rd = (buf, T) => { g.bindBuffer(g.COPY_READ_BUFFER, buf); const a = new T(g.getBufferParameter(g.COPY_READ_BUFFER, g.BUFFER_SIZE) / 4); g.getBufferSubData(g.COPY_READ_BUFFER, 0, a); return a; };
+      const out = { v: rd(m.vb, Float32Array), i: rd(m.ib, Uint32Array) }; g.bindBuffer(g.COPY_READ_BUFFER, cr); g.bindVertexArray(vao); return out; };
+    const enc = c => { c = Math.min(1, Math.max(0, c)); return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055; };
+    W.__dsHSV = (r, g, b) => { r = enc(r); g = enc(g); b = enc(b); const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; let h = 0;
+      if (d > 1e-9) h = mx === r ? 60 * (((g - b) / d) % 6) : mx === g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+      return [(h + 360) % 360, mx > 0 ? d / mx : 0, mx]; };
+    W.__dsStats = (v, mat, keep) => { let c = 0, s = 0, sat = 0, val = 0, n = 0;
+      for (let o = 0; o < v.length; o += 12) { if (Math.round(v[o + 9]) !== mat || (keep && !keep(o))) continue;
+        const [h, S, V] = W.__dsHSV(v[o + 6], v[o + 7], v[o + 8]); c += Math.cos(h * Math.PI / 180); s += Math.sin(h * Math.PI / 180); sat += S; val += V; n++; }
+      if (!n) return { n: 0 }; let h = Math.atan2(s, c) * 180 / Math.PI; if (h < -60) h += 360;
+      return { n, h: +h.toFixed(2), s: +(sat / n).toFixed(3), v: +(val / n).toFixed(4) }; };
+  });
+  // a road's stretch: the first s from 1 km on (every 25 m) whose next 200 m are of the one class and lane count and hold a straight, level line
+  const straightOf = cls => page.evaluate(cls => { const D = window.__DS;
+    for (let s = 1000; s < 120000; s += 25) { if (D.crossAt(s).sc.cls !== cls || D.crossAt(s + 200).sc.cls !== cls) continue;
+      const a = D.at(s), b = D.at(s + 200); let okS = true;
+      for (let d = 0; d <= 200 && okS; d += 10) { const p = D.at(s + d); if (D.crossAt(s + d).sc.cls !== cls || D.crossAt(s + d).L !== D.crossAt(s).L || Math.abs(p.th - a.th) > 0.5 * Math.PI / 180 || Math.abs(p.y - (a.y + (b.y - a.y) * d / 200)) > 0.6) okS = false; }
+      if (okS) return s; }
+    return null; }, cls);
+
+  // row: it snows. In winter at 13:00, the chase view at rest (the page's own frame): under Snow at intensity 1 the pass draws once
+  // and the frame differs from the same frame with the pass off on 0.2-15% of its pixels. Then the motion: a sparse field (the
+  // first 2,000 drops: precipCount swapped), the pass's own pixels (the frame with it on against off, at each moment: the trees sway with the clock) at the clock's now and two
+  // ticks later (now + 2/60, the pass reads nothing else), each piece's centroid matched to the nearest piece in the later frame:
+  // the median distance under Snow is under a third of the same under Rain, in the same place and the same ticks.
+  const fall = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    const view = t => { const keep = now; now = t; D.CAM.mode = 1; D.CAM.chase = null; frameNo = 0; updateCamera(0); renderFrame(); now = keep; return W.__dsPx(); };
+    for (const k of ['rain', 'snow']) { W.__wxWinter(k, 1, 13); W.__wxPlace(400); D.stepPlayer(0);
+      const on = W.__wxDraws(() => view(100)), off = W.__wxOff(() => view(100));
+      const r = { n: precipCount(), draws: on.precip, share: +W.__wxDiff(on.F, off).share.toFixed(4), cover: D.WX.snow, kind: D.WX.kind };
+      const t1 = 100 + 2 / 60, off1 = W.__wxOff(() => view(t1)), keep = precipCount; precipCount = () => 2000;
+      try { const A = W.__wxDiff(view(100), off), B = W.__wxDiff(view(t1), off1), w = off.w, h = off.h;
+        const a = W.__wxBlobs(A.m, w, h).filter(q => q[2] >= 2), b = W.__wxBlobs(B.m, w, h).filter(q => q[2] >= 2);
+        const d = a.map(p => Math.min(...b.map(q => Math.hypot(q[0] - p[0], q[1] - p[1])))).filter(Number.isFinite).sort((x, y) => x - y);
+        r.blobs = [a.length, b.length]; r.move = d.length ? +d[d.length >> 1].toFixed(2) : null; r.q = [0.25, 0.75].map(f => d.length ? +d[Math.floor(d.length * f)].toFixed(2) : null);
+      } finally { precipCount = keep; }
+      o[k] = r; }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  const fallR = fall.rain.move ? +(fall.snow.move / fall.rain.move).toFixed(3) : null;
+  console.log('  .. flakes and drops: ' + JSON.stringify({ snow: fall.snow, rain: fall.rain, ratio: fallR }));
+  ok('it snows: in winter under Snow, the chase view at rest draws the pass once and differs from the same frame with the pass off on 0.2-15% of its pixels; a sparse field\'s flakes move under a third as far over two ticks as the rain\'s drops',
+    fall.snow.kind === 'snow' && fall.snow.n > 0 && fall.snow.draws === 1 && fall.snow.share >= 0.002 && fall.snow.share <= 0.15
+    && fall.snow.blobs[0] >= 20 && fall.rain.blobs[0] >= 20 && fall.rain.move > 3 && fallR !== null && fallR < 1 / 3, { fall, ratio: fallR });
+
+  // row: snow settles. A town street (__wxTown) at 13:00 in winter, a camera 9 m up over the right lane looking 30 m on and 14 m to
+  // the right, at the yards and the houses: under Snow with the cover at 1, the grass's upward faces (the probe's grass with N.y
+  // over 0.9) and the roofs' (roof with N.y over 0.6) have a mean reflectance (the frame's linear luminance over the white
+  // reference's) over 0.6; under Clear in winter (no cover) they are as DS-3 and DS-11 made them: the same grass under 0.45 and
+  // green (the lawns: a mean hue of 75-120 deg on the pixels as shown), the roofs under 0.45.
+  const settle = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    const ts = W.__wxTown();
+    for (const k of ['clear', 'snow']) { W.__wxWinter(k, 1, 13); W.__wxPlace(ts); D.TRAFFIC.cars.length = 0;
+      const e = W.__wxPt(ts, 1.8); e[1] += 9; const tg = W.__wxPt(ts + 30, 14);
+      const P = W.__wxProbe(e, tg, [], true), grass = P.px.filter(p => p.m === D.MAT.GRASS && p.ny > 0.9), roof = P.px.filter(p => p.m === D.MAT.ROOF && p.ny > 0.6);
+      const refl = L => L.length ? +(L.reduce((a, p) => a + p.lin, 0) / L.reduce((a, p) => a + p.wht, 0)).toFixed(3) : null;
+      let c = 0, s = 0; for (const p of grass) { const [h] = W.__dsHSV(...[p.r, p.g, p.b].map(v => Math.pow(v / 255, 2.2))); c += Math.cos(h * Math.PI / 180); s += Math.sin(h * Math.PI / 180); }
+      o[k] = { cover: D.WX.snow, grassPx: grass.length, roofPx: roof.length, grass: refl(grass), roof: refl(roof), hue: +(Math.atan2(s, c) * 180 / Math.PI).toFixed(1) }; }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  ok('snow settles: in winter at 13:00 under Snow (cover 1) a town\'s grass and roofs, on their upward faces, have a mean reflectance over 0.6 of a white reference\'s; under Clear in winter the same grass is under 0.45 and green (hue 75-120 deg, DS-11\'s lawns) and the roofs under 0.45',
+    settle.snow.cover === 1 && settle.clear.cover === 0 && settle.snow.grassPx > 2000 && settle.snow.roofPx > 500 && settle.snow.grass > 0.6 && settle.snow.roof > 0.6
+    && settle.clear.grassPx > 2000 && settle.clear.grass < 0.45 && settle.clear.hue >= 75 && settle.clear.hue <= 120 && settle.clear.roof < 0.45, settle);
+
+  // the road rows' readings: a camera 3 m over the right lane at s, aimed down the road (120 m on), and the road's points at
+  // 8-20 m on (every 0.25 m) at each offset u of `U`, read with __wxProbe in winter at 13:00 under Clear (dry, no cover), under
+  // Snow (cover 1, wet 1) and under Snow with the ground dry and bare (wet and cover set to 0 for the frame: dry asphalt in the
+  // snow's own light); per u, a list of { refl, lin, m } along the distances (null off screen)
+  const roadRead = (s, U) => page.evaluate(([s, U, MAY5]) => { const W = window, D = W.__DS, o = { s, cls: D.crossAt(s).sc.cls, L: D.crossAt(s).L, sh: D.crossAt(s).sh };
+    const ds = []; for (let d = 8; d <= 20; d += 0.25) ds.push(d);
+    for (const k of ['clear', 'snow', 'dry']) { W.__wxWinter(k === 'clear' ? 'clear' : 'snow', 1, 13); W.__wxPlace(s); D.TRAFFIC.cars.length = 0;
+      if (k === 'dry') { D.WX.wet = 0; D.WX.snow = 0; }
+      const e = W.__wxPt(s, 1.8); e[1] += 3;
+      const P = W.__wxProbe(e, W.__wxPt(s + 120, 1.8), ds.flatMap(d => U.map(u => W.__wxPt(s + d, u))));
+      o[k] = { cover: D.WX.snow, wet: D.WX.wet, at: U.map((u, j) => ds.map((d, i) => { const p = P.pts[i * U.length + j]; return p && { refl: p.wht > 0 ? p.lin / p.wht : 0, lin: p.lin, m: p.m }; })) }; }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [s, U, MAY5]);
+  const mean = a => { const v = a.filter(x => x !== null && x !== undefined); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; };
+  const onRoad = (r, k, j, f = 'refl') => r[k].at[j].map(p => (p && p.m === 0 ? p[f] : null));
+  // a marking's contrast at each distance (Michelson, on the frame's linear luminance, so the light cancels): (line - road) /
+  // (line + road), the road being the mean of the u-columns jL and jR beside it
+  const contrast = (r, k, j, jL, jR) => onRoad(r, k, j, 'lin').map((v, i) => { const a = onRoad(r, k, jL, 'lin')[i], b = onRoad(r, k, jR, 'lin')[i];
+    return v === null || a === null || b === null ? null : (v - (a + b) / 2) / (v + (a + b) / 2); });
+  // the dash's painted stretches: the distances where Clear's contrast is over half its largest
+  const dashes = c => { const mx = Math.max(...c.filter(x => x !== null)); return c.map((x, i) => (x !== null && x > 0.5 * mx ? i : -1)).filter(i => i >= 0); };
+  const LW = 3.66;
+
+  // row: two-lane roads whiten. On rural2 (a straight, level stretch), at full cover under Snow at 13:00: the lane between the wheel
+  // paths (u 0.5 of a lane) has a mean reflectance over 0.55; the dashed yellow centre line's contrast against the road beside it
+  // (0.35 m either side), on its painted dashes (where Clear's is over half its largest), is under 15% of Clear's; the wheel paths
+  // (0.27 and 0.73 of a lane) are 0.45-0.85x the lane between them.
+  const R2U = [0, -0.35, 0.35, 0.27 * LW, 0.5 * LW, 0.73 * LW];
+  const r2s = await straightOf('rural2'), r2 = r2s === null ? null : await roadRead(r2s, R2U);
+  let two = { s: r2s };
+  if (r2) { const cC = contrast(r2, 'clear', 0, 1, 2), cS = contrast(r2, 'snow', 0, 1, 2), dz = dashes(cC);
+    const between = mean(onRoad(r2, 'snow', 4)), paths = mean([...onRoad(r2, 'snow', 3), ...onRoad(r2, 'snow', 5)]);
+    two = { s: r2s, cls: r2.cls, L: r2.L, cover: r2.snow.cover, between: +between.toFixed(3), paths: +paths.toFixed(3), pathRatio: +(paths / between).toFixed(3), dashN: dz.length,
+      yClear: +mean(dz.map(i => cC[i])).toFixed(4), ySnow: +mean(dz.map(i => cS[i])).toFixed(4) };
+    two.yRatio = +(Math.abs(two.ySnow) / two.yClear).toFixed(3); }
+  ok('two-lane roads whiten: on rural2 at full cover the lane between the wheel paths has a mean reflectance over 0.55, the dashed yellow\'s contrast is under 15% of Clear\'s, and the wheel paths are 0.45-0.85x the lane between them',
+    !!r2 && two.cls === 'rural2' && two.cover === 1 && two.between > 0.55 && two.dashN >= 6 && two.yClear > 0.3 && two.yRatio < 0.15 && two.pathRatio >= 0.45 && two.pathRatio <= 0.85, two);
+
+  // row: wider roads are scraped. On highway6 (a straight, level stretch) at the same cover: its three travel lanes (each at 0.15,
+  // 0.27, 0.5, 0.73 and 0.85 of the lane) have a lower mean luminance than the same lanes dry and bare in the same light (wet
+  // asphalt); the dashed white lane lines (at 1 and 2 lanes, 0.4 m either side for the road beside), on their painted dashes, keep
+  // over 70% of Clear's contrast; the shoulder past the edge line (1.0-2.6 m past it) has a mean reflectance over 0.55. And a taper
+  // from two lanes to more, where L is 1.5 (treat 0.5): the right lane's mean reflectance (0.27, 0.5, 0.73 of it) lies between the
+  // two-lane road's and the highway's, at least a fifth of the gap from each.
+  const LANES = [0, 1, 2].flatMap(k => [0.15, 0.27, 0.5, 0.73, 0.85].map(f => (k + f) * LW));
+  const H6U = [...LANES, LW, LW - 0.4, LW + 0.4, 2 * LW, 2 * LW - 0.4, 2 * LW + 0.4, ...[1.0, 1.4, 1.8, 2.2, 2.6].map(x => 3 * LW + x)];
+  const h6s = await straightOf('highway6'), h6 = h6s === null ? null : await roadRead(h6s, H6U);
+  const tap = await page.evaluate(() => { const D = window.__DS; D.sectionAt(120000);
+    for (const sc of D.ROAD.sect) { if (!sc.prev || sc.s0 < 1000) continue; const a = sc.prev.c.lanesPerDirection, b = sc.c.lanesPerDirection;
+      if (Math.min(a, b) !== 1 || Math.max(a, b) < 2) continue; const t = (1.5 - a) / (b - a); return { s: sc.s0 + sc.taper * t, from: sc.prev.cls, to: sc.cls }; }
+    return null; });
+  const TU = [0.27 * LW, 0.5 * LW, 0.73 * LW], tr = tap && await roadRead(tap.s, TU);
+  let wide = { s: h6s, taper: tap };
+  if (h6 && r2 && tr) { const nL = LANES.length, lanes = k => mean(LANES.flatMap((u, j) => onRoad(h6, k, j, 'lin')));
+    const keep = [0, 3].map(o => { const c = contrast(h6, 'clear', nL + o, nL + o + 1, nL + o + 2), sn = contrast(h6, 'snow', nL + o, nL + o + 1, nL + o + 2), dz = dashes(c);
+      const cl = mean(dz.map(i => c[i])), sw = mean(dz.map(i => sn[i])); return { n: dz.length, clear: +cl.toFixed(4), snow: +sw.toFixed(4), keep: +(sw / cl).toFixed(3) }; });
+    const sh = mean(H6U.slice(nL + 6).flatMap((u, j) => onRoad(h6, 'snow', nL + 6 + j)));
+    const rt = mean([3, 4, 5].flatMap(j => onRoad(r2, 'snow', j))), ht = mean([1, 2, 3].flatMap(j => onRoad(h6, 'snow', j))), tt = mean([0, 1, 2].flatMap(j => onRoad(tr, 'snow', j)));
+    wide = { s: h6s, cls: h6.cls, L: h6.L, cover: h6.snow.cover, wetLanes: +lanes('snow').toFixed(4), dryLanes: +lanes('dry').toFixed(4), lanesRatio: +(lanes('snow') / lanes('dry')).toFixed(3),
+      perU: [0, 1, 2, 3, 4].map(f => ["clear", "snow", "dry"].map(k => +mean([0, 5, 10].flatMap(o => onRoad(h6, k, o + f, "lin"))).toFixed(4))), lines: keep, shoulder: +sh.toFixed(3), taper: { s: +tap.s.toFixed(1), from: tap.from, to: tap.to, L: +tr.L.toFixed(3), two: +rt.toFixed(3), mid: +tt.toFixed(3), hw: +ht.toFixed(3) } }; }
+  const gap = wide.taper && wide.taper.two - wide.taper.hw;
+  ok('wider roads are scraped: on highway6 at full cover the travel lanes are darker than dry asphalt in the same light (wet), the lane lines keep over 70% of Clear\'s contrast, and the shoulder past the edge line has a mean reflectance over 0.55; a taper (L 1.5) reads between the two-lane road and the highway',
+    !!h6 && !!tr && wide.cls === 'highway6' && wide.cover === 1 && wide.wetLanes < wide.dryLanes && wide.lines.every(x => x.n >= 6 && x.clear > 0.3 && x.keep > 0.7) && wide.shoulder > 0.55
+    && Math.abs(wide.taper.L - 1.5) < 0.01 && gap > 0.2 && wide.taper.mid > wide.taper.hw + 0.2 * gap && wide.taper.mid < wide.taper.two - 0.2 * gap, wide);
+
+  // row: winter lawns stay green (DS-11). In winter, the suburb chunk SPRING_BEFORE records (7136) has its grass vertices (read back
+  // off the GPU, the town's and suburb's grass being their lawns) at a mean hue of 75-120 deg, where the fields chunk's grass (1568)
+  // is still straw (28-48 deg, DS-3's band) beyond the strip of lawn behind its kerbs (the terrain's first 2 m: an arterial's
+  // planting strip, a lawn, green too); back in spring, the five recorded chunks hash as SPRING_BEFORE.
+  const lawns = await page.evaluate(([S, MAY5]) => { const D = window.__DS, W = window, M = D.MAT, o = {};
+    D.setSeason('winter'); o.look = D.lookSeason;
+    const st = W.__dsAway([7136, 1568], ch => { const v = W.__dsMeshRead(ch.baseMesh).v;
+      return { env: ch.env, grass: W.__dsStats(v, M.GRASS), strip: W.__dsStats(v, M.GRASS, k => v[k + 11] < 2), beyond: W.__dsStats(v, M.GRASS, k => v[k + 11] >= 2) }; });
+    o.suburb = st[7136]; o.fields = st[1568];
+    D.setSeason('spring'); o.spring = W.__dsAway(S, (ch, s) => [D.sectionAt(s).env, W.__dsChunkHash(ch)]);
+    D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [Object.keys(SPRING_BEFORE).map(Number), MAY5]);
+  const lawnBad = Object.keys(SPRING_BEFORE).filter(s => JSON.stringify(lawns.spring[s]) !== JSON.stringify(SPRING_BEFORE[s]));
+  const hueIn = (q, a, b) => q && q.n > 100 && q.h >= a && q.h <= b;
+  ok('winter lawns stay green (DS-11): in winter a suburb chunk\'s grass vertices (its lawns) have a mean hue of 75-120 deg, the fields\' grass beyond the kerbside lawn strip is still straw (28-48 deg) and the strip green, and back in spring the recorded chunks hash as SPRING_BEFORE',
+    lawns.look === 'winter' && lawns.suburb.env === 'suburb' && hueIn(lawns.suburb.grass, 75, 120)
+    && lawns.fields.env === 'fields' && hueIn(lawns.fields.beyond, 28, 48) && hueIn(lawns.fields.strip, 75, 120) && lawnBad.length === 0,
+    { suburb: lawns.suburb, fields: lawns.fields, bad: lawnBad.map(s => ({ s, want: SPRING_BEFORE[s], got: lawns.spring[s] })) });
 
   const tail = await page.evaluate(() => ({ weather: window.__DS.SETTINGS.weather, look: window.__DS.lookSeason }));
   ok('no page errors; the suite booted under its Clear pin (nothing stored, so the pin wrote Clear) and leaves the page under Clear in spring',

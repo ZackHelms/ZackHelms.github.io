@@ -1579,8 +1579,10 @@ const SEASON_LOOK = {
   autumn: { crown: 'autumn', bark: C.bark, autumn: AUTUMN_LEAF, leaf: null, bush: lin3([120, 96, 48]), bushR: 1, treeline: lin3([138, 104, 52]),
     grassField: lin3([112, 108, 58]), grassDry: lin3([150, 128, 80]), grassForest: lin3([92, 74, 46]), lawn: lin3([84, 98, 48]) },
   winter: { crown: 'bare', bark: lin3([100, 92, 82]), leaf: null, bush: lin3([104, 88, 70]), bushR: 0.7, treeline: lin3([110, 98, 90]),
-    grassField: lin3([150, 128, 84]), grassDry: lin3([166, 142, 98]), grassForest: lin3([96, 80, 60]), lawn: lin3([128, 118, 74]) },
+    grassField: lin3([150, 128, 84]), grassDry: lin3([166, 142, 98]), grassForest: lin3([96, 80, 60]), lawn: lin3([70, 98, 50]) },
 };
+// DS-11: town and suburb lawns are tall fescue, a cool-season grass that stays green through a Raleigh winter, so winter's lawn is
+// a green a touch duller and greyer than spring's (62, 96, 42); the fields, the verges and the forest floor stay straw (DS-3).
 let LOOK = SEASON_LOOK.spring, lookSeason = 'spring';
 
 // ---------------------------------------------------------------- signs
@@ -2370,7 +2372,12 @@ uniform vec3 uLamp;            // head lamps on, brake, cabin night glow
 uniform sampler2DShadow uShadow; uniform sampler2D uSigns, uGauge, uMirror;
 uniform float uLaneW;
 uniform float uWet;            // how wet the ground is, 0-1 (DS-8, WX.wet): 0 when dry, where every term it touches is skipped
+uniform float uSnow;           // the settled snow cover, 0-1 (DS-8, WX.snow; winter only): 0 without, where every term it touches is skipped
+uniform float uSnowFall;       // how hard it is snowing now, 0-1 (WX.precip x WX.intensity under snow): the slush on a treated road
+uniform float uProbe;          // the suite's probe (WORLD_PROBE.mode), 0 in play: 1 every surface a white diffuse one, 2 the material and N.y
 out vec4 frag;
+// the settled cover at a ground point: uSnow with a noise edge, so a thin cover lies in patches and a full one everywhere
+float coverAt(vec2 xz){ float n = vn(xz * 0.45) * 0.65 + vn(xz * 2.3) * 0.35; return smoothstep(n - 0.12, n + 0.12, uSnow * 1.3 - 0.15); }
 float shadowAt(vec4 sp, float ndl){
   if (uShadowOn < 0.5) return 1.0;
   vec3 p = sp.xyz / sp.w * 0.5 + 0.5;
@@ -2420,20 +2427,46 @@ void main(){
     float el = lineAA(au - (edgeU - 0.08), 0.15);
     if (el > mark) { mark = el; mc = white; }
     if (sh > 2.0 && au > edgeU + 0.3 && au < edgeU + 0.75) alb *= 0.8 + 0.35 * step(0.5, fract(s * 3.3));
+    // Snow (DS-8), the CD's rule by class: a two-lane road (L 1) is not salted or scraped, a four- or six-lane one (L 2, 3) is;
+    // treat blends the two over a taper. On an untreated road the markings fade under the cover.
+    float treat = clamp(L - 1.0, 0.0, 1.0), cvR = 0.0;
+    if (uSnow > 0.0) { cvR = coverAt(P.xz); mark *= 1.0 - (1.0 - treat) * smoothstep(0.25, 0.75, cvR); }
     alb = mix(alb, mc, mark);
     retro = mark * 1.5;
     spec = 0.03;
     // Wet (DS-8): the water gathers first in the wheel paths and in low patches (puddles, from a slow noise), so a damp road
     // is wet there before it is wet between; wet asphalt darkens (albedo up to 0.4x, paint less), goes smooth and glossy
     // (rough toward 0.15, puddles 0.05) and takes the sky (refl up to 0.35, puddles 0.7) and every light's specular.
-    if (uWet > 0.0) {
+    // Under snow cover a treated road is at least 0.8 wet (salt melts what falls on it).
+    float wE = uWet;
+    if (uSnow > 0.0) wE = max(wE, 0.8 * treat * smoothstep(0.0, 0.1, uSnow));
+    if (wE > 0.0) {
       float pud = smoothstep(0.58, 0.72, vn(P.xz * 0.23 + 17.0)) * step(au, edgeU);
       float g = max(paths * 0.8 * step(au, edgeU), pud);
-      float wl = smoothstep(0.0, 1.0, uWet * (1.0 + 0.9 * g));
+      float wl = smoothstep(0.0, 1.0, wE * (1.0 + 0.9 * g));
       alb *= mix(1.0, mix(0.4, 0.8, mark), wl);
       rough = mix(rough, mix(0.15, 0.05, pud), wl);
       refl = wl * mix(0.35, 0.7, pud);
       spec = mix(spec, 0.5, wl);
+    }
+    // Settled snow on the road (DS-8). Untreated: the lanes and the shoulders whiten (albedo about 0.8) with two darker tire
+    // tracks in each lane where the wheels run (packed, dirty snow, about 0.42, grey-brown). Treated: the travel lanes stay wet
+    // asphalt with a little grey slush between the wheel paths while it falls; the shoulder past the edge line whitens, brightest
+    // at its outer edge (the plow's windrow).
+    if (uSnow > 0.0) {
+      float un = (1.0 - treat) * cvR;
+      vec3 sw = vec3(0.80, 0.82, 0.86) * (0.95 + 0.07 * n3);
+      float trk = (smoothstep(0.1, 0.02, abs(lanePos - 0.27)) + smoothstep(0.1, 0.02, abs(lanePos - 0.73))) * step(au, edgeU);
+      vec3 pk = vec3(0.45, 0.42, 0.37) * (0.85 + 0.3 * n1);
+      alb = mix(alb, mix(sw, pk, trk), un);
+      float shW = treat * cvR * smoothstep(edgeU + 0.1, edgeU + 0.6, au) * mix(0.85, 1.0, smoothstep(edgeU + 0.6, edgeU + sh, au));
+      alb = mix(alb, sw, shW);
+      float sl = treat * uSnowFall * 0.45 * smoothstep(0.16, 0.04, abs(lanePos - 0.5)) * step(au, edgeU);
+      alb = mix(alb, vec3(0.24, 0.235, 0.23), sl);
+      float k = max(un, shW);
+      // the treated lanes' film is brine and slush, duller than rainwater: it takes 0.4 of the rain's sky reflection, so the
+      // lanes stay black under a bright snow sky instead of turning to silver
+      rough = mix(rough, mix(1.0, 0.6, trk * (1.0 - treat)), k); refl *= (1.0 - max(k, sl)) * (1.0 - 0.6 * treat * cvR); spec = mix(spec, 0.03, k);
     }
   } else if (m == 1) {
     float n = vn(P.xz * 0.9) * 0.5 + vn(P.xz * 4.0) * 0.3 + vn(P.xz * 0.06) * 0.4;
@@ -2484,6 +2517,21 @@ void main(){
     if (m == 7 || m == 4 || m == 21 || ((m == 2 || m == 3) && refl == 0.0)) alb *= 1.0 - 0.25 * uWet;
     else if (m == 1) alb *= 1.0 - 0.1 * uWet;
   }
+  // settled snow (DS-8) beside the road, on upward faces with a noise edge: grass, roofs, concrete, dirt and the tops of limbs at
+  // full cover, foliage (the conifers, the treeline, the bushes) in patches at most 0.7; walls, cars and the rest stay clean
+  if (uSnow > 0.0 && m != 0) {
+    float mk = (m == 1 || m == 4 || m == 5 || m == 7 || m == 21) ? 1.0 : (m == 6 ? 0.7 : 0.0);
+    if (mk > 0.0) {
+      float c = coverAt(P.xz + P.y * 0.37) * smoothstep(0.45, 0.9, N.y) * mk;
+      if (m == 6) c *= smoothstep(0.3, 0.55, vn(P.xz * 1.9 + P.y * 2.3));
+      alb = mix(alb, vec3(0.80, 0.82, 0.86) * (0.95 + 0.07 * vn(P.xz * 9.0)), c);
+      rough = mix(rough, 1.0, c); spec = mix(spec, 0.02, c); refl *= 1.0 - c;
+    }
+  }
+  if (uProbe > 0.0) {
+    if (uProbe > 1.5) { frag = vec4(float(m) / 255.0, clamp(N.y, 0.0, 1.0), 0.0, 1.0); return; }
+    alb = vec3(1.0); refl = 0.0; spec = 0.0; emis = vec3(0.0); retro = 0.0;
+  }
   float ndl = max(dot(N, uSunDir), 0.0);
   float sh = ndl > 0.0 ? shadowAt(vSh, ndl) : 0.0;
   if (m == 6) { ndl = ndl * 0.75 + 0.25 * max(dot(-N, uSunDir), 0.0); }
@@ -2505,7 +2553,9 @@ void main(){
     local += c * (nl + retro * max(dot(Ld, V), 0.0) * 2.0);
     lspec += c * pow(max(dot(N, normalize(Ld + V)), 0.0), shin) * spec * 2.0;
   }
-  vec3 col = alb * (direct + amb + local) + uSunCol * sp * sh + lspec + emis;
+  // the sun's glint fades with the overcast (DS-8): a sun behind full cloud lights the ground dimly but makes no mirror image of
+  // itself on a wet road (exactly 1 under Clear)
+  vec3 col = alb * (direct + amb + local) + uSunCol * sp * sh * (1.0 - uCloud) + lspec + emis;
   if (refl > 0.0) {
     vec3 R = reflect(-V, N);
     float fr = 0.04 + 0.96 * pow(1.0 - max(dot(N, V), 0.0), 5.0);
@@ -2677,7 +2727,9 @@ void main(){ float r = length(vQ * vec2(1.0, 1.0)); float a = smoothstep(1.0, 0.
 // in the world while the eye moves through it. Every fall speed is a whole number of decimetres a second and uT wraps at
 // 1200 s, so speed * 1200 is a whole number of boxes and the wrap is seamless (a snow wobble must keep a period that divides
 // 1200 s). uMode picks the kind: 0 rain (a thin streak along the drop's velocity relative to the camera, uStreakT long: two
-// frames at 60 fps, the eye's persistence, so it slants as you drive); snow joins as another mode. Lit per vertex, at the drop:
+// frames at 60 fps, the eye's persistence, so it slants as you drive); 1 snow (a soft round flake 14-28 mm across, an aggregate
+// of crystals as a wet Carolina snow falls, at least 4 pixels across at the shipped scale, falling at 1.0-1.5 m/s on a slow wobble,
+// swept along the same relative motion over half a rain streak's time: a dot at rest, a streak at speed). Lit per vertex, at the drop:
 // the sky behind it (a drop is a small lens), the ambient, the sun and the moon (already dimmed under cloud) and the first four
 // local lights (the headlights first), fogged like the world, and tonemapped here. A drop is faded in from 0.8-3 m (no streak
 // through the eye) and out from 0.36-0.48 of the box (its wrap unseen). A drop whose streak meets the player's car box
@@ -2693,6 +2745,7 @@ uniform vec2 uPx;
 uniform vec3 uCarO, uCarX, uCarY, uCarZ, uCarH;
 uniform vec4 uLP[4]; uniform vec4 uLD[4]; uniform vec3 uLC[4]; uniform int uNL;
 out vec3 vC; out float vA, vQ;
+out vec2 vS; flat out vec3 vR;   // snow: the fragment's place (px) across and along the flake's path, and (the path's length, the radius, 1)
 const float BOX = ${PRECIP_BOX.toFixed(1)};   // the field's box (m); uEyeM is the eye modulo it
 uint hu(uint x){ x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
 float hf(uint x){ return float(hu(x) >> 8) / 16777216.0; }
@@ -2708,14 +2761,25 @@ bool segBox(vec3 a, vec3 b){
 void main(){
   uint id = uint(gl_InstanceID) * 4u;
   vec3 h3 = vec3(hf(id), hf(id + 1u), hf(id + 2u));
-  float speed = 6.0 + 0.1 * floor(hf(id + 3u) * 20.999);           // rain: 6.0-8.0 m/s
+  bool snow = uMode > 0.5;
+  float speed = snow ? 1.0 + 0.1 * floor(hf(id + 3u) * 5.999)       // snow: 1.0-1.5 m/s
+                     : 6.0 + 0.1 * floor(hf(id + 3u) * 20.999);    // rain: 6.0-8.0 m/s
+  // a flake's wobble: a slow circle 0.15-0.35 m across in 4, 5, 6 or 8 s (each divides 1200 s, so the wrap stays seamless)
+  vec3 wob = vec3(0.0), wv = vec3(0.0); float rad = 0.0;
+  if (snow) {
+    float h5 = hf(id + 0x40000000u), h6 = hf(id + 0x40000001u), per = h5 < 0.25 ? 4.0 : h5 < 0.5 ? 5.0 : h5 < 0.75 ? 6.0 : 8.0;
+    float amp = 0.15 + 0.2 * h6, ph = 6.2831853 * (fract(uT / per) + h6 * 7.0);
+    wob = amp * vec3(sin(ph), 0.0, 0.6 * sin(ph + 1.3)); wv = amp * 6.2831853 / per * vec3(cos(ph), 0.0, 0.6 * cos(ph + 1.3));
+    rad = 0.007 + 0.007 * hf(id + 0x40000002u);                    // a radius of 7-14 mm
+  }
   vec3 head;
   if (uField > 0.5) head = uCarO + mat3(uCarX, uCarY, uCarZ) * ((h3 * 2.0 - 1.0) * uCarH * 0.98 + vec3(uField > 1.5 ? 2.0 * uCarH.x + 0.3 : 0.0, 0.0, 0.0));
-  else head = mod(h3 * BOX - vec3(0.0, mod(speed * uT, BOX), 0.0) - uEyeM + BOX * 0.5, BOX) - BOX * 0.5;
-  vec3 vRel = vec3(0.0, -speed, 0.0) - uVel;
+  else head = mod(h3 * BOX + wob - vec3(0.0, mod(speed * uT, BOX), 0.0) - uEyeM + BOX * 0.5, BOX) - BOX * 0.5;
+  vec3 vRel = vec3(0.0, -speed, 0.0) + wv - uVel;
   vec3 tail = head - vRel * uStreakT;
   float dist = length(head);
-  vA = 0.6 * smoothstep(0.8, 3.0, dist) * (1.0 - smoothstep(BOX * 0.36, BOX * 0.48, dist));
+  vA = (snow ? 0.9 : 0.6) * smoothstep(0.8, 3.0, dist) * (1.0 - smoothstep(BOX * 0.36, BOX * 0.48, dist));
+  vS = vec2(0.0); vR = vec3(0.0);
   vec4 c0 = uVP * vec4(tail, 1.0), c1 = uVP * vec4(head, 1.0);
   int k = gl_VertexID % 6;
   float side = (k == 0 || k == 1 || k == 3) ? -1.0 : 1.0, end = (k == 1 || k == 2 || k == 4) ? 1.0 : 0.0;
@@ -2725,11 +2789,19 @@ void main(){
   float l = length(d); vec2 dir = l > 1e-3 ? d / l : vec2(0.0, 1.0), nrm = vec2(-dir.y, dir.x);
   vec2 sp = mix(s0, s1, end) + nrm * side * uWidth * 0.5 + dir * (end * 2.0 - 1.0) * 0.5;
   float w = mix(c0.w, c1.w, end), z = mix(c0.z / c0.w, c1.z / c1.w, end);
+  if (snow) {
+    // a round flake, its radius in pixels (the projection's focal length is the length of uVP's y row), at least 0.8 of a
+    // rain streak's width, drawn as a capsule along its path over the frame (a dot at rest, a short streak as you drive)
+    float R = max(rad * length(vec3(uVP[0][1], uVP[1][1], uVP[2][1])) / mix(c0.w, c1.w, 0.5) * uPx.y * 0.5, uWidth * 0.8);
+    sp = mix(s0, s1, end) + nrm * side * R + dir * (end * 2.0 - 1.0) * R;
+    vS = vec2(side * R, mix(-R, l + R, end)); vR = vec3(l, R, 1.0);
+  }
   gl_Position = vec4(sp / (uPx * 0.5) * w, z * w, w);
   // light at the drop: a drop is a little lens that shows the sky behind it (a little under the sky's own light), plus the sun
   // and the moon and the local lights it catches
   vec3 V = head / max(dist, 1e-3);
-  vec3 col = 0.8 * skyBase(normalize(vec3(V.x, 0.25, V.z))) + 0.15 * (uAmbSky + uSunCol + uMoonCol);
+  vec3 col = snow ? 0.85 * (uAmbSky + 0.5 * (uSunCol + uMoonCol))   // a flake is a little white diffuser
+                  : 0.8 * skyBase(normalize(vec3(V.x, 0.25, V.z))) + 0.15 * (uAmbSky + uSunCol + uMoonCol);
   for (int i = 0; i < 4; i++) {
     if (i >= uNL) break;
     vec3 Lv = uLP[i].xyz - head; float d2 = dot(Lv, Lv), ld = sqrt(d2); vec3 Ld = Lv / ld;
@@ -2743,8 +2815,13 @@ void main(){
 }`;
 const FS_PRECIP = `#version 300 es
 precision mediump float;
-in vec3 vC; in float vA, vQ; out vec4 o;
-void main(){ o = vec4(vC, vA * (1.0 - abs(vQ))); }`;
+in vec3 vC; in float vA, vQ; in vec2 vS; flat in vec3 vR; out vec4 o;
+void main(){
+  if (vR.z > 0.5) {   // a snowflake: a soft disc swept along its path, dimmer the longer the sweep
+    float t = vS.y - clamp(vS.y, 0.0, vR.x), d = length(vec2(t, vS.x));
+    o = vec4(vC, vA * smoothstep(vR.y, vR.y * 0.35, d) * clamp(2.0 * vR.y / (2.0 * vR.y + vR.x), 0.2, 1.0)); return; }
+  o = vec4(vC, vA * (1.0 - abs(vQ)));
+}`;
 
 // The windscreen and the wipers (DS-8, the cockpit only). A strip on the inside of the glass (buildCabin: 2.5 mm inside the glass
 // line, its edges under the A-pillars, the dash over its foot and the headliner over its head), drawn after everything else in the
@@ -3901,6 +3978,8 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   gl.uniform1f(wp.U.uShadowOn, opt.shadows ? 1 : 0);
   gl.uniform1f(wp.U.uLaneW, LANE_W);
   gl.uniform1f(wp.U.uWet, WX.wet);
+  gl.uniform1f(wp.U.uSnow, WX.snow); gl.uniform1f(wp.U.uSnowFall, WX.kind === 'snow' ? WX.precip * WX.intensity : 0);
+  gl.uniform1f(wp.U.uProbe, WORLD_PROBE.mode);
   gl.uniform1f(wp.U.uWind, now);
   const L = gatherLights(eye, recs);
   if (!opt.mirrorPass) PERF.lights = L.n;
@@ -3962,10 +4041,17 @@ const GFX = [
   { scale: 0.85, propDist: 560, shadows: true, precip: 0.65 },
   { scale: 1.0, propDist: 820, shadows: true, precip: 1.0 },
 ];
-// The precipitation pass's instance count (DS-8): at intensity 1, 5,000 rain streaks times the graphics row's scale, times how
-// much is falling (WX.precip, the spell's ramp) and its intensity. 0 under Clear and Fog, where the pass does not draw.
-// A page global, so a check can swap it for one frame (() => 0 is the frame with the pass off).
-const PRECIP_MAX = { rain: 5000 };
+// The precipitation pass's instance count (DS-8): at intensity 1, 5,000 rain streaks or 4,000 snowflakes times the graphics row's
+// scale, times how much is falling (WX.precip, the spell's ramp) and its intensity. 0 under Clear and Fog, where the pass does not
+// draw. A page global, so a check can swap it for one frame (() => 0 is the frame with the pass off).
+const PRECIP_MAX = { rain: 5000, snow: 4000 };
+// The world shader's probe, for the suite only (0 in play): 1 draws every surface as a white diffuse one in the same light (the
+// reference a cover's whiteness is measured against), 2 writes each pixel's material and normal's y (r = MAT / 255, g = N.y).
+const WORLD_PROBE = { mode: 0 };
+// How treated (salted and scraped) the road is at a cross-section of L lanes per direction (DS-8, the CD's rule): 0 on a two-lane
+// road, 1 on a four- or six-lane one, between over a taper; the world shader's treat, for the car's grip (step 6) to read at pr.p.L.
+// The road's cover there is WX.snow (the shader's own noise edge only shows while the cover is thin).
+function roadTreat(L) { return Math.min(1, Math.max(0, L - 1)); }
 function precipCount() {
   const g = GFX[SETTINGS.gfx] || GFX[1], k = PRECIP_MAX[WX.kind] || 0;
   return k > 0 ? Math.round(k * g.precip * WX.precip * WX.intensity) : 0;
@@ -3982,7 +4068,7 @@ function drawPrecip(vp, eye, w, h, L, opt, n) {
   const fx = Math.sin(P.yaw), fz = Math.cos(P.yaw), lx = Math.cos(P.yaw), lz = -Math.sin(P.yaw);
   gl.uniform3f(U.uVel, fx * P.vx + lx * P.vy, 0, fz * P.vx + lz * P.vy);
   gl.uniform3fv(U.uAmbSky, SKY.ambSky);
-  gl.uniform1f(U.uT, now % 1200); gl.uniform1f(U.uMode, 0); gl.uniform1f(U.uStreakT, 1 / 30);
+  gl.uniform1f(U.uT, now % 1200); gl.uniform1f(U.uMode, WX.kind === 'snow' ? 1 : 0); gl.uniform1f(U.uStreakT, WX.kind === 'snow' ? 1 / 60 : 1 / 30);
   gl.uniform1f(U.uWidth, 2.5 * (opt.mirrorPass ? 1 : RSCALE)); gl.uniform1f(U.uFog, fogSigma()); gl.uniform1f(U.uField, PRECIP.field);
   gl.uniform2f(U.uPx, w, h);
   // the player's car box, in every view (the mirror's camera sits inside it too)
@@ -4000,7 +4086,7 @@ function drawPrecip(vp, eye, w, h, L, opt, n) {
 // The windscreen (DS-8). GLASS: the strip's VAO, the frame copy the drops refract (refract: null until the first copy has been
 // checked with gl.getError(), then true, or false for the dark-lens fallback for good), the drops' upward creep on the glass at
 // speed (metres, stepped in tick), and snow: snow's own flag (on, white blots that melt replace the drops while it snows).
-const GLASS = { vao: null, tex: null, w: 0, h: 0, refract: null, err: 0, creep: 0, snow: false };
+const GLASS = { vao: null, tex: null, w: 0, h: 0, refract: null, err: 0, creep: 0, snow: true };
 // The wipers' rate by the weather (cycles out and back): intermittent, one every 6 s, under 0.35 intensity; low, 45 a minute, to
 // 0.7; high, 65 a minute, above; low for snow. P: the period, Ts: the sweep's time (the low or high speed's cycle)
 const WIPER_RATE = { int: { P: 6, Ts: 60 / 45 }, low: { P: 60 / 45, Ts: 60 / 45 }, high: { P: 60 / 65, Ts: 60 / 65 } };
@@ -5001,7 +5087,7 @@ function treeTest(id, season, x, z) {
     return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
   } finally { LOOK = keep; }
 }
-window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, WORLD_PROBE, roadTreat, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>
