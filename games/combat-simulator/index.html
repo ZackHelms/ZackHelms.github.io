@@ -1654,36 +1654,11 @@ function flatRing(cx, cz, r0, r1, col, seg) {
     flatTri(p00, p01, p11, col, col, col); flatTri(p00, p11, p10, col, col, col);
   }
 }
-function render(W, H, dpr) {
-  if (!gl) return;
-  const look = SETTINGS.style, P = progsFor(look);      // the one read of the style a frame
-  const t0 = performance.now();
-  const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
-  if (glc.width !== pw || glc.height !== ph) { glc.width = pw; glc.height = ph; }
-  updateCamera(APP.paused ? 0 : FRAME_DT, W, H);
-  // rig both fighters
-  const caps = [];
-  for (const who of ['p', 'e']) { const R = rigFighter(VIS[who], F[who], LOOK[who], APP.paused ? 0 : FRAME_DT); pushCaps(caps, R, LOOK[who]); }
-  const nCaps = fillLimbs(caps);
-  // shadow pass
-  const kd = SKY.key, sc = 19;
-  const shV = M4.lookAt(v3.mul(kd, 40), [0, 0, 0], Math.abs(kd[1]) > 0.98 ? [0, 0, 1] : [0, 1, 0]);
-  const shVP = M4.mul(M4.ortho(-sc, sc, -sc, sc, 1, 90), shV);
-  SHADOWS_ON = look === 'neon' ? 0 : 1;
-  if (SHADOWS_ON) {
-  gl.bindFramebuffer(gl.FRAMEBUFFER, SHADOW.fb); gl.viewport(0, 0, SHADOW.size, SHADOW.size);
-  gl.clear(gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
-  gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.5, 3);
-  gl.useProgram(P.shWorld.p); gl.uniformMatrix4fv(P.shWorld.U.uShVP, false, shVP);
-  gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0);
-  gl.useProgram(P.shLimb.p); gl.uniformMatrix4fv(P.shLimb.U.uShVP, false, shVP);
-  gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps);
-  gl.disable(gl.POLYGON_OFFSET_FILL);
-  }
-  // main pass
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, pw, ph);
-  if (!SHADOWS_ON) { gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); }
-  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+// the main pass, sky through sparks, into whatever framebuffer and viewport are bound: render() draws it
+// once onto the screen and, in neon, once more into the bloom's quarter-res target. R carries the
+// frame's shadow matrix, the CSS-to-device scale the ink width is set from, and the rigged capsules
+function drawScene(look, P, R) {
+  const { shVP, ph, dpr, caps, nCaps } = R;
   // sky
   gl.depthMask(false);
   gl.useProgram(P.sky.p); setCommon(P.sky);
@@ -1778,6 +1753,38 @@ function render(W, H, dpr) {
   }
   gl.depthMask(true); gl.disable(gl.BLEND);
   gl.bindVertexArray(null);
+}
+function render(W, H, dpr) {
+  if (!gl) return;
+  const look = SETTINGS.style, P = progsFor(look);      // the one read of the style a frame
+  const t0 = performance.now();
+  const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+  if (glc.width !== pw || glc.height !== ph) { glc.width = pw; glc.height = ph; }
+  updateCamera(APP.paused ? 0 : FRAME_DT, W, H);
+  // rig both fighters
+  const caps = [];
+  for (const who of ['p', 'e']) { const R = rigFighter(VIS[who], F[who], LOOK[who], APP.paused ? 0 : FRAME_DT); pushCaps(caps, R, LOOK[who]); }
+  const nCaps = fillLimbs(caps);
+  // shadow pass
+  const kd = SKY.key, sc = 19;
+  const shV = M4.lookAt(v3.mul(kd, 40), [0, 0, 0], Math.abs(kd[1]) > 0.98 ? [0, 0, 1] : [0, 1, 0]);
+  const shVP = M4.mul(M4.ortho(-sc, sc, -sc, sc, 1, 90), shV);
+  SHADOWS_ON = look === 'neon' ? 0 : 1;
+  if (SHADOWS_ON) {
+  gl.bindFramebuffer(gl.FRAMEBUFFER, SHADOW.fb); gl.viewport(0, 0, SHADOW.size, SHADOW.size);
+  gl.clear(gl.DEPTH_BUFFER_BIT); gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE);
+  gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1.5, 3);
+  gl.useProgram(P.shWorld.p); gl.uniformMatrix4fv(P.shWorld.U.uShVP, false, shVP);
+  gl.bindVertexArray(ARENA_MESH.vao); gl.drawElements(gl.TRIANGLES, ARENA_MESH.count, gl.UNSIGNED_INT, 0);
+  gl.useProgram(P.shLimb.p); gl.uniformMatrix4fv(P.shLimb.U.uShVP, false, shVP);
+  gl.bindVertexArray(LIMB.vao); gl.drawElementsInstanced(gl.TRIANGLES, LIMB.count, gl.UNSIGNED_SHORT, 0, nCaps);
+  gl.disable(gl.POLYGON_OFFSET_FILL);
+  }
+  // main pass
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, pw, ph);
+  if (!SHADOWS_ON) { gl.enable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.CULL_FACE); }
+  gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  drawScene(look, P, { shVP, ph, dpr, caps, nCaps });
   PERF.r3d += performance.now() - t0;
 }
 
