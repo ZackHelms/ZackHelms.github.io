@@ -516,14 +516,15 @@ const install = p => p.evaluate(() => {
     Math.abs(lean.v0.left - lean.v0.vertL) <= 5 && Math.abs(lean.v0.right - lean.v0.vertR) <= 5 && lean.v30.left <= -10 && lean.v30.right >= 10 && lean.v0.share > 0 && lean.v30.share > 0, lean);
 
   // row: no rain inside the car. In the cockpit (the page's own frame, the mirror's own pass held off so its glass shows one
-  // picture throughout: rain seen in the mirror is rain outside) under Rain at intensity 1: the cabin's own pixels (where the
+  // picture throughout: rain seen in the mirror is rain outside; and since step 4 the windscreen's pass held off too, as its drops
+  // refract the falling rain and sit where the cabin's mask is taken) under Rain at intensity 1: the cabin's own pixels (where the
   // frame with the cabin differs from the same frame without it, the pass off, less a pixel at its edges, where the antialiasing
   // mixes in the world beyond) are the same with the pass on and off. Then the field the suite alone uses (PRECIP.field 1: every
   // drop placed inside the player's car box) is culled whole: the cockpit frame and a chase camera's (9 m behind and 3 m over the car, looking at it) are the same with the pass on
   // and off, the car's own pixels included, while the same field beside the box (field 2) is seen from both.
   const cabin = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
     W.__wxPick('rain', 1); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0);
-    const mir = D.SETTINGS.mirror; D.SETTINGS.mirror = 0;
+    const mir = D.SETTINGS.mirror, keepG = glassOn; D.SETTINGS.mirror = 0; glassOn = () => false;   // the windscreen (step 4) held off: its drops refract the rain
     const cock = () => W.__wxView(0);
     const noCab = () => { const keep = D.CAM.mode; let F; try { D.CAM.mode = 0; D.CAM.chase = null; const k = now; now = 100; frameNo = 0; drawGauges(); updateCamera(0);
       const g = GFX[SETTINGS.gfx] || GFX[1], recs = carRecords(), shadows = g.shadows && (SKY.sun[1] > 0.02); if (shadows) renderShadow(recs);
@@ -545,7 +546,7 @@ const install = p => p.evaluate(() => {
       let car = 0, carHit = 0; for (let i = 0; i < carM.length; i++) if (carM[i]) { car++; if (dh.m[i]) carHit++; }
       return { cockpit: dc.n, chase: dh.n, carPx: car, carChanged: carHit }; } finally { D.PRECIP.field = keep; } };
     o.inBox = field(1); o.beside = field(2);
-    D.SETTINGS.mirror = mir; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    D.SETTINGS.mirror = mir; glassOn = keepG; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
     return o; }, MAY5);
   ok('no rain inside the car: under Rain in the cockpit the cabin\'s own pixels (dash, headliner, pillars) are the same with the pass on and off; every drop placed inside the car\'s box is culled, so the cockpit frame and a chase camera\'s (the car\'s own pixels included) are unchanged, while the same field beside the box is seen from both',
     cabin.cockpit.cabinPx > 1000 && cabin.cockpit.changed === 0 && cabin.cockpit.frameShare > 0
@@ -588,6 +589,122 @@ const install = p => p.evaluate(() => {
     dry: +lev(wetRun.day0).toFixed(1), wet: +lev(wetRun.day1).toFixed(1), night: [wetRun.night0, wetRun.night1], lamp: wetRun.lamp, s: wetRun.s } : { s: null };
   ok('the road is wet: with wet 1 at 13:00 the lane\'s asphalt (8-25 m on, a straight level road) has a mean luminance 0.4-0.75x dry\'s; at 21:00 on a town street the road\'s brightest pixel under a streetlight is brighter wet than dry',
     wetRun.s !== null && wet.lin >= 0.4 && wet.lin <= 0.75 && wet.n > 200 && !!wetRun.lamp && wetRun.night1 >= wetRun.night0 + 5, wet);
+
+  // ---- 3h. the windscreen and the wipers (DS-8, dsweather step 4) ----
+  // Step 4's helpers. __wxGlassPx(region): the pixels (readPixels indexing, rows up) where a region of the windscreen lies in the
+  // page's cockpit camera as last set: points on a 4 mm grid of the glass coordinates (a toward the driver's side, v up the glass
+  // from the cowl, metres) inside the region, placed by the page's own glassPoint() and projected by the suite. A region is a
+  // { blade, r0, r1, f0, f1 } sector of a wiper's sweep (f the fraction of the sweep from the park) or an { a0, a1, v0, v1 } box.
+  // __wxGlassDraws(fn): fn() with the glass program's draws counted. __wxGlassOnly(): the glass pass alone, over a flat grey,
+  // from the cockpit camera (the drops then show by their lenses' rims and highlights; the blades are near black).
+  // __wxShare(on, off, pix, blade): the share of a region's pixels that differ by 3 levels or more between two frames, leaving out
+  // blade pixels (under 40 levels in the frame with the glass) when `blade` is set.
+  await page.evaluate(() => {
+    const W = window;
+    W.__wxRegion = R => { const D = W.__DS, G = D.WIPER_GEO, out = [];
+      for (let a = -0.9; a <= 0.9; a += 0.004) for (let v = 0; v <= 1.0; v += 0.004) {
+        if (R.blade !== undefined) { const B = G.blades[R.blade], dx = a - B.a, dy = v - B.v, r = Math.hypot(dx, dy), f = (Math.PI - Math.atan2(dy, dx)) / (G.sweep * Math.PI / 180);
+          if (r < R.r0 || r > R.r1 || f < R.f0 || f > R.f1 || v < (R.vmin || 0)) continue; }
+        else if (a < R.a0 || a > R.a1 || v < R.v0 || v > R.v1) continue;
+        out.push([a, v]); }
+      return out; };
+    W.__wxGlassPx = (R, w, h) => { const C = W.__DS.CAM, B = playerBasis(), vp = M4.mul(M4.persp(C.fov, w / h, C.near, 2400), M4.look([0, 0, 0], C.fwd, C.up)), set = new Set();
+      for (const [a, v] of W.__wxRegion(R)) { const p = toWorld(B, glassPoint(a, v)), q = [p[0] - C.eye[0], p[1] - C.eye[1], p[2] - C.eye[2]];
+        const cx = vp[0] * q[0] + vp[4] * q[1] + vp[8] * q[2] + vp[12], cy = vp[1] * q[0] + vp[5] * q[1] + vp[9] * q[2] + vp[13], cw = vp[3] * q[0] + vp[7] * q[1] + vp[11] * q[2] + vp[15];
+        if (cw <= 0) continue; const x = Math.floor((cx / cw * 0.5 + 0.5) * w), y = Math.floor((cy / cw * 0.5 + 0.5) * h);
+        if (x >= 0 && x < w && y >= 0 && y < h) set.add(y * w + x); }
+      return [...set]; };
+    W.__wxGlassDraws = fn => { const g = document.getElementById('gl').getContext('webgl2'), orig = g.drawArrays, c = { glass: 0 };
+      g.drawArrays = function (...a) { if (g.getParameter(g.CURRENT_PROGRAM) === PRG.glass.p) c.glass++; return orig.apply(this, a); };
+      try { c.F = fn(); } finally { g.drawArrays = orig; } return c; };
+    W.__wxGlassOnly = () => { const C = W.__DS.CAM, w = glc.width, h = glc.height;
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, w, h); gl.clearColor(0.5, 0.5, 0.5, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.clearColor(0, 0, 0, 1);
+      gl.enable(gl.DEPTH_TEST); drawGlass(M4.mul(M4.persp(C.fov, w / h, C.near, 2400), M4.look([0, 0, 0], C.fwd, C.up)), C.eye, w, h);
+      gl.disable(gl.BLEND); gl.depthMask(true); return W.__dsPx(); };
+    W.__wxShare = (on, off, pix, blade) => { let n = 0, m = 0; for (const j of pix) { const i = j * 4;
+      if (blade && on.px[i] * 0.2126 + on.px[i + 1] * 0.7152 + on.px[i + 2] * 0.0722 < 40) continue; m++;
+      if (Math.max(Math.abs(on.px[i] - off.px[i]), Math.abs(on.px[i + 1] - off.px[i + 1]), Math.abs(on.px[i + 2] - off.px[i + 2])) >= 3) n++; }
+      return m ? n / m : 0; };
+  });
+  // the regions: the driver's blade's sector near the park (f 0.15-0.38, r 0.35-0.6, v over 0.1, clear of the dash: the blade
+  // crosses it last on its way back),
+  // the same blade's sector near the top of its stroke (f 0.75-0.95: out and back close together), and the corner below the
+  // driver's A-pillar, which neither blade reaches (a 0.52-0.64, v 0.1-0.22)
+  const ARC_LOW = { blade: 0, r0: 0.35, r1: 0.6, f0: 0.15, f1: 0.38, vmin: 0.1 }, ARC_TOP = { blade: 0, r0: 0.3, r1: 0.55, f0: 0.75, f1: 0.95 }, CORNER = { a0: 0.52, a1: 0.64, v0: 0.1, v1: 0.22 };
+
+  // row: drops on the glass, in the cockpit only. Under Rain (the fixed pick) at 13:00 with the wipers not yet started, the
+  // cockpit frame's windscreen (the strip's own pixels, by the page's glassPoint) differs from the same frame with the glass pass
+  // off (glassOn swapped to false) on more than 1% of its pixels, and the pass draws once; in the chase and orbit views under Rain
+  // and in the cockpit under Clear the glass program does not draw and the frame is the same with the pass off.
+  const glassRow = await page.evaluate(([MAY5, CORNER]) => { const W = window, D = W.__DS, o = {};
+    const mir = D.SETTINGS.mirror; D.SETTINGS.mirror = 0;
+    for (const k of ['rain', 'clear']) { W.__wxPick(k); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0); D.WIPER.on = false;
+      for (const mode of k === 'rain' ? [0, 1, 2] : [0]) {
+        const on = W.__wxGlassDraws(() => W.__wxView(mode)), keep = glassOn; glassOn = () => false; let off; try { off = W.__wxView(mode); } finally { glassOn = keep; }
+        const r = { draws: on.glass, frame: +W.__wxDiff(on.F, off).share.toFixed(4) };
+        if (mode === 0) { const pix = W.__wxGlassPx({ a0: -0.9, a1: 0.9, v0: 0, v1: 1.1 }, on.F.w, on.F.h); r.glassPx = pix.length; r.share = +W.__wxShare(on.F, off, pix).toFixed(4); }
+        o[k + mode] = r; } }
+    D.SETTINGS.mirror = mir; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [MAY5, CORNER]);
+  ok('drops on the glass, in the cockpit only: under Rain the cockpit\'s windscreen differs from the same frame with the glass pass off on more than 1% of its pixels (one draw); in the chase and orbit views under Rain, and in the cockpit under Clear, the glass pass does not draw and the frame is unchanged',
+    glassRow.rain0.draws === 1 && glassRow.rain0.glassPx > 5000 && glassRow.rain0.share > 0.01
+    && glassRow.rain1.draws === 0 && glassRow.rain1.frame === 0 && glassRow.rain2.draws === 0 && glassRow.rain2.frame === 0 && glassRow.clear0.draws === 0 && glassRow.clear0.frame === 0, glassRow);
+
+  // row: the wipers clear what they sweep. Under Rain at 0.25 (intermittent: one cycle every 6 s), stepped with tick(1/60) from the
+  // wipers' start with the tick clock set to 1000 s (the drops' births and the sweeps then fall the same way every run; this row
+  // and the next), in the page's own cockpit frame. A region's drops are the share of its pixels the glass pass changes, as a share
+  // of the same at the same moment with the wipers taken off (WIPER.on false for the frame: every drop that has fallen, unwiped),
+  // so the regions' different backgrounds cancel. Right after the second sweep has ended (the first tick with the blades parked)
+  // the drops in the driver's blade's sector near the park are under 20% of those in the corner below the A-pillar (which no blade
+  // reaches, so it reads 1); on the last tick before the next sweep they are back to at least 70% of the corner's.
+  const wipeRow = await page.evaluate(([MAY5, ARC, CORNER]) => { const W = window, D = W.__DS, o = {};
+    const mir = D.SETTINGS.mirror; D.SETTINGS.mirror = 0;
+    W.__wxPick('rain', 0.25); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0); D.WIPER.on = false; now = 1000; D.CAM.mode = 0; D.CAM.chase = null;
+    const frame = () => { updateCamera(0); const g = GFX[SETTINGS.gfx] || GFX[1], recs = carRecords();
+      const draw = () => { gl.viewport(0, 0, glc.width, glc.height); gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+        renderScene(CAM.eye, CAM.fwd, CAM.up, CAM.fov, CAM.near, glc.width, glc.height, { propDist: g.propDist, shadows: false, hidePlayer: false, cabin: true }, recs); return W.__dsPx(); };
+      const on = draw(); D.WIPER.on = false; let all, off; try { all = draw(); } finally { D.WIPER.on = true; }
+      const keep = glassOn; glassOn = () => false; try { off = draw(); } finally { glassOn = keep; }
+      const pa = W.__wxGlassPx(ARC, on.w, on.h), pc = W.__wxGlassPx(CORNER, on.w, on.h), rel = p => { const a = W.__wxShare(all, off, p); return a > 0 ? +(W.__wxShare(on, off, p) / a).toFixed(4) : -1; };
+      return { arc: rel(pa), corner: rel(pc), arcAll: +W.__wxShare(all, off, pa).toFixed(4), cornerAll: +W.__wxShare(all, off, pc).toFixed(4), arcPx: pa.length, cornerPx: pc.length, wiper: D.wiperAt(D.now) }; };
+    D.tick(1 / 60); o.rate = D.WIPER.rate; o.P = D.WIPER.P;
+    let n = 0; while (!(D.wiperAt(D.now).cycle === 1 && D.wiperAt(D.now).stroke === 'park') && n < 2000) { D.tick(1 / 60); n++; }
+    o.after = frame();
+    while (D.wiperAt(D.now + 1 / 60).cycle === 1 && n < 3000) { D.tick(1 / 60); n++; }
+    o.before = frame();
+    D.SETTINGS.mirror = mir; W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.WIPER.on = false;
+    return o; }, [MAY5, ARC_LOW, CORNER]);
+  const wA = wipeRow.after, wB = wipeRow.before;
+  ok('the wipers clear what they sweep: under Rain at 0.25, stepped with tick(1/60), right after a sweep the drops in the swept arc are under 20% of those in the unswept corner below the A-pillar, and before the next sweep they are back to at least 70% of the corner\'s',
+    wipeRow.rate === 'int' && wA.wiper.stroke === 'park' && wA.wiper.cycle === 1 && wB.wiper.cycle === 1 && wB.wiper.tau > 5.9 && wA.arcPx > 300 && wA.cornerPx > 150
+    && wA.arcAll > 0.01 && wA.cornerAll > 0.01 && wA.corner > 0.9 && wA.arc < 0.2 * wA.corner && wB.corner > 0.9 && wB.arc >= 0.7 * wB.corner, wipeRow);
+
+  // row: the wipers follow the rain. 30 s of tick(1/60) from the wipers' start under Rain at 0.25, 0.5 and 0.9. Every third tick,
+  // the glass pass alone (__wxGlassOnly), and q: the share of drop pixels in the driver's blade's sector near the top of its stroke
+  // over the same with the wipers taken off for the frame; a tick with that blade at 70% of its sweep or more (over or beside the
+  // sector) is skipped, so only the drops are read. Between sweeps q only grows (drops gather); a cycle is counted when q falls,
+  // to under half the reading before and by more than 0.08: the out stroke clears the sector and the back stroke, before the next
+  // reading, finds it still clear. Intermittent at 0.25: 4-7; low at 0.5:
+  // 19-26 (the Design's 22.5); high at 0.9: 28-37 (32.5).
+  const rateRow = await page.evaluate(([MAY5, ARC]) => { const W = window, D = W.__DS, o = {};
+    for (const I of [0.25, 0.5, 0.9]) {
+      W.__wxPick('rain', I); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.stepPlayer(0); D.WIPER.on = false; now = 1000; D.CAM.mode = 0; D.CAM.chase = null; updateCamera(0);
+      const grey = (() => { const w = glc.width, h = glc.height; gl.viewport(0, 0, w, h); gl.clearColor(0.5, 0.5, 0.5, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); gl.clearColor(0, 0, 0, 1); return W.__dsPx(); })();
+      const pix = W.__wxGlassPx(ARC, grey.w, grey.h);
+      const q = () => { updateCamera(0); const on = W.__wxShare(W.__wxGlassOnly(), grey, pix, true), keep = D.WIPER.on; D.WIPER.on = false; let all; try { all = W.__wxShare(W.__wxGlassOnly(), grey, pix, true); } finally { D.WIPER.on = keep; } return all > 0 ? on / all : -1; };
+      const qs = []; let prev = q(), cycles = 0, skipped = 0, fallMin = 9, riseMax = 0;
+      for (let i = 1; i <= 1800; i++) { D.tick(1 / 60); if (i % 3) continue;
+        if (D.wiperAt(D.now).angle >= 0.7 * D.WIPER_GEO.sweep) { skipped++; continue; }
+        const v = q(); qs.push(+v.toFixed(2));
+        if (v < 0.5 * prev && prev - v > 0.08) { cycles++; fallMin = Math.min(fallMin, prev - v); } else riseMax = Math.max(riseMax, prev - v);
+        prev = v; }
+      o['I' + I] = { rate: D.WIPER.rate, P: +D.WIPER.P.toFixed(3), px: pix.length, cycles, skipped, fallMin: +fallMin.toFixed(2), otherDropMax: +riseMax.toFixed(2), qs: qs.slice(0, 50).join(' ') }; }
+    W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); D.WIPER.on = false;
+    return o; }, [MAY5, ARC_TOP]);
+  console.log('  .. wiper cycles in 30 s: ' + JSON.stringify([0.25, 0.5, 0.9].map(I => [I, rateRow['I' + I].rate, rateRow['I' + I].cycles])));
+  ok('the wipers follow the rain: over 30 s of ticks, cycles counted from the swept arc\'s drop count falling: intermittent at 0.25 (4-7), low at 0.5 (19-26), high at 0.9 (28-37)',
+    [['0.25', 'int', 4, 7], ['0.5', 'low', 19, 26], ['0.9', 'high', 28, 37]].every(([I, r, a, b]) => { const x = rateRow['I' + I]; return x.rate === r && x.px > 300 && x.cycles >= a && x.cycles <= b; }),
+    rateRow);
 
   const tail = await page.evaluate(() => ({ weather: window.__DS.SETTINGS.weather, look: window.__DS.lookSeason }));
   ok('no page errors; the suite booted under its Clear pin (nothing stored, so the pin wrote Clear) and leaves the page under Clear in spring',

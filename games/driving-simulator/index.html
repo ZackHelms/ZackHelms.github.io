@@ -2243,7 +2243,41 @@ function buildCabin(car) {
   }
   boxIn(wmb, -0.06, -0.05, -0.05, 0.06, 0.05, -0.015, plastic, MAT.TRIM, [0, 0, -1]);
   wmb.box(0, 0.0, -0.052, 0.012, 0.012, 0.002, 0, [0.6, 0.6, 0.62], MAT.RIM);
-  return { mb, wheel: wmb, mirrorAt: [0, my, mz], sw, eye };
+  return { mb, wheel: wmb, mirrorAt: [0, my, mz], sw, eye, glass: buildWindscreen(car, rf, eye) };
+}
+// The windscreen's strip (DS-8), for the glass pass only (never in the cabin's mesh, so the cabin is as it was): one row across the
+// car at every station from the cowl up to the header rf, on the glass line (the station's top) moved 2.5 mm toward the cabin along
+// the line's normal, so it never meets the body's glazing; each row reaches 5 cm under the A-pillar (whose line runs from the cowl
+// corner a through b at the windscreen's base station to c2 at the header, as above), so the pillars cover its edges, the dash its
+// foot and the headliner its head. Its glass coordinates: x across, v the distance up the glass line from the cowl (metres).
+function buildWindscreen(car, rf, eye) {
+  const prof = car.V.profile, ws = car.ws, cowl = car.cowl, sd = eye[0] < 0 ? -1 : 1;
+  const st = prof.filter(s => s.z <= cowl.z && s.z >= rf.z).sort((p, q) => q.z - p.z);
+  const pil = [[cowl.z, cowl.halfWidth - 0.04], [ws.z, ws.topHalfWidth - 0.03], [rf.z, rf.topHalfWidth - 0.03]];
+  const pillarX = z => { for (let i = 0; i < 2; i++) { const [z0, x0] = pil[i], [z1, x1] = pil[i + 1]; if (z <= z0 && z >= z1) return z0 === z1 ? x0 : lerp(x0, x1, (z0 - z) / (z0 - z1)); } return pil[2][1]; };
+  const P = st.map(s => [s.top, s.z]);
+  let v = 0;
+  const rows = P.map((p, i) => {
+    if (i > 0) v += Math.hypot(p[0] - P[i - 1][0], p[1] - P[i - 1][1]);
+    const a = P[Math.max(0, i - 1)], b = P[Math.min(P.length - 1, i + 1)], t = [b[0] - a[0], b[1] - a[1]], tl = Math.hypot(t[0], t[1]) || 1;
+    let n = [t[1] / tl, -t[0] / tl];
+    if (n[0] * (eye[1] - p[0]) + n[1] * (eye[2] - p[1]) < 0) n = [-n[0], -n[1]];   // toward the cabin
+    return { v, y: p[0] + n[0] * 0.0025, z: p[1] + n[1] * 0.0025, hx: pillarX(st[i].z) - 0.05 };
+  });
+  const data = [];
+  const vert = (r, sx) => data.push(sx * r.hx, r.y, r.z, sx * r.hx, r.v);
+  for (let i = 0; i < rows.length - 1; i++) {
+    const r0 = rows[i], r1 = rows[i + 1];
+    vert(r0, -1); vert(r0, 1); vert(r1, 1); vert(r0, -1); vert(r1, 1); vert(r1, -1);
+  }
+  return { rows, sd, data: new Float32Array(data), count: data.length / 5 };
+}
+// a point on the windscreen strip from its glass coordinates (a toward the driver's side, v up the glass), in the car's frame
+function glassPoint(a, v) {
+  const G = CABIN.glass, R = G.rows;
+  let i = 0; while (i < R.length - 2 && v > R[i + 1].v) i++;
+  const r0 = R[i], r1 = R[i + 1], f = (v - r0.v) / (r1.v - r0.v);
+  return [a * G.sd, lerp(r0.y, r1.y, f), lerp(r0.z, r1.z, f)];
 }
 
 // ---------------------------------------------------------------- WebGL2
@@ -2712,6 +2746,96 @@ precision mediump float;
 in vec3 vC; in float vA, vQ; out vec4 o;
 void main(){ o = vec4(vC, vA * (1.0 - abs(vQ))); }`;
 
+// The windscreen and the wipers (DS-8, the cockpit only). A strip on the inside of the glass (buildCabin: 2.5 mm inside the glass
+// line, its edges under the A-pillars, the dash over its foot and the headliner over its head), drawn after everything else in the
+// cockpit's own pass with the depth test on and no depth written. Its coordinates vG are on the glass, in metres: x across (a = x
+// times uSd, toward the driver's side) and v up the glass from the cowl. The drops are a field of hashed cells GLASS_CELL on a side
+// in (a, v - uCreep): a cell holds drops if its first hash is under uDens (how hard it rains), each cell gets a new drop every
+// GLASS_LIFE seconds at its own phase (uNow wraps at 2400 s, a whole number of lives), and a drop shows only if it is younger than
+// the time since the wipers last crossed its place. That time is analytic, from the sweep schedule (uWip: the time into the cycle,
+// the period, the sweep time, on): a blade's angle runs from the park through WIPER_GEO.sweep and back as (1 - cos 2 pi tau/Ts)/2,
+// so the stroke reaches a place at a fraction f of the sweep at tau = Ts acos(1 - 2f) / 2 pi on the way out and Ts less that on
+// the way back (wiperAt() is the same schedule, for the page and the sound). A drop refracts: it samples the frame copied under it
+// (uScene) through a little lens, the scene inverted and squeezed into it; where the copy is not offered (uRefr 0) it is a dark
+// lens with a highlight. Snow on the glass (uSnowG, the snow's own flag) is a white blot that melts in 4 s, wiped like a drop.
+const GLASS_CELL = 0.018, GLASS_LIFE = 2.0, GLASS_MELT = 4.0;
+// The wipers' geometry on the glass, in its coordinates (metres, a toward the driver's side): tandem blades parked along the
+// cowl pointing toward the passenger's side (180 deg), pivots under the cowl, sweeping up 100 deg; r0-r1 is the stretch a blade wipes
+const WIPER_GEO = { sweep: 100, blades: [{ a: 0.36, v: -0.03, r0: 0.12, r1: 0.62 }, { a: -0.12, v: -0.03, r0: 0.10, r1: 0.52 }] };
+const VS_GLASS = `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPos; layout(location=1) in vec2 aG;
+uniform mat4 uVP, uModel;
+out vec2 vG;
+void main(){ vG = aG; gl_Position = uVP * uModel * vec4(aPos, 1.0); }`;
+const FS_GLASS = `#version 300 es
+precision highp float; precision highp int;
+in vec2 vG; out vec4 o;
+uniform sampler2D uScene;
+uniform vec4 uWip;
+uniform vec2 uPx;
+uniform vec3 uHL;
+uniform float uNow, uDens, uCreep, uSd, uRefr, uSnowG;
+const float PI = 3.14159265, CELL = ${GLASS_CELL.toFixed(4)}, LIFE = ${GLASS_LIFE.toFixed(2)}, MELT = ${GLASS_MELT.toFixed(2)}, SW = ${(WIPER_GEO.sweep * Math.PI / 180).toFixed(6)};
+${WIPER_GEO.blades.map((b, i) => `const vec4 BL${i} = vec4(${b.a.toFixed(3)}, ${b.v.toFixed(3)}, ${b.r0.toFixed(3)}, ${b.r1.toFixed(3)});`).join('\n')}
+uint hu(uint x){ x ^= x >> 16; x *= 0x7feb352du; x ^= x >> 15; x *= 0x846ca68bu; x ^= x >> 16; return x; }
+float hf(uint x){ return float(hu(x) >> 8) / 16777216.0; }
+// the time since a blade last crossed p (1e9: never, or out of its reach)
+float wipeAge(vec2 p, vec4 B){
+  vec2 d = p - B.xy; float r = length(d);
+  if (uWip.w < 0.5 || r < B.z || r > B.w) return 1e9;
+  float f = (PI - atan(d.y, d.x)) / SW;
+  if (f < 0.0 || f > 1.0) return 1e9;
+  float tau = uWip.x, P = uWip.y, Ts = uWip.z, to = Ts / (2.0 * PI) * acos(clamp(1.0 - 2.0 * f, -1.0, 1.0));
+  if (tau >= Ts - to) return tau - (Ts - to);
+  if (tau >= to) return tau - to;
+  return tau + P - (Ts - to);
+}
+// a blade and its arm at the schedule's angle: 1 on the rubber
+float blade(vec2 p, vec4 B, float th){
+  vec2 dir = vec2(cos(th), sin(th)), d = p - B.xy; float al = dot(d, dir), pr = abs(dot(d, vec2(-dir.y, dir.x)));
+  float px = length(fwidth(p));
+  if (al > B.z - 0.02 && al < B.w + 0.01) return 1.0 - smoothstep(0.006 - px, 0.006 + px, pr);
+  if (al > 0.0 && al <= B.z - 0.02) return 1.0 - smoothstep(0.004 - px, 0.004 + px, pr);
+  return 0.0;
+}
+void main(){
+  vec2 p = vec2(vG.x * uSd, vG.y);
+  float tau = uWip.x, s = tau < uWip.z ? (1.0 - cos(2.0 * PI * tau / uWip.z)) * 0.5 : 0.0, th = PI - SW * s;
+  float bl = uWip.w > 0.5 ? max(blade(p, BL0, th), blade(p, BL1, th)) : 0.0;
+  if (bl >= 0.999) { o = vec4(0.022, 0.022, 0.024, 1.0); return; }
+  // the drop in this cell, if there is one
+  vec2 pc = vec2(p.x, p.y - uCreep) / CELL; ivec2 ic = ivec2(floor(pc)) + 8192;
+  uint ch = (uint(ic.x) * 7919u + uint(ic.y) * 104729u) * 4u;
+  float life = uSnowG > 0.5 ? MELT * 1.2 : LIFE;
+  vec4 dc = vec4(0.0);
+  if (hf(ch) < uDens) {
+    float ph = hf(ch + 1u), nb = floor(uNow / life - ph), age = uNow - (nb + ph) * life;
+    int n = int(nb); n = ((n % 100) + 100) % 100;   // 100 divides both kinds of life in 2400 s
+    uint dh = hu(ch + 2u + uint(n) * 8u);
+    vec2 c = (floor(pc) + 0.3 + 0.4 * vec2(hf(dh), hf(dh + 1u)));
+    float rad = 0.12 + 0.18 * hf(dh + 2u);
+    float wa = min(wipeAge(p, BL0), wipeAge(p, BL1));
+    if (uSnowG > 0.5) rad *= sqrt(max(0.0, 1.0 - age / MELT));
+    vec2 q = (pc - c) / rad; float rr = length(q);
+    if (age < wa && rr < 1.0 && rad > 0.02) {
+      float aa = clamp(length(fwidth(pc)) / rad * 1.5, 0.02, 0.9);
+      float edge = 1.0 - smoothstep(1.0 - aa, 1.0, rr), rim = smoothstep(0.55, 1.0, rr);
+      float hl = 1.0 - smoothstep(0.0, 0.34, length(q - vec2(-0.32, 0.38)));
+      if (uSnowG > 0.5) dc = vec4(uHL * mix(1.05, 0.85, rim), edge * 0.9);
+      else if (uRefr > 0.5) {
+        // a lens: the scene in front, inverted and squeezed into the drop (a field about three drops wide), darker at the rim
+        float rpx = rad / max(length(fwidth(pc)), 1e-4);
+        vec3 sc = texture(uScene, (gl_FragCoord.xy - q * rpx * 3.0) / uPx).rgb;
+        dc = vec4(sc * mix(0.97, 0.5, rim) + uHL * hl * 0.8, edge);
+      } else dc = vec4(uHL * hl, edge * max(0.2 + 0.4 * rim, hl));
+    }
+  }
+  if (bl > 0.0) dc = vec4(mix(dc.rgb, vec3(0.022, 0.022, 0.024), bl), max(dc.a, bl));
+  if (dc.a <= 0.0) discard;
+  o = dc;
+}`;
+
 function compile(vs, fs, name) {
   const mk = (type, src) => {
     const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
@@ -2783,7 +2907,7 @@ function initGL() {
   PRG = {
     world: compile(VS_WORLD, FS_WORLD, 'world'), shadow: compile(VS_SHADOW, FS_SHADOW, 'shadow'),
     sky: compile(VS_SKY, FS_SKY, 'sky'), glow: compile(VS_GLOW, FS_GLOW, 'glow'), blob: compile(VS_BLOB, FS_BLOB, 'blob'),
-    stars: compile(VS_STARS, FS_STARS, 'stars'), precip: compile(VS_PRECIP, FS_PRECIP, 'precip'),
+    stars: compile(VS_STARS, FS_STARS, 'stars'), precip: compile(VS_PRECIP, FS_PRECIP, 'precip'), glass: compile(VS_GLASS, FS_GLASS, 'glass'),
   };
   PRECIP.vao = gl.createVertexArray();   // no attributes: the precipitation pass builds its quads from gl_VertexID and gl_InstanceID
   initStars();
@@ -3574,6 +3698,13 @@ function initVehicles() {
   }
   const cab = buildCabin(CARMESH[PV.kind].car);
   CABIN = { ...cab, mesh: upload(cab.mb), wheelMesh: upload(cab.wheel) };
+  // the windscreen's strip (DS-8): its own buffer, position and glass coordinates
+  const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+  const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, cab.glass.data, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0); gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 20, 0);
+  gl.enableVertexAttribArray(1); gl.vertexAttribPointer(1, 2, gl.FLOAT, false, 20, 12);
+  gl.bindVertexArray(null);
+  GLASS.vao = vao;
 }
 
 // ---------------------------------------------------------------- frame rendering
@@ -3820,6 +3951,8 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
     gl.bindVertexArray(QUAD);
     gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, data.length / 7);
   }
+  // the windscreen and the wipers (DS-8): last, over everything seen through the glass, under the cabin's pillars and dash
+  if (glassOn(opt)) drawGlass(vp, eye, w, h);
   gl.disable(gl.BLEND); gl.depthMask(true);
   gl.bindVertexArray(null);
 }
@@ -3863,6 +3996,86 @@ function drawPrecip(vp, eye, w, h, L, opt, n) {
   gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, n);
   gl.bindVertexArray(null);
   gl.disable(gl.BLEND); gl.depthMask(true); gl.enable(gl.CULL_FACE);
+}
+// The windscreen (DS-8). GLASS: the strip's VAO, the frame copy the drops refract (refract: null until the first copy has been
+// checked with gl.getError(), then true, or false for the dark-lens fallback for good), the drops' upward creep on the glass at
+// speed (metres, stepped in tick), and snow: snow's own flag (on, white blots that melt replace the drops while it snows).
+const GLASS = { vao: null, tex: null, w: 0, h: 0, refract: null, err: 0, creep: 0, snow: false };
+// The wipers' rate by the weather (cycles out and back): intermittent, one every 6 s, under 0.35 intensity; low, 45 a minute, to
+// 0.7; high, 65 a minute, above; low for snow. P: the period, Ts: the sweep's time (the low or high speed's cycle)
+const WIPER_RATE = { int: { P: 6, Ts: 60 / 45 }, low: { P: 60 / 45, Ts: 60 / 45 }, high: { P: 60 / 65, Ts: 60 / 65 } };
+function wiperRate(kind, I) { return kind === 'snow' ? 'low' : kind !== 'rain' ? null : I < 0.35 ? 'int' : I <= 0.7 ? 'low' : 'high'; }
+// The wipers' schedule: on, its base t0 (on the tick clock `now`), period and sweep time. stepWipers() (in tick) starts it when rain
+// or snow falls and changes the rate, or stops it, only with the blades parked (or at a cycle's turn), so the angle never jumps.
+const WIPER = { on: false, t0: 0, P: 0, Ts: 0, k: 0, rate: null };
+function stepWipers() {
+  const W = WIPER, r = WX.precip > 0 ? wiperRate(WX.kind, WX.intensity) : null;
+  if (!W.on) { if (r) Object.assign(W, { on: true, t0: now, P: WIPER_RATE[r].P, Ts: WIPER_RATE[r].Ts, k: 0, rate: r }); return; }
+  const k = Math.floor((now - W.t0) / W.P), tau = now - W.t0 - k * W.P;
+  if ((k !== W.k || tau >= W.Ts) && r !== W.rate) {
+    if (!r) { W.on = false; W.rate = null; return; }
+    Object.assign(W, { t0: tau >= W.Ts ? now : W.t0 + k * W.P, P: WIPER_RATE[r].P, Ts: WIPER_RATE[r].Ts, k: 0, rate: r });
+    return;
+  }
+  W.k = k;
+}
+// The blades at time t (the tick clock), analytic and shared by the glass shader and the sound: `angle` is degrees from the park
+// (0) up to WIPER_GEO.sweep and back, as sweep * (1 - cos(2 pi tau / Ts)) / 2 while tau < Ts and parked after; stroke 'out' while
+// tau < Ts/2 (the top at Ts/2), 'back' to Ts (the park), then 'park' to the period's end. cycle: the cycle's index from t0.
+function wiperAt(t) {
+  const W = WIPER;
+  if (!W.on) return { on: false, angle: 0, stroke: 'park', tau: 0, phase: 0, P: 0, Ts: 0, t0: W.t0, cycle: 0, rate: null };
+  const e = t - W.t0, k = Math.floor(e / W.P), tau = e - k * W.P;
+  const angle = tau < W.Ts ? WIPER_GEO.sweep * (1 - Math.cos(TAU * tau / W.Ts)) / 2 : 0;
+  return { on: true, angle, stroke: tau >= W.Ts ? 'park' : tau < W.Ts / 2 ? 'out' : 'back', tau, phase: tau / W.P, P: W.P, Ts: W.Ts, t0: W.t0, cycle: k, rate: W.rate };
+}
+// The drops creep up the glass above about 15 m/s (the airflow), up to 0.12 m/s at 25 m/s; the field slides, wrapping at 4096 cells
+function stepGlass(dt) {
+  const k = clamp((Math.abs(PLAYER.vx) - 15) / 10, 0, 1);
+  if (k > 0) GLASS.creep = (GLASS.creep + dt * 0.12 * k) % (GLASS_CELL * 4096);
+}
+// Whether the glass pass draws (a page global, so a check can swap it for one frame): in the cockpit's own pass only, while rain
+// falls (or snow, once snow's flag is on). Never in the chase or orbit views, the mirror, or under Clear or Fog.
+function glassOn(opt) { return CAM.mode === 0 && !!opt.cabin && !opt.mirrorPass && WX.precip > 0 && (WX.kind === 'rain' || (WX.kind === 'snow' && GLASS.snow)); }
+// The glass pass: the frame copied (while refraction stands), then the strip, depth-tested against the cabin, no depth written,
+// blended, both faces. Leaves CULL_FACE on and the active texture unit 3, as renderScene had them here (BLEND and the depth mask
+// are its tail's to put back).
+function drawGlass(vp, eye, w, h) {
+  if (GLASS.refract !== false) {
+    gl.activeTexture(gl.TEXTURE4);
+    if (!GLASS.tex || GLASS.w !== w || GLASS.h !== h) {
+      if (GLASS.tex) gl.deleteTexture(GLASS.tex);
+      GLASS.tex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, GLASS.tex);
+      gl.texStorage2D(gl.TEXTURE_2D, 1, gl.RGB8, w, h);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      GLASS.w = w; GLASS.h = h;
+    } else gl.bindTexture(gl.TEXTURE_2D, GLASS.tex);
+    // the default framebuffer is antialiased: the copy is expected to resolve it, which is checked once (gl.getError()); an error
+    // drops refraction for good and the drops are drawn as dark lenses instead
+    if (GLASS.refract === null) while (gl.getError() !== gl.NO_ERROR) { /* drain earlier errors */ }
+    gl.copyTexSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+    if (GLASS.refract === null) { GLASS.err = gl.getError(); GLASS.refract = GLASS.err === gl.NO_ERROR; }
+  }
+  const gp = PRG.glass, U = gp.U, P = PLAYER, wp = wiperAt(now);
+  gl.useProgram(gp.p);
+  gl.uniformMatrix4fv(U.uVP, false, vp);
+  gl.uniformMatrix4fv(U.uModel, false, basisModel(playerBasis(), eye));
+  gl.uniform4f(U.uWip, wp.tau, wp.P || 1, wp.Ts || 1, wp.on ? 1 : 0);
+  gl.uniform1f(U.uNow, now % 2400);
+  gl.uniform1f(U.uDens, clamp(WX.precip, 0, 1) * (0.25 + 0.75 * WX.intensity));
+  gl.uniform1f(U.uCreep, GLASS.creep); gl.uniform1f(U.uSd, CABIN.glass.sd);
+  gl.uniform1f(U.uRefr, GLASS.refract ? 1 : 0); gl.uniform1f(U.uSnowG, WX.kind === 'snow' && GLASS.snow ? 1 : 0);
+  gl.uniform2f(U.uPx, w, h);
+  // the drops' highlight (and snow's white): the daylight on the glass, display-referred, a little up by night for the lamps
+  const hl = 0.12 + 0.6 * SKY.day * (1 - 0.3 * WX.cloud);
+  gl.uniform3f(U.uHL, hl, hl * 1.01, hl * 1.04);
+  if (U.uScene) { gl.activeTexture(gl.TEXTURE4); if (GLASS.tex) gl.bindTexture(gl.TEXTURE_2D, GLASS.tex); gl.uniform1i(U.uScene, 4); }
+  gl.disable(gl.CULL_FACE); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+  gl.bindVertexArray(GLASS.vao);
+  gl.drawArrays(gl.TRIANGLES, 0, CABIN.glass.count);
+  gl.bindVertexArray(null);
+  gl.enable(gl.CULL_FACE); gl.activeTexture(gl.TEXTURE3);
 }
 function renderFrame() {
   const g = GFX[SETTINGS.gfx] || GFX[1];
@@ -4692,6 +4905,7 @@ function tick(dt) {
   stepInput(dt);
   advanceClock(dt);
   stepWeather(SETTINGS.cycle > 0 ? dt * 24 / SETTINGS.cycle : 0);
+  stepWipers(); stepGlass(dt);
   updateSky();
   stepPlayer(dt);
   stepTraffic(dt);
@@ -4787,7 +5001,7 @@ function treeTest(id, season, x, z) {
     return { v: mb.v.slice(), i: mb.i.slice(), n: mb.n, col: col.circ, spheres: T.canopy.length, conifer: CONIFERS.has(id) };
   } finally { LOOK = keep; }
 }
-window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, GFX, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
+window.__DS = { treeTest, MAT, LIMB, SKY_KEYS, STARS, MW, starDir, STAR_GAIN, MW_GAIN, MOON_K, ES_GAIN, MOON_RGB, MOON_AMB, MOON_DIM, enuToWorld, SEASONS, SEASONS_OPEN, SEASON_LOOK, get LOOK() { return LOOK; }, get lookSeason() { return lookSeason; }, applySeason, setSeason, WX, WX_SEASON, WX_FIXED, WX_MODES, setWeather, wxAt, wxHistory, wxDayAt, wxDerive, stepWeather, PRECIP, PRECIP_MAX, GFX, GLASS, WIPER, WIPER_GEO, WIPER_RATE, wiperRate, wiperAt, glassPoint, get now() { return now; }, OBS, OBS_SKY, ZMH_SKY, SKY_DATA, SEASON_DATES, mjdOf, civilOf, weekday, dateText, utcOffset, setDate, CRUISE, setCruise, PERF, STATIONS, openSettings, closeSettings, menuOpen, layoutUI, REVERSE_HOLD, SND, teleport, tick, spawnCar, ensureSigns, advanceClock, updateSky, setPaused: v => { paused = v; }, UI, CABIN, CARMESH, stepTraffic, stepPlayer, resetPlayer, ROAD, at, sectionAt, crossAt, PLAYER, TRAFFIC, CHUNKS, SKY, CAM, INPUT, SETTINGS, KEYS, laneCenter, project, groundAt, SIGNS };
 boot();
 requestAnimationFrame(frame);
 </script>
