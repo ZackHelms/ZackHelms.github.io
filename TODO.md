@@ -223,18 +223,6 @@ in `.claude/<game>.md`.
   "caught" only by that row, or by section 2's pairing under the same load, is
   noise, not a catch (`.claude/cyoa2.md` § Tests, the second pass).
 
-- [driving-sim] **Make the radio's test rows independent of the test machine's frame rate**
-  (the CD, 2026-11-03: the radio "sounds fine to me"; a note, no game change). Two suite rows,
-  "the radio sits near it (0.5-1.6x the engine)" and "all four stations ... within 25%", fail on
-  a slow software-rendered test box: the page queues the radio 0.4 s ahead from its frame loop
-  (`index.html` about line 3843), so at about 1 s a frame beats drop and the radio measures quiet.
-  On a phone the queue never runs dry. Fix the measurement (for example step the scheduler on a
-  timer while the rows sample), not the radio. Detail: `.claude/plans/DONE/dssky.horizon-stars-moon-sliders.md`
-  step 7 Results. DS-3 (2026-11-04) built the pattern: its season sound rows drive `SND.update(0)` on a
-  50 ms timer with `Math.random` seeded (suite section 9a). Test-only: the page is not edited.
-  **Plan ready (2026-11-04)** - run:
-  `/zmh-producer:oversee-implementation .claude/plans/dsradio.frame-rate-free-sound-rows.md`
-
 ## Icebox
 
 - [phasic] Seed browser / level-code entry for the endless space.

@@ -1,5 +1,16 @@
 # DONE — done log
 
+- 2026-11-04 [driving-sim] **The radio's test rows no longer depend on the frame rate** (dsradio; the
+  CD, 2026-11-03: the radio "sounds fine to me", so a test-only fix). Section 9's sound windows and the
+  stations row now hold the frame loop and step the sound scheduler on a 50 ms timer with `Math.random`
+  seeded (`lvT`), and a new row proves every window really ran that way. On a copy of the page slowed to
+  about 1 s a frame the old sampler failed the radio row (0.083x the engine) and `lvT` passed five runs of
+  five. The squared-taper row now compares two windows of whole engine beats (the engine's two
+  oscillators beat about every 5.4 s, traced), with its band unchanged. Three new radio breaks, all
+  caught on the page and on the slow copy. The page is not edited, so no badge. Suite 157 -> 158, break
+  list 76 -> 79. Detail: `.claude/driving-simulator.md` (the dsradio rows); plan
+  `.claude/plans/DONE/dsradio.frame-rate-free-sound-rows.md`.
+
 - 2026-11-04 [driving-sim] **Summer, autumn and winter, each as Raleigh looks and sounds** (DS-3; the
   CD, 2026-11-01: "other seasons are visible but not selectable (yet)"). All four seasons are selectable and saved; choosing
   one puts the calendar on its middle date (the sky follows) and rebuilds the road around the car in its look, with the car

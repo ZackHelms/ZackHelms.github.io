@@ -1760,24 +1760,64 @@ const AE = {
   const lv = async (keys, secs = 2) => page.evaluate(async ([keys, secs]) => { const S = window.__DS.SND, acc = {}; for (const k of keys) acc[k] = 0; const n = secs * 20;
     for (let i = 0; i < n; i++) { for (const k of keys) acc[k] += (S.rms(k) || 0) ** 2; await new Promise(r => setTimeout(r, 50)); }
     for (const k of keys) acc[k] = Math.sqrt(acc[k] / n); return acc; }, [keys, secs]);
+  // lvT (dsradio step 1): lv's figure (the root-mean-square of 50 ms reads) with the frame loop held, by section 9a's pattern
+  // (ambWin below). The radio is queued from SND.update only 0.4 s ahead and the ambient 0.3 s, once a frame, so where a
+  // frame takes a second (SwiftShader here) the queue ran dry and the rows read the machine's frame rate. A timer alone
+  // cannot help while frames draw (one thread: it waits out each frame), so the loop is held first: requestAnimationFrame
+  // swallowed once the queued frame has run, Math.random seeded (mulberry32 at AMB_SEED: the hats' noise and the birds),
+  // SND.update(0) once and then from a 50 ms setInterval, a 1 s lead-in so both queues are full, then secs * 20 reads.
+  // Every window's { held, frames, steps, drawn } goes to LVT for the method row after the stations: frames counts calls to
+  // the stub after the hold took (each frame() calls requestAnimationFrame first), steps the interval's updates, and drawn
+  // whether PERF's per-frame count moved (a frame drawn by any path). Section 9b keeps lv: its settle() needs the loop.
+  const AMB_SEED = 20261103, LVT = [];
+  const lvT = async (keys, secs = 2) => { const r = await page.evaluate(async ([keys, secs, seed]) => {
+    const W = window, S = W.__DS.SND, P = W.__DS.PERF, sleep = ms => new Promise(r => setTimeout(r, ms)), lead = 1;
+    const acc = {}; for (const k of keys) acc[k] = 0; const n = Math.round(secs * 20);
+    const raf = W.requestAnimationFrame, rnd = Math.random; let held = null, frames = 0, steps = 0, iv = null, p0 = null, drawn = true;
+    W.requestAnimationFrame = f => { if (held) frames++; held = f; return 0; };
+    try {
+      for (let i = 0; i < 200 && !held; i++) await sleep(25);      // the frame already queued runs once, then holds
+      p0 = [P.k, P.t0];
+      let a = seed >>> 0;
+      Math.random = () => { a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+      S.update(0);
+      iv = setInterval(() => { steps++; S.update(0); }, 50);
+      await sleep(lead * 1000);
+      for (let i = 0; i < n; i++) { for (const k of keys) acc[k] += (S.rms(k) || 0) ** 2; await sleep(50); }
+      drawn = P.k !== p0[0] || P.t0 !== p0[1];
+    } finally {
+      clearInterval(iv); Math.random = rnd; W.requestAnimationFrame = raf; if (held) raf(held);
+    }
+    for (const k of keys) acc[k] = Math.sqrt(acc[k] / n);
+    return Object.assign(acc, { held: !!held, frames, steps, drawn, lead, secs });
+  }, [keys, secs, AMB_SEED]); LVT.push({ keys: keys.join(','), held: r.held, frames: r.frames, steps: r.steps, drawn: r.drawn, lead: r.lead, secs: r.secs }); return r; };
   const setVol = (k, v) => page.evaluate(([k, v]) => { const D = window.__DS; D.SETTINGS.vols[k] = v; D.SND.apply(); }, [k, v]);
   await page.evaluate(() => { const D = window.__DS; D.setPaused(true); D.SETTINGS.muted = false; D.SETTINGS.station = 0; D.SND.tune(); D.SND.apply();
     D.CAM.mode = 1; D.SKY.hour = 12; D.updateSky(); D.PLAYER.vx = 25; D.PLAYER.thr = 0.5; });
   await page.waitForTimeout(1500);
-  const lvOn = await lv(['sfx', 'music', 'engine', 'tyres', 'wind', 'ambient']);
+  const lvOn = await lvT(['sfx', 'music', 'engine', 'tyres', 'wind', 'ambient']);
   await setVol('music', 0); await page.waitForTimeout(2500);
-  const lvOff = await lv(['sfx', 'music']);
+  const lvOff = await lvT(['sfx', 'music']);
   await setVol('music', 100);
   await setVol('engine', 0); await page.waitForTimeout(600);
-  const engOff = await lv(['engine', 'tyres', 'wind', 'music']);
-  await setVol('engine', 100); await setVol('engine', 50); await page.waitForTimeout(600);
-  const engHalf = await lv(['engine']);
+  const engOff = await lvT(['engine', 'tyres', 'wind', 'music']);
+  // the squared taper (dsradio step 1): two like windows back to back, the engine at 100 then at 50, each a whole number of the
+  // engine's beat periods long (at least 10 s). The page sets o1 to f = rpm / 60 * 2 and o2 to f * 1.007 (index.html, SND.update:
+  // `eng.o2.frequency.setTargetAtTime(f * 1.007, ...)`), so the engine's level swells and fades every 1 / (0.007 f) s (about 5.4 s
+  // at section 9's 789 rpm), and by phase alone a 2 s window at 50 read 0.17 to 0.37 of a 2 s window at 100, where 0.25 is right.
+  // The period comes from the page's own rpm at measure time; the band is unchanged.
+  const beatT = await page.evaluate(() => 1 / (0.007 * window.__DS.PLAYER.rpm / 60 * 2));
+  const engSecs = Math.max(1, Math.ceil(10 / beatT - 1e-9)) * beatT;
+  await setVol('engine', 100); await page.waitForTimeout(600);
+  const engFull = await lvT(['engine'], engSecs);
+  await setVol('engine', 50); await page.waitForTimeout(600);
+  const engHalf = await lvT(['engine'], engSecs);
   await setVol('engine', 100);
   ok('the engine is audible and the radio sits near it (0.5-1.6x the engine)', lvOn.engine > 0.02 && lvOn.music > 0.5 * lvOn.engine && lvOn.music < 1.6 * lvOn.engine, lvOn);
   ok('the ambient bed is there by day but well under the engine (0.05-0.4x)', lvOn.ambient > 0.05 * lvOn.engine && lvOn.ambient < 0.4 * lvOn.engine, lvOn);
   ok('the radio slider at 0 silences the music bus and nothing else', lvOff.music < 0.002 && lvOff.sfx > 0.02, lvOff);
   ok('the engine slider at 0 silences the engine while tyres, wind and radio play on', engOff.engine < 0.0005 && engOff.tyres > 0.005 && engOff.wind > 0.005 && engOff.music > 0.01, engOff);
-  ok('the engine slider half way is a quarter of the level (a squared taper)', Math.abs(engHalf.engine / lvOn.engine - 0.25) < 0.08, [engHalf.engine, lvOn.engine]);
+  ok('the engine slider half way is a quarter of the level (a squared taper)', Math.abs(engHalf.engine / engFull.engine - 0.25) < 0.08, [engHalf.engine, engFull.engine, engSecs]);
 
   // ---- 9a. the ambient by season (DS-3, dsseasons step 3): birds and insects measured off their own probes ----
   // The rows do not depend on the frame rate. For each window the live loop is held (requestAnimationFrame swallowed, so no
@@ -1788,7 +1828,7 @@ const AE = {
   // left from the window before is measured. The radio is at 0 throughout (its noise draws dice too). Each probe's RMS is
   // read every 50 ms and the window's figure is the plain mean of those reads (proportional to how many voices sing, so a
   // bird rate of 0.5 reads about 0.5x); `pk` is the loudest read. The view is the chase view at a cruise (section 9's setup).
-  const AMB_SEED = 20261103;
+  // AMB_SEED is declared at section 9's head (dsradio step 1: lvT seeds with it too).
   const ambWin = (season, hour, secs) => page.evaluate(async ([season, hour, secs, seed]) => {
     const W = window, D = W.__DS, S = D.SND, sleep = ms => new Promise(r => setTimeout(r, ms));
     // the bed stopped: nothing new is queued, and what was (at most 0.3 s ahead) is let finish: 0.5 s of unbroken silence on
@@ -2048,10 +2088,14 @@ const AE = {
   for (let k = 0; k < 4; k++) {
     await page.evaluate(k => { const D = window.__DS; D.SETTINGS.station = k; D.SND.tune(); }, k);
     await page.waitForTimeout(800);
-    st.push((await lv(['music'], 8)).music);
+    st.push((await lvT(['music'], 8)).music);
   }
   await page.evaluate(() => { const D = window.__DS; D.SETTINGS.station = 0; D.SND.tune(); D.PLAYER.thr = 0; });
   ok('all four stations play and sit within 25% of each other', st.every(v => v > 0.015) && Math.max(...st) / Math.min(...st) < 1.25, st);
+  // the method row (dsradio step 1): every lvT window above held the loop (none drew a frame) and stepped the scheduler on its
+  // timer; a hold that never took fails here (held false, or frames drawn), never skips. 5 windows in section 9 (the taper's two), 4 stations.
+  ok('the sound windows of section 9 and the stations ran with the frame loop held and the scheduler on its timer (no frame drawn, at least 15 steps a second)',
+    LVT.length === 9 && LVT.every(w => w.held && w.frames === 0 && !w.drawn && w.steps >= 15 * (w.lead + w.secs)), LVT);
 
   // ---- 10. performance stats: pure green FPS at the top, the rest on the left, both behind a setting ----
   const greenIn = R => page.evaluate(R => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => {

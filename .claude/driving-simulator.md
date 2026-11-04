@@ -3,7 +3,7 @@
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
 Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (157 checks).
+`.claude/tests/drive-driving-simulator.cjs` (158 checks).
 
 ## The CD's brief (verbatim)
 
@@ -90,6 +90,12 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | The insects' voices and levels (DS-3) | `level` is the insects' gain: spring 1, summer 1.5, autumn 1, winter 0. **Cicada** (by day when `SKY.day > 0.6`, on a line of its own beside the birds): noise, a bandpass Q 4 at 4.7-5.3 kHz rising 7% over the swell, pulsed fully by a triangle LFO at 30-60 Hz, an exponential swell over 2-6 s and a linear fade over 1-2.5 s, 1-4 s between; `CICADA_GAIN = 0.4`. **Katydid** (by night): 2-4 pulses of 50-75 ms every 120-170 ms, noise through a bandpass Q 5 at 3-4 kHz, 0.8-1.5 s between calls; `KATYDID_GAIN = 0.2`. Both panned like a bird, both through the ambient's glass (in the cockpit its 1.5 kHz lowpass all but silences them, as it does the crickets) | Measured, not by ear: katydids at 0.3 read 3.4x spring's crickets, at 0.16 1.25-2.07x over six seeds, at 0.2 2.05x at the suite's seed (band 1.3-2.5). Cicadas at 0.4: a mean of 0.05x the engine at a cruise in the chase view and a loudest read of 0.30x (under 0.6x) |
 | The ambient slider's preview (DS-3) | By night the season's night insect (winter, with none, a bird); by day summer's cicada shortened to a 0.7 s swell and a 0.5 s fade, any other season a bird | "The season's own voice"; a 3-8 s cicada is too long for a preview, and a winter night with no voice would leave the slider silent |
 | The season sound rows' method (DS-3) | Section 9a: per window the live loop is held (`requestAnimationFrame` swallowed), `SND.update(0)` runs from a 50 ms `setInterval`, `Math.random` is a mulberry32 at seed 20261103, `SND.ambRestart()` (a hook for checks) starts the schedule afresh, the radio is at 0; before it the bed is stopped until both probes read silent for 0.5 s unbroken. Every window is 8 s (the plan said 4 s for the winter and night rows) and its figure is the plain mean of the 50 ms RMS reads; cicadas vs the engine compare means (the peak is logged) | Holding the loop takes the frame rate out entirely; 0.5 s of unbroken silence because a gap between two crickets read as silence and let a queued one leak into the next window (0.0001 in spring by day); 8 s so a night window holds six or more katydid calls rather than three or four (over six seeds the ratio still ran 1.25-2.07x at 0.19); the seed is fixed, so the suite's figures repeat |
+| The sound windows' sampler `lvT` (dsradio) | Section 9's radio, engine and ambient windows and the stations row read through `lvT(keys, secs)`, beside `lv`: the loop is held as in 9a, `Math.random` is seeded, `SND.update(0)` runs once and then every 50 ms, a **1 s lead-in** goes unread, then `secs * 20` reads are taken (`S.rms(k)`, then a 50 ms sleep, in `lv`'s order) and each key's figure is their **root-mean-square**. 9b keeps `lv` | The radio is queued only 0.4 s ahead from `SND.update`, which runs once a frame, so a frame of a second leaves the queue dry and the radio reads quiet against the engine (the oscillators run on). Holding the loop and stepping the scheduler by timer takes the frame rate out; the lead-in fills the 0.4 s and 0.3 s queues before the first read; `lv`'s aggregate keeps the rows' bands meaning what they meant (9a's plain mean stays 9a's); reads are counted, not timed, so a slow box reads the same window; 9b's `settle()` waits on voices the frame loop updates, so it stays on `lv` |
+| The seed per window (dsradio) | `lvT` seeds `Math.random` with mulberry32 at `AMB_SEED` (20261103, the constant 9a uses, now declared at section 9's head with its value unchanged) at the start of every window | The hats' noise offset and the birds draw dice; re-seeding per window gives every station the same dice, so the stations compare on the music |
+| Proof that nothing was drawn (dsradio) | `lvT` counts calls to its `requestAnimationFrame` stub (`frames`) and also checks that `PERF.k` and `PERF.t0` did not move (`drawn`), an independent witness that no frame ran by any path. The method row fails on either | A hold that silently fails falls back to the old measurement and stays green on a fast box; a second, separate witness is cheap |
+| The method row needs nine windows (dsradio) | The row `the sound windows of section 9 and the stations ran with the frame loop held ...` collects exactly 9 windows (`lvOn`, `lvOff`, `engOff`, `engFull`, `engHalf`, four stations) and fails on any other count, on `frames > 0`, on `drawn`, or on fewer than 15 steps a second | A window that was skipped must fail, not pass for lack of evidence (`games/CLAUDE.md`, "A check that can skip"); 15 a second is three quarters of the 20 a second asked for, enough to refill a 0.4 s queue |
+| The hold is inside the `try` (dsradio) | `lvT` swaps `requestAnimationFrame` and waits for the held frame inside the `try`, with the restore, the re-queue of the held frame and the cleared interval in the `finally` | A hold that times out must not leave the stub in place and starve every later section of frames |
+| The squared-taper row's windows (dsradio, the overseer's decision; the CD reviews it) | The row compares two `lvT` windows back to back, `engFull` at engine 100 then `engHalf` at 50, each a whole number of the engine's beat periods (two beats, about 10.98 s at rpm 789; never under 10 s). Its band and its wording are unchanged (0.25 +- 0.08) | The engine's two oscillators beat (see the engine beat in Testing), so a 2 s engine window swings about +-20% by phase alone (0.052-0.078 at engine 100), and a 2 s window at 50 read 0.17 to 0.37 of a 2 s window at 100 where 0.25 is right: under `lvT` the old pairing read 0.361 once and failed, and the old `lv` read the taper at 0.283-0.288 for the same reason. Whole beats average the phase out (0.2487 / 0.2503 / 0.2501 measured) |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
 
@@ -1252,11 +1258,49 @@ it holds one at 0.25x and an unthinned winter reads near 1x) and winter's greyer
 conifers too (conifers never change). The tree tuning itself (the attach height back at 0.9) has no
 break: it is cosmetic, and the rows bound the tree's structure, not its proportions.
 
-**A known flake (untraced hypothesis):** under machine load (two suites at
-once, or the gates beside a break run) the sound rows (the engine and radio
-levels, the engine slider, the four stations within 25%) and the perf block's
-row (FPS 0) can go red. They measure over wall-clock time. A break "caught"
-only by one of them is not caught. Run the gates alone.
+**The sound windows, held (dsradio, 2026-11-04; the suite 157 -> 158, the list 76 -> 79).** One new
+row after the stations row: `the sound windows of section 9 and the stations ran with the frame
+loop held and the scheduler on its timer (no frame drawn, at least 15 steps a second)`. It needs
+all nine `lvT` windows (a skipped one fails it) and fails on a drawn frame by either witness. Three
+breaks, run on copies with `negtest-copies.py --page-env DS_PAGE --jobs 1`, one foreground chunk,
+through the whole suite, each caught by the row its `row` field names: `radio-unscheduled` (the
+`while (nextBeat < t + 0.4)` scheduler line removed: the radio reads 0 against an engine of 0.068,
+and the engine-slider row and the four stations row, all at 0, go red too), `radio-quiet` (the
+radio bus gain 1.5 -> 0.4: 0.0144 against 0.0691, 0.21x the engine, under the row's 0.5x; the
+four stations row goes red as well, at 0.014 each) and `station-untrimmed` (classical's trim 1.54 ->
+1.0: 0.0545 / 0.0518 / 0.0513 / 0.0336, a spread of 1.62 against the row's 1.25). The plan expected
+the radio at 0.13-0.2x for `radio-quiet`; that rested on the old 0.5-0.75x ratio, and under `lvT`
+the radio is about 0.9-1.1x the engine, so a bus at 0.4/1.5 (0.27 of today) reads about 0.2-0.3x. `radio-unscheduled`
+and `station-untrimmed` were also run against the 900 ms slow copy through the step-1 harness
+(the suite's boot and section 9 to the method row, 9b left out, copied verbatim; scratch, not in
+the repo): each caught by its row there too (`radio-unscheduled` music 0 against 0.072;
+`station-untrimmed` 0.0542 / 0.0501 / 0.0529 / 0.0334, spread 1.62). None missed, no row added.
+
+**The sound rows and the frame rate (dsradio, 2026-11-04; traced).** The radio is queued only 0.4 s
+ahead, from `SND.update()` (`while (nextBeat < t + 0.4)`), and `SND.update` runs once a frame from
+`frame()`. When a frame takes about a second (SwiftShader here, or a gate beside another job), the
+beats in the gap are never scheduled, so the music probe read quiet against the engine, whose
+oscillators run on. `__DS.setPaused(true)` stops `tick()` only; frames, and `SND.update`, still run.
+On a phone the queue never runs dry. The ambient bed is queued 0.3 s ahead from the same call. So
+section 9's radio, engine and ambient windows and the stations row now read through `lvT`: the loop
+is held, `Math.random` seeded, and `SND.update(0)` stepped from a 50 ms timer, with a method row
+that fails if any window drew a frame or stepped under 15 times a second (see the assumed rows
+marked dsradio). Proven with a copy of the page that busy-waits 900 ms at the top of `frame()`: the
+old sampler went red there on "the radio sits near it" (music 0.0054 against the engine's 0.065,
+0.083x) and on the engine-slider-at-0 row; `lvT` stayed green on five runs of five. The breaks
+`radio-unscheduled` and `station-untrimmed` were caught on that slow copy as well as on the page. Run
+the gates alone anyway (a loaded box starves the Chromium it drives). **Still a known flake,
+untraced:** the perf block's row (FPS 0) can go red under machine load; it reads wall-clock FPS. A
+break "caught" only by it is not caught.
+
+**The engine beats (traced to the page).** `SND.update` sets the engine's two oscillators to
+`f = rpm / 60 * 2` and `f * 1.007` (`eng.o2.frequency.setTargetAtTime(f * 1.007, ...)`), so the
+engine's level beats at 0.007 f: about 0.18 Hz, a period of about 5.4 s at rpm 789. A 2 s engine
+window therefore swings about +-20% by phase alone (0.052-0.078 at engine 100, measured), and a 2 s
+window at 50 read 0.17 to 0.37 of a 2 s window at 100 where 0.25 is right, and any
+ratio built on one moves run to run (the radio/engine and ambient/engine figures below). The
+squared-taper row compares two windows of whole beat periods for that reason; `lvOn`'s 2 s engine
+window still falls anywhere on the beat, which the radio and ambient bands are wide enough for.
 
 Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for example
 `node .claude/scripts/shot-page.cjs games/driving-simulator/index.html /tmp/x.png w=844 h=390 wait=4000 eval="__DS.SETTINGS.cycle=0;__DS.SKY.hour=20.5;__DS.teleport(10600);__DS.CAM.mode=0"`
@@ -1307,11 +1351,17 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
 
 - Simulation (`tick`) median < 0.1 ms, p95 0.2 ms; worst 13 ms on a frame that
   builds a town chunk.
-- Audio: engine RMS ~0.04 idle, ~0.06 cruising, ~0.08 full throttle; radio ~0.5-0.75x
-  the engine at half throttle, about 1.1x at a light cruise. The four stations
-  measured 0.0515 / 0.0569 / 0.0372 / 0.0335 untrimmed (a 1.7x spread); trimmed
-  1.0 / 0.9 / 1.38 / 1.54 they sit at 0.049-0.054. Ambient, outside at noon:
-  0.006 (0.14x the engine); at night 0.004; in the cockpit at idle 0.003.
+- Audio: engine RMS ~0.04 idle, ~0.06 cruising, ~0.08 full throttle. The following are
+  `lvT` figures from 2026-11-04 (loop held, scheduler on a timer; they replace the figures `lv`
+  gave under the frame loop: radio 0.5-0.75x the engine, the stations 0.0515 / 0.0569 / 0.0372 /
+  0.0335 untrimmed): radio 0.86-1.10x the engine at half throttle on the page (0.78-0.81x on the
+  900 ms slow copy), ambient 0.13-0.145x the engine (0.105-0.106x slow), the four stations trimmed
+  (1.0 / 0.9 / 1.38 / 1.54) 0.0510-0.0544 with a spread of 1.036-1.070 (0.0504-0.0549 and
+  1.066-1.082 slow), the squared taper 0.2487 / 0.2503 / 0.2501 (engine 100 about 0.0645, 50 about
+  0.0161; 0.249-0.252 slow). The radio and ambient ratios still swing run to run because their
+  2 s engine window falls anywhere on the engine's 0.18 Hz beat; the other figures are steadier.
+  Ambient, outside at noon: 0.006 by the old reading; at night 0.004; in the cockpit at idle 0.003
+  (not re-measured under `lvT`).
 - Cruise control on a straight holds the set speed to the last digit (the
   feed-forward is the car's own force model); over 90 s of real grades within
   0.3 m/s.

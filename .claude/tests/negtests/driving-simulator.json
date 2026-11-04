@@ -530,5 +530,26 @@
   "file": "games/driving-simulator/index.html",
   "old": "  const bark = birch ? C.birchBark : (conifer ? C.bark : LOOK.bark).map(v => v * rnd.range(0.8, 1.15));",
   "new": "  const bark = birch ? C.birchBark : LOOK.bark.map(v => v * rnd.range(0.8, 1.15)); /* @negtest */"
+ },
+ {
+  "name": "radio-unscheduled",
+  "row": "the engine is audible and the radio sits near it (0.5-1.6x the engine)",
+  "file": "games/driving-simulator/index.html",
+  "old": "      while (nextBeat < t + 0.4) { BEATS[st](nextBeat, beat++, step); nextBeat += step; }",
+  "new": "      /* @negtest */"
+ },
+ {
+  "name": "radio-quiet",
+  "row": "the engine is audible and the radio sits near it (0.5-1.6x the engine)",
+  "file": "games/driving-simulator/index.html",
+  "old": "music.gain.value = 1.5;",
+  "new": "music.gain.value = 0.4; /* @negtest */"
+ },
+ {
+  "name": "station-untrimmed",
+  "row": "all four stations play and sit within 25% of each other",
+  "file": "games/driving-simulator/index.html",
+  "old": "bpm: 76, trim: 1.54",
+  "new": "bpm: 76, trim: 1.0 /* @negtest */"
  }
 ]
