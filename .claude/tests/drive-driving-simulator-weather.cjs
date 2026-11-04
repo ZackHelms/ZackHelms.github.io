@@ -302,6 +302,158 @@ const install = p => p.evaluate(() => {
     && !!gather.snow && gather.snow.peak > 0.9 && gather.snow.after12 < 0.7 * gather.snow.peak
     && [gather.rainAgree, gather.snowAgree, gather.snowWetAgree].every(a => !!a && a.length === 10 && maxA(a) <= 0.02), gather);
 
+  // ---- 3f. the grey sky, the fog, the light under cloud, headlights in weather (DS-8, dsweather step 2) ----
+  // Step 2's helpers. __wxPick(kind, I): a fixed pick at intensity I (WX_FIXED's own when I is left out), through setWeather, so
+  // the sky, the fog and the lamps read it as a player's pick; __wxPick('clear') puts WX_FIXED back. __dsContrast / __dsPeaks:
+  // the main suite's star-pixel method (section 8b), copied. __wxRoad(s, fog): a camera 3 m over the right lane at s aimed down
+  // the road (no cars), the frame drawn through renderScene() with the world's fog sigma replaced by `fog` when it is a number
+  // (fogSigma swapped for the one frame), and the pixels where the lane centre lies at each distance in `ds`, each with its
+  // distance from the eye. __wxLamps(): the player's car and a traffic car, each seen from 6 m ahead of it at 1.2 m, and the
+  // brightest pixel within 3 px of each headlamp, with the lamps as the page has them and with lightsOn() swapped to false.
+  await page.evaluate(() => {
+    const W = window, F0 = Object.assign({}, W.__DS.WX_FIXED);
+    W.__wxPick = (kind, I) => { const D = W.__DS; Object.assign(D.WX_FIXED, F0); if (I !== undefined) D.WX_FIXED[kind] = I; D.setWeather(kind); };
+    W.__dsContrast = (F, x, y) => { const v = F.L(x, y); for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) if ((dx || dy) && F.L(x + dx, y + dy) > v) return -1;
+      let ring = 0, lo = 1e9, hi = -1e9; for (let d = -3; d <= 3; d++) for (const q of [F.L(x + d, y - 3), F.L(x + d, y + 3), F.L(x - 3, y + d), F.L(x + 3, y + d)]) { ring += q; lo = Math.min(lo, q); hi = Math.max(hi, q); }
+      return hi - lo > 8 ? -1 : v - ring / 28; };
+    W.__dsPeaks = (F, frac, t) => { let n = 0; for (let y = Math.floor(F.h * (1 - frac)) + 3; y < F.h - 3; y++) for (let x = 3; x < F.w - 3; x++) if (W.__dsContrast(F, x, y) >= t) n++; return n; };
+    // a camera at eye looking at a world point, the frame through renderScene, and the suite's own projection of world points
+    W.__wxCam = (eye, target, recs, pts) => { const c = document.getElementById('gl'), g = c.getContext('webgl2'), w = c.width, h = c.height, fov = 0.8, up = [0, 1, 0];
+      const fl = Math.hypot(target[0] - eye[0], target[1] - eye[1], target[2] - eye[2]), f = [0, 1, 2].map(i => (target[i] - eye[i]) / fl);
+      g.bindFramebuffer(g.FRAMEBUFFER, null); g.viewport(0, 0, w, h); g.clearColor(0, 0, 0, 1); g.clear(g.COLOR_BUFFER_BIT | g.DEPTH_BUFFER_BIT);
+      renderScene(eye, f, up, fov, 0.2, w, h, { propDist: 560, shadows: false, hidePlayer: false }, recs);
+      const F = W.__dsPx(), cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]], dt = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+      const s0 = cr(f, up), sl = Math.hypot(...s0), sv = s0.map(v => v / sl), u = cr(sv, f), t = Math.tan(fov / 2);
+      F.at = pts.map(p => { const d = [0, 1, 2].map(i => p[i] - eye[i]); return { x: (dt(d, sv) / dt(d, f) / (t * w / h) * 0.5 + 0.5) * w - 0.5, y: (dt(d, u) / dt(d, f) / t * 0.5 + 0.5) * h - 0.5, dist: Math.hypot(...d) }; });
+      return F; };
+    W.__wxRoad = (s, fog, ds) => { const D = W.__DS, keep = now, keepF = fogSigma; now = 100;
+      const pt = (q, u = 1.8) => { const p = D.at(q), xz = worldAt(p, u); return [xz[0], D.groundAt(p, u, xz[0], xz[1]), xz[1]]; };
+      const e = pt(s); e[1] += 3;
+      if (typeof fog === 'number') fogSigma = () => fog;
+      let F; try { F = W.__wxCam(e, pt(s + 120), [], ds.flatMap(d => [pt(s + d), pt(s + d, 0.9), pt(s + d, 2.7)])); } finally { fogSigma = keepF; now = keep; }
+      return ds.map((d, i) => { const a = F.at[3 * i], y = Math.round(a.y), x0 = Math.round(Math.min(F.at[3 * i + 1].x, F.at[3 * i + 2].x)), x1 = Math.round(Math.max(F.at[3 * i + 1].x, F.at[3 * i + 2].x)), px = [];
+        for (let x = x0; x <= x1; x++) { const k = (y * F.w + x) * 4; px.push([F.px[k], F.px[k + 1], F.px[k + 2]]); }
+        return { d, dist: +a.dist.toFixed(2), x0, x1, y, px }; }); };
+    W.__wxLamps = () => { const D = W.__DS, keep = now, keepL = lightsOn, mode = D.CAM.mode; now = 100; D.CAM.mode = 1;
+      const look = (B, V, recs) => { const H = V.headlamp, eye = toWorld(B, [0, 1.2, V.length / 2 + 6]), tg = toWorld(B, [0, 0.7, 0]);
+        const lamps = [1, -1].map(sx => toWorld(B, [sx * H.x, H.y, V.length / 2]));
+        const F = W.__wxCam(eye, tg, recs, lamps);
+        return F.at.map(a => { let m = 0; for (let y = Math.round(a.y) - 3; y <= Math.round(a.y) + 3; y++) for (let x = Math.round(a.x) - 3; x <= Math.round(a.x) + 3; x++) m = Math.max(m, F.L(x, y)); return Math.round(m); }); };
+      const P = D.PLAYER, pb = playerBasis();
+      // the traffic car furthest from every other car (and the player), within 250 m
+      let best = null, bd = 0;
+      for (const c of D.TRAFFIC.cars) { const dp = Math.hypot(c.x - P.x, c.z - P.z); if (dp > 250) continue;
+        let md = dp; for (const o of D.TRAFFIC.cars) if (o !== c) md = Math.min(md, Math.hypot(c.x - o.x, c.z - o.z)); if (md > bd) { bd = md; best = c; } }
+      const out = { gap: Math.round(bd) };
+      try {
+        for (const on of [true, false]) {
+          if (!on) lightsOn = () => false;
+          const recs = carRecords();
+          out[on ? 'on' : 'off'] = { player: look(pb, D.CARMESH[P.V.kind].car.V, recs), car: best ? look(carBasis(best.x, best.y, best.z, best.yaw, best.pitch, 0), D.CARMESH[best.kind].car.V, recs) : null,
+            head: recs.map(r => r.head) };
+        }
+      } finally { lightsOn = keepL; now = keep; D.CAM.mode = mode; }
+      return out; };
+  });
+  // the pixels' linear values: the page's tonemap undone (8-bit level -> its pow(1/2.2) -> the ACES fit solved for x)
+  const unTone = v => { const Y = Math.pow(Math.min(v, 254.5) / 255, 2.2), A = 2.51 - 2.43 * Y, B = 0.03 - 0.59 * Y; return (-B + Math.sqrt(B * B + 4 * A * 0.14 * Y)) / (2 * A); };
+
+  // row: Clear is as shipped. WX_BEFORE's five frames hash as recorded; then Rain (a frame drawn under it, the state stepped), and
+  // back to Clear with wet and snow 0: the five again
+  const clearRow = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    o.first = W.__wxFrames(MAY5);
+    W.__wxPick('rain'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400); o.rain = { kind: D.WX.kind, cloud: D.WX.cloud, wet: D.WX.wet }; W.__wxView(1); D.stepWeather(0.5);
+    W.__wxPick('clear'); D.WX.wet = 0; D.WX.snow = 0;
+    o.again = W.__wxFrames(MAY5); o.after = { kind: D.WX.kind, cloud: D.WX.cloud, wet: D.WX.wet, snow: D.WX.snow, fog: D.WX.fog };
+    return o; }, MAY5);
+  const clearBad = ['first', 'again'].flatMap(p => Object.keys(WX_BEFORE).filter(k => !(clearRow[p][k] && clearRow[p][k][1] === WX_BEFORE[k][1] && clearRow[p][k][0] === WX_BEFORE[k][0])).map(k => p + '.' + k));
+  ok('Clear is as shipped: the five WX_BEFORE frames (road at 13:00 chase and cockpit, the stars at 22:00, the sun at 17:00, a town street at 21:00) hash as recorded on the page before the weather, and again after Rain then back to Clear with wet and snow 0',
+    clearBad.length === 0 && clearRow.rain.kind === 'rain' && clearRow.rain.cloud === 1 && clearRow.after.kind === 'clear' && clearRow.after.cloud === 0 && clearRow.after.wet === 0 && clearRow.after.fog === 0,
+    { bad: clearBad, rain: clearRow.rain, after: clearRow.after, again: clearBad.length ? clearRow.again : 'same' });
+
+  // row: cloud hides the bodies. Under Rain at intensity 1: the sun's disc at 17:00 (WX_BEFORE's sun17 aim) within 5% of the sky
+  // 3 and 30 deg beside it in azimuth (Clear's aureole is near white 3 deg off, so the 30 deg sample is what shows the aim is on it), the moon's at 04:00 on May 6 (SKY_BEFORE's moon4 aim) likewise (or within one 8-bit level, the
+  // night sky being dark), where under Clear each disc is far brighter than its neighbour; and at 22:00 (the night22 aim) no
+  // star pixel by the star row's own method (section 8b: isolated pixels 30 levels over their ring), where Clear has them.
+  const bodies = await page.evaluate(MAY5 => { const W = window, D = W.__DS, DR = Math.PI / 180, o = {}, keep = now; now = 100;
+    const enu = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
+    const aim = b => { const v = D.SKY[b], az = Math.atan2(v[0], v[2]) / DR, alt = Math.max(Math.asin(v[1]) / DR, 32); return D.enuToWorld(enu(alt, az)); };
+    const side = (v, deg) => { const az = Math.atan2(v[0], v[2]) + deg * DR, h = Math.hypot(v[0], v[2]); return [Math.sin(az) * h, v[1], Math.cos(az) * h]; };
+    const body = (mjd, hr, b) => { D.SKY.hour = hr; D.setDate(mjd); const disc = D.SKY[b + 'DiscW'], F = W.__dsAimed(aim(b), 0, [disc, side(disc, 3), side(disc, 30)]);
+      const L = a => Math.round(F.L(Math.round(a.x), Math.round(a.y)) * 10) / 10; return { disc: L(F.at[0]), beside: L(F.at[1]), far: L(F.at[2]), alt: +(Math.asin(D.SKY[b][1]) / DR).toFixed(1) }; };
+    const stars = () => { D.SKY.hour = 22; D.setDate(MAY5); const F = W.__dsAimed(D.enuToWorld(enu(32, 200)), 0); return { n30: W.__dsPeaks(F, 1, 30), n40: W.__dsPeaks(F, 1, 40) }; };
+    for (const [k, I] of [['clear'], ['rain', 1]]) { W.__wxPick(k, I); o[k] = { sun: body(MAY5, 17, 'sun'), moon: body(MAY5 + 1, 4, 'moon'), stars: stars(), cloud: D.WX.cloud, I: D.WX.intensity }; }
+    W.__wxPick('clear'); now = keep; D.SKY.hour = 13; D.setDate(MAY5);
+    return o; }, MAY5);
+  const near = (r, tol) => [r.beside, r.far].every(b => Math.abs(r.disc - b) <= Math.max(tol * b, 1));
+  ok('cloud hides the bodies: under Rain at intensity 1 the sun\'s disc at 17:00 and the moon\'s at 04:00 are within 5% of the sky 3 and 30 deg beside them (Clear: the sun saturated and far over the sky 30 deg off, the moon far over its neighbour), and at 22:00 there is no star pixel by the star row\'s method (Clear: some)',
+    bodies.rain.I === 1 && bodies.rain.cloud === 1 && near(bodies.rain.sun, 0.05) && near(bodies.rain.moon, 0.05) && bodies.rain.stars.n30 === 0
+    && bodies.clear.sun.disc >= 250 && bodies.clear.sun.disc > bodies.clear.sun.far + 30 && bodies.clear.moon.disc > bodies.clear.moon.beside + 30 && bodies.clear.stars.n40 >= 4, bodies);
+
+  // row: the sky goes grey. Under Rain (the fixed pick) at 13:00 on May 5, the sky aimed 32 deg up at azimuth 200 and again at
+  // azimuth 20 (all sky): its mean HSV saturation (the pixels as shown) under 0.15 where Clear's is over 0.3, and its mean 8-bit
+  // luminance 0.4-0.8x Clear's
+  const grey = await page.evaluate(MAY5 => { const W = window, D = W.__DS, DR = Math.PI / 180, o = {}, keep = now; now = 100;
+    const enu = (alt, az) => [Math.sin(az * DR) * Math.cos(alt * DR), Math.sin(alt * DR), Math.cos(az * DR) * Math.cos(alt * DR)];
+    const stat = F => { let s = 0, l = 0, n = 0; for (let i = 0; i < F.px.length; i += 4) { const r = F.px[i], g = F.px[i + 1], b = F.px[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      s += mx > 0 ? (mx - mn) / mx : 0; l += 0.2126 * r + 0.7152 * g + 0.0722 * b; n++; } return { sat: +(s / n).toFixed(3), lum: +(l / n).toFixed(2) }; };
+    for (const k of ['clear', 'rain']) { W.__wxPick(k); D.SKY.hour = 13; D.setDate(MAY5); o[k] = [200, 20].map(az => stat(W.__dsAimed(D.enuToWorld(enu(32, az)), 0))); o[k + 'Cloud'] = D.WX.cloud; }
+    W.__wxPick('clear'); now = keep; D.SKY.hour = 13; D.setDate(MAY5);
+    return o; }, MAY5);
+  const greyRatio = grey.rain.map((r, i) => +(r.lum / grey.clear[i].lum).toFixed(3));
+  ok('the sky goes grey: under Rain at 13:00 the sky (32 deg up, two azimuths) has a mean HSV saturation under 0.15 where Clear\'s is over 0.3, and a mean luminance 0.4-0.8x Clear\'s',
+    grey.rainCloud === 1 && grey.rain.every(r => r.sat < 0.15) && grey.clear.every(r => r.sat > 0.3) && greyRatio.every(q => q >= 0.4 && q <= 0.8), { grey, greyRatio });
+
+  // row: the fog closes the view. A straight, level stretch (the heading within 0.5 deg and the road within 0.6 m of a straight
+  // line over 340 m), a camera 3 m over the right lane aimed down it at 13:00, no cars. At the lane centre 50, 75, 100, 150, 200
+  // and 300 m on, three frames: the weather's own, and the same with the world's fog sigma replaced by 0 and by 1 (fogSigma
+  // swapped for the frame). With the tonemap undone, C(d) = (weather - full) / (none - full) is the share of the road's own
+  // contrast against the fog colour still showing; ln C over the eye's distance is fitted with a line, over the distances where
+  // the weather frame is still 6 levels from the full fog, and its slope is the measured sigma. Fog at 0.2 and 1.0 must give
+  // 3 / MOR for 400 and 150 m within 20%. Under Clear (an optical range of about 2.9 km) C(300) / C(50) is at least 0.7: an
+  // optical range over 2 km. (The plan's 0.85 cannot hold for the shipped haze: exp(-0.00105 x 250) is 0.77; Clear is not to move.)
+  const DS = [50, 75, 100, 150, 200, 300];
+  const fogRun = await page.evaluate(([MAY5, DS]) => { const W = window, D = W.__DS, o = {};
+    // the stretch: from 1 km on, every 50 m, the first whose next 340 m hold the heading and lie on a line
+    let s0 = null;
+    for (let s = 1000; s < 40000 && s0 === null; s += 50) { const a = D.at(s), b = D.at(s + 340); let okS = true;
+      for (let d = 0; d <= 340 && okS; d += 10) { const p = D.at(s + d); if (Math.abs(p.th - a.th) > 0.5 * Math.PI / 180 || Math.abs(p.y - (a.y + (b.y - a.y) * d / 340)) > 0.6) okS = false; }
+      if (okS) s0 = s; }
+    o.s = s0; if (s0 === null) return o;
+    D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(s0); D.TRAFFIC.cars.length = 0; o.cls = D.sectionAt(s0).cls;
+    for (const [k, I] of [['clear'], ['fog', 0.2], ['fog', 1]]) { W.__wxPick(k, I); o[k + (I || '')] = { mor: D.WX.mor, w: W.__wxRoad(s0, null, DS), none: W.__wxRoad(s0, 0, DS), full: W.__wxRoad(s0, 1, DS) }; }
+    W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, [MAY5, DS]);
+  const fogFit = run => { if (!run) return null; const pts = [];
+    run.w.forEach((p, i) => { const lin = q => q.reduce((a, c) => a + c.reduce((x, v) => x + unTone(v), 0), 0), raw = q => q.reduce((a, c) => a + c[0] + c[1] + c[2], 0);
+      const w = lin(p.px), n = lin(run.none[i].px), f = lin(run.full[i].px), C = (w - f) / (n - f);
+      pts.push({ d: p.d, dist: p.dist, npx: p.px.length, C: +C.toFixed(4), lev: +(Math.abs(raw(p.px) - raw(run.full[i].px)) / 3).toFixed(1), den: +(Math.abs(n - f) / p.px.length).toFixed(4) }); });
+    const use = pts.filter(q => q.lev >= 8 && q.den > 0.01 && q.C > 0);
+    let sig = null; if (use.length >= 2) { const n = use.length, mx = use.reduce((a, q) => a + q.dist, 0) / n, my = use.reduce((a, q) => a + Math.log(q.C), 0) / n;
+      sig = -use.reduce((a, q) => a + (q.dist - mx) * (Math.log(q.C) - my), 0) / use.reduce((a, q) => a + (q.dist - mx) ** 2, 0); }
+    return { sig: sig && +sig.toFixed(5), n: use.length, pts }; };
+  const fit = { clear: fogFit(fogRun.clear), fog02: fogFit(fogRun['fog0.2']), fog1: fogFit(fogRun.fog1) };
+  const within = (f, mor) => !!f && f.sig !== null && Math.abs(f.sig / (3 / mor) - 1) <= 0.2;
+  const cR = fit.clear && (fit.clear.pts[5].C / fit.clear.pts[0].C);
+  console.log('  .. fog fits: ' + JSON.stringify({ s: fogRun.s, cls: fogRun.cls, clear: fit.clear && fit.clear.sig, c300_50: cR && +cR.toFixed(3), fog02: fit.fog02 && [fit.fog02.sig, 3 / 400, fit.fog02.n], fog1: fit.fog1 && [fit.fog1.sig, 3 / 150, fit.fog1.n] }));
+  ok('the fog closes the view: down a straight, level road at 13:00 the road\'s contrast against the fog colour falls as exp(-sigma d) with sigma within 20% of 3 / MOR for Fog at 0.2 (400 m) and 1.0 (150 m), measured off the pixels; under Clear the contrast at 300 m is at least 0.7x that at 50 m',
+    fogRun.s !== null && within(fit.fog02, 400) && within(fit.fog1, 150) && Math.abs(fogRun['fog0.2'].mor - 400) < 0.01 && Math.abs(fogRun.fog1.mor - 150) < 0.01 && cR >= 0.7 && fit.clear.pts[0].den > 0.01,
+    { s: fogRun.s, fit });
+
+  // row: headlights in weather. At 13:00, the player's car and a traffic car seen from 6 m ahead: under Rain, Fog and Snow (in
+  // winter) the brightest pixel within 3 px of each headlamp is at least 25 levels over the same frame with the lamps forced off
+  // (lightsOn swapped to false), and under Clear the two frames' lamps are the same, level for level
+  const lampRun = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    for (const k of ['clear', 'rain', 'fog', 'snow']) { if (k === 'snow') D.setSeason('winter'); W.__wxPick(k); D.SKY.hour = 13; D.setDate(k === 'snow' ? D.SKY.mjd : MAY5); W.__wxPlace(k === 'snow' ? 400 : 400);
+      o[k] = Object.assign(W.__wxLamps(), { kind: D.WX.kind, lights: D.SKY.lights, day: +D.SKY.day.toFixed(2) }); }
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  const lit = r => !!r.on.car && [0, 1].every(i => r.on.player[i] >= r.off.player[i] + 25 && r.on.car[i] >= r.off.car[i] + 25);
+  const same = r => !!r.on.car && JSON.stringify([r.on.player, r.on.car]) === JSON.stringify([r.off.player, r.off.car]);
+  ok('headlights in weather: at 13:00 the player\'s headlamps and a traffic car\'s are lit under Rain, Fog and Snow (each lamp at least 25 levels over the same frame with the lamps off) and unlit under Clear',
+    ['rain', 'fog', 'snow'].every(k => lampRun[k].kind === k && !lampRun[k].lights && lit(lampRun[k])) && lampRun.clear.kind === 'clear' && !lampRun.clear.lights && same(lampRun.clear),
+    Object.fromEntries(Object.entries(lampRun).map(([k, r]) => [k, { on: [r.on.player, r.on.car], off: [r.off.player, r.off.car], gap: r.gap, kind: r.kind, lights: r.lights }])));
+
   const tail = await page.evaluate(() => ({ weather: window.__DS.SETTINGS.weather, look: window.__DS.lookSeason }));
   ok('no page errors; the suite booted under its Clear pin (nothing stored, so the pin wrote Clear) and leaves the page under Clear in spring',
     errors.length === 0 && boot.weather === 'clear' && boot.kind === 'clear' && tail.weather === 'clear' && tail.look === 'spring', { errors: errors.slice(0, 5), boot, tail });

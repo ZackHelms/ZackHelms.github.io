@@ -2267,6 +2267,8 @@ const MAXL = 16;
 const GLSL_COMMON = `
 uniform vec3 uSunDir, uMoonDir, uSunCol, uMoonCol, uCamWrap;
 uniform float uDay, uNight;
+uniform float uCloud;          // the weather's overcast, 0-1 (DS-8): 0 under Clear, where every term it touches is skipped
+uniform vec3 uOvCol;           // the overcast's grey by day (DS-8, WX_GREY: by the weather's kind)
 float h21(vec2 p){ p = mod(p, 4096.0); return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
   return mix(mix(h21(i), h21(i+vec2(1,0)), u.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), u.x), u.y); }
@@ -2290,8 +2292,18 @@ vec3 skyBase(vec3 d){
   vec3 c = mix(hor, zen, pow(max(up, 0.0), 0.5));
   if (d.y < 0.0) c = mix(hor, hor * 0.35, smoothstep(0.0, -0.2, d.y));
   float cs = dot(d, uSunDir);
-  c += uSunCol * (pow(max(cs, 0.0), 10.0) * 0.18) * step(-0.06, sy);
   float cm = dot(d, uMoonDir);
+  // Overcast (DS-8): the clear sky mixed toward a grey by uCloud, the sun's lobe and the moon's glow faded by 1 - uCloud. A
+  // branch of its own, so Clear runs the shipped lines below and keeps its bytes. The grey: uOvCol by day (WX_GREY), a touch
+  // lighter toward the horizon; bluish-dark by night; darkened below the horizon as the clear sky is.
+  if (uCloud > 0.0) {
+    vec3 ov = mix(vec3(0.0055, 0.0068, 0.0115), uOvCol, uDay) * (1.0 - 0.18 * pow(max(up, 0.0), 0.5));
+    if (d.y < 0.0) ov = mix(ov, ov * 0.35, smoothstep(0.0, -0.2, d.y));
+    c = mix(c, ov, uCloud);
+    c += (uSunCol * (pow(max(cs, 0.0), 10.0) * 0.18) * step(-0.06, sy) + uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6) * (1.0 - uCloud);
+    return c;
+  }
+  c += uSunCol * (pow(max(cs, 0.0), 10.0) * 0.18) * step(-0.06, sy);
   c += uMoonCol * pow(max(cm, 0.0), 30.0) * 0.6;
   return c;
 }
@@ -2471,6 +2483,7 @@ precision highp float;
 ${GLSL_COMMON}
 uniform mat4 uInvVP; uniform float uExposure; uniform float uMtn;
 uniform mat3 uStarM; uniform float uMwGain;
+uniform float uWxFog;          // the weather's fog beyond Clear's (1/m, DS-8): 0 under Clear and wherever Clear's is thicker
 uniform vec3 uSunDisc, uMoonDisc, uPoleW; uniform float uSunR, uMoonR, uMoonES, uMoonK;
 ${ZMH_SKY_GLSL.MILKY_WAY_GLSL}
 ${ZMH_SKY_GLSL.MOON_DISC_GLSL}
@@ -2508,7 +2521,11 @@ vec3 skyBodies(vec3 d){
 }
 void main(){
   vec4 a = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(a.xyz / a.w);
-  vec3 c = skyBase(d) + skyBodies(d);   // the sky with the sun and moon: the view ray only (the hills below replace it under the ridge)
+  // the sky with the sun and moon: the view ray only (the hills below replace it under the ridge). Under cloud the bodies fade
+  // by 1 - uCloud (none through a full overcast, DS-8); uCloud is uniform, so skyBodies' fwidth stays in uniform control flow.
+  vec3 c;
+  if (uCloud > 0.0) c = skyBase(d) + skyBodies(d) * (1.0 - uCloud);
+  else c = skyBase(d) + skyBodies(d);
   // distant hills: a ridge at infinity, hazed toward the horizon colour (skyBase: no disc in the haze)
   float az = atan(d.z, d.x);
   float ridge = ridgeY(az, uMtn);
@@ -2519,6 +2536,14 @@ void main(){
     vec3 hz = skyBase(normalize(vec3(d.x, 0.02, d.z)));
     vec3 hill = mix(vec3(0.02, 0.035, 0.03) * (0.2 + uDay * 2.0), hz, 0.62);
     c = mix(hill, hz, smoothstep(ridge, ridge - 0.04, d.y) * 0.3);
+  }
+  // Weather fog (DS-8) toward the world's own fog colour for a level ray (skyBase, never the bodies: DS-7's rule): the hills as
+  // if 3 km off, and a band of sky over the horizon as if seen up through a fog 120 m deep, so the band thickens with the fog and
+  // the far road and the hills go together. Both assumed.
+  if (uWxFog > 0.0) {
+    vec3 fc = skyBase(normalize(vec3(d.x, 0.02, d.z)));
+    float k = 1.0 - exp(-uWxFog * (d.y < ridge ? 3000.0 : 120.0 / max(d.y, 0.02)));
+    c = mix(c, fc, k);
   }
   frag = vec4(tonemap(c * uExposure), 1.0);
 }`;
@@ -3113,6 +3138,10 @@ const WX_SEASON = {
 const WX_SPELL = { rain: { start: [0, 24], len: [2, 10], I: [0.2, 1] }, fog: { start: [4, 10], len: [3, 7], I: [0.2, 1] }, snow: { start: [0, 24], len: [3, 12], I: [0.3, 1] } };
 const WX_FIXED = { clear: 0, rain: 0.7, fog: 0.8, snow: 0.7 };   // a fixed pick's intensity
 const WX_MOR = { rain: [8000, 1000], fog: [400, 150], snow: [1500, 400] };   // the optical range (m) at intensity 0.2 and 1.0
+// The overcast's grey by day (linear; GLSL_COMMON's uOvCol), by kind (chosen): rain's about 0.28x the clear day horizon's
+// luminance, so the sky reads 0.4-0.8x Clear's on screen; snow's lighter; fog's about 0.55x, a bright fog the road stands
+// dark against. Read only under cloud (clear's is never drawn).
+const WX_GREY = { clear: [0.148, 0.153, 0.163], rain: [0.148, 0.153, 0.163], snow: [0.21, 0.215, 0.225], fog: [0.29, 0.295, 0.305] };
 // game hours: the edges' ramp, wetting (while rain or snow falls), drying by day / night, snow settling (at intensity 1),
 // melting by day / night; wxHistory's memory and step
 const WX_T = { ramp: 0.5, wet: 20 / 60, dryDay: 2, dryNight: 5, snow: 1.5, meltDay: 8, meltNight: 24, hist: 48, step: 1 / 6 };
@@ -3313,6 +3342,7 @@ const starDir = i => ZMH_SKY.mat3MulVec(SKY.starM, Array.from(STARS.data.subarra
 // The Julian date (UT) of the game's date and clock. Doubles carry it to well under a second; never pass it to GLSL.
 function julianDate() { return 2400000.5 + SKY.mjd + (SKY.hour - (SKY.dst ? -4 : -5)) / 24; }
 function updateSky() {
+  wxRefresh();   // the weather for this hour (cheap: a day's spell is cached), so a jump of SKY.hour never reads a stale WX
   const off = SKY.dst ? -4 : -5, jd = julianDate();
   const s = ZMH_SKY.skyAt(jd, OBS_SKY, SKY_DATA.planets);
   // SKY.* stay in the kit's ENU [east, up, north]; the GPU gets them through enuToWorld (above). The sun, moon and planets are of
@@ -3357,7 +3387,24 @@ function updateSky() {
   SKY.ambGnd = [lerp(0.0015, 0.15, dk), lerp(0.002, 0.16, dk), lerp(0.003, 0.11, dk)];
   SKY.exposure = lerp(1.8, 0.95, smooth(0, 1, dk));
   SKY.lights = SKY.day < 0.5;
+  // Light under cloud (DS-8), after the SKY sliders: the sun down to 0.15 and the moon out under a full overcast; by day the
+  // ambient gains part of what the sun lost (diffuse daylight, up to 1.3x), and the moonlit share of it goes with the moon. The
+  // exposure stays: the picture really is darker. A branch of its own, so Clear keeps its numbers exactly.
+  if (WX.cloud > 0) {
+    const c = WX.cloud, ka = 1 + 0.3 * c * dk, mo = MOON_RGB.map(v => MOON_AMB * v * SKY.moonLight * kMoon);
+    SKY.sunCol = SKY.sunCol.map(v => v * (1 - 0.85 * c));
+    SKY.moonCol = SKY.moonCol.map(v => v * (1 - c));
+    SKY.ambSky = SKY.ambSky.map((v, k) => (v - mo[k]) * ka + mo[k] * (1 - c));
+    SKY.ambGnd = SKY.ambGnd.map(v => v * ka);
+  }
 }
+// Headlights (DS-8): on by night, and whenever the weather is not Clear (North Carolina's wipers-on rule, inferred), for the
+// player and the traffic. The streetlights keep to SKY.lights: their photocells answer daylight, not rain.
+function lightsOn() { return SKY.lights || WX.kind !== 'clear'; }
+// The world's fog (sigma, 1/m): Clear's haze (an optical range of about 2.9 km by day), or the weather's where it is thicker
+// (DS-8: the larger, not the sum, so each weather's optical range is its own)
+function clearFog() { return lerp(0.0016, 0.00105, SKY.day); }
+function fogSigma() { return Math.max(clearFog(), WX.fog); }
 
 // ---------------------------------------------------------------- camera
 const CAM = { mode: SETTINGS.view | 0, eye: [0, 0, 0], fwd: [0, 0, 1], up: [0, 1, 0], fov: 1, near: 0.1,
@@ -3454,11 +3501,11 @@ function carRecords() {
   const P = PLAYER;
   const pb = playerBasis();
   out.push({ kind: P.V.kind, B: pb, paint: lin3([28, 58, 120]), metallic: true, spin: P.spin, steer: P.steer,
-    head: SKY.lights ? 1 : 0, brake: (INPUT.brake > 0.05 || INPUT.keyBrake > 0.05) && P.gear > 0 ? 1 : 0, player: true });
+    head: lightsOn() ? 1 : 0, brake: (INPUT.brake > 0.05 || INPUT.keyBrake > 0.05) && P.gear > 0 ? 1 : 0, player: true });
   for (const c of TRAFFIC.cars) {
     const B = carBasis(c.x, c.y, c.z, c.yaw, c.pitch, 0);
     const blink = c.hazard && Math.floor(now * 2.5) % 2 ? 1 : 0;
-    out.push({ kind: c.kind, B, paint: c.paint, metallic: c.metallic, spin: c.spin, steer: 0, head: SKY.lights ? 1 : 0, brake: c.acc < -0.8 || c.stopT > 0 ? 1 : blink, car: c });
+    out.push({ kind: c.kind, B, paint: c.paint, metallic: c.metallic, spin: c.spin, steer: 0, head: lightsOn() ? 1 : 0, brake: c.acc < -0.8 || c.stopT > 0 ? 1 : blink, car: c });
   }
   return out;
 }
@@ -3504,6 +3551,8 @@ function setFrameUniforms(prog, eye) {
   gl.uniform3fv(U.uSunDir, SKY.sunW); gl.uniform3fv(U.uMoonDir, SKY.moonW);
   gl.uniform3fv(U.uSunCol, SKY.sunCol); gl.uniform3fv(U.uMoonCol, SKY.moonCol);
   gl.uniform1f(U.uDay, SKY.day); gl.uniform1f(U.uNight, SKY.night);
+  if (U.uCloud) gl.uniform1f(U.uCloud, WX.cloud);
+  if (U.uOvCol) gl.uniform3fv(U.uOvCol, WX_GREY[WX.kind]);
   gl.uniform3f(U.uCamWrap, eye[0] - Math.floor(eye[0] / 4096) * 4096, eye[1], eye[2] - Math.floor(eye[2] / 4096) * 4096);
   if (U.uExposure) gl.uniform1f(U.uExposure, SKY.exposure);
 }
@@ -3516,7 +3565,8 @@ function gatherLights(eye, recs) {
     const q = rel(p, eye);
     LP.set([q[0], q[1], q[2], range], n * 4); LD.set([d[0], d[1], d[2], cosCut], n * 4); LC.set(col, n * 3); n++;
   };
-  if (SKY.lights) {
+  // the headlight cones whenever the lamps are on (lightsOn: by night, or in weather); the streetlights by night only (DS-8)
+  if (lightsOn()) {
     for (const r of recs) {
       const d = Math.hypot(r.B.o[0] - eye[0], r.B.o[2] - eye[2]);
       r._d = d;
@@ -3532,6 +3582,8 @@ function gatherLights(eye, recs) {
       } else add(toWorld(r.B, [0, H.y, V.length / 2 + 0.1]), dir, 0.9, [700, 650, 560], 120);
       cars++;
     }
+  }
+  if (SKY.lights) {
     const lamps = [];
     for (const ch of CHUNKS.values()) for (const l of ch.lights) {
       const d = (l[0] - eye[0]) ** 2 + (l[2] - eye[2]) ** 2;
@@ -3595,18 +3647,19 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   gl.uniform1f(sk.U.uMtn, 1);
   // the SKY sliders (DS-6): the Milky Way, the moon's disc and the star pass here; the sun, the moon's light and the earthshine in updateSky()
   const SK = SETTINGS.sky;
-  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN * SKY.starDim * (SK.mw / 100) : 0);
+  gl.uniformMatrix3fv(sk.U.uStarM, true, SKY.starW); gl.uniform1f(sk.U.uMwGain, MW.on ? MW_GAIN * SKY.starDim * (SK.mw / 100) * (1 - WX.cloud) : 0);
+  gl.uniform1f(sk.U.uWxFog, Math.max(0, WX.fog - clearFog()));
   gl.uniform3fv(sk.U.uSunDisc, SKY.sunDiscW); gl.uniform3fv(sk.U.uMoonDisc, SKY.moonDiscW); gl.uniform3fv(sk.U.uPoleW, SKY.poleW);
   gl.uniform1f(sk.U.uSunR, SKY.sunR); gl.uniform1f(sk.U.uMoonR, SKY.moonR); gl.uniform1f(sk.U.uMoonES, SKY.moonES); gl.uniform1f(sk.U.uMoonK, MOON_K * (SK.moon / 100));
   gl.bindVertexArray(null); gl.drawArrays(gl.TRIANGLES, 0, 3);
   // stars and planets: after the sky, before the world (which covers them); additive, then blend off.
   // The kit's matrices are row-major, hence transpose = true. uPx: the main pass's render scale, 1 in the mirror.
-  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0)) {
+  if (SKY.night > 0 && STARS.on && STARS.vao && (SK.stars > 0 || SK.planets > 0) && WX.cloud < 0.98) {   // none through a full overcast (DS-8)
     const sp = PRG.stars; gl.useProgram(sp.p);
     gl.uniformMatrix3fv(sp.U.uStarM, true, SKY.starW);
     gl.uniformMatrix4fv(sp.U.uVP, false, vp);
     gl.uniform1f(sp.U.uPx, opt.mirrorPass ? 1 : RSCALE);
-    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim);
+    gl.uniform1f(sp.U.uStarK, STAR_GAIN * SKY.exposure * SKY.night * SKY.starDim * (1 - WX.cloud));
     gl.uniform1f(sp.U.uStarsK, SK.stars / 100); gl.uniform1f(sp.U.uPlanetK, SK.planets / 100); gl.uniform1i(sp.U.uNStars, STARS.n);
     gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE);
     gl.bindVertexArray(STARS.vao); gl.drawArrays(gl.POINTS, 0, STARS.count);
@@ -3618,7 +3671,7 @@ function renderScene(eye, fwd, up, fov, near, w, h, opt, recs) {
   gl.uniformMatrix4fv(wp.U.uVP, false, vp);
   gl.uniformMatrix4fv(wp.U.uShVP, false, SHVP);
   gl.uniform3fv(wp.U.uAmbSky, SKY.ambSky); gl.uniform3fv(wp.U.uAmbGnd, SKY.ambGnd);
-  gl.uniform1f(wp.U.uFog, lerp(0.0016, 0.00105, SKY.day));
+  gl.uniform1f(wp.U.uFog, fogSigma());
   gl.uniform1f(wp.U.uShadowOn, opt.shadows ? 1 : 0);
   gl.uniform1f(wp.U.uLaneW, LANE_W);
   gl.uniform1f(wp.U.uWind, now);
@@ -3726,7 +3779,7 @@ function drawGauges() {
   g.font = '15px Arial'; g.fillStyle = '#9ab'; g.fillText(mph ? 'mph' : 'km/h', W / 2, 108);
   g.fillStyle = PLAYER.gear < 0 ? '#f84' : '#6f6'; g.font = 'bold 22px Arial'; g.fillText(PLAYER.gear < 0 ? 'R' : 'D' + (PLAYER.gi + 1), W / 2, 140);
   g.fillStyle = '#9ab'; g.font = '16px Arial'; g.fillText(clockText(), W / 2, 168);
-  if (SKY.lights) { g.fillStyle = '#3c6'; g.font = '16px Arial'; g.fillText('◖≡', W / 2 - 60, 140); }
+  if (lightsOn()) { g.fillStyle = '#3c6'; g.font = '16px Arial'; g.fillText('◖≡', W / 2 - 60, 140); }
   if (CRUISE.on) { g.fillStyle = '#3c6'; g.font = '14px Arial'; g.fillText('CC ' + Math.round(CRUISE.v * (mph ? 2.23694 : 3.6)), W / 2 + 50, 140); }
   gl.bindTexture(gl.TEXTURE_2D, TEX.gauge);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, gaugeCv);
