@@ -128,7 +128,7 @@ const AE = {
 
 (async () => {
   const browser = await chromium.launch({
-    executablePath: '/opt/pw-browsers/chromium',
+    executablePath: process.env.SMOKE_CHROMIUM || '/opt/pw-browsers/chromium',
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
   const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
