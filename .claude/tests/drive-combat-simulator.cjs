@@ -740,9 +740,11 @@ function rate(rank, bot, N) { let w = 0; for (let s = 1; s <= N; s++) if ((duel(
     return out;
   });
   console.log('     neon light: ' + JSON.stringify(neonLit));
-  // measured at 844x390 (rank 1): neon mean 0.084 with 99.2% of its brightest 2% on the palette (realistic 0.73, toon 0.76)
-  ok('neon is dark and its light is the palette: mean luminance under 0.12, and 85% of the brightest 2% within 25 deg of a palette hue or near-white',
-    neonLit.neon && neonLit.neon.mean < 0.12 && neonLit.neon.onPalette >= 0.85, neonLit);
+  // measured at 844x390 (rank 1): neon mean 0.084 with 99.2% of its brightest 2% on the palette (realistic 0.73, toon 0.76).
+  // The hue share is held at 96%, not the plan's 85%: the courtyard tonemapped drifts it to 93.9% (and its mean to 0.23),
+  // so at 85% the hue clause could not fail on its own
+  ok('neon is dark and its light is the palette: mean luminance under 0.12, and 96% of the brightest 2% within 25 deg of a palette hue or near-white',
+    neonLit.neon && neonLit.neon.mean < 0.12 && neonLit.neon.onPalette >= 0.96, neonLit);
   // you are green, they are red: each fighter drawn alone (FX.only) beside a frame with neither, in ONE
   // evaluate; a fighter's pixels are those that differ inside its box, and the mean colour of the brightest
   // 10% of them must be its own colour by 1.5x over both other channels
