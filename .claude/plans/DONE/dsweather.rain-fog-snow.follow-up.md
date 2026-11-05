@@ -1,8 +1,8 @@
 # dsweather: follow-up (oversee run, 2026-11-04/05)
 
 Run branch: `ds-weather` on origin (local worktree branch `worktree-oversee+dsweather`), base `a7ddfc0`.
-Commits `9bbb754` (task 0) .. `a4813e9` (step 8). Steps 1-8 done; **step 9 (ship) not yet run**: see
-`.claude/plans/dsweather.handoff.md`.
+Commits `9bbb754` (task 0) .. `a4813e9` (step 8), then the overseer's ship commit; landed on `main` as
+one commit on 2026-11-05 at `build 2026-11-05 13:22 UTC`.
 
 ## Blocked: needs you
 
