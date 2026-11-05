@@ -1160,9 +1160,21 @@ row-major, uploaded with transpose); the page's world is (east, up, south), so t
 gets every body through `enuToWorld`. Choosing a season (DS-3) moves the calendar to its
 middle date and rebuilds the road where it stands, the car and the traffic untouched: deeper
 green in summer; maples red and orange, oaks russet, birches and street trees yellow in autumn;
-bare broadleaf limbs and straw grass in winter (conifers never change; spring is byte for byte
-as shipped); cicadas and katydids in summer, fewer birds and no insects in winter. Suite:
-`.claude/tests/drive-driving-simulator.cjs` (158 checks). Detailed context:
+bare broadleaf limbs and straw fields and verges in winter, with the town's lawns still fescue green
+(DS-11; conifers never change; spring is byte for byte as shipped); cicadas and katydids in summer,
+fewer birds and no insects in winter. **Weather** (DS-8, 2026-11-04): a Weather row after Season
+offers **Auto** (the default: a pure function of the date and hour on its own seeded stream,
+weighted by season, snow only in winter) or a fixed Clear, Rain, Fog or Snow (Snow greyed out
+outside winter). Rain greys the sky and hides the sun, moon and stars, darkens and glosses the road,
+falls as streaks that slant with the car's motion, beads the windscreen in the cockpit for the
+wipers to clear (by rate), and is heard (hiss, roof drumming, wipers, wet tires); fog closes the
+view to a few hundred metres; snow falls and settles, two-lane roads whitening with faded markings
+and darker tire tracks while four- and six-lane roads stay wet and black with white shoulders.
+Wet grip is about 0.7x dry and packed snow 0.3x, the traffic slows to match, and headlights come on
+in any weather. Every weather term is a uniform behind its own `if (uX > 0.0)` branch, so under
+Clear every frame, car and sound is exactly as shipped. Suites:
+`.claude/tests/drive-driving-simulator.cjs` (158 checks) and
+`.claude/tests/drive-driving-simulator-weather.cjs` (37 checks, the weather's). Detailed context:
 `.claude/driving-simulator.md`.
 ---
 

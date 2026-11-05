@@ -123,7 +123,7 @@ const install = p => p.evaluate(() => {
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto(PAGE);
+  await page.goto(PAGE, { timeout: 60000 });
   await page.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
   await page.evaluate(() => window.__DS.setPaused(true));
   await install(page);
@@ -132,7 +132,7 @@ const install = p => p.evaluate(() => {
   // ---- 3e. the weather's state, its timeline and the dropdown (DS-8, dsweather step 1) ----
   // A page in a context: booted, paused, `fn(arg)` evaluated, closed
   const visitIn = async (c, fn, arg) => { const p = await c.newPage(); p.on('pageerror', e => errors.push('visit: ' + String(e)));
-    await p.goto(PAGE); await p.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
+    await p.goto(PAGE, { timeout: 60000 }); await p.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
     await p.evaluate(() => window.__DS.setPaused(true));
     const r = await p.evaluate(fn, arg); await p.close(); return r; };
   // row: the dropdown. A Weather row straight after Season in TIME listing Auto, Clear, Rain, Fog, Snow; Auto on a fresh page (a
@@ -155,14 +155,14 @@ const install = p => p.evaluate(() => {
   // each pick on #weather-sel in a second page of the pinned context, then that page reloaded
   const pw = await ctx.newPage(); pw.on('pageerror', e => errors.push('picks: ' + String(e)));
   const bootPw = async () => { await pw.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 }); await pw.evaluate(() => window.__DS.setPaused(true)); };
-  await pw.goto(PAGE); await bootPw();
+  await pw.goto(PAGE, { timeout: 60000 }); await bootPw();
   const picks = [];
   for (const v of ['rain', 'fog', 'snow', 'auto', 'clear']) {
     const live = await pw.evaluate(v => { const D = window.__DS, el = document.getElementById('weather-sel');
       if (v === 'snow') D.setSeason('winter');
       el.value = v; el.dispatchEvent(new Event('change'));
       return { weather: D.SETTINGS.weather, kind: D.WX.kind, stored: (JSON.parse(localStorage.getItem('drivingSimulator.settings.v1') || '{}') || {}).weather }; }, v);
-    await pw.reload(); await bootPw();
+    await pw.reload({ timeout: 60000 }); await bootPw();
     const back = await pw.evaluate(readW);
     const look = await pw.evaluate(() => window.__DS.lookSeason);
     if (v === 'snow') await pw.evaluate(() => window.__DS.setSeason('spring'));
@@ -217,7 +217,7 @@ const install = p => p.evaluate(() => {
   await page.evaluate(() => window.__DS.setWeather('auto'));
   const a1 = await sampleIn(page);
   const ap = await ctx.newPage(); ap.on('pageerror', e => errors.push('auto: ' + String(e)));
-  await ap.goto(PAGE); await ap.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
+  await ap.goto(PAGE, { timeout: 60000 }); await ap.waitForFunction(() => window.__DS && window.__DS.CHUNKS.size > 10, null, { timeout: 60000 });
   const a2 = await sampleIn(ap); await ap.close();
   await page.evaluate(() => window.__DS.teleport(5200));
   const a3 = await sampleIn(page);
@@ -729,9 +729,9 @@ const install = p => p.evaluate(() => {
     W.__wxPt = (s, u) => { const D = W.__DS, p = D.at(s), xz = worldAt(p, u); return [xz[0], D.groundAt(p, u, xz[0], xz[1]), xz[1]]; };
     const unT = v => { const Y = Math.pow(Math.min(v, 254.5) / 255, 2.2), A = 2.51 - 2.43 * Y, B = 0.03 - 0.59 * Y; return (-B + Math.sqrt(B * B + 4 * A * 0.14 * Y)) / (2 * A); };
     W.__wxLin = (px, i) => 0.2126 * unT(px[i]) + 0.7152 * unT(px[i + 1]) + 0.0722 * unT(px[i + 2]);
-    W.__wxProbe = (eye, target, pts, whole) => { const D = W.__DS, keepF = fogSigma, keepP = precipCount, k = now, fr = [];
+    W.__wxProbe = (eye, target, pts, whole, recs) => { const D = W.__DS, keepF = fogSigma, keepP = precipCount, k = now, fr = [];
       fogSigma = () => 0; precipCount = () => 0; now = 100;
-      try { for (const m of [0, 1, 2]) { D.WORLD_PROBE.mode = m; fr.push(W.__wxCam(eye, target, [], pts)); } } finally { D.WORLD_PROBE.mode = 0; fogSigma = keepF; precipCount = keepP; now = k; }
+      try { for (const m of [0, 1, 2]) { D.WORLD_PROBE.mode = m; fr.push(W.__wxCam(eye, target, recs || [], pts)); } } finally { D.WORLD_PROBE.mode = 0; fogSigma = keepF; precipCount = keepP; now = k; }
       const [F, R, M] = fr, w = F.w, h = F.h, at = i => ({ lin: W.__wxLin(F.px, i * 4), wht: W.__wxLin(R.px, i * 4), m: M.px[i * 4], ny: M.px[i * 4 + 1] / 255 });
       const out = { pts: F.at.map(a => { const x = Math.round(a.x), y = Math.round(a.y); return x < 1 || y < 1 || x >= w - 1 || y >= h - 1 ? null : Object.assign(at(y * w + x), { dist: a.dist }); }) };
       if (whole) { out.px = []; for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) { const i = y * w + x, m = M.px[i * 4]; let same = true;
@@ -828,16 +828,20 @@ const install = p => p.evaluate(() => {
   // the road rows' readings: a camera 3 m over the right lane at s, aimed down the road (120 m on), and the road's points at
   // 8-20 m on (every 0.25 m) at each offset u of `U`, read with __wxProbe in winter at 13:00 under Clear (dry, no cover), under
   // Snow (cover 1, wet 1) and under Snow with the ground dry and bare (wet and cover set to 0 for the frame: dry asphalt in the
-  // snow's own light); per u, a list of { refl, lin, m } along the distances (null off screen)
-  const roadRead = (s, U) => page.evaluate(([s, U, MAY5]) => { const W = window, D = W.__DS, o = { s, cls: D.crossAt(s).sc.cls, L: D.crossAt(s).L, sh: D.crossAt(s).sh };
+  // snow's own light); per u, a list of { refl, lin, m } along the distances (null off screen). `hour` (13 unless given) and
+  // `lit`: the night row's 22:00 with the road ahead lit by the car's own headlamps (the car set on the road under the camera by
+  // stepPlayer(0), as __wxPlace leaves it below the surface, and its records passed to the frames, which otherwise carry no car)
+  const roadRead = (s, U, hour = 13, lit = false) => page.evaluate(([s, U, MAY5, hour, lit]) => { const W = window, D = W.__DS, o = { s, cls: D.crossAt(s).sc.cls, L: D.crossAt(s).L, sh: D.crossAt(s).sh };
     const ds = []; for (let d = 8; d <= 20; d += 0.25) ds.push(d);
-    for (const k of ['clear', 'snow', 'dry']) { W.__wxWinter(k === 'clear' ? 'clear' : 'snow', 1, 13); W.__wxPlace(s); D.TRAFFIC.cars.length = 0;
+    for (const k of ['clear', 'snow', 'dry']) { W.__wxWinter(k === 'clear' ? 'clear' : 'snow', 1, hour); W.__wxPlace(s); D.TRAFFIC.cars.length = 0;
       if (k === 'dry') { D.WX.wet = 0; D.WX.snow = 0; }
+      if (lit) D.stepPlayer(0);
       const e = W.__wxPt(s, 1.8); e[1] += 3;
-      const P = W.__wxProbe(e, W.__wxPt(s + 120, 1.8), ds.flatMap(d => U.map(u => W.__wxPt(s + d, u))));
+      const P = W.__wxProbe(e, W.__wxPt(s + 120, 1.8), ds.flatMap(d => U.map(u => W.__wxPt(s + d, u))), false, lit ? carRecords() : null);
+      if (lit) o[k + 'Head'] = carRecords().filter(r => r.head).length;
       o[k] = { cover: D.WX.snow, wet: D.WX.wet, at: U.map((u, j) => ds.map((d, i) => { const p = P.pts[i * U.length + j]; return p && { refl: p.wht > 0 ? p.lin / p.wht : 0, lin: p.lin, m: p.m }; })) }; }
     W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
-    return o; }, [s, U, MAY5]);
+    return o; }, [s, U, MAY5, hour, lit]);
   const mean = a => { const v = a.filter(x => x !== null && x !== undefined); return v.length ? v.reduce((p, q) => p + q, 0) / v.length : NaN; };
   const onRoad = (r, k, j, f = 'refl') => r[k].at[j].map(p => (p && p.m === 0 ? p[f] : null));
   // a marking's contrast at each distance (Michelson, on the frame's linear luminance, so the light cancels): (line - road) /
@@ -862,6 +866,20 @@ const install = p => p.evaluate(() => {
     two.yRatio = +(Math.abs(two.ySnow) / two.yClear).toFixed(3); }
   ok('two-lane roads whiten: on rural2 at full cover the lane between the wheel paths has a mean reflectance over 0.55, the dashed yellow\'s contrast is under 15% of Clear\'s, and the wheel paths are 0.45-0.85x the lane between them',
     !!r2 && two.cls === 'rural2' && two.cover === 1 && two.between > 0.55 && two.dashN >= 6 && two.yClear > 0.3 && two.yRatio < 0.15 && two.pathRatio >= 0.45 && two.pathRatio <= 0.85, two);
+
+  // row: the markings fade by night too (dsweather step 8: a break that left the markings unfaded passed every row above, because
+  // on an untreated road at full cover the snow's own white is laid over the paint by day; but a marking also sends the headlamps
+  // back (its retroreflection), and unfaded it glows through the snow at night). On rural2's stretch at 22:00 in winter, the
+  // camera 3 m over the car, whose own headlamps light the road ahead: the dashed yellow's contrast on its painted dashes (where
+  // Clear's is over half its largest) under Snow at full cover is under 15% of Clear's at the same hour.
+  const r2n = r2s === null ? null : await roadRead(r2s, R2U.slice(0, 3), 22, true);
+  let night = { s: r2s };
+  if (r2n) { const cC = contrast(r2n, 'clear', 0, 1, 2), cS = contrast(r2n, 'snow', 0, 1, 2), dz = dashes(cC);
+    night = { s: r2s, cover: r2n.snow.cover, head: [r2n.clearHead, r2n.snowHead], dashN: dz.length, yClear: +mean(dz.map(i => cC[i])).toFixed(4), ySnow: +mean(dz.map(i => cS[i])).toFixed(4) };
+    night.yRatio = +(Math.abs(night.ySnow) / night.yClear).toFixed(3); }
+  console.log('  .. markings by night: ' + JSON.stringify(night));
+  ok('the markings fade by night too: on rural2 at full cover at 22:00, under the car\'s own headlamps, the dashed yellow\'s contrast is under 15% of Clear\'s at the same hour',
+    !!r2n && night.cover === 1 && night.head.every(n => n >= 1) && night.dashN >= 6 && night.yClear > 0.3 && night.yRatio < 0.15, night);
 
   // row: wider roads are scraped. On highway6 (a straight, level stretch) at the same cover: its three travel lanes (each at 0.15,
   // 0.27, 0.5, 0.73 and 0.85 of the lane) have a lower mean luminance than the same lanes dry and bare in the same light (wet
@@ -1027,6 +1045,39 @@ const install = p => p.evaluate(() => {
   console.log('  .. traffic: ' + JSON.stringify({ ratios: flowR, flow }));
   ok('traffic in the weather: over 90 s each, the traffic\'s mean speed over its limit under Rain is at most 0.95x Clear\'s and under Snow on a two-lane road at most 0.72x; under Clear, Rain, Fog and Snow no car crosses to the other side, none overlaps, leaves the paved lanes or stays in an ended lane, and they still change lanes',
     disc && !!flowR && flow.rain.wet === 1 && flow.two_snow.cover === 1 && flow.two_snow.nTwo > 10000 && flowR.rain <= 0.95 && flowR.snowTwo <= 0.72, { ratios: flowR, flow });
+
+  // row: new cars join at the weather's pace (dsweather step 8: a break that spawned cars at the dry speed passed every row above,
+  // the 90 s means being carried by the cars already on the road). On the traffic row's two-lane road, the player parked off it,
+  // eight times over: the road emptied, the traffic's dice reseeded (the suite's own seeds through the page's mulberry32), one
+  // stepTraffic, which spawns a car at each end, with spawnCar wrapped to read [id, s, dir, lane, its speed over its section's
+  // limit as it enters]. The same seed makes the same two cars in every weather, so the speeds compare car for car: under Rain
+  // (wet 1) every car enters at most 0.95x its speed under Clear, and in winter under Snow at full cover at most 0.72x (the
+  // traffic row's bands); under Clear every car enters at 0.85-1.0 of the limit, as shipped. (Run longer, a slower car blocks a
+  // spawn the dry run made, and from there the two runs draw different dice.)
+  const spawnRun = await page.evaluate(MAY5 => { const W = window, D = W.__DS, o = {};
+    let two = null; for (let s = 2000; s < 60000 && two === null; s += 50) { let okT = true; for (let d = -450; d <= 1150; d += 10) if (D.at(s + d).L > 1) { okT = false; break; } if (okT) two = s; }
+    o.twoS = two; if (two === null) return o;
+    const keep = spawnCar;
+    const run = () => { const P = D.PLAYER, cars = []; W.__wxPlace(two);
+      spawnCar = function () { const c = keep.apply(this, arguments); cars.push([c.id, +c.s.toFixed(2), c.dir, c.lane, +(c.v / (D.sectionAt(c.s).c.speedLimitMph * 0.44704)).toFixed(4)]); return c; };
+      try { for (let k = 1; k <= 8; k++) { D.TRAFFIC.cars.length = 0; D.TRAFFIC.rnd = mulberry32(hashSeed(20261104, 'spawn-' + k));
+        const q = D.at(P.s); P.x = q.x - q.tz * 40; P.z = q.z + q.tx * 40; P.u = 40; P.yaw = q.th; P.vx = 0; P.vy = 0; P.r = 0; D.stepTraffic(1 / 60); } }
+      finally { spawnCar = keep; W.__wxPlace(two); }
+      return { cars, kind: D.WX.kind, wet: +D.WX.wet.toFixed(3), cover: +D.WX.snow.toFixed(3) }; };
+    W.__wxPick('clear'); D.SKY.hour = 13; D.setDate(MAY5); o.clear = run();
+    W.__wxPick('rain'); D.SKY.hour = 13; D.setDate(MAY5); o.rain = run();
+    W.__wxWinter('clear', 1, 13); o.wClear = run();
+    W.__wxWinter('snow', 1, 13); o.snow = run();
+    W.__wxPick('clear'); D.setSeason('spring'); D.SKY.hour = 13; D.setDate(MAY5); W.__wxPlace(400);
+    return o; }, MAY5);
+  // the i-th car of one run against the i-th of the other, where the two entered at the same place, direction and lane
+  const sameCars = (a, b) => !a || !b ? [] : a.cars.flatMap((c, i) => { const q = b.cars[i]; return q && q[1] === c[1] && q[2] === c[2] && q[3] === c[3] ? [+(q[4] / c[4]).toFixed(4)] : []; });
+  const spR = { rain: sameCars(spawnRun.clear, spawnRun.rain), snow: sameCars(spawnRun.wClear, spawnRun.snow) };
+  console.log('  .. spawns: ' + JSON.stringify({ s: spawnRun.twoS, n: spawnRun.clear && [spawnRun.clear, spawnRun.rain, spawnRun.wClear, spawnRun.snow].map(r => r.cars.length), ratios: spR }));
+  ok('new cars join at the weather\'s pace: on a two-lane road every car the traffic spawns under Rain enters at most 0.95x the speed the same car enters at under Clear, and under Snow at full cover at most 0.72x; under Clear they enter at 0.85-1.0 of the limit',
+    spawnRun.twoS !== null && spawnRun.rain.wet === 1 && spawnRun.snow.cover === 1 && spawnRun.clear.kind === 'clear' && spawnRun.wClear.kind === 'clear'
+    && [spawnRun.clear, spawnRun.rain, spawnRun.wClear, spawnRun.snow].every(r => r.cars.length === 16) && spR.rain.length === 16 && spR.snow.length === 16
+    && spR.rain.every(x => x <= 0.95) && spR.snow.every(x => x <= 0.72) && [spawnRun.clear, spawnRun.wClear].every(r => r.cars.every(c => c[4] >= 0.85 && c[4] <= 1.0)), { ratios: spR, spawnRun });
 
   // ---- 9c. the weather's sound (DS-8, dsweather step 7) ----
   // Every row here is measured off the analysers (SND.probe) with the main suite's lvT method (section 9): the frame loop held

@@ -2,8 +2,9 @@
 
 An endless two-way US road you drive in WebGL2, from the driver's seat or from
 outside the car. CD commission, 2026-11-01, placed on the hub straight after
-Animation Rigs. Open licence (MIT, the default). Suite:
-`.claude/tests/drive-driving-simulator.cjs` (158 checks).
+Animation Rigs. Open licence (MIT, the default). Suites:
+`.claude/tests/drive-driving-simulator.cjs` (158 checks) and, for the weather (DS-8),
+`.claude/tests/drive-driving-simulator-weather.cjs` (37 checks): 195 in all.
 
 ## The CD's brief (verbatim)
 
@@ -73,9 +74,9 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | Reference distance (DS-2) | `TV_REF = 5` m: a voice's distance gain is `5 / max(d, 1)`, capped at 1 | The plan's choice; inside 5 m every car is at full level, so the level row's closest point (about 4.5 m from the chase camera) sits at the cap |
 | `TRAFFIC_GAIN = 0.75` (DS-2) | The voices' overall level, ahead of the distance gain | Tuned on the level row (dssound step 2): a car passing 4 m away at 25 m/s, oncoming, the player at a cruise in the next lane, held at five places round its closest approach; the peak `traffic` RMS against the `engine` RMS in the same 2 s windows. 0.7 gave 0.63x (chase) and 0.43x (cockpit); 0.75 gives about 0.68x and 0.45x, near the middle of the 0.5-1.0 and 0.25-0.6 bands, so the player's engine is never masked. The cruise throttle on that stretch was 0.035, so the engine was near its quietest |
 | Shift points and idle (DS-2) | A voice's gear: the player's `GEARS` and `FINAL`, up above 2600 rpm, down below 1300, idle 800 rpm; the gear is kept per voice and reset when the voice takes a new car (then the lowest gear under 2600) | A calm driver's shift points; the player's own box revs to 5600 before it shifts, which no cruising car does |
-| A voice's engine and tyres (DS-2) | Engine gain 0.08 (the player's is 0.05-0.12 with throttle); its lowpass at `500 + rpm * 0.12` Hz, Q 2.5; tyre roar band-passed at `380 + v * 6` Hz, Q 0.6, at `min(0.12, v * 0.004)`, as the player's. Doppler goes on the oscillators and the tyre source's `playbackRate`; the tyre band is not moved | The player's shapes with the throttle taken out (no car's throttle is known); the plan names `playbackRate` only |
-| Where a car sounds from (DS-2) | 0.5 m above its road position (`c.y + 0.5`), for its distance, bearing and Doppler | About the height of an engine and a tyre's contact patch averaged |
-| Fades (DS-2) | A voice whose car leaves the six fades with a 0.027 s time constant (about 80 ms) and is free 0.12 s later; a new car's pitches and pan are set at once (the voice is silent then) and its level rises with a 0.05 s constant; pitch and pan follow with 0.03 s, the air filter with 0.05 s, the tyres with 0.1 s | The plan's 80 ms; the rest the player's engine's constants |
+| A voice's engine and tires (DS-2) | Engine gain 0.08 (the player's is 0.05-0.12 with throttle); its lowpass at `500 + rpm * 0.12` Hz, Q 2.5; tire roar band-passed at `380 + v * 6` Hz, Q 0.6, at `min(0.12, v * 0.004)`, as the player's. Doppler goes on the oscillators and the tire source's `playbackRate`; the tire band is not moved | The player's shapes with the throttle taken out (no car's throttle is known); the plan names `playbackRate` only |
+| Where a car sounds from (DS-2) | 0.5 m above its road position (`c.y + 0.5`), for its distance, bearing and Doppler | About the height of an engine and a tire's contact patch averaged |
+| Fades (DS-2) | A voice whose car leaves the six fades with a 0.027 s time constant (about 80 ms) and is free 0.12 s later; a new car's pitches and pan are set at once (the voice is silent then) and its level rises with a 0.05 s constant; pitch and pan follow with 0.03 s, the air filter with 0.05 s, the tires with 0.1 s | The plan's 80 ms; the rest the player's engine's constants |
 | The season switch's rebuild (DS-3) | `applySeason()` rebuilds every loaded chunk (about 16) at once, inside the `change` handler, while the menu (which pauses the game) is open; nothing is spread over frames | The plan's `updateChunks(99)`; measured at step 4 (SwiftShader, 16 chunks, finished on the GPU): 46-52 ms into spring, summer or autumn and 120 ms into winter, behind the open menu |
 | The look's keys (DS-3) | `SEASON_LOOK[season]` = `{ crown, bark, leaf, autumn, bush, bushR, treeline, grassField, grassDry, grassForest, lawn }`; spring's row is the shipped `C` arrays themselves (byte-identical). `crown` is `'leaf'` (spring, summer: `LOOK.leaf` with the tree's `lv` and `hue`), `'autumn'` (a colour per tree from `AUTUMN_LEAF`, times `lv`, no `hue`) or `'bare'` (winter); `bushR` scales a yard bush's radius (0.7 in winter; its height ratio is kept, so the whole bush is 0.7x); `bark` is the trunk and limbs of a non-birch broadleaf tree, `C.bark` (96, 70, 50) in spring, summer and autumn and a greyer (100, 92, 82) in winter (step 4, the tree-expert review: the KB's oak bark midpoint, lighter for red maple, inferred), with the same 0.8-1.15 draw in every season; birch and conifer bark never change | The plan names the table and `LOOK`, not the keys; `C.conifer` and `C.birchBark` stay in `C` (they never change) |
 | Autumn by kit id (DS-3) | `AUTUMN_LEAF`: maple-1 and sapling-1 share the maple pick; oak-1, birch-1 their lerps; every other broadleaf id (tree-1..3) the street trees' lerp. The position hash's first number picks, its second mixes | The plan's colours and weights; the "street" fallback rather than three named rows keeps a new kit tree from having no autumn colour |
@@ -96,6 +97,27 @@ Animation Rigs. Open licence (MIT, the default). Suite:
 | The method row needs nine windows (dsradio) | The row `the sound windows of section 9 and the stations ran with the frame loop held ...` collects exactly 9 windows (`lvOn`, `lvOff`, `engOff`, `engFull`, `engHalf`, four stations) and fails on any other count, on `frames > 0`, on `drawn`, or on fewer than 15 steps a second | A window that was skipped must fail, not pass for lack of evidence (`games/CLAUDE.md`, "A check that can skip"); 15 a second is three quarters of the 20 a second asked for, enough to refill a 0.4 s queue |
 | The hold is inside the `try` (dsradio) | `lvT` swaps `requestAnimationFrame` and waits for the held frame inside the `try`, with the restore, the re-queue of the held frame and the cleared interval in the `finally` | A hold that times out must not leave the stub in place and starve every later section of frames |
 | The squared-taper row's windows (dsradio, the overseer's decision; the CD reviews it) | The row compares two `lvT` windows back to back, `engFull` at engine 100 then `engHalf` at 50, each a whole number of the engine's beat periods (two beats, about 10.98 s at rpm 789; never under 10 s). Its band and its wording are unchanged (0.25 +- 0.08) | The engine's two oscillators beat (see the engine beat in Testing), so a 2 s engine window swings about +-20% by phase alone (0.052-0.078 at engine 100), and a 2 s window at 50 read 0.17 to 0.37 of a 2 s window at 100 where 0.25 is right: under `lvT` the old pairing read 0.361 once and failed, and the old `lv` read the taper at 0.283-0.288 for the same reason. Whole beats average the phase out (0.2487 / 0.2503 / 0.2501 measured) |
+| Auto's spells (DS-8) | At most one spell a day, from four draws of the day's own stream `mulberry32(hashSeed(WORLD_SEED, 'wx-' + mjd))` whatever the kind: the kind by the look's weights (`WX_SEASON`), a start, a length, an intensity. A spell may run past midnight (`wxAt` asks yesterday's too) and where two overlap the stronger wins; the edges ramp over 30 game minutes. Fog's intensity 0.2-1.0 (from 04:00-10:00 starts); rain and snow start at any hour, except summer's rain (13:00-19:00). The weights key off `lookSeason`, cached per look and date (`WX_CACHE`) | The plan's weights and ranges; the overlap rule and fog's intensity range were not in it. Measured over each season's dates (the share of days a spell starts): spring rain 0.247, fog 0.097; summer 0.298 / 0.085; autumn 0.281 / 0.157; winter 0.281 / 0.067, snow 0.191. Spring and summer rain sit 0.053 and 0.052 under the chosen 0.30 and 0.35, inside the row's 0.06; seeded, so they cannot flap |
+| Cloud (DS-8) | `cloud = ramp x min(1, 0.7 + 0.5 I)`: 0.8 at intensity 0.2, 1 from 0.6. A fixed pick is cloud 1 (Rain 0.7, Fog 0.8, Snow 0.7) | So light rain still greys the sky without hiding the sun entirely |
+| Wet and snow (DS-8) | `wet` rises (20 min) whenever rain or snow falls; every rate goes by `precip` (how much of the spell is falling, its ramp), so the stepped state and the history integrator agree; drying and melting blend their day and night rates (1/tau) by the daylight; snow settles at intensity / 1.5 per game hour and does not melt while it falls. The daylight is `wxDayAt()`: a sunrise and sunset from a cosine declination at Raleigh, ramped over an hour, not `SKY.day` | `SKY.day` is the renderer's, set by `updateSky()` at the current hour only; the history needs the daylight at any date and hour, purely. Accurate to minutes, which drying over hours cannot see |
+| Jumps and fixed picks (DS-8) | `wxHistory()` steps the same equations over the 48 game hours before, from nothing, in 10-minute steps at each step's middle. A fixed pick's steady state applies at every jump (boot, `setDate`, the time-of-day slider, a season switch), not at boot only: Rain wet 1; Snow wet 1 and cover 1; Clear and Fog dry. A fixed pick made live keeps wet and snow where they are. Boot writes storage only when a stored Snow sits outside winter (it becomes Auto) | One rule for every jump; a boot that saved every time would write on every visit |
+| The overcast's grey (DS-8) | `WX_GREY` by kind, linear: rain (0.148, 0.153, 0.163), about 0.28x the clear day horizon's luminance; snow lighter (0.21, 0.215, 0.225); fog (0.29, 0.295, 0.305), about 0.55x; 0.18 darker toward the zenith; by night (0.0055, 0.0068, 0.0115) | The plan's 0.55x is a linear figure and its row's band ("0.4-0.8x Clear's") reads the screen, where 0.55x linear came out too bright; fog brighter so the road stands dark against it (a pixel ratio on a low-contrast surface measures quantization, not fog) |
+| Fog's sigma and the sky pass (DS-8) | `fogSigma() = max(clearFog(), WX.fog)`, not the sum. The sky pass fogs the hills as if 3 km off and its horizon band as if through a fog 120 m deep, with only the fog beyond Clear's haze (`uWxFog = max(0, WX.fog - clearFog())`) | A sum misses Fog 0.2's 400 m by about 21%, and Rain 0.2's 8 km would be clearer than Clear's 2.9 km. The plan says the hills fade; the two distances are chosen |
+| Light under cloud (DS-8) | `sunCol x (1 - 0.85 cloud)`, and the shader's sun lobe, disc and glint also `x (1 - cloud)` (so the disc fades as (1 - 0.85c)(1 - c)); `moonCol x (1 - cloud)`; the ambient `x (1 + 0.3 cloud)` by day, its moonlit share `x (1 - cloud)`; exposure unchanged. Streetlights are not lit by the weather (`SKY.lights`, photocells); only the headlights follow `lightsOn()` | The Design read literally (both the light and the shader's own factor); real streetlights switch on darkness, not rain |
+| Clear's fog band (DS-8) | The fog row asks Clear's C(300) / C(50) to be at least **0.7**, not the plan's 0.85 | The shipped haze gives exp(-0.00105 x 250) = 0.77 (measured 0.782); Clear must not move a byte |
+| The rain field (DS-8) | A **24 m** box round the eye (not 60) and streaks **1/30 s** long (not 1/60); 5,000 drops at intensity 1 times the `GFX` row (0.35 / 0.65 / 1.0) times intensity; falls of 6.0-8.0 m/s in 0.1 steps; speeds in tenths and the clock mod 1200 s so the box's wrap is seamless | The plan's numbers drew about 0.06% of the pixels against the row's 0.5% floor |
+| A drop's light (DS-8) | 0.8 of `skyBase()` behind it plus 0.15 of the ambient, sun and moon, plus the first four local lights; alpha 0.6, faded in over 0.8-3 m and out over 0.36-0.48 of the box | A streak reads as the sky seen through water; the lights put rain in the headlight beams |
+| Wet asphalt (DS-8) | Albedo **0.4x** (paint 0.8x), sky reflection **0.35** (puddles 0.7), rough 0.15 (puddles 0.05), specular 0.5; first in the wheel paths and low noise patches; concrete, roofs and walls 0.75x, grass 0.9x, dirt as concrete; round highlights only (no stretched reflections) | The plan's 0.45 and 0.6 gave 0.87x dry: the grey sky's sheen cancelled the darkening. The row reads linear luminance (0.734 in 8-bit levels) |
+| The windscreen (DS-8) | Drops on 1.8 cm cells, radius 0.12-0.3 of a cell, density 0.25 + 0.75 I, a new drop every 2 s a cell; each a lens refracting a copy of the frame (the scene inverted from about 3 radii, the rim at 0.5x, a highlight by daylight). The glass draws **while rain falls**, not on `wet` alone, so the drops go when it stops. Above 15 m/s the field creeps up, 0.12 m/s at 25 m/s | The plan said `wet > 0`; a windscreen still beaded an hour after the rain read wrong. Refraction shipped: `copyTexSubImage2D` from the antialiased default framebuffer gives `getError()` 0 (iOS untested; the dark-lens fallback stays) |
+| The wipers (DS-8) | Tandem blades parked toward the passenger side, pivots at a = 0.36 and -0.12 m, wiping 0.12-0.62 and 0.10-0.52 m, a cosine sweep of 100 deg (out and back in `Ts`); intermittent (`P` 6 s, `Ts` 4/3 s) under 0.35, low (45 a minute) to 0.7, high (65 a minute) above, low for snow. The rate changes only parked or at a cycle's turn | The plan's rates and sweep; the geometry chosen to clear the driver's view |
+| Snow on the ground (DS-8) | Cover on upward faces with a two-octave noise edge (+-0.12); snow albedo (0.80, 0.82, 0.86); grass, roofs, bark, concrete and dirt full, leaf 0.7 patchy; cars clean. Two-lane: tracks (0.45, 0.42, 0.37) at lanePos 0.27 / 0.73 +-0.1 of the lane. Four- and six-lane: the shoulder white from the edge line + 0.1-0.6 m, 0.85 rising to 1.0 at the outer edge; grey slush (0.24) 0.45 x the fall in mid-lane +-0.16; the treated lanes' film takes **0.4 of the rain's sky reflection**; the sun's glint `x (1 - cloud)` | Without the duller film the treated lanes read 1.37x dry under the bright snow sky, against the row's "darker than dry". "Dry asphalt" is the same road bare in the snow's own light; contrast is Michelson on linear luminance; whiteness is reflectance against a white diffuse reference (`WORLD_PROBE`) |
+| Falling snow (DS-8) | The precipitation pass's snow mode: 1.0-1.5 m/s in 0.1 steps, a slow circle 0.15-0.35 m across in 4, 5, 6 or 8 s (each divides 1200 s), radius 7-14 mm and never under 0.8 of the streak width in pixels, colour 0.85 (ambient + 0.5 (sun + moon)) plus the lights; 4,000 at intensity 1. On the glass: white blots living 4.8 s, shrinking over the last 4, wiped like drops | The plan's speeds and count. Flakes look sparse at 4,000: the CD may want more |
+| Green lawns (DS-11) | Winter's `lawn` sRGB (70, 98, 50). It also greens the 2 m kerbside planting strips of town and arterial chunks, which are `LOOK.lawn` | The plan's colour. The strips are lawn in the code and in Raleigh; the main suite's "grass by season" row was restated to read the fields' grass beyond them |
+| Grip (DS-8) | `surfaceAt(onRoad, L)` -> `{ mu, wet, cover }`; a wet or cover under **2%** counts as none (then rescaled), so a dry, bare road is the frozen `SURF_DRY` and Clear's grip is the shipped grip byte for byte; a treated road under cover is at least 0.8 wet (the shader's own floor). The skid squeal reads the tires' own surface | Auto's drying is exponential and never reaches 0, so without the dead zone Clear-in-Auto after rain would not be exact. Measured 60-0: dry 37.1 m, wet 52.2 (1.41x); winter rural2 36.7 -> 113.9 (3.11x), highway6 36.4 -> 51.1 (1.40x) |
+| Traffic (DS-8) | `trafficWx(L)`: each factor follows the state it is about (wet, cover, fog's strength ramped over intensity 0-0.2), not the kind, so it eases in with the weather; the lowest `v0` and the highest `T` win; `B` is the road's mu. A car spawned in the weather joins at `v0` times its factor | Measured over 90 s against Clear: rain 0.906, fog 0.843, snow at the lane drop 0.772, snow on a two-lane road 0.598; discipline clean in every run |
+| The rain's sound (DS-8) | `RAIN_SND`: hiss 0.5, rumble 0.05, glass 0.6, drum 2.2, thump 0.5, the top knock 0.4 of the park's, swish 0.03; the rain's level is the intensity while rain falls (`precip > 0`, no fade). The wipers are heard in snow too, in the cockpit; under snow the rain channel is silent in the chase view. "Falling" (no birds, no insects) is `precip > 0` | Levels measured to the rows' bands (rain 0.9 / 0.25: 3.59x; cockpit / chase 0.97x; wet tires 1.99x). A knock at the top as loud as the park's made the envelope's period read Ts/2 |
+| Two suites (DS-8, the overseer's call) | Every weather row is in `drive-driving-simulator-weather.cjs`, beside the main suite, with the main suite's boot copied verbatim and its Clear pin in both; rows the plan restated (the volume keys, the TIME list, the grass row) stayed in the main suite | The main suite takes about 7.5 minutes here, and one Bash call cannot run past 10 |
+| Page loads in the weather suite (DS-8, step 8) | Its `goto` and `reload` calls wait 60 s (Playwright's default is 30), as its `__DS` waits already did | A paused page still draws every frame, and with another program loading the machine a frame took about 0.9 s at 844x390; a second page's load then took 23-29 s and the 9c old-save visit timed out at 30 s (twice running, then alone). With the first page's loop stopped the same load took 0.8 s |
 
 ## The second brief (2026-11-01, after "plays great"), verbatim
 
@@ -113,7 +135,7 @@ What was built, and the one cause that was traced:
   `sign(vx)`. The slip angles already carry the direction of travel, so in
   reverse that flipped the sign of the yaw damping and the car spun (measured:
   wheel half left at 5.6 m/s backwards gave +2.4 rad/s, a turn every 2.6 s,
-  the wrong way). Removed, with the same stray `sign(vx)` on the front tyre's
+  the wrong way). Removed, with the same stray `sign(vx)` on the front tire's
   drag. Now the same input gives a steady -0.36 rad/s, the kinematic value, and
   the car turns as a real one backs up: wheel left, tail left.
 - **Reverse** engages after `REVERSE_HOLD` = 1.0 s with the brake held and the
@@ -128,11 +150,11 @@ What was built, and the one cause that was traced:
   speed on the button and "CC nn" on the dash.
 - **The menu pauses** the loop (`menuOpen()` gates `tick`). The sound keeps
   playing as it was, so each slider is heard as it moves, and a slider for a
-  one-shot sound (horn, crash, skid, tyres, wind, ambient, buttons) plays a
+  one-shot sound (horn, crash, skid, tires, wind, ambient, buttons) plays a
   sample of it when let go (`SND.preview`). Esc closes the menu; the time-of-day
   slider redraws the sky while paused.
 - **A volume per sound** (`SETTINGS.vols`, `VOL_KEYS`): radio, ambient, engine,
-  tyres, other cars (DS-2), wind, tyre squeal, crashes, horn, buttons; 0-100 with 100 the measured
+  tires, other cars (DS-2), wind, tire squeal, crashes, horn, buttons; 0-100 with 100 the measured
   mix and a squared taper (half way is a quarter). "All sound" (the old master)
   stays above them. An old save's `radio: 0` becomes `vols.music = 0`.
 - **Ambient**: there was no ambient sound to put a slider on, so one was built:
@@ -395,7 +417,7 @@ by the level row.
      Its pitch comes from the car's speed (`c.v`) through the same gearbox
      shape, scaled by `c.kind`: lower for `boxTruck` and `pickup`, higher for
      `hatchback`.
-   - Tyre roar: band-passed noise from the shared buffer on the voice's own
+   - Tire roar: band-passed noise from the shared buffer on the voice's own
      BufferSource, so that source's `playbackRate` can carry the Doppler.
      Its level follows speed.
    - Then air absorption: a lowpass falling with distance, from about 16 kHz
@@ -422,7 +444,7 @@ by the level row.
    - `f' = f x (c + v_L·û) / (c + v_S·û)`, where c = 343 m/s, û is the unit
      vector from the listener to the car, v_L the listener's velocity and v_S
      the car's (`c.dir x c.v` along its heading).
-   - Apply it every frame to the engine oscillators' frequencies and the tyre
+   - Apply it every frame to the engine oscillators' frequencies and the tire
      source's `playbackRate`, with a time constant of about 30 ms, so a
      pass-by sweeps rather than steps.
    - Worked case, an oncoming car with both at 25 m/s: x1.157 approaching,
@@ -499,8 +521,11 @@ peaking in late October, leaves down by December).
   - Summer: deeper green, a little dry.
   - Autumn: tan-green.
   - Winter: dormant straw-brown. Raleigh's warm-season lawns go dormant.
+    *Since DS-11 (2026-11-04) the town and suburb lawns stay fescue green in
+    winter; the fields, verges and forest floor stay straw.*
   - No snow. Raleigh sees only a few snow days a year, and snow would be a
-    weather item.
+    weather item. *It became one: DS-8 (2026-11-04) brings snow in winter, as
+    weather, Auto or picked.*
 - **Ambient** (`bird()`, `cricket()`).
   - Summer: cicadas by day, katydids at night, louder.
   - Autumn: crickets, and fewer birds.
@@ -849,6 +874,10 @@ overrule it.
 
 ### DS-8. Weather: rain, fog and snow (`TODO.md` § Now)
 
+**Built (dsweather steps 1-8, 2026-11-04).** As the plan's Design has it; the choices beyond it
+are the "Assumed, not decided" rows marked DS-8, how it works is § Architecture, Weather, the rows
+and the breaks are § Testing, The weather, and the frame cost is § Measured.
+
 - **Decided:** what comes next is **weather**, picked over junctions with signals and
   over a destination. The first pass has **all three**: rain, fog and snow.
 - **Decided, the control:** a **Weather dropdown** in settings with **Auto** (it
@@ -902,10 +931,14 @@ overrule it.
 
 ### DS-11. Green lawns in winter (bundled into DS-8's plan, `dsweather` step 5)
 
+**Built (dsweather step 5, 2026-11-04).** Winter's `lawn` is `lin3([70, 98, 50])`; spring's
+chunks still hash as `SPRING_BEFORE`. It also greens the kerbside planting strips of town and
+arterial chunks, which are `LOOK.lawn` too (the row marked DS-11 in "Assumed, not decided").
+
 - **Decided:** **town and suburb lawns stay fescue green in winter**; fields and verges
   stay dormant straw. The fescue premise was checked by the CD's pick, not against a
   source.
-- One row of `SEASON_LOOK` (winter's `lawn`, today `lin3([128, 118, 74])`) plus its
+- One row of `SEASON_LOOK` (winter's `lawn`, until then `lin3([128, 118, 74])`) plus its
   suite rows. *Chosen:* a slightly dulled spring lawn, about sRGB (70, 98, 50) in the
   plan. It rides in dsweather's snow step, which touches the same winter look.
 
@@ -1124,7 +1157,7 @@ overrule it.
   and a rear-view mirror whose glass shows a second camera (320x96 FBO, every
   other frame, no shadows; its texture is already tonemapped, so the shader
   passes it straight through).
-- **The car** (`stepPlayer`): a dynamic bicycle model with linear tyres clamped
+- **The car** (`stepPlayer`): a dynamic bicycle model with linear tires clamped
   at the friction limit, a kinematic blend below 2 m/s, front-drive traction
   (55% of weight), power at the wheels, drag, rolling resistance, engine
   braking and grade. Reverse: hold the brake for 1 s at 0 mph. Cruise control
@@ -1143,7 +1176,7 @@ overrule it.
   and pinch (orbit view), and the cruise button. Keyboard: arrows/WASD,
   Space, H, C, X (cruise), Esc (close the menu).
 - **Sound**: engine (two saws and a square through a throttle-opened lowpass,
-  four-cylinder firing frequency from the gearbox's rpm), tyre and wind noise,
+  four-cylinder firing frequency from the gearbox's rpm), tire and wind noise,
   skid squeal, crash, horn, an ambient bed; the radio's four stations on the
   music bus. Every sound has its own channel gain (a slider each) and an
   analyser: `SND.rms(name)` reads `sfx`, `music` or any channel. Muffled in the
@@ -1161,23 +1194,71 @@ overrule it.
 - **Other cars' voices** (DS-2, `updateTraffic()` inside `SND`): a pool of six built once in
   `S.unlock()` and never added to or disconnected. A voice is the player's engine shape (two
   saws and a square through a lowpass) and its own looping `BufferSource` on the shared noise
-  buffer through a bandpass (tyres), both into an air-absorption lowpass, a distance gain, a
+  buffer through a bandpass (tires), both into an air-absorption lowpass, a distance gain, a
   left and a right gain and a `ChannelMerger(2)`; all six go through one cockpit lowpass and
   gain (1.5 kHz and x0.5 when `CAM.mode === 0`) into the `traffic` channel ("Other cars", after
-  tyres in `VOL_KEYS`), which feeds `sfx`. Each frame the cars within 150 m of `CAM.eye` are
+  `tyres` in `VOL_KEYS`), which feeds `sfx`. Each frame the cars within 150 m of `CAM.eye` are
   sorted and the nearest six hold voices; a voice whose car leaves fades and is handed on only
   after its `freeAt`. The pan is equal-power on `p = 0.8 sin(bearing)`, the bearing taken against
   **right = cross(CAM.fwd, up)**, which facing +z is -x (the world is east, up, south; +x is the
   screen's left there). Doppler by hand, `k = (343 + vL.u) / (343 + vS.u)` clamped to 0.5-2, with
   the player's world velocity as the listener's in every view, on the three oscillators and the
-  tyre source's `playbackRate`. Probes: `traffic` (the channel loop) and `trafficL` / `trafficR`
+  tire source's `playbackRate`. Probes: `traffic` (the channel loop) and `trafficL` / `trafficR`
   off a `ChannelSplitter(2)` (an analyser downmixes to mono). Hooks: `SND.traffic()` (read-only:
   per voice `{ i, id, d, pan, k, f, gain, want }`, with `pan`, `k` and `gain` read back off the
   AudioParams), `SND.probe(name)` and the test-only `SND.trafficTest.noTyres`.
+- **Weather (DS-8).** One object, `WX` = `{ mode, kind, intensity, cloud, fog, mor, precip, wet,
+  snow }`: `kind` clear, rain, fog or snow; `cloud` the overcast; `fog` the weather's extinction
+  sigma (1/m, `mor` = 3 / sigma, the meteorological optical range); `precip` how much is falling
+  (the spell's ramp, 0 for fog); `wet` and `snow` (the settled cover, 0 outside a winter look)
+  **accumulate**. `SETTINGS.weather` is `auto` or a fixed pick (`WX_FIXED`: Rain 0.7, Fog 0.8, Snow
+  0.7), set by `setWeather(v)` (the `#weather-sel` row after Season, and the hook), which refuses
+  Snow outside winter; `wxLook()` greys Snow out on a season switch and turns a Snow pick into Auto.
+  **The timeline:** Auto is a pure function of the date and hour, `wxAt(mjd, hour)`, from each day's
+  own stream (`wxSpell`, `hashSeed(WORLD_SEED, 'wx-' + mjd)`, never `TRAFFIC.rnd` or `Math.random`);
+  `tick()` calls `stepWeather(dt x 24 / cycle)` after the clock, so a stopped clock stops the
+  weather; every jump (boot, `setDate`, the time-of-day slider, a season, a pick of Auto) re-derives
+  wet and snow from `wxHistory()`, the same equations (`wxIntegrate`, linear ODEs stepped exactly)
+  over the 48 game hours before. **The shader terms, and Clear's bytes:** every weather term is a
+  uniform (`uCloud`, `uOvCol` in `GLSL_COMMON`; `uWxFog` in `FS_SKY`; `uWet`, `uSnow`, `uSnowFall`
+  in `FS_WORLD`), no chunk is rebuilt for weather, and each new GLSL term is its own `if (uX > 0.0)
+  { ... }` branch above the shipped lines, which stay untouched below it (so under Clear the shipped
+  code runs exactly); a new JS factor is exactly 1 under Clear or sits behind a test of the state.
+  `WX_BEFORE` (five frames hashed on the base page) proves it. `uCloud` mixes `skyBase()` toward the
+  grey and fades the sun's lobe, the moon's glow, the bodies (`skyBodies() x (1 - uCloud)`), the
+  stars (skipped at cloud 0.98) and the Milky Way; `fogSigma()` is `max(clearFog(), WX.fog)` and the
+  fog still mixes toward `skyBase()` only (DS-7's rule); `lightsOn()` (`SKY.lights` or any weather)
+  is every headlamp reader's; `updateSky()` calls `wxRefresh()` first and dims the light last. The
+  road reads `treat = clamp(L - 1, 0, 1)` off its own vertex colour (two-lane untreated, four- and
+  six-lane treated, a taper between): the wet block darkens and glosses asphalt, the snow blocks
+  whiten an untreated road with fading markings and dark tracks and keep a treated one wet with
+  white shoulders; `roadTreat(L)` is the same for the car. **The passes:** `PRG.precip`, one
+  `drawArraysInstanced` with no attributes (drops placed from `gl_InstanceID` by an integer hash in a
+  24 m box that wraps round the eye; a streak along the drop's velocity relative to the camera, or a
+  round flake in snow mode), after the cabin, culled inside the player's car box in every view, in
+  the mirror too; `PRG.glass` (`buildWindscreen()` -> `CABIN.glass`, 2.5 mm inside the glass line)
+  in the cockpit's own pass while rain or snow falls, its drops refracting a `copyTexSubImage2D` of
+  the frame, wiped analytically from the blades' schedule (`WIPER`, `wiperAt(t)`, stepped by
+  `stepWipers()` in `tick` on the tick clock `now`). Both turn culling off, blend, write no depth,
+  and put the state back. **Grip and traffic:** `stepPlayer` multiplies `mu` by `surfaceAt(onRoad,
+  pr.p.L).mu` (wet 0.7x, packed snow 0.3x on an untreated road; one factor through traction, brakes,
+  both axles' lateral force and the cruise control), and `idm()` takes `trafficWx(L)`'s factors
+  (`v0`, `T`, `B`) per car, as `spawnCar` does for a new car's speed. **Sound:** a `rain` channel
+  ("Rain and wipers", after Wind) built once in `S.unlock()`: the hiss and rumble (through the glass
+  in the cockpit), the roof's crackled drumming (cockpit only), and the wipers' swish and knocks,
+  each cycle scheduled whole from `WIPER` onto the audio clock by `updateRain()`; the tires' band and
+  level rise on a wet road and drop on snow, the squeal quiets on a wet road and stops on cover, and
+  falling rain or snow hushes the birds and insects (and snow the breeze). Hooks on `__DS`: `WX`,
+  `WX_SEASON`, `WX_FIXED`, `WX_MODES`, `setWeather`, `wxAt`, `wxHistory`, `wxDayAt`, `wxDerive`,
+  `stepWeather`, `roadTreat`, `surfaceAt`, `surfaceMu`, `trafficWx`, `SURF_DRY`, `GLASS`, `WIPER`,
+  `WIPER_GEO`, `WIPER_RATE`, `wiperRate`, `wiperAt`, `glassPoint`, `RAIN_SND`, `now`. Page globals a
+  check may swap for one frame: `lightsOn`, `clearFog`, `fogSigma`, `glassOn`, `precipCount`,
+  `spawnCar`.
 - **Settings** (cog): day length (24 s / 1 min / **2.4 min** / 10 min / 24 min /
   1 h / real time / stopped), time of day, traffic, units, graphics
   (resolution scale, shadows, props distance), mirror, performance stats, the
   season (spring by default; all four selectable since DS-3, each saved), the
+  weather (Auto by default, or Clear, Rain, Fog and, in winter, Snow; DS-8), the
   radio station, all sound and a slider per sound, and the how-to and road
   notes. Opening it pauses the game. Persisted in `drivingSimulator.settings.v1`.
 - **Performance stats** (`PERF`): see the second brief. The draw-call counter
@@ -1274,8 +1355,8 @@ stereo right and left (a car parked 6 m to the camera's right or left, placed by
 right vector cross(fwd, up): the louder side's RMS over the other's 4-12, the law 6.31), dead ahead
 (L and R within 10%), the pan law at 45 deg (R/L within 10% of the law's 2.82, and L^2 + R^2 = 1
 within 2% read off the graph's pan gains there and abeam), the Doppler factor (oncoming, receding
-and same speed: the applied factor, read back off the tyre source's `playbackRate`, against the
-suite's own formula within 0.5%), Doppler in the FFT (tyres muted, the traffic channel's 20-400 Hz
+and same speed: the applied factor, read back off the tire source's `playbackRate`, against the
+suite's own formula within 0.5%), Doppler in the FFT (tires muted, the traffic channel's 20-400 Hz
 peak at fftSize 16384 with a parabolic fit moves by k_approach / k_recede within 3%), range (a car
 at 160 m holds no voice and the channel is under 1e-4; at 140 m it is heard), paused (the menu alone
 holding the sim for 2 s, k, pan and level unchanged on the graph), the level (a car passing 4 m away
@@ -1299,7 +1380,7 @@ pan sign (world +x as right) caught by stereo right and left; the pan law linear
 Doppler sign, Doppler off and the listener's velocity ignored each caught by the Doppler factor and
 the FFT rows; a node created per frame by no node growth; a seventh voice by the pool; a 1500 m range
 by range; the cockpit not muffled by the level (cockpit ratio); the traffic channel's gain following
-the tyres slider by the slider row. None caught only by a timed row. The 47 earlier breaks touch no
+the tires slider by the slider row. None caught only by a timed row. The 47 earlier breaks touch no
 `SND` code and were not rerun.
 
 **The seasons (DS-3, dsseasons, 16 rows; the suite 141 -> 157).** Section 3b (step 1, 5 rows):
@@ -1397,6 +1478,87 @@ ratio built on one moves run to run (the radio/engine and ambient/engine figures
 squared-taper row compares two windows of whole beat periods for that reason; `lvOn`'s 2 s engine
 window still falls anywhere on the beat, which the radio and ambient bands are wide enough for.
 
+**The weather (DS-8 and DS-11, dsweather, 2026-11-04): a second suite, 37 rows.** Every weather row
+is in `.claude/tests/drive-driving-simulator-weather.cjs`, beside the main suite, because the main
+suite already takes about 7.5 minutes here and one Bash call (so one gate call) cannot run past 10.
+`gates.sh` finds `drive-<slug>-*.cjs` by itself, so both run as part of the game's gate. The second
+suite copies the main suite's boot verbatim (launch arguments, the context, the `__DS` waits,
+`ok()`, the exit code; its summary line is `DRIVING SIMULATOR WEATHER DRIVE: N passed, M failed`,
+with ` (copy)` under `DS_PAGE`). **The Clear pin** is in both suites' setup: an `addInitScript`
+that writes `weather: 'clear'` only when no `weather` key is stored, so every older row runs under
+the clear sky it was written for and a row that saves a weather keeps it across a reload; each
+weather row sets its own weather and puts Clear back. Rows the plan restated stay in the main suite,
+which keeps 158: the volume-key row gains `'rain'` (step 7) and "grass by season" reads the fields'
+grass beyond the 2 m kerbside strip, which DS-11 made green (step 5). **The rows,** by section:
+3e, the state and the dropdown (5: the dropdown at 320 px, Snow is winter's, Auto is the date's own
+weather and draws nothing from `TRAFFIC.rnd` or `Math.random`, Auto's shares by season, wet and
+snow gather and fade and agree with `wxHistory` after a jump); 3f, the sky (5: Clear is as shipped,
+`WX_BEFORE`'s five frames hashed on the base page; cloud hides the sun, the moon and the stars; the
+sky goes grey; the fog's contrast falls as exp(-sigma d) with sigma within 20% of 3 / MOR; headlamps
+lit in every weather by day); 3g, rain (4: one instanced draw covering 0.5-15% of the pixels; streaks
+leaning out from the vanishing point at 30 m/s, by structure tensor; no rain in the cockpit or the
+car's own pixels; the road 0.4-0.75x dry and brighter under a streetlight wet); 3h, the windscreen
+(3: drops in the cockpit only, the wipers clear what they sweep, the cycles counted per rate); 3i,
+snow (6: flakes slower than a third of rain's, grass and roofs over 0.6 of a white reference,
+two-lane roads white with faded markings and darker tracks, the markings faded by night too under the
+car's headlamps (added at step 8), wider roads wet with white shoulders,
+DS-11's green lawns with spring's chunks still hashing as `SPRING_BEFORE`); 3j, grip and traffic
+(5: wet braking 1.25-1.6x, snow braking by road, a slide on snow, the traffic slower with its
+discipline intact, and new cars joining at the weather's pace, added at step 8); 9c, sound (8, on
+`lvT`'s held loop: the Rain slider, the rain scaling and silent under Clear, Fog and Snow, under the
+roof, wet tires, the wipers' period and knock at the park, the birds and the breeze, no node growth,
+"tire" on the labels); and a tail row (no page errors, the pin took, Clear in spring at the end).
+The oracles are the plan's figures typed in (the CD's 0.7 and 0.3, v^2 / 2 mu g, MOR = 3 / sigma,
+the fall speeds, the wiper rates); the measured side is pixels, GPU buffers, the car's own stepped
+motion or the analysers.
+
+**The break list, DS-8 (2026-11-04, 38 breaks; the list now 117).** Run on copies with
+`negtest-copies.py --page-env DS_PAGE` (`--jobs 2`, the sound section `--jobs 1`), through harnesses
+cut from the weather suite by section (a scratch script keeps every helper and only the chosen rows,
+plus any row whose top-level names a kept row reads: 9c keeps "snow braking" for its rural2
+stretch); each harness passed on the unbroken page first. The plan's 30: Snow pickable outside winter
+(Snow is winter's), an old save reading Rain (the dropdown), `wxSpell` drawing from `TRAFFIC.rnd`
+(Auto is the date's own weather), Auto on winter's weights in spring (Auto by season), `wet` that
+never dries (it gathers and fades), `uCloud` at least 0.01 under Clear (Clear is as shipped), the sun
+and moon through cloud and the stars through cloud (cloud hides the bodies), `fogSigma` left at
+Clear's (the fog closes the view), no headlamps in weather (headlights in weather), the car-box cull
+removed (no rain inside the car), streaks ignoring the car's motion (streaks follow the relative
+wind), no wet darkening (the road is wet), the glass pass in the chase view (drops on the glass), a
+wipe that never clears and one rate for all rain (the two wiper rows), a treated road's lanes white
+(wider roads are scraped), markings not fading (see below), no tire tracks (two-lane roads whiten),
+winter lawns straw (winter lawns stay green, and snow settles), wet grip at dry (wet braking), snow's
+0.3 on a treated road (snow braking, by road), traffic not slowing (traffic in the weather), the rain
+on the Wind channel (a Rain slider), rain heard under Clear (rain is heard and scales), no roof
+drumming (under the roof), no wet-tire hiss (wet tires), birds in the rain (the birds hide), a node a
+frame (no node growth), "Tyre" back on a label ("tire"). Eight more: the overcast's grey removed (the
+sky goes grey), 250 drops (it rains where you look), flakes at rain's speed (it snows), no cover on
+grass and roofs (snow settles), cornering grip left dry on snow (it slides on snow), the traffic's
+desired speed left dry (traffic in the weather), new cars spawned at the dry speed (new cars join at
+the weather's pace) and the wipers' loud knock at the top of the sweep (the wipers). **Two had no row, and each got one:** new cars at
+the dry speed (found at step 6: the 90 s means are carried by the cars already on the road) got
+"new cars join at the weather's pace", eight seeded spawns per weather compared car for car (rain
+0.92 and snow 0.60 of Clear's speed, exactly the factors); and **markings not fading** was MISSED
+because on an untreated road at full cover the snow's own white is laid over the paint by day, so the
+fade cannot show, but an unfaded marking still sends the headlamps back (`retro`) and glows through
+the snow at night (0.69 of Clear's contrast on the broken copy, 0.017 on the page). It got "the markings fade by night
+too" (rural2 at 22:00 under the car's own headlamps; `roadRead` and `__wxProbe` gained the car's
+records for it, which they had never passed, so no earlier road row was lit by the car). The
+suite 35 -> 37. None caught only by a timed row; the 79 earlier breaks touch no weather code and
+were not rerun.
+
+**The flaky date row (main suite, checked at step 8).** "The date is saved at midnight and a second
+visit comes back to it" went red once at step 7 (the second visit read May 5) and passed on the
+re-run. Repeated alone (`scratchpad` harness: the main suite's boot and pin, the save by crossing
+midnight, a second page in the same context; 2026-11-04, with another program loading the machine):
+1 failure in 62 runs on this page, 0 in 56 on the base page (`a7ddfc0`). One event does not tell the
+two apart. In the failure the second page's store held **no date at all** when an init script read
+it, before any of the page's own script ran, while the first page's store still held Apr 2 and no
+`storage` event had fired: the second page was handed an empty store. No page code can do that to a
+page whose script has not run, and the Clear pin only reacts to it (finding no `weather` key, it writes
+one). Logged as a race in the browser's delivery of one page's `localStorage` to another under load,
+not the weather's: the row is unchanged. If it recurs, the cheap cure is in the row (open the second
+page again when it finds nothing stored), not in the page.
+
 Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for example
 `node .claude/scripts/shot-page.cjs games/driving-simulator/index.html /tmp/x.png w=844 h=390 wait=4000 eval="__DS.SETTINGS.cycle=0;__DS.SKY.hour=20.5;__DS.teleport(10600);__DS.CAM.mode=0"`
 (sections at the default seed: forest 2-lane from the start, 4-lane from ~1.1 km,
@@ -1405,6 +1567,45 @@ Screenshots for review: `.claude/scripts/shot-page.cjs` with the test hook, for 
 (300-800 ms a frame), so it says nothing about phone frame rate.
 
 ## Measured (2026-11-01)
+
+- **The weather's frame cost (dsweather step 8, 2026-11-04, SwiftShader).** The forest at `teleport(400)`, 13:00, paused,
+  each weather at its fixed pick's steady state (`wxDerive`), Rain, Fog and Snow at intensity 1, Snow in winter (cover 1)
+  and measured against Clear in winter. Draw calls and triangles from one `renderFrame()` with the counters reset (two in
+  the cockpit, where the mirror alternates frames: without / with it); the frame time is the median rAF delta of 12
+  frames after 4 on the live, presenting page, taken three times with the ten configurations interleaved, and the median
+  of the three is shown. Measured with a harness of the steps' own kind (`scratchpad/step8/cost.cjs`, after step 4's),
+  not `frame-budget.cjs`: that one launches a browser per run, and sixty runs were most of an hour here. **Another
+  program was using about two cores throughout**, so the times are well above the steps' own (a Clear chase frame at
+  390x844 read 467-550 ms at steps 3-5 and 617-700 here); compare each weather with the Clear beside it, measured in the
+  same minutes.
+
+  | 390x844 at dpr 3 | calls | triangles | frame (ms) | x Clear |
+  |---|---|---|---|---|
+  | Clear, chase | 78 | 225,775 | 667 | 1 |
+  | Rain 1.0, chase | 81 | 232,557 | 784 | 1.17 |
+  | Fog 1.0, chase | 84 | 227,225 | 767 | 1.15 |
+  | Clear (winter), chase | 80 | 252,961 | 684 | 1 |
+  | Snow 1.0 (winter), chase | 80 | 258,437 | 817 | 1.19 |
+  | Clear, cockpit | 79 / 127 | 222,731 / 320,920 | 951 | 1 |
+  | Rain 1.0, cockpit | 82 / 132 | 229,579 / 334,612 | 1,201 | 1.26 |
+  | Fog 1.0, cockpit | 80 / 129 | 222,955 / 321,368 | 1,134 | 1.19 |
+  | Clear (winter), cockpit | 93 / 149 | 254,263 / 362,880 | 967 | 1 |
+  | Snow 1.0 (winter), cockpit | 91 / 144 | 258,401 / 371,176 | 1,184 | 1.22 |
+
+  | 844x390 at dpr 3 | frame (ms) | x Clear |
+  |---|---|---|
+  | Clear / Rain / Fog, chase | 1,000 / 1,217 / 1,167 | 1 / 1.22 / 1.17 |
+  | Clear (winter) / Snow, chase | 1,034 / 1,217 | 1 / 1.18 |
+  | Clear / Rain / Fog, cockpit | 1,184 / 1,451 / 1,401 | 1 / 1.23 / 1.18 |
+  | Clear (winter) / Snow, cockpit | 1,234 / 1,484 | 1 / 1.20 |
+
+  The calls and triangles are the same at 844x390 (the same scene). The windscreen's frame copy alone (20 copies of the
+  frame, finished by a one-pixel `readPixels`): **10.2 ms** at 390x844 (canvas 663x1435) and 9.6 ms at 844x390 (step 4,
+  on a quiet machine: 7.9 ms). Every weather sits at 1.15-1.26x Clear, inside the plan's 1.5x trigger, so neither the
+  count nor the refraction was lowered. The precipitation pass adds one call and its quads' triangles; the glass one
+  more in the cockpit; the rest of the call difference is the lights and the traffic in view (headlamps lit in every
+  weather add their glows). Fog draws no pass and still costs about what rain does: the fog's own branches run on
+  every world and sky pixel. SwiftShader says how the renderer behaves with no GPU at all, not a phone's frame rate.
 
 - **The seasons' frame cost (dsseasons step 4, 2026-11-04, SwiftShader, 844x390).** The forest at
   `teleport(400)`, 13:00, paused, one `renderFrame()` with the counters reset: chase 83 draw calls
