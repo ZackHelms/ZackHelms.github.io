@@ -24,6 +24,11 @@ const PAGE = 'file://' + (process.env.DS_PAGE || path.join(process.cwd(), 'games
 const TAIL = COPY ? ' (copy)' : '';
 let pass = 0, fail = 0;
 function ok(n, c, x) { if (c) { pass++; console.log('  ok  ' + n); } else { fail++; console.log('FAIL  ' + n + (x !== undefined ? '  -> ' + JSON.stringify(x) : '')); } }
+// The Clear pin (DS-8, dsweather): every context's pages boot under a fixed Clear unless a weather is already stored, so every row
+// here runs under the clear sky it was written for (Auto, the page's default, would rain on some dates). The weather's own rows
+// live in drive-driving-simulator-weather.cjs, which carries the same pin.
+const CLEAR_PIN = () => { try { const k = 'drivingSimulator.settings.v1', s = JSON.parse(localStorage.getItem(k) || '{}') || {};
+  if (!('weather' in s)) { s.weather = 'clear'; localStorage.setItem(k, JSON.stringify(s)); } } catch (e) { /* private mode */ } };
 
 // ---- the suite's own calendar and sun (never the page's) ----
 // MJD from the UTC calendar; the sun is the Astronomical Almanac's low-precision sun, turned to
@@ -128,10 +133,11 @@ const AE = {
 
 (async () => {
   const browser = await chromium.launch({
-    executablePath: '/opt/pw-browsers/chromium',
+    executablePath: process.env.SMOKE_CHROMIUM || '/opt/pw-browsers/chromium',
     args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
   });
   const ctx = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+  await ctx.addInitScript(CLEAR_PIN);
   const page = await ctx.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(String(e)));
@@ -531,7 +537,8 @@ const AE = {
     for (const sn of SEAS) { D.setSeason(sn);
       out[sn] = W.__dsAway(S, (ch, s) => { const b = W.__dsMeshRead(ch.baseMesh), lf = []; for (let o = 0; o < b.v.length; o += 12) if (Math.round(b.v[o + 9]) === M.LEAF) for (let j = 0; j < 12; j++) lf.push(b.v[o + j]);
         return { env: ch.env, trees: JSON.stringify(ch.trees), nTrees: ch.trees.length, broad: ch.trees.filter(t => !['fir-1', 'pine-1'].includes(t.id)).length, col: JSON.stringify(ch.col),
-          props: W.__dsMeshHash(ch.propMesh).join(' '), grass: W.__dsStats(b.v, M.GRASS), tl: W.__dsStats(b.v, M.LEAF), tlHash: W.__dsFnvF(lf) + ':' + lf.length,
+          props: W.__dsMeshHash(ch.propMesh).join(' '), grass: W.__dsStats(b.v, M.GRASS),
+          grassBeyond: W.__dsStats(b.v, M.GRASS, o => b.v[o + 11] >= 2), grassStrip: W.__dsStats(b.v, M.GRASS, o => b.v[o + 11] < 2), tl: W.__dsStats(b.v, M.LEAF), tlHash: W.__dsFnvF(lf) + ':' + lf.length,
           bush: ch.env === 'town' ? bushes(ch) : null }; }); }
     D.setSeason('spring'); D.SKY.hour = 6.25; D.setDate(MAY5);
     out.look = D.lookSeason; out.season = D.SETTINGS.season; return out; }, [SPRING_S, SEAS, MAY5]);
@@ -540,12 +547,18 @@ const AE = {
     return { s, env: L[0].env, trees: L[0].nTrees, broad: L[0].broad, sameTrees: L.every(x => x.trees === L[0].trees), sameCol: L.every(x => x.col === L[0].col), winterProps: looks.winter[s].props !== looks.spring[s].props }; });
   ok('the same trees in the same places: each recorded chunk (forest, fields, suburb, open, town) has the same trees list and the same colliders, circles and boxes, in all four seasons, and its props buffer in winter differs from spring\'s wherever it has a broadleaf tree (the rebuild happened)',
     sameT.every(x => x.sameTrees && x.sameCol && (x.broad === 0 || x.winterProps)) && sameT.filter(x => x.broad > 0).length >= 4 && looks.look === 'spring' && looks.season === 'spring', sameT);
-  // row: grass by season
+  // row: grass by season. Restated at dsweather step 5 (DS-11, winter lawns stay fescue green): the fields chunk sits on an
+  // arterial with kerbs, and the first 2 m of terrain behind a kerb is a planting strip coloured as a lawn (LOOK.lawn), which this
+  // row's winter mean used to count as straw (the old winter lawn, hue 49); the lawn is green now (hue 95), so the winter clause
+  // reads the grass beyond the strip (terrain offset 2 m on) for the straw band, as before, and asks the strip to be green. Was:
+  // "in winter 28-48 at mean saturation 0.2-0.55" over all of the chunk's grass.
   const gF = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][1568].grass])), gW = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][416].grass]));
+  const gFb = looks.winter[1568].grassBeyond, gFs = looks.winter[1568].grassStrip;
   const inR = (x, a, b) => x >= a && x <= b;
-  ok('grass by season: the fields chunk\'s grass in summer at mean hue 60-100 deg with mean value at most 0.92x spring\'s, in autumn 36-62, in winter 28-48 at mean saturation 0.2-0.55; the forest floor in autumn and winter 25-45 (leaf litter)',
-    gF.spring.n > 100 && inR(gF.summer.h, 60, 100) && gF.summer.v <= 0.92 * gF.spring.v && inR(gF.autumn.h, 36, 62) && inR(gF.winter.h, 28, 48) && inR(gF.winter.s, 0.2, 0.55)
-    && gW.autumn.n > 100 && inR(gW.autumn.h, 25, 45) && inR(gW.winter.h, 25, 45), { fields: gF, forest: gW, vRatio: +(gF.summer.v / gF.spring.v).toFixed(3) });
+  ok('grass by season: the fields chunk\'s grass in summer at mean hue 60-100 deg with mean value at most 0.92x spring\'s, in autumn 36-62, in winter 28-48 at mean saturation 0.2-0.55 beyond the kerbside lawn strip (the strip green, 75-120: DS-11); the forest floor in autumn and winter 25-45 (leaf litter)',
+    gF.spring.n > 100 && inR(gF.summer.h, 60, 100) && gF.summer.v <= 0.92 * gF.spring.v && inR(gF.autumn.h, 36, 62) && gFb.n > 100 && inR(gFb.h, 28, 48) && inR(gFb.s, 0.2, 0.55)
+    && gFs.n > 100 && inR(gFs.h, 75, 120)
+    && gW.autumn.n > 100 && inR(gW.autumn.h, 25, 45) && inR(gW.winter.h, 25, 45), { fields: gF, fieldsWinter: { beyond: gFb, strip: gFs }, forest: gW, vRatio: +(gF.summer.v / gF.spring.v).toFixed(3) });
   // row: bushes and the treeline follow
   const bsh = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][10688].bush])), tlF = Object.fromEntries(SEAS.map(sn => [sn, looks[sn][1568].tl])), tlW = SEAS.map(sn => looks[sn][416].tlHash);
   const bR = bsh.spring.r ? bsh.winter.r / bsh.spring.r : 0;
@@ -1715,6 +1728,7 @@ const AE = {
   // px, STAR_GAIN 4.0) Polaris min 207, iota Leo min 88, 9 in the patch, so the row asks for 7 (9 less 20%, floored).
   const JD22p = jdOf(MAY5, 22, -4);
   const ctxP = await browser.newContext({ viewport: { width: 844, height: 390 }, deviceScaleFactor: 3, hasTouch: true, isMobile: true });
+  await ctxP.addInitScript(CLEAR_PIN);
   const pageP = await ctxP.newPage();
   pageP.on('pageerror', e => errors.push('phone: ' + String(e)));
   await pageP.goto(PAGE);
@@ -2074,10 +2088,11 @@ const AE = {
   // every sound has its own slider in the menu, and the radio's on/off switch is gone
   // Restated at dssky step 5: the SOUND section is found by its heading, not as the fourth h3 (the SKY section is a new one before it).
   // Restated at dssound step 1: 'traffic' ("Other cars") joins the hand-written list of keys.
+  // Restated at dsweather step 7: 'rain' ("Rain and wipers", DS-8) joins it; its own rows are the weather suite's section 9c.
   const menu = await page.evaluate(() => ({ chans: [...document.querySelectorAll('input.chan')].map(e => e.dataset.k), radioSel: !!document.getElementById('radio-sel'),
     stations: [...document.getElementById('station-sel').options].map(o => o.textContent), firstRow: [...document.querySelectorAll('#settings h3')].find(h => h.textContent === 'SOUND')?.nextElementSibling?.querySelector('select')?.id,
     keys: window.__DS.SETTINGS.vols && Object.keys(window.__DS.SETTINGS.vols) }));
-  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
+  ok('settings have a volume slider for radio, ambient, engine and every other sound', ['music', 'ambient', 'engine', 'tyres', 'traffic', 'wind', 'rain', 'skid', 'crash', 'horn', 'ui'].every(k => menu.chans.includes(k)) && !menu.radioSel, menu);
   ok('a radio station selector heads the sound section, with four stations', menu.firstRow === 'station-sel' && menu.stations.length === 4, menu);
   // a slider for a one-shot sound plays a sample of it when let go, through its own channel
   const preview = await page.evaluate(async () => { const S = window.__DS.SND; let m = 0; const el = document.getElementById('vol-horn'); el.dispatchEvent(new Event('change'));

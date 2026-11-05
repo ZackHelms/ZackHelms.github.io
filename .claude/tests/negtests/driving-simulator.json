@@ -551,5 +551,271 @@
   "file": "games/driving-simulator/index.html",
   "old": "bpm: 76, trim: 1.54",
   "new": "bpm: 76, trim: 1.0 /* @negtest */"
+ },
+ {
+  "name": "wx-snow-any-season",
+  "row": "snow is winter's (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (!WX_MODES.includes(v) || (v === 'snow' && lookSeason !== 'winter')) return false;",
+  "new": "  if (!WX_MODES.includes(v)) return false; /* @negtest */"
+ },
+ {
+  "name": "wx-old-save-rain",
+  "row": "the dropdown (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "perf: 2, season: 'spring', weather: 'auto',",
+  "new": "perf: 2, season: 'spring', weather: 'rain', /* @negtest */"
+ },
+ {
+  "name": "wx-draws-traffic-rnd",
+  "row": "Auto is the date's own weather (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "r = mulberry32(hashSeed(WORLD_SEED, 'wx-' + mjd));",
+  "new": "r = TRAFFIC.rnd; /* @negtest */"
+ },
+ {
+  "name": "wx-ignores-season",
+  "row": "Auto by season (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const W = WX_SEASON[look] || WX_SEASON.spring,",
+  "new": "const W = WX_SEASON.winter, /* @negtest */"
+ },
+ {
+  "name": "wx-never-dries",
+  "row": "it gathers and fades (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "st.wet = ex(st.wet, p / WX_T.wet, (1 - p) * lerp(1 / WX_T.dryNight, 1 / WX_T.dryDay, day));",
+  "new": "st.wet = ex(st.wet, p / WX_T.wet, 0); /* @negtest */"
+ },
+ {
+  "name": "wx-cloud-under-clear",
+  "row": "Clear is as shipped (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "if (U.uCloud) gl.uniform1f(U.uCloud, WX.cloud);",
+  "new": "if (U.uCloud) gl.uniform1f(U.uCloud, Math.max(0.01, WX.cloud)); /* @negtest */"
+ },
+ {
+  "name": "wx-sun-through-cloud",
+  "row": "cloud hides the bodies (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "if (uCloud > 0.0) c = skyBase(d) + skyBodies(d) * (1.0 - uCloud);",
+  "new": "if (uCloud > 0.0) c = skyBase(d) + skyBodies(d); /* @negtest */"
+ },
+ {
+  "name": "wx-stars-through-cloud",
+  "row": "cloud hides the bodies (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "(SK.stars > 0 || SK.planets > 0) && WX.cloud < 0.98) {",
+  "new": "(SK.stars > 0 || SK.planets > 0)) { const WX = { cloud: 0 }; /* @negtest */"
+ },
+ {
+  "name": "wx-sky-not-grey",
+  "row": "the sky goes grey (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "    c = mix(c, ov, uCloud);",
+  "new": "    /* @negtest */"
+ },
+ {
+  "name": "wx-fog-unchanged",
+  "row": "the fog closes the view (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function fogSigma() { return Math.max(clearFog(), WX.fog); }",
+  "new": "function fogSigma() { return clearFog(); } /* @negtest */"
+ },
+ {
+  "name": "wx-no-headlights",
+  "row": "headlights in weather (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function lightsOn() { return SKY.lights || WX.kind !== 'clear'; }",
+  "new": "function lightsOn() { return SKY.lights; } /* @negtest */"
+ },
+ {
+  "name": "wx-rain-sparse",
+  "row": "it rains where you look (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const PRECIP_MAX = { rain: 5000, snow: 4000 };",
+  "new": "const PRECIP_MAX = { rain: 250, snow: 4000 }; /* @negtest */"
+ },
+ {
+  "name": "wx-streaks-no-motion",
+  "row": "streaks follow the relative wind (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "gl.uniform3f(U.uVel, fx * P.vx + lx * P.vy, 0, fz * P.vx + lz * P.vy);",
+  "new": "gl.uniform3f(U.uVel, 0, 0, 0); /* @negtest */"
+ },
+ {
+  "name": "wx-rain-in-car",
+  "row": "no rain inside the car (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": " || segBox(boxL(tail), boxL(head))) {",
+  "new": ") { /* @negtest */"
+ },
+ {
+  "name": "wx-road-not-darker",
+  "row": "the road is wet (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "      alb *= mix(1.0, mix(0.4, 0.8, mark), wl);",
+  "new": "      /* @negtest */"
+ },
+ {
+  "name": "wx-glass-in-chase",
+  "row": "drops on the glass, in the cockpit only (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function glassOn(opt) { return CAM.mode === 0 && !!opt.cabin && !opt.mirrorPass",
+  "new": "function glassOn(opt) { return /* @negtest */ !opt.mirrorPass"
+ },
+ {
+  "name": "wx-wipers-no-clear",
+  "row": "the wipers clear what they sweep (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "float wipeAge(vec2 p, vec4 B){",
+  "new": "float wipeAge(vec2 p, vec4 B){ return 1e9; /* @negtest */"
+ },
+ {
+  "name": "wx-wiper-rate-constant",
+  "row": "the wipers follow the rain (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function wiperRate(kind, I) { return kind === 'snow' ? 'low' : kind !== 'rain' ? null : I < 0.35 ? 'int' : I <= 0.7 ? 'low' : 'high'; }",
+  "new": "function wiperRate(kind, I) { return kind === 'snow' || kind === 'rain' ? 'low' : null; } /* @negtest */"
+ },
+ {
+  "name": "wx-snow-at-rain-speed",
+  "row": "it snows (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "float speed = snow ? 1.0 + 0.1 * floor(hf(id + 3u) * 5.999)",
+  "new": "float speed = snow ? 6.0 + 0.1 * floor(hf(id + 3u) * 5.999) /* @negtest */"
+ },
+ {
+  "name": "wx-no-cover-grass-roofs",
+  "row": "snow settles (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "float mk = (m == 1 || m == 4 || m == 5 || m == 7 || m == 21) ? 1.0 : (m == 6 ? 0.7 : 0.0);",
+  "new": "float mk = (m == 5 || m == 7 || m == 21) ? 1.0 : (m == 6 ? 0.7 : 0.0); /* @negtest */"
+ },
+ {
+  "name": "wx-markings-no-fade",
+  "row": "the markings fade by night too (weather suite; added for this break: by day at full cover the snow covers unfaded paint)",
+  "file": "games/driving-simulator/index.html",
+  "old": "if (uSnow > 0.0) { cvR = coverAt(P.xz); mark *= 1.0 - (1.0 - treat) * smoothstep(0.25, 0.75, cvR); }",
+  "new": "if (uSnow > 0.0) { cvR = coverAt(P.xz); /* @negtest */ }"
+ },
+ {
+  "name": "wx-no-tire-tracks",
+  "row": "two-lane roads whiten (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "vec3 pk = vec3(0.45, 0.42, 0.37) * (0.85 + 0.3 * n1);",
+  "new": "vec3 pk = sw; /* @negtest */"
+ },
+ {
+  "name": "wx-treated-lanes-white",
+  "row": "wider roads are scraped (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "float un = (1.0 - treat) * cvR;",
+  "new": "float un = cvR; /* @negtest */"
+ },
+ {
+  "name": "wx-winter-lawn-straw",
+  "row": "winter lawns stay green (DS-11) (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "lawn: lin3([70, 98, 50])",
+  "new": "lawn: lin3([150, 128, 84]) /* @negtest */"
+ },
+ {
+  "name": "wx-grip-dry-when-wet",
+  "row": "wet braking (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "return { mu: lerp(lerp(1, 0.7, wE), 0.3, cE), wet: wE, cover: cE };",
+  "new": "return { mu: lerp(1, 0.3, cE), wet: wE, cover: cE }; /* @negtest */"
+ },
+ {
+  "name": "wx-snow-03-on-treated",
+  "row": "snow braking, by road (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "cE = c * (1 - t);",
+  "new": "cE = c; /* @negtest */"
+ },
+ {
+  "name": "wx-corners-dry-on-snow",
+  "row": "it slides on snow (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const muF = mu * m * G * b / Lw, muR = mu * m * G * a / Lw;",
+  "new": "const muF = (onRoad ? 1 : 0.62) * m * G * b / Lw, muR = (onRoad ? 1 : 0.62) * m * G * a / Lw; /* @negtest */"
+ },
+ {
+  "name": "wx-traffic-not-slowing",
+  "row": "traffic in the weather (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function trafficWx(L) {",
+  "new": "function trafficWx(L) { return null; /* @negtest */"
+ },
+ {
+  "name": "wx-traffic-v0-dry",
+  "row": "traffic in the weather (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const v0 = K ? limit * c.f * fastLane * K.v0 : limit * c.f * fastLane;",
+  "new": "const v0 = limit * c.f * fastLane; /* @negtest */"
+ },
+ {
+  "name": "wx-spawn-dry-speed",
+  "row": "new cars join at the weather's pace (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "  if (K) car.v *= K.v0;   // in the weather a car joins at the weather's pace (DS-8)",
+  "new": "  /* @negtest */"
+ },
+ {
+  "name": "wx-rain-on-wind-channel",
+  "row": "a Rain slider (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const outG = ac.createGain(); outF.connect(outG); outG.connect(ch.rain);",
+  "new": "const outG = ac.createGain(); outF.connect(outG); outG.connect(ch.wind); /* @negtest */"
+ },
+ {
+  "name": "wx-rain-heard-in-clear",
+  "row": "rain is heard and scales (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const rk = WX.precip > 0 && WX.kind === 'rain' ? WX.intensity : 0, R = RAIN_SND;",
+  "new": "const rk = Math.max(0.2, WX.precip > 0 && WX.kind === 'rain' ? WX.intensity : 0), R = RAIN_SND; /* @negtest */"
+ },
+ {
+  "name": "wx-no-roof-drum",
+  "row": "under the roof (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "rn.drumG.gain.setTargetAtTime(inside ? R.drum * rk : 0, t, 0.3);",
+  "new": "rn.drumG.gain.setTargetAtTime(0, t, 0.3); /* @negtest */"
+ },
+ {
+  "name": "wx-no-wet-tire-hiss",
+  "row": "wet tires (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "tw = sf === SURF_DRY ? 0 : sf.wet * (1 - sf.cover) * clamp(v / 20, 0, 1),",
+  "new": "tw = 0 /* @negtest */,"
+ },
+ {
+  "name": "wx-knock-at-the-top",
+  "row": "the wipers (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "for (const [f, A, tc] of [[0.5, R.thump * R.top, 0.03], [1, R.thump, 0.045]]) {",
+  "new": "for (const [f, A, tc] of [[0.5, R.thump, 0.03], [1, R.thump * R.top, 0.045]]) { /* @negtest */"
+ },
+ {
+  "name": "wx-birds-in-rain",
+  "row": "the birds hide (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "const falling = WX.precip > 0 && (WX.kind === 'rain' || WX.kind === 'snow'),",
+  "new": "const falling = false /* @negtest */,"
+ },
+ {
+  "name": "wx-node-a-frame",
+  "row": "no node growth (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "function updateRain(t, inside) {",
+  "new": "function updateRain(t, inside) { ac.createGain(); /* @negtest */"
+ },
+ {
+  "name": "wx-tyre-label",
+  "row": "\"tire\" (weather suite)",
+  "file": "games/driving-simulator/index.html",
+  "old": "tyres: 'Tires on the road',",
+  "new": "tyres: 'Tyres on the road', /* @negtest */"
  }
 ]

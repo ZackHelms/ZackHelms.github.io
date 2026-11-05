@@ -1,5 +1,19 @@
 # DONE — done log
 
+- 2026-11-05 [driving-sim] **Weather: rain, fog and snow, Auto or picked, and green winter lawns**
+  (DS-8 + DS-11, live at `build 2026-11-05 13:22 UTC`). A Weather row in settings (Auto, a pure
+  function of the date and hour weighted by season, or a fixed Clear / Rain / Fog / Snow, Snow in
+  winter only). Overcast skies that hide the sun, moon and stars; fog by visibility (400 m down to
+  150 m); headlights in any weather; rain streaks that slant with the car's motion; wet, glossy
+  roads; drops on the windscreen that refract the scene and wipers that sweep them at the rain's
+  rate; snow that settles on grass, roofs and pines, whitening two-lane roads (markings fading,
+  darker tire tracks) while four- and six-lane roads stay wet and scraped; real-world grip (wet
+  stops 1.41x dry, snow on a two-lane road 3.1x) and traffic that slows; rain, roof drumming,
+  wipers and wet-tire sound on a new "Rain and wipers" slider; "Tire" on the labels. DS-11: town
+  lawns stay fescue green in winter. Clear is byte-identical. Suites 158 + a new weather suite of
+  37; break list 79 -> 117, all caught; frame cost 1.15-1.26x Clear. Landed by the dsweather run.
+  Plan: `.claude/plans/DONE/dsweather.rain-fog-snow.md`.
+
 - 2026-11-04 [combat-sim] **The neon graphics style, with a bloom** (CS-2; the CD, 2026-11-01, "All
   three with selector in settings menu"): `neon` is the third option in the `Graphics style` select,
   after realistic and toon. The site's Neon Arcade palette in 3D, drawn in display space: near-black

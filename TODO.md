@@ -12,23 +12,23 @@ in `.claude/<game>.md`.
 
 ## Now
 
-- [driving-sim] **Weather: rain, fog and snow, with DS-11's green winter lawns** (DS-8 +
-  DS-11; *Decided 2026-11-04, backlog refinement*: weather is next for Driving Simulator, over
-  junctions with signals and a destination). All three in the first pass. A **Weather
-  dropdown** in settings: **Auto** (changes by itself, weighted by season, **snow only in
-  winter**) or a fixed Clear / Rain / Fog / Snow, saved like Season. *Decided 2026-11-04,
-  plan-gen*: **real-world grip** (wet about 0.7x, packed snow about 0.3x; traffic slows to
-  match); **light to heavy rain, no thunderstorms**; the manual **Snow pick is winter only**;
-  settled snow by road class, the CD verbatim: "treat 2 lane roads more like back roads that dont
-  get salt treated and scraped so they whiten with markings fading under snow and darker tire
-  tracks in the lanes [...]. 4 lane and 6 lane roads get treated and scraped." Bundled: DS-11,
-  town and suburb lawns stay fescue green in winter (the snow step touches the same winter
-  look). Clear stays byte-identical. Spec: `.claude/driving-simulator.md` § Backlog
-  (refinement, 2026-11-04), DS-8 and DS-11.
-  **Plan ready (2026-11-04)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/dsweather.rain-fog-snow.md`
+- (none)
 
 ## Needs Zack
+
+- [driving-sim] **Play the weather** (DS-8 + DS-11, live at `build 2026-11-05 13:22 UTC`).
+  Settings, Weather: Auto by default; Clear, Rain and Fog pickable; Snow greyed out until the
+  season is winter. **Rain**: a grey sky with no sun, a dark shiny road that shows the
+  streetlights at night, streaks that slant as you speed up, headlights on by day, longer stops;
+  in the cockpit, drops on the glass, the wipers clearing them (slow in light rain, fast in
+  heavy), rain drumming on the roof and wet tires hissing. **Fog**: the road and the hills gone
+  within a few hundred metres. **Winter, Snow**: flakes falling; grass, roofs and pines white;
+  two-lane roads white with the lines fading and darker tire tracks; four- and six-lane roads
+  black and wet with snow on the shoulders; the car sliding and stopping long on the white
+  roads; the town's lawns still green under Clear. **Clear**: exactly as before. Three calls to
+  judge: the snowfall looks **sparse** (4,000 flakes; raise it?), Auto snows on **~19% of winter
+  days** (real Raleigh ~5%), and the **wiper rates** (6 s intermittent, 45 and 65 a minute).
+  Numbers the run moved off the plan: `.claude/plans/DONE/dsweather.rain-fog-snow.follow-up.md`.
 
 - [driving-sim] **Play the three things shipped since the real sky** (asked at refinement
   2026-11-04: not yet played). The page is live at `build 2026-11-04 04:01 UTC`. **DS-3
@@ -230,21 +230,20 @@ in `.claude/<game>.md`.
   "car + colour"). Car and Colour rows in settings, saved, over the six kit bodies and twelve
   kit paints the page already carries; the default stays the blue sedan so old saves look the
   same. Open for the plan: whether each body brings its own physics (handling was signed off on
-  the sedan) and its own cockpit eye point. **After DS-8**: every driving-sim item edits the page
-  and the suite, and weather changes the grip and the cockpit this would cite, so plan this once
-  dsweather lands. Spec: `.claude/driving-simulator.md` DS-9.
+  the sedan) and its own cockpit eye point. DS-8 (weather) has landed, so this is ready for
+  `/zmh-producer:backlog-plan-gen driving-sim`. Spec: `.claude/driving-simulator.md` DS-9.
 
 - [driving-sim] **A median on the 6-lane road** (DS-10; *Decided 2026-11-04*: "add a median",
   overruling the first build's undivided `highway6`). A grass median (rural 65 mph class, no
   kerbs), opening and closing over the class change. Open for the plan: its width, and a
-  page-side constant vs a zmh-3d road-kit field. **After DS-8**: weather's snow reads the road
-  class in the shader, so plan this once dsweather lands. Spec: `.claude/driving-simulator.md` DS-10.
+  page-side constant vs a zmh-3d road-kit field. Weather's snow reads the road class in the
+  shader; DS-8 has landed, so this is ready for `/zmh-producer:backlog-plan-gen driving-sim`. Spec: `.claude/driving-simulator.md` DS-10.
 
 - [driving-sim] **Trees: the structure pass** (DS-12; *Decided 2026-11-04*: tree-expert items
   1-3 only). A twig shell on winter crowns, more limbs at staggered heights, and a tapered leader
   on street trees. Spring stays byte-identical, and the tree-expert agent re-reviews the
-  after-shots. **After DS-8**: weather's snow settles on the limbs, so plan this once dsweather
-  lands. Spec: `.claude/driving-simulator.md` DS-12.
+  after-shots. Weather's snow settles on the limbs (a shader term); DS-8 has landed, so this is
+  ready for `/zmh-producer:backlog-plan-gen driving-sim`. Spec: `.claude/driving-simulator.md` DS-12.
 
 - [phasic] Endless launch-board weighting: endless (73+) never draws the
   launch template (block-8 curriculum only, by construction). Decide a

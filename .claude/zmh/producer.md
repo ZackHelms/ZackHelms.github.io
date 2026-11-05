@@ -60,6 +60,12 @@
   NO-PLAYWRIGHT and goes RED. A suite that hardcodes `/opt/pw-browsers/chromium` needs
   `process.env.SMOKE_CHROMIUM ||` in front of it (the combat suite got this). SwiftShader
   output matched the container's byte for byte (the same frame hash).
+- **Driving Simulator's suite is split in two, and long commands get backgrounded**
+  (2026-11-04, dsweather). One Bash call caps at 10 minutes and the main suite already takes
+  about 7.5, so the weather's rows live in `drive-driving-simulator-weather.cjs` (`gates.sh`
+  finds `drive-<slug>-*.cjs` by itself); give each its own gate call. The harness also moves any
+  command running past about 180 s into the background: wait for it in the foreground with a
+  short script polling its output file (under 180 s a poll), never by ending the turn.
 - **This session cannot delete anything on the remote.** `git push --delete`
   is hung up on by the agent proxy and `gh api -X DELETE` answers 403 ("Write
   access to this GitHub API path is not permitted through this proxy"). A
