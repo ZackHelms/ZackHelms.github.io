@@ -1,6 +1,8 @@
 # dsweather - Driving Simulator: rain, fog and snow, Auto or picked (DS-8, with DS-11's green winter lawns)
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-05. Branch `ds-weather` (`9bbb754`..`a4813e9`, then the ship commit),
+landed on `main` as one commit (see `DONE.md`), badge `build 2026-11-05 13:22 UTC`. Decisions and moved
+numbers: `dsweather.rain-fog-snow.follow-up.md`.
 **Drafted on** `main` at `bec4bfc` (suite 158 checks, break list 79). Every `file:line` below was read on
 `bec4bfc`; re-grep each anchor before editing, as another session may land first.
 **Requested:** 2026-11-04, the CD, at backlog refinement and plan-gen (each answer a pick from offered
@@ -570,3 +572,53 @@ ears (assumed: a phone, sound on):
 /compact
 /zmh-producer:oversee-implementation .claude/plans/dsweather.rain-fog-snow.md
 ```
+
+## Results (2026-11-05)
+
+Steps 1-8 were done by implementers, one commit each on `ds-weather`. Task 0 (`9bbb754`) let the main suite
+find Chromium from `SMOKE_CHROMIUM`. The overseer did step 9. The run stopped twice on the usage limit and
+once on quota, and resumed each time with no work lost.
+
+- **Gates at the ship commit** (badge `build 2026-11-05 13:22 UTC`):
+  - smoke, games-sync and negtest scan GREEN;
+  - main suite 158/0;
+  - the new weather suite `drive-driving-simulator-weather.cjs` 37/0. The suite was split because one Bash
+    call caps at 10 minutes.
+- **Rows:** the 34 planned, plus a housekeeping row and 2 from step 8: the markings fade by night too, and
+  new cars join at the weather's pace.
+- **Breaks:** 38 new (79 -> 117), all caught. The one that was missed at first got the night-markings row.
+- **Clear** hashes as recorded on the base page (`WX_BEFORE`), and the traffic trace equals `TRAFFIC_BEFORE`.
+- **Frame cost:** 1.15-1.26x Clear in every weather, view and orientation, under the 1.5x trigger. Refraction
+  kept.
+- **Moved numbers and decisions** are in the follow-up file. The plan's Clear fog band (0.85) was a drafting
+  error and is now 0.7.
+
+
+| Measure | Result | Band / target |
+|---|---|---|
+| Fog visibility | MOR off pixels: Fog 0.2 sigma 0.00746 | target 0.0075 |
+| | Fog 1.0 sigma 0.0222 | target 0.020, inside 20% |
+| | Clear, 300 m vs 50 m contrast | 0.782 |
+| Rain | changes 1.2% of the chase frame, in one instanced draw | - |
+| | streaks lean +-52 deg at 30 m/s | - |
+| Wet asphalt | 0.649x dry, linear | - |
+| | night highlight under a streetlight 168 -> 209 | - |
+| Windscreen | drops on 3.5% of the region | - |
+| | wiper cycles in 30 s: 5 / 23 / 33 | 4-7 / 19-26 / 28-37 |
+| | frame copy 7.9-10 ms; refraction shipped | - |
+| Snow | two-lane lane 0.80 reflectance, tracks 0.52x, yellow contrast 0.004x Clear's | - |
+| | highway lanes 0.89x dry, lines 0.97x / 1.08x, shoulder 0.73 | - |
+| | lawn hue 94-95 deg in winter | - |
+| Braking 60-0 | wet 1.407x dry | v^2/2mug: 1.43x |
+| | snow on rural2 3.107x | about 3.3x less drag |
+| | snow on treated highway6 1.403x | - |
+| | half-lock step steer at 20 m/s: slip 0.479 dry, 2.0 on snow | - |
+| Traffic speed vs Clear | rain 0.906, fog 0.843 | - |
+| | snow on treated roads 0.772, snow on two-lane 0.598 | - |
+| | new cars spawn at 0.92 / 0.60 | - |
+| Sound | rain 3.59x louder at 0.9 than at 0.25 | - |
+| | cockpit 0.967x outside, centroid 1195 Hz against 6027 Hz | - |
+| | wet tires 1.99x dry | - |
+| | wiper envelope period 1.33 s | cycle 1.333 s |
+| | no AudioNode created in 600 ticks | - |
+| Frame cost | 1.15-1.26x Clear across Rain / Fog / Snow, chase / cockpit, both orientations | trigger 1.5x |
