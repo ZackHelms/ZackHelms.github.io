@@ -92,6 +92,48 @@ section('island', async () => {
   check('deterministic', JSON.stringify((await import('../src/island.js')).genIsland(3).trees.slice(0, 20)) === JSON.stringify((await island(3)).trees.slice(0, 20)));
 });
 
+/* ---------------- nav ---------------- */
+section('nav', async () => {
+  const { makeNav, findPath, pathTime, nearestPassable } = await import('../src/nav.js');
+  const { COVER, coverAt } = await import('../src/island.js');
+  const bad = { pond: [], cross: [], time: [] };
+  for (let seed = 1; seed <= 20; seed++) {
+    const isl = await island(seed), nav = makeNav(isl);
+    const p = findPath(nav, isl.landing, isl.pond);
+    if (!p) { bad.pond.push(seed + ': no path'); continue; }
+    const end = p[p.length - 1];
+    if (Math.hypot(end.x - isl.pond.x, end.z - isl.pond.z) > isl.pond.r + 8) bad.pond.push(seed + ': ends ' + Math.hypot(end.x - isl.pond.x, end.z - isl.pond.z).toFixed(0) + ' m out');
+    const hrs = pathTime(nav, [isl.landing, ...p]) / 3600;
+    if (hrs < 3 || hrs > 6) bad.time.push(seed + ':' + hrs.toFixed(2) + 'h');
+    let prev = isl.landing;
+    for (const q of p) {
+      const L = Math.hypot(q.x - prev.x, q.z - prev.z);
+      for (let s = 0; s <= L; s += 1) {
+        const x = prev.x + (q.x - prev.x) * s / L, z = prev.z + (q.z - prev.z) * s / L, k = coverAt(isl, x, z);
+        if (k === COVER.CLIFF || k === COVER.SEA) { bad.cross.push(seed + '@' + x.toFixed(0) + ',' + z.toFixed(0) + ' k' + k); break; }
+      }
+      prev = q;
+    }
+  }
+  check('path landing→pond exists and reaches the pond edge (20 seeds)', !bad.pond.length, bad.pond.join(' '));
+  check('landing→pond walk 3-6 game hours', !bad.time.length, bad.time.join(' '));
+  check('paths never cross cliff or sea (1 m samples)', !bad.cross.length, bad.cross.slice(0, 5).join(' '));
+  const isl = await island(1), nav = makeNav(isl);
+  const top = isl.falls.top, foot = isl.falls.bottom;
+  const up = findPath(nav, foot, { x: top.x + (top.x - foot.x), z: top.z + (top.z - foot.z) });
+  const len = up ? up.reduce((a, q, i) => a + Math.hypot(q.x - (i ? up[i - 1] : foot).x, q.z - (i ? up[i - 1] : foot).z), 0) : 0;
+  const straight = Math.hypot(2 * (top.x - foot.x), 2 * (top.z - foot.z));
+  check('climbing the scarp detours round it (via a ramp)', up && len > straight * 2, up ? len.toFixed(0) + ' vs ' + straight.toFixed(0) : 'no path');
+  const sea = findPath(nav, isl.camp, { x: isl.landing.x + (isl.landing.x - isl.camp.x), z: isl.landing.z + (isl.landing.z - isl.camp.z) });
+  check('a path to the sea ends on passable ground', sea && Number.isFinite(nav.costAt(sea[sea.length - 1].x, sea[sea.length - 1].z)));
+  const np = nearestPassable(nav, isl.pond);
+  check('nearestPassable of pond centre is passable and near', Number.isFinite(nav.costAt(np.x, np.z)) && Math.hypot(np.x - isl.pond.x, np.z - isl.pond.z) < isl.pond.r + 8);
+  const R = (await import('../src/rng.js')).makeRng(5);
+  const pts = []; while (pts.length < 400) { const q = { x: R.range(0, 1000), z: R.range(0, 700) }; if (Number.isFinite(nav.costAt(q.x, q.z))) pts.push(q); }
+  const t0 = Date.now(); for (let i = 0; i < 200; i++) findPath(nav, pts[i], pts[i + 200]); const ms = Date.now() - t0;
+  check('200 random paths under 2 s', ms < 2000, ms + ' ms');
+});
+
 for (const s of sections) {
   if (only.length && !only.includes(s.name)) continue;
   console.log('[' + s.name + ']');

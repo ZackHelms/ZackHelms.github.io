@@ -56,10 +56,10 @@ export function genIsland(seed) {
   let pondA = R.range(-0.25, 0.25);
   const scarpAt = (x, z) => {
     const d = Math.hypot(x - camp.x, z - camp.z), a = wrapA(Math.atan2(z - camp.z, x - camp.x) - northA);
-    let t = sstep(1.15, 0.85, Math.abs(a));
-    for (const g of ramp) t *= sstep(0.03, 0.09, Math.abs(a - g));
-    const r0 = R0 + 18 * (fbm(a * 2.2 + 40, 3.3, 2) - 0.5);
-    return HS * t * sstep(r0 - 2.5, r0 + 2.5, d);
+    const t = sstep(1.15, 0.85, Math.abs(a));
+    let g = 1; for (const q of ramp) g *= sstep(0.04, 0.11, Math.abs(a - q));
+    const r0 = R0 + 18 * (fbm(a * 2.2 + 40, 3.3, 2) - 0.5), w = lerp(80, 5, g);   // a ramp is the same rise over 80 m
+    return HS * t * sstep(r0 - w / 2, r0 + w / 2, d);
   };
 
   for (let i = 0; i < N; i++) {
@@ -113,7 +113,7 @@ export function genIsland(seed) {
   }
   let prevY = ph;
   for (const p of river) {
-    const i0 = idx(p.x, p.z), y = Math.min(prevY, Math.max(h[i0] - 0.6, -0.4)); prevY = y;
+    const i0 = idx(p.x, p.z), y = Math.max(h[i0] - 0.6, -0.4); prevY = y;   // the bed follows the ground: no canyon walls
     for (let dz = -3; dz <= 3; dz += CELL) for (let dx = -3; dx <= 3; dx += CELL) {
       if (dx * dx + dz * dz > 9) continue;
       const i = idx(p.x + dx, p.z + dz);
