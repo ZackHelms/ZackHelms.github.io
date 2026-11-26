@@ -17,12 +17,25 @@ const here = dirname(fileURLToPath(import.meta.url));
 const ORDER = ['rng.js', 'island.js', 'nav.js', 'data.js', 'brain.js', 'sim.js', 'rig.js', 'render.js', 'audio.js', 'ui.js', 'main.js'];
 const src = (f) => readFileSync(join(here, 'src', f), 'utf8');
 
-const strip = (f) => src(f)
-  .replace(/^\s*import\s+[^;]*?\s+from\s*(['"])[^'"]*\1\s*;?/gm, '')
-  .replace(/\bexport\s+(?=(?:const|let|var|function|class|async)\b)/g, '');
+// Each module becomes its own block, so private helpers (HOUR, clamp, lerp...) never collide.
+// Exported names are declared once outside every block and assigned inside it; imports are
+// simply removed, since an imported name is one of those outer bindings. Nothing runs across
+// modules at load time, so assignment order is enough (sim.js and brain.js import each other).
+const exported = new Map();
+function claim(name, f) {
+  if (exported.has(name)) throw new Error(name + ' is exported by both ' + exported.get(name) + ' and ' + f);
+  exported.set(name, f);
+}
+const wrap = (f) => {
+  let code = src(f).replace(/^\s*import\s+[^;]*?\s+from\s*(['"])[^'"]*\1\s*;?/gm, '');
+  code = code.replace(/\bexport\s+(async\s+)?function\s+([A-Za-z_$][\w$]*)/g, (m, as, name) => { claim(name, f); return name + ' = ' + (as || '') + 'function ' + name; });
+  code = code.replace(/\bexport\s+(?:const|let|var)\s+([A-Za-z_$][\w$]*)/g, (m, name) => { claim(name, f); return name; });
+  return '/* ===== ' + f + ' ===== */\n{\n' + code + '\n}';
+};
 const missing = ORDER.filter((f) => !existsSync(join(here, 'src', f)));
 if (missing.length) throw new Error('missing modules: ' + missing.join(', '));
-const js = ORDER.map((f) => '/* ===== ' + f + ' ===== */\n' + strip(f)).join('\n');
+const blocks = ORDER.map(wrap);
+const js = 'let ' + [...exported.keys()].join(', ') + ';\n' + blocks.join('\n');
 for (const bad of [/^\s*import\b.*from/m, /^\s*export\b/m]) {
   if (bad.test(js)) throw new Error('a module statement survived stripping: ' + bad);
 }

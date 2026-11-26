@@ -3,7 +3,9 @@
 // they can never disagree (the Wayfinder rule).
 import { makeRng } from './rng.js';
 
-export const CELL = 2, IW = 500, IH = 350;           // 1000 m x 700 m
+export const CELL = 2;           // 1000 m x 700 m
+export const IW = 500;
+export const IH = 350;
 export const COVER = { SEA: 0, SAND: 1, ROCKY: 2, GRASS: 3, FOREST: 4, CLIFF: 5, POND: 6, RIVER: 7 };
 const CAMP_Y = 2.8;
 

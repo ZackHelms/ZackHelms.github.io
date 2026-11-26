@@ -342,7 +342,7 @@ export const FX = {
     if (takeFood(sim, 'meal', 1)) { got = TUNE.meal; hot = true; }
     else if (takeFood(sim, 'dried', 1)) got = TUNE.meal;
     else { const b = takeFood(sim, 'berries', 4); got = b * TUNE.berry; if (!b) { const f = takeFood(sim, 'fish', 1); got = f * TUNE.rawFish; } }
-    if (!got) { say(sim, s, 'Nothing to eat at camp.', 'refuse'); return; }
+    if (!got) { event(sim, s, 'nofood', s.name + ' found nothing to eat at camp.'); return false; }   // the task fails; the next thought is foraging
     s.m.hunger = Math.min(100, s.m.hunger + got); s.stats.meals++; s.ateAt = sim.t;
     // heading out for the day: pack a lunch if the store can spare it
     if (hourOf(sim) < 9.5 && !(s.packed > 0) && s.role !== 'leader' && foodCount(sim, 'meal') + foodCount(sim, 'dried') >= sim.settlers.length + 1) {

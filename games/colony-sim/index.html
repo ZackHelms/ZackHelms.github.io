@@ -71,7 +71,7 @@ ol,ul{margin:0;padding:0;list-style:none}
 @media (max-width:820px){.side.left{display:none}.side.right{width:calc(100% - 16px);top:auto;height:45%}#topbar{right:8px;left:96px;top:calc(44px + env(safe-area-inset-top))}#speeds .spd:nth-child(n+5){display:none}}</style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 22:39 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:11 UTC</div>
 <canvas id="view"></canvas>
 <div id="bubbles"></div>
 
@@ -102,11 +102,13 @@ ol,ul{margin:0;padding:0;list-style:none}
 <script>
 (function(){
 "use strict";
+let fnv1a, makeRng, hashState, genIsland, heightAt, coverAt, slopeAt, walkCost, CELL, IW, IH, COVER, makeNav, nearestPassable, findPath, pathTime, NAV_CELL, WALK, hhmm, TUNE, FOUNDERS, TOOLS, BUILDINGS, GOALS, DEFAULT_GOALS, PHASE1_BUILDS, LESSONS, REFUSALS, LEARNED, lessonParam, learnChance, learnEvent, needOf, think, checkInterrupts, leaderTick, nextWork, makeTask, applyPlayerInput, forecastNeeds, learned, isMealtime, activeSites, buildable, LABEL, eff, clockOf, layoutOf, createSim, event, say, goalDone, addFood, takeFood, toolEff, moodTarget, dropCarry, replaceTask, preempt, carryCap, completeSite, discover, step, runFor, applyInput, assignTask, replay, snapshot, restore, simHash, TICK, DAY, hourOf, dayOf, isDark, site, built, goalOpen, foodCount, mealUnits, foodTarget, FX, ik2, buildPose, makeRig, updateRig, rigCapsules, hand, headOf, makeRenderer, makeAudio, makeUI, SPEEDS;
 /* ===== rng.js ===== */
+{
 // rng.js — seeded randomness. sfc32 core; named streams so one system's draws
 // never shift another's (a test can then force one outcome without moving the rest).
 // A stream's state is four uint32s, so a whole simulation can be saved and restored.
-function fnv1a(str) {
+fnv1a = function fnv1a(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return h >>> 0;
@@ -138,16 +140,21 @@ function gen(seed, name) {
   for (let i = 0; i < 12; i++) r.next();
   return r;
 }
-function makeRng(seed) { return gen(seed >>> 0, 'root'); }
-function hashState(obj) { return fnv1a(JSON.stringify(obj)).toString(16).padStart(8, '0'); }
+makeRng = function makeRng(seed) { return gen(seed >>> 0, 'root'); }
+hashState = function hashState(obj) { return fnv1a(JSON.stringify(obj)).toString(16).padStart(8, '0'); }
 
+}
 /* ===== island.js ===== */
+{
 // island.js — the island, generated from a seed. A heightfield + a land-cover grid
 // baked once; everything (rendering, walking, jobs) samples these same arrays so
-// they can never disagree (the Wayfinder rule).
+// they can never disagree (the Wayfinder rule).
 
-const CELL = 2, IW = 500, IH = 350;           // 1000 m x 700 m
-const COVER = { SEA: 0, SAND: 1, ROCKY: 2, GRASS: 3, FOREST: 4, CLIFF: 5, POND: 6, RIVER: 7 };
+
+CELL = 2;           // 1000 m x 700 m
+IW = 500;
+IH = 350;
+COVER = { SEA: 0, SAND: 1, ROCKY: 2, GRASS: 3, FOREST: 4, CLIFF: 5, POND: 6, RIVER: 7 };
 const CAMP_Y = 2.8;
 
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -172,7 +179,7 @@ function makeNoise(rng) {
   };
 }
 
-function genIsland(seed) {
+genIsland = function genIsland(seed) {
   const rng = makeRng(seed), R = rng.stream('island');
   const fbm = makeNoise(rng.stream('noise'));
   const W = IW, H = IH, N = W * H;
@@ -346,24 +353,24 @@ function genIsland(seed) {
   return isl;
 }
 
-function heightAt(isl, x, z) {
+heightAt = function heightAt(isl, x, z) {
   const fx = x / isl.CELL - 0.5, fz = z / isl.CELL - 0.5;
   const x0 = Math.max(0, Math.min(isl.W - 2, Math.floor(fx))), z0 = Math.max(0, Math.min(isl.H - 2, Math.floor(fz)));
   const tx = Math.min(1, Math.max(0, fx - x0)), tz = Math.min(1, Math.max(0, fz - z0)), W = isl.W, h = isl.h;
   const a = h[z0 * W + x0], b = h[z0 * W + x0 + 1], c = h[(z0 + 1) * W + x0], d = h[(z0 + 1) * W + x0 + 1];
   return lerp(lerp(a, b, tx), lerp(c, d, tx), tz);
 }
-function coverAt(isl, x, z) {
+coverAt = function coverAt(isl, x, z) {
   const cx = Math.floor(x / isl.CELL), cz = Math.floor(z / isl.CELL);
   if (cx < 0 || cz < 0 || cx >= isl.W || cz >= isl.H) return COVER.SEA;
   return isl.cover[cz * isl.W + cx];
 }
-function slopeAt(isl, x, z) {
+slopeAt = function slopeAt(isl, x, z) {
   const e = 1;
   return Math.hypot(heightAt(isl, x + e, z) - heightAt(isl, x - e, z), heightAt(isl, x, z + e) - heightAt(isl, x, z - e)) / (2 * e);
 }
 // Seconds-per-metre multiplier for walking; Infinity where nobody can walk.
-function walkCost(isl, x, z) {
+walkCost = function walkCost(isl, x, z) {
   const k = coverAt(isl, x, z);
   if (k === COVER.SEA || k === COVER.CLIFF || k === COVER.POND) return Infinity;
   if (slopeAt(isl, x, z) > 0.9) return Infinity;
@@ -373,14 +380,16 @@ function walkCost(isl, x, z) {
   return 1;
 }
 
+}
 /* ===== nav.js ===== */
+{
 // nav.js — walking routes over the island: A* on a 4 m grid whose cost is the
 // slowest ground in each cell, then string-pulled where the straight line is no slower.
 
-const NAV_CELL = 4;
-const WALK = 1 / 30;            // metres per game second (1.6 m/s real at 1x = 120 m per game hour)
+NAV_CELL = 4;
+WALK = 1 / 30;            // metres per game second (1.6 m/s real at 1x = 120 m per game hour)
 
-function makeNav(isl) {
+makeNav = function makeNav(isl) {
   const NW = Math.floor(isl.W * isl.CELL / NAV_CELL), NH = Math.floor(isl.H * isl.CELL / NAV_CELL), N = NW * NH;
   const cost = new Float32Array(N);
   for (let cz = 0; cz < NH; cz++) for (let cx = 0; cx < NW; cx++) {
@@ -417,7 +426,7 @@ function makeNav(isl) {
 const centre = (nav, c) => ({ x: (c % nav.NW + 0.5) * NAV_CELL, z: (Math.floor(c / nav.NW) + 0.5) * NAV_CELL });
 
 // The nearest walkable point in region `comp` (default: the island's main region).
-function nearestPassable(nav, p, comp) {
+nearestPassable = function nearestPassable(nav, p, comp) {
   if (comp === undefined) comp = nav.main;
   const c0 = nav.cellOf(p.x, p.z);
   if (c0 >= 0 && nav.comp[c0] === comp) return { x: p.x, z: p.z };
@@ -444,7 +453,7 @@ function lineCost(nav, a, b) {
   return m;
 }
 
-function findPath(nav, from, to) {
+findPath = function findPath(nav, from, to) {
   const fc = nav.cellOf(from.x, from.z), home = fc >= 0 && nav.comp[fc] >= 0 ? nav.comp[fc] : nav.main;
   const s0 = nearestPassable(nav, from, home), t0 = nearestPassable(nav, to, home);
   if (!s0 || !t0) return null;
@@ -497,7 +506,7 @@ function findPath(nav, from, to) {
 }
 
 // Game seconds to walk a polyline at walking pace over its ground.
-function pathTime(nav, pts) {
+pathTime = function pathTime(nav, pts) {
   let t = 0;
   for (let i = 1; i < pts.length; i++) {
     const a = pts[i - 1], b = pts[i], L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(L / 2));
@@ -509,17 +518,19 @@ function pathTime(nav, pts) {
   return t;
 }
 
+}
 /* ===== data.js ===== */
+{
 // data.js — every number and every written thing the simulation reads.
 // Tuned by headless runs (tools/run.mjs); see .claude/colony-sim.md § Measured.
 
-const TUNE = {
+TUNE = {
   // per game hour
-  energyWork: 5.4, energyLight: 3.2, energyIdle: 2.2,
+  energyWork: 3.6, energyLight: 2.6, energyIdle: 1.7,
   hungerAwake: 3.6, hungerSleep: 1.4,
   bladderAwake: 6.2, bladderSleep: 1.6,
   bowelAwake: 3.3, bowelSleep: 1.2,
-  cleanAwake: 1.0, cleanDirty: 1.9, cleanSleep: 0.4,
+  cleanAwake: 0.32, cleanDirty: 0.62, cleanSleep: 0.15,
   moodRate: 3,
   healIdle: 0.8, healSleep: 1.6, healWork: 0.25,
   // sleep: energy per hour and the cap each place allows
@@ -528,21 +539,21 @@ const TUNE = {
   peeAt: 40, pooAt: 34,
   wakeHour: 6, latestWake: 9,
   injuryPerHour: 0.012,
-  toolWear: 1.4, toolFloor: 50, toolFix: 25,
+  toolWear: 1.4, toolFloor: 50, toolFix: 60,
   spoil: { berries: 3, meat: 1.2, fish: 1, meal: 2, dried: 10 },     // days, outside the food store
   spoilStored: { berries: 5, meat: 2, fish: 1.6, meal: 5, dried: 14 },
   mealsPerDay: 2,
   foodGoalDays: 3,
-  startMeals: 14,
+  startMeals: 6,
   bushRegrowDays: 3,
-  trapCatchPerDay: 0.35,
-  fishPerHour: 1.4,
+  trapCatchPerDay: 0.45,
+  fishPerHour: 1.8,
   carry: { wood: 2, stone: 3 },
 };
 
 // The founders (CD: a leader, a gatherer, a hunter and an architect, chosen by the
 // expedition's backers for a well-rounded set of skills). Immortal, with perseverance.
-const FOUNDERS = [
+FOUNDERS = [
   {
     id: 0, name: 'Ada', role: 'leader', title: 'Leader',
     attrs: { STR: 10, DEX: 11, CON: 12, INT: 15, WIS: 16, CHA: 16 },
@@ -586,24 +597,24 @@ const FOUNDERS = [
 ];
 
 // Tools (CD): one indestructible set whose effectiveness wears from 100% to 50%.
-const TOOLS = ['axe', 'pick', 'hammer', 'knife', 'spear'];
+TOOLS = ['axe', 'pick', 'hammer', 'knife', 'spear'];
 
 // Buildings; f = metres toward the island's interior from the campfire, r = metres to its right.
-const BUILDINGS = {
-  campfire: { label: 'Campfire', cost: { wood: 3, stone: 6 }, hours: 1.0, f: 0, r: 0, size: [1.8, 1.8, 0.5] },
-  leanto: { label: 'Lean-to', cost: { wood: 8, stone: 0 }, hours: 3.0, f: 7, r: -9, size: [5, 3, 2.2], sleeps: 4, sleep: 'leanto' },
-  storage: { label: 'Storage', cost: { wood: 6, stone: 2 }, hours: 2.0, f: 6, r: 10, size: [4, 4, 1.2] },
-  foodstore: { label: 'Food store', cost: { wood: 8, stone: 6 }, hours: 4.0, f: -6, r: 9, size: [3, 3, 2.4] },
-  latrine: { label: 'Latrine', cost: { wood: 5, stone: 0 }, hours: 2.0, f: 24, r: 18, size: [1.6, 1.6, 2.2] },
-  hut1: { label: 'Hut', cost: { wood: 20, stone: 10 }, hours: 9.0, f: 16, r: -7, size: [5.5, 4.5, 3], sleeps: 3, sleep: 'hut' },
-  hut2: { label: 'Second hut', cost: { wood: 20, stone: 10 }, hours: 9.0, f: 16, r: 7, size: [5.5, 4.5, 3], sleeps: 3, sleep: 'hut' },
-  bed: { label: 'Bed', cost: { wood: 4, stone: 0 }, hours: 1.5, size: [0.9, 2, 0.5], sleeps: 1, sleep: 'bed' },
-  toolbench: { label: 'Tool bench', cost: { wood: 8, stone: 4 }, hours: 3.0, f: -5, r: -9, size: [2.4, 1.2, 1] },
-  dryrack: { label: 'Drying rack', cost: { wood: 6, stone: 0 }, hours: 2.0, f: -9, r: 1, size: [2.4, 1, 1.6] },
+BUILDINGS = {
+  campfire: { label: 'Campfire', cost: { wood: 4, stone: 9 }, hours: 1.5, f: 0, r: 0, size: [1.8, 1.8, 0.5] },
+  leanto: { label: 'Lean-to', cost: { wood: 12, stone: 0 }, hours: 5.0, f: 7, r: -9, size: [5, 3, 2.2], sleeps: 4, sleep: 'leanto' },
+  storage: { label: 'Storage', cost: { wood: 9, stone: 3 }, hours: 3.0, f: 6, r: 10, size: [4, 4, 1.2] },
+  foodstore: { label: 'Food store', cost: { wood: 12, stone: 9 }, hours: 6.5, f: -6, r: 9, size: [3, 3, 2.4] },
+  latrine: { label: 'Latrine', cost: { wood: 8, stone: 0 }, hours: 3.0, f: 24, r: 18, size: [1.6, 1.6, 2.2] },
+  hut1: { label: 'Hut', cost: { wood: 30, stone: 15 }, hours: 14.5, f: 16, r: -7, size: [5.5, 4.5, 3], sleeps: 3, sleep: 'hut' },
+  hut2: { label: 'Second hut', cost: { wood: 30, stone: 15 }, hours: 14.5, f: 16, r: 7, size: [5.5, 4.5, 3], sleeps: 3, sleep: 'hut' },
+  bed: { label: 'Bed', cost: { wood: 6, stone: 0 }, hours: 2.5, size: [0.9, 2, 0.5], sleeps: 1, sleep: 'bed' },
+  toolbench: { label: 'Tool bench', cost: { wood: 12, stone: 6 }, hours: 5.0, f: -5, r: -9, size: [2.4, 1.2, 1] },
+  dryrack: { label: 'Drying rack', cost: { wood: 9, stone: 0 }, hours: 3.0, f: -9, r: 1, size: [2.4, 1, 1.6] },
 };
 
 // Colony goals the leader works from (CD: goals board, control A).
-const GOALS = {
+GOALS = {
   campfire: { label: 'Campfire', builds: ['campfire'], prereq: [] },
   leanto: { label: 'Lean-to shelter', builds: ['leanto'], prereq: ['campfire'] },
   storage: { label: 'Storage area', builds: ['storage'], prereq: ['campfire'] },
@@ -616,23 +627,23 @@ const GOALS = {
   toolbench: { label: 'Tool bench', builds: ['toolbench'], prereq: ['campfire'] },
   dryrack: { label: 'Drying rack', builds: ['dryrack'], prereq: ['campfire'] },
 };
-const DEFAULT_GOALS = ['campfire', 'leanto', 'food3', 'storage', 'foodstore', 'latrine', 'hut1', 'toolbench', 'hut2', 'beds5', 'dryrack'];
-const PHASE1_BUILDS = ['campfire', 'leanto', 'storage', 'foodstore', 'latrine', 'hut1', 'hut2', 'toolbench'];
+DEFAULT_GOALS = ['campfire', 'leanto', 'food3', 'storage', 'foodstore', 'latrine', 'hut1', 'toolbench', 'hut2', 'beds5', 'dryrack'];
+PHASE1_BUILDS = ['campfire', 'leanto', 'storage', 'foodstore', 'latrine', 'hut1', 'hut2', 'toolbench'];
 
 // Lessons (CD: learned by trial and error, at a rate set by INT and WIS). The list of
 // what can be learned is written here; the number inside each lesson is learned.
-const LESSONS = {
+LESSONS = {
   overwork: { label: 'Stop before exhaustion', param: 'stopEnergy', start: 10, target: 32, fmt: (v) => 'stops work at ' + v.toFixed(0) + '% energy' },
   lateNight: { label: 'Bed at a sane hour', param: 'bedHour', start: 23.6, target: 21.4, fmt: (v) => 'in bed by ' + hhmm(v) },
-  skipMeal: { label: "Don't skip meals", param: 'eatHunger', start: 12, target: 38, fmt: (v) => 'eats below ' + v.toFixed(0) + '% hunger' },
-  hygiene: { label: 'Wash regularly', param: 'washAt', start: 18, target: 42, fmt: (v) => 'bathes below ' + v.toFixed(0) + '% clean' },
+  skipMeal: { label: "Don't skip meals", param: 'eatHunger', start: 12, target: 52, fmt: (v) => 'eats below ' + v.toFixed(0) + '% hunger' },
+  hygiene: { label: 'Wash regularly', param: 'washAt', start: 42, target: 62, fmt: (v) => 'bathes below ' + v.toFixed(0) + '% clean' },
   farAtDusk: { label: 'Head home before dark', param: 'homeHour', start: 19.8, target: 17.6, fmt: (v) => 'heads home by ' + hhmm(v) },
   dullTools: { label: 'Keep tools sharp', param: 'fixAt', start: 0, target: 70, fmt: (v) => 'sharpens tools below ' + v.toFixed(0) + '%' },
 };
-function hhmm(h) { const H = Math.floor(h), M = Math.round((h - H) * 60); return String(H % 24).padStart(2, '0') + ':' + String(M % 60).padStart(2, '0'); }
+hhmm = function hhmm(h) { const H = Math.floor(h), M = Math.round((h - H) * 60); return String(H % 24).padStart(2, '0') + ':' + String(M % 60).padStart(2, '0'); }
 
 // What a settler says when they refuse an order a lesson tells them is a mistake.
-const REFUSALS = {
+REFUSALS = {
   overwork: "I'm running on empty. Last time I pushed on like this I got hurt. Sleep first.",
   lateNight: "It's late. Every time I stay up, tomorrow is wasted. I'm going to bed.",
   skipMeal: "I need to eat first. I collapsed the last time I worked through hunger.",
@@ -640,7 +651,7 @@ const REFUSALS = {
   farAtDusk: "Not this late. I got caught out after dark once already.",
   dullTools: "These tools are dull enough to be dangerous. They get sharpened first.",
 };
-const LEARNED = {
+LEARNED = {
   overwork: 'Lesson learned: stop before I drop.',
   lateNight: 'Lesson learned: no more late nights.',
   skipMeal: 'Lesson learned: eat before I fade.',
@@ -649,7 +660,9 @@ const LEARNED = {
   dullTools: 'Lesson learned: sharp tools, safe hands.',
 };
 
+}
 /* ===== brain.js ===== */
+{
 // brain.js — what each settler decides to do: their needs, the leader's assignments,
 // lessons learned by trial and error, refusals, and the player's orders (controls A and B).
 
@@ -658,25 +671,32 @@ const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 /* ------------------------------ lessons ------------------------------ */
-function lessonParam(s, key) { return s.lessons[key] ? s.lessons[key].v : LESSONS[key].start; }
-const learned = (s, key) => !!s.lessons[key];
-function learnChance(s) { return clamp(0.15 + 0.04 * ((s.attrs.INT + s.attrs.WIS) / 2 - 10), 0.1, 0.6); }
-function learnEvent(sim, s, key) {
+lessonParam = function lessonParam(s, key) { return s.lessons[key] ? s.lessons[key].v : LESSONS[key].start; }
+learned = (s, key) => !!s.lessons[key];
+learnChance = function learnChance(s) { return clamp(0.15 + 0.04 * ((s.attrs.INT + s.attrs.WIS) / 2 - 10), 0.1, 0.6); }
+learnEvent = function learnEvent(sim, s, key) {
   const L = LESSONS[key]; if (!L) return false;
   s.exp[key] = (s.exp[key] || 0) + 1;
-  if (sim.R.learn.next() >= learnChance(s)) return false;
+  // the same mistake again makes the lesson likelier to stick
+  if (sim.R.learn.next() >= Math.min(0.9, learnChance(s) * (1 + 0.3 * (s.exp[key] - 1)))) return false;
   const cur = lessonParam(s, key), v = cur + 0.6 * (L.target - cur);
   const first = !s.lessons[key];
   s.lessons[key] = { v, times: (s.lessons[key] ? s.lessons[key].times : 0) + 1, day: dayOf(sim) };
   s.stats.learned++;
   event(sim, s, 'learn', s.name + (first ? ' learned: ' : ' refined: ') + L.label + ' (' + L.fmt(v) + ').');
   if (first) say(sim, s, LEARNED[key], 'learn');
+  if (key === 'dullTools' && s.role === 'leader' && !goalDone(sim, 'toolbench')) {
+    const i = sim.goals.indexOf('toolbench'); if (i > 0) { sim.goals.splice(i, 1); sim.goals.unshift('toolbench'); }
+    else if (i < 0) sim.goals.unshift('toolbench');
+    say(sim, s, 'These tools are getting dangerous. The tool bench comes first now.', 'say');
+    event(sim, s, 'goal', s.name + ' moved the tool bench to the top of the goals.');
+  }
   return true;
 }
 
 /* ------------------------------ needs ------------------------------ */
 // Returns the most pressing need: {kind, urgent, lesson}. Urgent needs interrupt work.
-function needOf(sim, s, softToo = true) {
+needOf = function needOf(sim, s, softToo = true) {
   const m = s.m, h = hourOf(sim), delayed = (k) => s.delay && s.delay[k] > sim.t;
   if (m.bladder < TUNE.peeAt) return { kind: 'pee', urgent: true };
   if (m.bowel < TUNE.pooAt) return { kind: 'poo', urgent: true };
@@ -685,15 +705,15 @@ function needOf(sim, s, softToo = true) {
   if (!softToo) return null;
   const bed = lessonParam(s, 'lateNight');
   if ((h >= bed || h < 4.5) && !delayed('sleep')) return { kind: 'sleep', urgent: false, lesson: 'lateNight', why: 'bedtime' };
-  const meal = (h >= 6.8 && h < 8.2) || (h >= 18.7 && h < 20.2) || (h >= 12.2 && h < 13 && m.hunger < 55);
-  if (meal && m.hunger < 72 && mealUnits(sim) >= 1 && dist(s, sim.lay.fire) < 120 && !delayed('eat')) return { kind: 'eat', urgent: false, lesson: 'skipMeal' };
-  if (m.clean < lessonParam(s, 'hygiene') && h > 7 && h < 18 && !delayed('bathe')) return { kind: 'bathe', urgent: false, lesson: 'hygiene' };
+  if (isMealtime(h) && m.hunger < 80 && ((mealUnits(sim) >= 1 && dist(s, sim.lay.fire) < 120) || s.packed > 0 || (s.carry && s.carry.food && s.carry.item !== 'meat')) && !delayed('eat') && !(s.ateAt > sim.t - 2 * HOUR)) return { kind: 'eat', urgent: false, lesson: 'skipMeal', meal: true };
+  if (m.clean < lessonParam(s, 'hygiene') && h > 6.5 && h < 20 && !delayed('bathe')) return { kind: 'bathe', urgent: false, lesson: 'hygiene' };
   if ((m.mood < 32 || m.health < 35) && !delayed('rest')) return { kind: 'rest', urgent: false };
   return null;
 }
+isMealtime = (h) => (h >= 6.8 && h < 8.2) || (h >= 12 && h < 13.6) || (h >= 18.6 && h < 20.2);
 const NEED_KINDS = new Set(['pee', 'poo', 'sleep', 'eat', 'bathe', 'rest', 'collapse', 'persevere', 'home']);
 
-function think(sim, s) {
+think = function think(sim, s) {
   const n = needOf(sim, s);
   let T = null;
   if (n) T = makeTask(sim, s, n.kind, { need: n });
@@ -722,14 +742,15 @@ function forecast(sim, s) {
 }
 
 // Called every 5 game minutes: urgent needs interrupt work, unless the player pinned it.
-function checkInterrupts(sim, s) {
+checkInterrupts = function checkInterrupts(sim, s) {
   const T = s.task; if (!T || NEED_KINDS.has(T.kind)) return;
   // out late, far from camp
   if (dist(s, sim.lay.fire) > 110 && hourOf(sim) >= lessonParam(s, 'farAtDusk') && hourOf(sim) < 23 && !T.pinned && T.kind !== 'explore') {
     if (T.kind === 'explore' && !learned(s, 'farAtDusk')) return;
     preempt(sim, s, makeTask(sim, s, 'home')); return;
   }
-  const n = needOf(sim, s, false);
+  let n = needOf(sim, s, false);
+  if (!n) { const soft = needOf(sim, s, true); if (soft && (soft.meal || soft.why === 'bedtime') && !T.pinned && T.kind !== 'explore') n = soft; }
   if (!n) return;
   if (T.pinned) {
     if (n.lesson && learned(s, n.lesson)) { refuse(sim, s, n.lesson); T.pinned = false; preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); }
@@ -767,7 +788,7 @@ function ensureSites(sim) {
     if (++opened >= 2) break;
   }
 }
-const activeSites = (sim) => sim.sites.filter((x) => !x.done).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
+activeSites = (sim) => sim.sites.filter((x) => !x.done).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
 function shortfall(sim) {
   const act = activeSites(sim);
   const need = { wood: 0, stone: 0 };
@@ -778,12 +799,12 @@ function shortfall(sim) {
   const piles = sim.piles.reduce((a, p) => { a[p.item] = (a[p.item] || 0) + p.n; return a; }, {});
   return { wood: need.wood - sim.stock.wood - (piles.wood || 0), stone: need.stone - sim.stock.stone - (piles.stone || 0) };
 }
-function leaderTick(sim) {
+leaderTick = function leaderTick(sim) {
   ensureSites(sim);
   for (const s of sim.settlers) if (s.delay) for (const k in s.delay) if (s.delay[k] <= sim.t) delete s.delay[k];
 }
 
-const buildable = (sim) => activeSites(sim).filter((x) => {
+buildable = (sim) => activeSites(sim).filter((x) => {
   const frac = Math.min(x.have.wood / Math.max(1, x.need.wood), x.need.stone ? x.have.stone / x.need.stone : 1);
   return frac * x.hours > x.prog + 0.05;
 });
@@ -793,7 +814,7 @@ const anyPile = (sim) => sim.piles.some((p) => !sim.world.reserved['p' + p.id]);
 const trapsReady = (sim) => sim.traps.some((t) => t.catch || sim.t - (t.checked || t.set) > 20 * HOUR);
 const rawFood = (sim) => foodCount(sim, 'meat') + foodCount(sim, 'fish');
 
-function nextWork(sim, s, o = {}) {
+nextWork = function nextWork(sim, s, o = {}) {
   const skip = (k) => o.skip === k || o.skip2 === k;
   const sh = shortfall(sim), food = mealUnits(sim), target = foodTarget(sim), h = hourOf(sim), N = sim.settlers.length;
   const B = buildable(sim), D = deliverable(sim);
@@ -804,6 +825,11 @@ function nextWork(sim, s, o = {}) {
     if (toolFree(sim, 'spear', s) && h < 17.5) return 'fish';
     return 'forage';
   };
+  const allBuilt = !sim.goals.some((g) => GOALS[g] && !GOALS[g].food && !goalDone(sim, g));
+  if (allBuilt && s.role !== 'leader' && s.role !== 'hunter' && food < target + 10 && !skip('forage')) {
+    if (s.role === 'gatherer' && toolFree(sim, 'spear', s) && h < 17.5 && !skip('fish')) return { kind: 'fish' };
+    return { kind: 'forage' };
+  }
   const lowTool = TOOLS.some((k) => sim.tools[k].cond < Math.max(55, lessonParam(s, 'dullTools')));
   if (s.role === 'leader') {
     const sad = sim.settlers.find((o2) => o2 !== s && o2.m.mood < 50 && o2.act !== 'sleep');
@@ -816,7 +842,7 @@ function nextWork(sim, s, o = {}) {
       [anyPile(sim), 'tidy'],
       [D, 'deliver'],
       [B.length && !sim.settlers.some((o2) => o2.role === 'architect' && o2.task && o2.task.kind === 'build' && o2.task.site === B[0].id) , 'build'],
-      [food < target * 0.6, 'forage'],
+      [food < target * (allBuilt ? 1.2 : 0.6), 'forage'],
       [sh.stone > 0, 'gather'],
       [true, 'rest'],
     );
@@ -859,7 +885,7 @@ function nextWork(sim, s, o = {}) {
 }
 
 /* ------------------------------ tasks ------------------------------ */
-const LABEL = {
+LABEL = {
   sleep: 'Sleep', collapse: 'Collapsed', persevere: 'Get back to camp', eat: 'Eat', pee: 'Pee', poo: 'Bathroom',
   bathe: 'Wash', rest: 'Rest by the fire', chop: 'Chop a tree', gather: 'Gather stone', forage: 'Forage berries',
   fish: 'Fish from the shore', trap: 'Set a snare', checktraps: 'Check the snares', cook: 'Cook', dry: 'Dry meat and fish',
@@ -895,7 +921,7 @@ function bathroomSpot(sim, s) {
   return nearestPassable(sim.nav, { x: s.x + 7 * Math.cos(s.id * 2.1), z: s.z + 7 * Math.sin(s.id * 2.1) });
 }
 
-function makeTask(sim, s, kind, opts = {}) {
+makeTask = function makeTask(sim, s, kind, opts = {}) {
   const lay = sim.lay, fire = lay.fire, seat = lay.seats[sim.settlers.indexOf(s) % lay.seats.length];
   const T = { id: sim.nextId++, kind, label: LABEL[kind] || kind, steps: [], i: 0, started: sim.t, owner: opts.owner || 'self' };
   const S = T.steps;
@@ -917,8 +943,22 @@ function makeTask(sim, s, kind, opts = {}) {
       S.push(go(fire, 'walk back to camp'));
       break;
     case 'eat': {
-      if (mealUnits(sim) >= 0.34 && dist(s, fire) < 150) {
+      if (s.carry && s.carry.food && s.carry.item !== 'meat' && dist(s, fire) >= 60 && !(s.packed > 0)) {
+        T.label = 'Eat some of what they gathered';
+        S.push(work('eat', 10, 'eat from the basket', { fx: 'eatCarry', outdoor: false, meters: [] }));
+        break;
+      }
+      if (s.packed > 0 && dist(s, fire) >= 60) {
+        T.label = 'Eat a packed lunch';
+        S.push(work('eat', 15, 'eat the packed lunch', { fx: 'eatPacked', outdoor: false, meters: [] }));
+        break;
+      }
+      const ready = foodCount(sim, 'meal') + foodCount(sim, 'dried') + foodCount(sim, 'fish') + foodCount(sim, 'berries') / 4;
+      if (ready >= 0.25 && dist(s, fire) < 150) {
         S.push(go(seat, 'walk to the fire'), work('eat', 25, 'eat', { fx: 'eat', outdoor: false, meters: [] }));
+      } else if (foodCount(sim, 'meat') > 0 && dist(s, fire) < 150) {
+        T.label = 'Cook something and eat';
+        S.push(go(seat, 'walk to the fire'), work('cook', 20, 'cook', { fx: 'cook', outdoor: false, meters: [] }), work('eat', 25, 'eat', { fx: 'eat', outdoor: false, meters: [] }));
       } else {
         const bush = nearest(sim.isl.bushes, s, (b) => (sim.world.bushes[b.id] ?? b.berries) >= 2 && !sim.world.reserved['b' + b.id]);
         if (!bush) return null;
@@ -1058,7 +1098,7 @@ function makeTask(sim, s, kind, opts = {}) {
 }
 
 /* ------------------------------ the player's orders ------------------------------ */
-function applyPlayerInput(sim, rec) {
+applyPlayerInput = function applyPlayerInput(sim, rec) {
   const s = rec.sid != null ? sim.settlers[rec.sid] : null;
   switch (rec.type) {
     case 'goalMove': {
@@ -1081,8 +1121,8 @@ function applyPlayerInput(sim, rec) {
       if (!T) { say(sim, s, "I can't do that right now.", 'refuse'); return false; }
       T.pinned = true; T.owner = 'player';
       if (n && n.lesson && learned(s, n.lesson) && (n.urgent || n.why === 'bedtime' || n.kind === 'eat')) {
-        refuse(sim, s, n.lesson); T.pinned = false; s.plan.unshift(T);
-        preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); return 'refused';
+        refuse(sim, s, n.lesson); T.pinned = false;
+        preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); s.plan.unshift(T); return 'refused';
       }
       preempt(sim, s, T); return true;
     }
@@ -1098,7 +1138,7 @@ function applyPlayerInput(sim, rec) {
   }
   return false;
 }
-function forecastNeeds(sim, s) {
+forecastNeeds = function forecastNeeds(sim, s) {
   const out = [], h = hourOf(sim);
   const bed = lessonParam(s, 'lateNight');
   out.push({ kind: 'sleep', at: bed, label: 'Sleep around ' + hhmm(bed) });
@@ -1107,25 +1147,27 @@ function forecastNeeds(sim, s) {
   return out;
 }
 
+}
 /* ===== sim.js ===== */
+{
 // sim.js — the colony simulation. DOM-free, render-free, seeded: the same seed and the
 // same inputs always play out the same. A tick is 10 game seconds. Settlers know where
 // they are, how fast they move and what they are doing; joints are the renderer's business.
 
-const TICK = 10;
+TICK = 10;
 const HOUR = 3600, DAYS = 86400;
-const DAY = DAYS;
+DAY = DAYS;
 
-function eff(v) { return v < 50 ? Math.max(0, v) / 50 : v <= 80 ? 1 : 1 + 0.2 * (Math.min(100, v) - 80) / 20; }
-const hourOf = (sim) => (sim.t % DAYS) / HOUR;
-const dayOf = (sim) => Math.floor(sim.t / DAYS) + 1;
-function clockOf(sim) { const s = sim.t % DAYS; return { day: dayOf(sim), hour: Math.floor(s / HOUR), minute: Math.floor((s % HOUR) / 60) }; }
-const isDark = (sim) => { const h = hourOf(sim); return h < 5.9 || h > 19.6; };
+eff = function eff(v) { return v < 50 ? Math.max(0, v) / 50 : v <= 80 ? 1 : 1 + 0.2 * (Math.min(100, v) - 80) / 20; }
+hourOf = (sim) => (sim.t % DAYS) / HOUR;
+dayOf = (sim) => Math.floor(sim.t / DAYS) + 1;
+clockOf = function clockOf(sim) { const s = sim.t % DAYS; return { day: dayOf(sim), hour: Math.floor(s / HOUR), minute: Math.floor((s % HOUR) / 60) }; }
+isDark = (sim) => { const h = hourOf(sim); return h < 5.9 || h > 19.6; };
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 
 /* ------------------------------ camp layout ------------------------------ */
-function layoutOf(isl) {
+layoutOf = function layoutOf(isl) {
   const c = isl.camp, L = isl.landing, dl = Math.hypot(c.x - L.x, c.z - L.z) || 1;
   const fwd = { x: (c.x - L.x) / dl, z: (c.z - L.z) / dl }, right = { x: -fwd.z, z: fwd.x };
   const at = (f, r) => ({ x: c.x + fwd.x * f + right.x * r, z: c.z + fwd.z * f + right.z * r });
@@ -1155,7 +1197,7 @@ function layoutOf(isl) {
 }
 
 /* ------------------------------ creation ------------------------------ */
-function createSim(seed, opts = {}) {
+createSim = function createSim(seed, opts = {}) {
   const isl = genIsland(seed), nav = makeNav(isl), lay = layoutOf(isl), root = makeRng(seed);
   const sim = {
     v: 1, seed, tick: 0, t: 6 * HOUR, isl, nav, lay,
@@ -1185,52 +1227,52 @@ function createSim(seed, opts = {}) {
 }
 
 /* ------------------------------ helpers ------------------------------ */
-function event(sim, s, type, text) {
+event = function event(sim, s, type, text) {
   sim.events.push({ t: sim.t, sid: s ? s.id : null, type, text });
   if (sim.events.length > 400) sim.events.splice(0, sim.events.length - 400);
   if (s && text) { s.log.push({ t: sim.t, text }); if (s.log.length > 40) s.log.shift(); }
 }
-function say(sim, s, text, kind = 'say') {
+say = function say(sim, s, text, kind = 'say') {
   sim.bubbles.push({ id: sim.nextId++, sid: s.id, t: sim.t, text, kind });
   if (sim.bubbles.length > 30) sim.bubbles.shift();
 }
-const site = (sim, id) => sim.sites.find((x) => x.id === id);
-const built = (sim, type) => sim.sites.some((x) => x.type === type && x.done);
-function goalDone(sim, g) {
+site = (sim, id) => sim.sites.find((x) => x.id === id);
+built = (sim, type) => sim.sites.some((x) => x.type === type && x.done);
+goalDone = function goalDone(sim, g) {
   const G = GOALS[g];
   if (G.food) return mealUnits(sim) >= foodTarget(sim);
   const need = {}; for (const b of G.builds) need[b] = (need[b] || 0) + 1;
   for (const b in need) if (sim.sites.filter((x) => x.type === b && x.done && x.goal === g).length < need[b]) return false;
   return true;
 }
-const goalOpen = (sim, g) => GOALS[g].prereq.every((p) => goalDone(sim, p)) && !goalDone(sim, g);
+goalOpen = (sim, g) => GOALS[g].prereq.every((p) => goalDone(sim, p)) && !goalDone(sim, g);
 
 /* food: batches with an expiry; the food store keeps them longer */
-function addFood(sim, kind, n) {
+addFood = function addFood(sim, kind, n) {
   if (n <= 0) return;
   const stored = built(sim, 'foodstore') || (kind === 'dried');
   const days = (stored ? TUNE.spoilStored : TUNE.spoil)[kind];
   sim.food.push({ kind, n, exp: sim.t + days * DAYS });
 }
-const foodCount = (sim, kind) => sim.food.reduce((a, b) => a + (b.kind === kind ? b.n : 0), 0);
-function takeFood(sim, kind, n) {
+foodCount = (sim, kind) => sim.food.reduce((a, b) => a + (b.kind === kind ? b.n : 0), 0);
+takeFood = function takeFood(sim, kind, n) {
   let got = 0;
   sim.food.sort((a, b) => a.exp - b.exp);
   for (const b of sim.food) { if (b.kind !== kind || got >= n) continue; const k = Math.min(b.n, n - got); b.n -= k; got += k; }
   sim.food = sim.food.filter((b) => b.n > 1e-9);
   return got;
 }
-const mealUnits = (sim) => foodCount(sim, 'meal') + foodCount(sim, 'dried') + foodCount(sim, 'meat') * 2 + foodCount(sim, 'fish') * 1.5 + foodCount(sim, 'berries') / 3;
-const foodTarget = (sim) => TUNE.foodGoalDays * (sim.settlers.length + 1) * TUNE.mealsPerDay;
+mealUnits = (sim) => foodCount(sim, 'meal') + foodCount(sim, 'dried') + foodCount(sim, 'meat') * 2 + foodCount(sim, 'fish') * 1.5 + foodCount(sim, 'berries') / 3;
+foodTarget = (sim) => TUNE.foodGoalDays * (sim.settlers.length + 1) * TUNE.mealsPerDay;
 
-function toolEff(sim, name) { return name ? sim.tools[name].cond / 100 : 1; }
+toolEff = function toolEff(sim, name) { return name ? sim.tools[name].cond / 100 : 1; }
 
 /* ------------------------------ needs ------------------------------ */
 const HEAVY = new Set(['chop', 'mine', 'build', 'carry']);
 const LIGHT = new Set(['forage', 'cook', 'trap', 'fish', 'tidy', 'bathe', 'talk', 'maintain', 'pick', 'walk', 'run', 'look']);
 const DIRTY = new Set(['chop', 'mine', 'build', 'trap', 'forage', 'carry']);
 
-function moodTarget(sim, s) {
+moodTarget = function moodTarget(sim, s) {
   let t = 62;
   if (s.sleep && s.sleep.place && s.sleep.place !== 'wild') t += s.sleep.place === 'bed' ? 10 : s.sleep.place === 'ground' ? 2 : 6;
   if (sim.t - s.ateHot < 10 * HOUR) t += 6;
@@ -1260,7 +1302,11 @@ function drain(sim, s, dt) {
   const mt = moodTarget(sim, s);
   m.mood += clamp(mt - m.mood, -TUNE.moodRate * h, TUNE.moodRate * h);
   for (const k in m) m[k] = clamp(m[k], 0, 100);
-  for (const k of ['health', 'energy', 'hunger', 'mood', 'clean']) if (m[k] < s.stats.lowest) { s.stats.lowest = m[k]; s.stats.lowWhat = k; }
+  for (const k of ['health', 'energy', 'hunger', 'mood', 'clean']) {
+    if (m[k] < s.stats.lowest) { s.stats.lowest = m[k]; s.stats.lowWhat = k; }
+    if (!s.dayMin) s.dayMin = {};
+    if (!(s.dayMin[k] <= m[k])) s.dayMin[k] = m[k];
+  }
 
   // things that happen at zero
   if (m.bladder <= 0 || m.bowel <= 0) {
@@ -1273,9 +1319,9 @@ function drain(sim, s, dt) {
     learnEvent(sim, s, 'overwork');
     if (s.sleep && s.sleep.lateStart) learnEvent(sim, s, 'lateNight');
     replaceTask(sim, s, makeTask(sim, s, 'collapse'));
-  } else if (!s.persevere && (m.hunger <= 0 || m.health <= 0)) {
+  } else if (!s.persevere && !(s.persevereUntil > sim.t) && (m.hunger <= 0 || m.health <= 0)) {
     const why = m.hunger <= 0 ? 'hunger' : 'injury';
-    s.stats.collapses++; s.persevere = true;
+    s.stats.collapses++; s.persevere = true; s.persevereUntil = sim.t + 6 * HOUR;
     event(sim, s, 'collapse', s.name + ' collapsed (' + why + ') and is dragging themselves back to camp.');
     say(sim, s, why === 'hunger' ? "Can't... think. Need food. Back to camp." : 'I need to get back to camp.', 'refuse');
     if (why === 'hunger') learnEvent(sim, s, 'skipMeal'); else learnEvent(sim, s, 'overwork');
@@ -1365,7 +1411,7 @@ function maybeInjure(sim, s, st, dt) {
   }
 }
 
-function dropCarry(sim, s) {
+dropCarry = function dropCarry(sim, s) {
   if (!s.carry) return;
   if (s.carry.food) addFood(sim, s.carry.item, s.carry.n);
   else sim.piles.push({ id: sim.nextId++, x: s.x, z: s.z, item: s.carry.item, n: s.carry.n });
@@ -1397,11 +1443,11 @@ function finishTask(sim, s, ok) {
   if (T && T.kind === 'persevere') s.persevere = false;
   s.task = null; s.act = 'idle';
 }
-function replaceTask(sim, s, T2) {
+replaceTask = function replaceTask(sim, s, T2) {
   if (s.task) { releaseTask(sim, s, s.task); dropCarry(sim, s); }
   s.task = T2; T2.started = sim.t;
 }
-function preempt(sim, s, T2) {
+preempt = function preempt(sim, s, T2) {
   const T = s.task;
   if (T && T.kind !== 'collapse' && T.kind !== 'persevere') {
     releaseTask(sim, s, T);
@@ -1427,7 +1473,7 @@ const UNTIL = {
   fixed(sim, s, st) { return TOOLS.every((k) => sim.tools[k].cond >= 98 || (sim.tools[k].by != null && sim.tools[k].by !== s.id)) || st.done >= st.mins * 60; },
 };
 
-const FX = {
+FX = {
   sleepStart(sim, s, st) {
     const h = hourOf(sim);
     s.sleep = { place: st.place, slot: st.slot, start: sim.t, lateStart: h >= 23.25 || h < 4, startEnergy: s.m.energy };
@@ -1443,11 +1489,22 @@ const FX = {
     if (takeFood(sim, 'meal', 1)) { got = TUNE.meal; hot = true; }
     else if (takeFood(sim, 'dried', 1)) got = TUNE.meal;
     else { const b = takeFood(sim, 'berries', 4); got = b * TUNE.berry; if (!b) { const f = takeFood(sim, 'fish', 1); got = f * TUNE.rawFish; } }
-    if (!got) { say(sim, s, 'Nothing to eat at camp.', 'refuse'); return; }
-    s.m.hunger = Math.min(100, s.m.hunger + got); s.stats.meals++;
+    if (!got) { event(sim, s, 'nofood', s.name + ' found nothing to eat at camp.'); return false; }   // the task fails; the next thought is foraging
+    s.m.hunger = Math.min(100, s.m.hunger + got); s.stats.meals++; s.ateAt = sim.t;
+    // heading out for the day: pack a lunch if the store can spare it
+    if (hourOf(sim) < 9.5 && !(s.packed > 0) && s.role !== 'leader' && foodCount(sim, 'meal') + foodCount(sim, 'dried') >= sim.settlers.length + 1) {
+      if (takeFood(sim, 'meal', 1) || takeFood(sim, 'dried', 1)) s.packed = 1;
+    }
     if (hot) s.ateHot = sim.t;
     for (const o of sim.settlers) if (o !== s && o.act === 'eat' && dist(o, s) < 8) { s.rel[o.id] = Math.min(100, s.rel[o.id] + 2); }
   },
+  eatCarry(sim, s) {
+    if (!s.carry || !s.carry.food) return;
+    const per = s.carry.item === 'fish' ? TUNE.rawFish : TUNE.berry, k = Math.min(s.carry.n, s.carry.item === 'fish' ? 1 : 4);
+    s.carry.n -= k; s.m.hunger = Math.min(100, s.m.hunger + k * per); s.stats.meals++; s.ateAt = sim.t;
+    if (s.carry.n <= 0) s.carry = null;
+  },
+  eatPacked(sim, s) { if (s.packed > 0) { s.packed--; s.m.hunger = Math.min(100, s.m.hunger + TUNE.meal); s.stats.meals++; s.ateAt = sim.t; } },
   eatBerries(sim, s, st) {
     const b = sim.world.bushes[st.bush] ?? sim.isl.bushes[st.bush].berries;
     const k = Math.min(b, 4); sim.world.bushes[st.bush] = b - k;
@@ -1555,9 +1612,9 @@ const FX = {
   idle() {},
 };
 
-function carryCap(s, item) { return (TUNE.carry[item] || 4) + (item === 'wood' && s.attrs.STR >= 15 ? 1 : 0) + (item === 'stone' && s.attrs.STR >= 15 ? 1 : 0); }
+carryCap = function carryCap(s, item) { return (TUNE.carry[item] || 4) + (item === 'wood' && s.attrs.STR >= 15 ? 1 : 0) + (item === 'stone' && s.attrs.STR >= 15 ? 1 : 0); }
 
-function completeSite(sim, x, s) {
+completeSite = function completeSite(sim, x, s) {
   x.done = true; x.prog = x.hours; x.doneT = sim.t;
   event(sim, s, 'built', (BUILDINGS[x.type].label) + ' finished.');
   say(sim, s, BUILDINGS[x.type].label + ' is done!', 'say');
@@ -1566,7 +1623,17 @@ function completeSite(sim, x, s) {
 }
 
 /* ------------------------------ the world ticking ------------------------------ */
+// Each evening a settler looks back on the day: a meter that fell out of the normal
+// range (below 50) is a chance to learn the habit that would have kept it there.
+const REVIEW = { energy: 'lateNight', hunger: 'skipMeal', clean: 'hygiene', health: 'overwork' };
+function nightlyReview(sim) {
+  for (const s of sim.settlers) {
+    for (const k in REVIEW) if (s.dayMin && s.dayMin[k] < 50) learnEvent(sim, s, REVIEW[k]);
+    s.dayMin = {};
+  }
+}
 function worldHourly(sim) {
+  if (Math.abs(hourOf(sim) - 21) < 1e-6) nightlyReview(sim);
   // spoilage
   const before = mealUnits(sim);
   sim.food = sim.food.filter((b) => b.exp > sim.t);
@@ -1582,7 +1649,7 @@ function trapRichness(sim, tr) {
   const crowd = sim.traps.filter((o) => o !== tr && Math.hypot(o.x - tr.x, o.z - tr.z) < 40).length;
   return Math.min(1.4, 0.4 + d / 200) / (1 + crowd * 0.5);
 }
-function discover(sim, s) {
+discover = function discover(sim, s) {
   const isl = sim.isl;
   if (!sim.discovered.pond && Math.hypot(s.x - isl.pond.x, s.z - isl.pond.z) < 48) {
     sim.discovered.pond = sim.t;
@@ -1610,7 +1677,10 @@ function phase1Check(sim) {
   const builtAll = PHASE1_BUILDS.every((b) => built(sim, b)) && sim.sites.filter((x) => x.type === 'bed' && x.done).length >= 5;
   const food = mealUnits(sim) >= foodTarget(sim);
   const ok = sim.settlers.every((s) => ['health', 'energy', 'hunger', 'mood', 'clean'].every((k) => s.m[k] >= 50));
-  if (!ok) sim.okSince = null; else if (sim.okSince == null) sim.okSince = sim.t;
+  if (!ok) {
+    sim.okSince = null;
+    if (builtAll) { const b = sim.settlers.flatMap((s) => ['health', 'energy', 'hunger', 'mood', 'clean'].filter((k) => s.m[k] < 50).map((k) => s.name + ' ' + k)); sim.breakers = sim.breakers || {}; for (const k of b) sim.breakers[k] = (sim.breakers[k] || 0) + 1; }
+  } else if (sim.okSince == null) sim.okSince = sim.t;
   sim.p1 = { builtAll, food, okHours: sim.okSince == null ? 0 : (sim.t - sim.okSince) / HOUR };
   if (builtAll && food && sim.okSince != null && sim.t - sim.okSince >= 48 * HOUR) {
     sim.phase1 = { done: true, t: sim.t, day: dayOf(sim) };
@@ -1619,7 +1689,7 @@ function phase1Check(sim) {
 }
 
 /* ------------------------------ the tick ------------------------------ */
-function step(sim) {
+step = function step(sim) {
   sim.tick++; sim.t += TICK;
   for (const s of sim.settlers) drain(sim, s, TICK);
   for (const s of sim.settlers) runSettler(sim, s, TICK);
@@ -1628,14 +1698,14 @@ function step(sim) {
   if (sim.tick % 360 === 0) { worldHourly(sim); phase1Check(sim); }
   // the hour as ticks: pin any player input to the tick it arrived on
 }
-function runFor(sim, secs) { const n = Math.round(secs / TICK); for (let i = 0; i < n; i++) step(sim); }
+runFor = function runFor(sim, secs) { const n = Math.round(secs / TICK); for (let i = 0; i < n; i++) step(sim); }
 
-function applyInput(sim, input) {
+applyInput = function applyInput(sim, input) {
   const rec = { ...input, tick: sim.tick };
   sim.inputs.push(rec);
   return applyPlayerInput(sim, rec);
 }
-function assignTask(sim, s, kind, opts = {}) {
+assignTask = function assignTask(sim, s, kind, opts = {}) {
   const T = makeTask(sim, s, kind, opts);
   if (!T) return null;
   if (opts.pinned) T.pinned = true;
@@ -1643,40 +1713,1273 @@ function assignTask(sim, s, kind, opts = {}) {
   return T;
 }
 
+// Re-run a game from its seed, applying each recorded input on the tick it arrived.
+replay = function replay(seed, inputs, toTick) {
+  const sim = createSim(seed);
+  let k = 0;
+  while (sim.tick < toTick || (k < inputs.length && inputs[k].tick <= sim.tick)) {
+    while (k < inputs.length && inputs[k].tick === sim.tick) { const rec = inputs[k++]; sim.inputs.push(rec); applyPlayerInput(sim, rec); }
+    if (sim.tick >= toTick) break;
+    step(sim);
+  }
+  return sim;
+}
+
 /* ------------------------------ save / load ------------------------------ */
-function snapshot(sim) {
+snapshot = function snapshot(sim) {
   const o = {};
   for (const k in sim) if (k !== 'isl' && k !== 'nav' && k !== 'lay' && k !== 'R') o[k] = sim[k];
   o.R = {}; for (const k in sim.R) o.R[k] = sim.R[k].save();
   return JSON.parse(JSON.stringify(o));
 }
-function restore(snap) {
+restore = function restore(snap) {
   const sim = createSim(snap.seed);
   for (const k in snap) if (k !== 'R') sim[k] = snap[k];
   for (const k in snap.R) sim.R[k].load(snap.R[k]);
   for (const s of sim.settlers) s.look = FOUNDERS[s.id] ? FOUNDERS[s.id].look : s.look;
   return sim;
 }
-function simHash(sim) { return hashState(snapshot(sim)); }
+simHash = function simHash(sim) { return hashState(snapshot(sim)); }
 
+}
 /* ===== rig.js ===== */
-// rig.js — placeholder (filled in a later task)
+{
+// rig.js — the settlers' bodies. The skeleton, two-bone IK and buildPose() are copied from
+// Animation Rigs (games/animation-rigs, the A002 form: soft IK and sagittal poles); feet are
+// planted on the island's heightfield. Pure presentation: it reads a settler and never writes one.
 
+
+const V = (x, y, z) => ({ x, y, z });
+const add = (a, b) => V(a.x + b.x, a.y + b.y, a.z + b.z), sub = (a, b) => V(a.x - b.x, a.y - b.y, a.z - b.z);
+const mul = (a, k) => V(a.x * k, a.y * k, a.z * k), madd = (a, b, k) => V(a.x + b.x * k, a.y + b.y * k, a.z + b.z * k);
+const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+const cross = (a, b) => V(a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x);
+const vlen = (a) => Math.hypot(a.x, a.y, a.z), norm = (a) => { const l = vlen(a) || 1; return V(a.x / l, a.y / l, a.z / l); };
+const lerp = (a, b, t) => a + (b - a) * t, lerpV = (a, b, t) => V(lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t));
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v), smooth = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+const frac = (x) => x - Math.floor(x);
+const wrapA = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+const UP = V(0, 1, 0);
+
+// Two-bone IK (Animation Rigs): returns [middle joint, end joint]; the end is pulled back
+// onto the reachable shell when the target is out of range, so bone lengths stay exact.
+ik2 = function ik2(root, target, a, b, pole, soft) {
+  const d = sub(target, root); let dist = vlen(d);
+  const dir = dist > 1e-6 ? mul(d, 1 / dist) : V(0, -1, 0);
+  if (soft) { const ds = a + b - soft; if (dist > ds) dist = ds + soft * (1 - Math.exp(-(dist - ds) / soft)); }
+  dist = clamp(dist, Math.abs(a - b) + 1e-3, a + b - 1e-4);
+  const ca = (a * a + dist * dist - b * b) / (2 * a * dist);
+  const along = a * ca, h = Math.sqrt(Math.max(0, a * a - along * along));
+  let pd = sub(pole, mul(dir, dot(pole, dir)));
+  if (vlen(pd) < 1e-5) pd = Math.abs(dir.y) < 0.9 ? cross(dir, UP) : V(1, 0, 0);
+  pd = norm(pd);
+  return [add(madd(root, dir, along), mul(pd, h)), madd(root, dir, dist)];
+}
+
+// Builds the 21 joints (+ a nose point) from a parameter block P (Animation Rigs' buildPose).
+buildPose = function buildPose(s, P) {
+  const f = P.f, u = P.u, r = norm(cross(f, u));
+  const lean = P.lean || 0, cl = lean * 1.25 + (P.chestLean || 0);
+  let sd = norm(add(mul(u, Math.cos(lean)), mul(f, Math.sin(lean))));
+  let cd = norm(add(mul(u, Math.cos(cl)), mul(f, Math.sin(cl))));
+  if (P.sideLean) { sd = norm(madd(sd, r, Math.sin(P.sideLean))); cd = norm(madd(cd, r, Math.sin(P.sideLean * 1.4))); }
+  const pel = P.pelvis;
+  const spine = madd(pel, sd, 0.2 * s), chest = madd(spine, cd, 0.26 * s), neck = madd(chest, cd, 0.1 * s);
+  const fp = norm(cross(cd, r));
+  const hp = P.headPitch || 0;
+  const hd = norm(add(mul(cd, Math.cos(hp)), mul(fp, Math.sin(hp))));
+  const head = madd(neck, hd, 0.13 * s);
+  const hy = P.headYaw || 0, nf = norm(cross(hd, r));
+  const nose = madd(head, norm(add(mul(nf, Math.cos(hy)), mul(r, Math.sin(hy)))), 0.17 * s);
+  const tw = P.twist || 0;
+  const rs = add(mul(r, Math.cos(tw)), mul(fp, Math.sin(tw)));
+  const shY = -0.035 * s + (P.breath || 0);
+  const shL = madd(madd(chest, rs, -0.18 * s), cd, shY), shR = madd(madd(chest, rs, 0.18 * s), cd, shY);
+  const fpp = norm(cross(sd, r)); let rp = add(mul(r, Math.cos(-tw * 0.5)), mul(fpp, Math.sin(-tw * 0.5)));
+  if (P.roll) rp = norm(add(mul(rp, Math.cos(P.roll)), mul(u, -Math.sin(P.roll))));
+  const hipL = madd(madd(pel, rp, -0.1 * s), sd, -0.04 * s), hipR = madd(madd(pel, rp, 0.1 * s), sd, -0.04 * s);
+  const kp = P.kneePole || f;
+  const sk = P.softIK ? 0.025 * s : 0;
+  const sag = (a, b, sg, out) => madd(norm(cross(r, norm(sub(b, a)))), r, sg * out);
+  const [knL, anL] = ik2(hipL, P.ankL, 0.45 * s, 0.44 * s, P.sagPoles ? sag(hipL, P.ankL, -1, 0.12) : madd(kp, r, -0.12), sk);
+  const [knR, anR] = ik2(hipR, P.ankR, 0.45 * s, 0.44 * s, P.sagPoles ? sag(hipR, P.ankR, 1, 0.12) : madd(kp, r, 0.12), sk);
+  const defToe = norm(add(mul(f, 0.9), mul(u, -0.45)));
+  const toeL = madd(anL, P.toeL ? norm(sub(P.toeL, anL)) : defToe, 0.15 * s);
+  const toeR = madd(anR, P.toeR ? norm(sub(P.toeR, anR)) : defToe, 0.15 * s);
+  const ep = P.elbowPole || add(mul(f, -1), mul(u, -0.3));
+  const arm = (sh, sg, A, grip, w) => {
+    A = A || { sw: 0, reach: 0.52 * s, out: 0.06 * s };
+    const rest = madd(add(sh, mul(add(mul(u, -Math.cos(A.sw)), mul(f, Math.sin(A.sw))), A.reach)), r, sg * A.out);
+    const tgt = grip ? lerpV(rest, grip, w == null ? 1 : w) : rest;
+    const pole = P.sagPoles ? madd(mul(norm(cross(r, norm(sub(tgt, sh)))), -1), r, sg * 0.5) : madd(ep, r, sg * 0.5);
+    const [el, wr] = ik2(sh, tgt, 0.29 * s, 0.26 * s, pole, P.softIK ? 0.035 * s : 0);
+    return [el, wr, madd(wr, norm(sub(wr, el)), 0.08 * s)];
+  };
+  const [elL, wrL, haL] = arm(shL, -1, P.armL, P.gripL, P.wL);
+  const [elR, wrR, haR] = arm(shR, 1, P.armR, P.gripR, P.wR);
+  return [pel, spine, chest, neck, head, shL, elL, wrL, haL, shR, elR, wrR, haR, hipL, knL, anL, toeL, hipR, knR, anR, toeR, nose];
+}
+
+/* ------------------------------ the rig ------------------------------ */
+const CROUCH = { pick: 0.36, forage: 0.4, trap: 0.42, drop: 0.3, squat: 0.5, cook: 0.42 };
+const SIT = new Set(['eat', 'sit']);
+const LIE = new Set(['sleep', 'collapsed']);
+
+makeRig = function makeRig(st, isl) {
+  const s = st.look.height || 1;
+  const rig = { s, x: st.x, z: st.z, yaw: st.yaw, py: null, phase: 0, steps: 0, feet: [null, null], J: null, act: null, snap: null, blendT: 1, t: 0, runAmt: 0, seed: (st.look.shirt || '').length };
+  plantFeet(rig, isl);
+  rig.J = pose(rig, st, isl, 0);
+  return rig;
+}
+function restFoot(rig, i) {
+  const fw = V(Math.cos(rig.yaw), 0, Math.sin(rig.yaw)), rt = V(-Math.sin(rig.yaw), 0, Math.cos(rig.yaw)), sg = i ? 1 : -1;
+  return V(rig.x + rt.x * sg * 0.11 * rig.s, 0, rig.z + rt.z * sg * 0.11 * rig.s);
+}
+function plantFeet(rig, isl) {
+  for (let i = 0; i < 2; i++) { const p = restFoot(rig, i); p.y = heightAt(isl, p.x, p.z); rig.feet[i] = { plant: p, sw: false, t: 0, from: null }; }
+}
+
+updateRig = function updateRig(rig, st, dt, isl) {
+  dt = clamp(dt || 0, 0, 0.1);
+  rig.t += dt;
+  const jump = Math.hypot(st.x - rig.x, st.z - rig.z);
+  rig.x = st.x; rig.z = st.z;
+  // turn toward the settler's heading at a human rate (a teleport resets everything)
+  if (jump > 6) { rig.yaw = st.yaw; plantFeet(rig, isl); rig.py = null; }
+  else { const dy = wrapA(st.yaw - rig.yaw), mx = 7 * dt; rig.yaw += clamp(dy, -mx, mx); }
+  const act = moving(st) ? (st.speed > 2.6 ? 'run' : 'walk') : (st.act === 'walk' || st.act === 'run' ? 'idle' : st.act || 'idle');
+  const group = LIE.has(act) ? 'lie' : SIT.has(act) ? 'sit' : act;
+  if (rig.act !== null && group !== rig.group) { rig.snap = rig.J.map((p) => V(p.x, p.y, p.z)); rig.blendT = 0; }
+  rig.act = act; rig.group = group;
+  const J = pose(rig, st, isl, dt);
+  if (rig.blendT < 1 && rig.snap) { rig.blendT = Math.min(1, rig.blendT + dt / 0.35); const k = smooth(rig.blendT); rig.J = J.map((p, i) => lerpV(rig.snap[i], p, k)); }
+  else rig.J = J;
+}
+const moving = (st) => st.speed > 0.15;
+
+function pose(rig, st, isl, dt) {
+  const s = rig.s, yaw = rig.yaw, t = rig.t;
+  const fw = V(Math.cos(yaw), 0, Math.sin(yaw)), rt = V(-Math.sin(yaw), 0, Math.cos(yaw));
+  const g0 = heightAt(isl, rig.x, rig.z);
+  const act = rig.act;
+  const P = { f: fw, u: UP, softIK: true, sagPoles: true, breath: Math.sin(t * 1.6) * 0.004 * s };
+  const standY = g0 + 0.93 * s;
+
+  if (LIE.has(act)) {
+    // lying on the back, head toward the heading
+    const pel = V(rig.x, g0 + 0.13 * s, rig.z);
+    P.u = fw; P.f = UP; P.pelvis = pel; P.lean = 0; P.breath = Math.sin(t * (act === 'sleep' ? 1.1 : 2.2)) * 0.006 * s;
+    for (let i = 0; i < 2; i++) {
+      const sg = i ? 1 : -1, a = madd(madd(pel, fw, -0.84 * s), rt, sg * 0.13 * s);
+      a.y = heightAt(isl, a.x, a.z) + 0.08 * s;
+      P[i ? 'ankR' : 'ankL'] = a; P[i ? 'toeR' : 'toeL'] = madd(a, UP, 0.2);
+      rig.feet[i].plant = V(a.x, a.y - 0.08 * s, a.z); rig.feet[i].sw = false;
+    }
+    P.armL = { sw: 0.05, reach: 0.52 * s, out: 0.1 * s }; P.armR = { sw: 0.05, reach: 0.52 * s, out: 0.1 * s };
+    P.headPitch = act === 'collapsed' ? 0.5 : 0.1; P.headYaw = act === 'collapsed' ? 0.6 : 0;
+    rig.py = pel.y;
+    return buildPose(s, P);
+  }
+
+  if (act === 'walk' || act === 'run') { loco(rig, st, isl, dt, P, fw, rt); }
+  else {
+    // standing still: settle any foot that is out of place, one at a time
+    settle(rig, isl, dt, fw, rt);
+    for (let i = 0; i < 2; i++) { const f = rig.feet[i]; P[i ? 'ankR' : 'ankL'] = f.ank || V(f.plant.x, f.plant.y + 0.08 * s, f.plant.z); P[i ? 'toeR' : 'toeL'] = madd(V(f.plant.x, f.plant.y + 0.015, f.plant.z), fw, 0.13 * s); }
+    let py = standY - 0.01 * s + Math.sin(t * 1.6) * 0.004 * s;
+    if (CROUCH[act]) py -= CROUCH[act] * s;
+    if (SIT.has(act)) py = g0 + 0.47 * s;
+    rig.py = rig.py == null ? py : lerp(rig.py, py, 1 - Math.exp(-dt / 0.12));
+    P.pelvis = V(rig.x, rig.py, rig.z);
+    P.armL = { sw: 0.06, reach: 0.52 * s, out: 0.07 * s }; P.armR = { sw: 0.06, reach: 0.52 * s, out: 0.07 * s };
+    workPose(rig, st, isl, P, fw, rt, g0);
+  }
+  return buildPose(s, P);
+}
+
+function workPose(rig, st, isl, P, fw, rt, g0) {
+  const s = rig.s, t = rig.t, act = rig.act, pel = P.pelvis;
+  const sh = madd(pel, UP, 0.5 * s);
+  const front = (d, h, side = 0) => V(rig.x + fw.x * d * s + rt.x * side * s, g0 + h * s, rig.z + fw.z * d * s + rt.z * side * s);
+  switch (act) {
+    case 'chop': case 'mine': {
+      const ph = frac(t / 1.35 + rig.seed * 0.07);
+      const up = ph < 0.6 ? smooth(ph / 0.6) : ph < 0.72 ? 1 - smooth((ph - 0.6) / 0.12) : 0;
+      const hi = V(rig.x + rt.x * 0.12 * s - fw.x * 0.05 * s, g0 + 1.75 * s, rig.z + rt.z * 0.12 * s - fw.z * 0.05 * s);
+      const lo = front(act === 'chop' ? 0.62 : 0.55, act === 'chop' ? 0.85 : 0.35, 0.05);
+      const g = lerpV(lo, hi, up);
+      P.gripR = g; P.gripL = madd(g, norm(sub(lo, hi)), -0.14 * s); P.wL = 1; P.wR = 1;
+      P.lean = lerp(act === 'chop' ? 0.25 : 0.5, -0.05, up); P.twist = lerp(0.1, -0.25, up);
+      if (act === 'mine') P.pelvis = V(pel.x, pel.y - 0.1 * s * (1 - up), pel.z);
+      break;
+    }
+    case 'build': {
+      const ph = frac(t / 0.75), k = ph < 0.55 ? smooth(ph / 0.55) : 1 - smooth((ph - 0.55) / 0.2);
+      P.gripR = front(0.42, 1.0 + 0.28 * k, 0.1); P.gripL = front(0.42, 0.95, -0.12); P.wL = 1; P.wR = 1; P.lean = 0.2;
+      break;
+    }
+    case 'maintain': {
+      const k = Math.sin(t * 4);
+      P.gripR = front(0.4 + 0.08 * k, 0.98, 0.08); P.gripL = front(0.38, 0.97, -0.1); P.wL = 1; P.wR = 1; P.lean = 0.25; P.headPitch = 0.4;
+      break;
+    }
+    case 'pick': case 'forage': case 'trap': case 'drop': case 'cook': {
+      const k = Math.sin(t * (act === 'cook' ? 2.4 : 3.4));
+      P.gripR = front(0.5 + 0.05 * k, act === 'cook' ? 0.42 : 0.12 + 0.06 * Math.max(0, k), 0.12); P.gripL = front(0.48, act === 'cook' ? 0.4 : 0.14, -0.14);
+      P.wL = 0.9; P.wR = 1; P.lean = 0.55; P.kneePole = norm(add(fw, mul(UP, 0.3))); P.headPitch = 0.3;
+      break;
+    }
+    case 'squat': P.lean = 0.3; P.kneePole = fw; P.armL = { sw: 0.4, reach: 0.5 * s, out: 0.1 * s }; P.armR = { sw: 0.4, reach: 0.5 * s, out: 0.1 * s }; break;
+    case 'eat': case 'sit': {
+      for (let i = 0; i < 2; i++) { const a = front(0.42, 0.08, i ? 0.13 : -0.13); a.y = heightAt(isl, a.x, a.z) + 0.08 * s; P[i ? 'ankR' : 'ankL'] = a; P[i ? 'toeR' : 'toeL'] = madd(a, fw, 0.2); }
+      P.kneePole = norm(add(fw, UP)); P.lean = 0.08;
+      const knees = front(0.38, 0.55);
+      if (act === 'eat') { const k = 0.5 + 0.5 * Math.sin(t * 1.4); P.gripR = lerpV(knees, madd(madd(sh, fw, 0.16 * s), UP, 0.18 * s), smooth(k)); P.gripL = front(0.3, 0.62, -0.08); P.wL = 1; P.wR = 1; }
+      else { P.gripR = front(0.36, 0.6, 0.12); P.gripL = front(0.36, 0.6, -0.12); P.wL = 1; P.wR = 1; }
+      break;
+    }
+    case 'talk': {
+      const k = Math.sin(t * 2.1);
+      P.gripR = front(0.32, 1.05 + 0.08 * k, 0.22); P.wR = 0.7 + 0.3 * Math.sin(t * 0.7); P.headYaw = 0.15 * Math.sin(t * 0.5);
+      break;
+    }
+    case 'bathe': {
+      P.pelvis = V(pel.x, pel.y - 0.12 * s, pel.z);
+      const k = Math.sin(t * 3);
+      P.gripR = madd(madd(sh, fw, 0.12 * s), rt, (-0.12 + 0.06 * k) * s); P.gripL = madd(madd(sh, fw, 0.1 * s), rt, (0.14 - 0.05 * k) * s); P.wL = 1; P.wR = 1;
+      break;
+    }
+    case 'fish': {
+      const ph = frac(t / 4), k = ph > 0.8 ? smooth((ph - 0.8) / 0.1) * (1 - smooth((ph - 0.9) / 0.1)) : 0;
+      P.gripR = lerpV(front(0.15, 1.75, 0.18), front(0.7, 1.0, 0.1), k); P.gripL = front(0.4, 1.2, -0.05); P.wL = 0.8; P.wR = 1; P.lean = 0.15 + 0.3 * k; P.headPitch = 0.35;
+      break;
+    }
+    case 'look': {
+      P.gripR = madd(madd(sh, UP, 0.24 * s), fw, 0.2 * s); P.wR = 1; P.headYaw = 0.6 * Math.sin(t * 0.6); P.headPitch = -0.1;
+      break;
+    }
+    default: {
+      const k = Math.sin(t * 0.35 + rig.seed);
+      P.sideLean = 0.02 * k;
+    }
+  }
+  if (st.carry) carryArms(rig, P, fw, rt);
+}
+function carryArms(rig, P, fw, rt) {
+  const s = rig.s, c = madd(madd(P.pelvis, UP, 0.28 * s), fw, 0.3 * s);
+  P.gripL = madd(c, rt, -0.16 * s); P.gripR = madd(c, rt, 0.16 * s); P.wL = 1; P.wR = 1;
+}
+
+function settle(rig, isl, dt, fw, rt) {
+  const s = rig.s;
+  let swinging = rig.feet.findIndex((f) => f.sw);
+  if (swinging < 0) {
+    for (let i = 0; i < 2; i++) {
+      const r = restFoot(rig, i), f = rig.feet[i];
+      if (Math.hypot(f.plant.x - r.x, f.plant.z - r.z) > 0.16 * s) { f.sw = true; f.t = 0; f.from = f.plant; swinging = i; break; }
+    }
+  }
+  for (let i = 0; i < 2; i++) {
+    const f = rig.feet[i];
+    f.plant.y = heightAt(isl, f.plant.x, f.plant.z);
+    if (!f.sw) { f.ank = V(f.plant.x, f.plant.y + 0.08 * s, f.plant.z); continue; }
+    f.t += dt * 2.6;
+    const r = restFoot(rig, i); r.y = heightAt(isl, r.x, r.z);
+    const e = smooth(f.t);
+    f.ank = V(lerp(f.from.x, r.x, e), lerp(f.from.y, r.y, e) + 0.08 * s + Math.sin(Math.PI * clamp(f.t, 0, 1)) * 0.07 * s, lerp(f.from.z, r.z, e));
+    if (f.t >= 1) { f.sw = false; f.plant = r; f.ank = V(r.x, r.y + 0.08 * s, r.z); rig.steps++; }
+  }
+}
+
+function loco(rig, st, isl, dt, P, fw, rt) {
+  const s = rig.s, spd = st.speed, t = rig.t;
+  rig.runAmt = lerp(rig.runAmt, spd > 2.6 ? 1 : 0, 1 - Math.exp(-dt / 0.3));
+  const ra = rig.runAmt;
+  const stride = lerp(1.45, 2.6, ra) * s;               // metres per full cycle (two steps)
+  const skate = spd > 6;                                  // fast-forward: no planting, just a cycle
+  const cad = skate ? 1.6 : clamp(spd / stride, 0.55, 1.7);
+  const sf = lerp(0.4, 0.62, ra);
+  const cycT = 1 / cad;
+  const ph0 = rig.phase; rig.phase = frac(rig.phase + cad * dt);
+  let ground = 0, nG = 0, maxPel = 1e9;
+  for (let i = 0; i < 2; i++) {
+    const f = rig.feet[i], sg = i ? 1 : -1, lp0 = frac(ph0 + i * 0.5), lp = frac(rig.phase + i * 0.5);
+    const side = V(rt.x * sg * 0.1 * s, 0, rt.z * sg * 0.1 * s);
+    if (skate) {
+      const k = Math.sin(lp * Math.PI * 2);
+      const a = V(rig.x + fw.x * k * 0.35 * s + side.x, 0, rig.z + fw.z * k * 0.35 * s + side.z);
+      a.y = heightAt(isl, a.x, a.z) + 0.08 * s + Math.max(0, -Math.cos(lp * Math.PI * 2)) * 0.12 * s;
+      f.plant = V(a.x, a.y - 0.08 * s, a.z); f.sw = false; f.ank = a;
+      P[i ? 'ankR' : 'ankL'] = a; continue;
+    }
+    if (!f.sw && lp < lp0 && lp0 > 0.6) { f.sw = true; f.t = 0; f.from = V(f.plant.x, f.plant.y, f.plant.z); rig.steps++; }
+    if (f.sw) {
+      f.t = clamp(lp / sf, 0, 1);
+      const lead = spd * cycT * (sf * (1 - f.t) + (1 - sf) / 2);
+      const tx = rig.x + fw.x * lead + side.x, tz = rig.z + fw.z * lead + side.z;
+      if (!f.to || f.t < 0.85) f.to = V(tx, heightAt(isl, tx, tz), tz);
+      const e = smooth(f.t);
+      const a = V(lerp(f.from.x, f.to.x, e), lerp(f.from.y, f.to.y, e) + 0.08 * s + Math.sin(Math.PI * f.t) * lerp(0.11, 0.2, ra) * s, lerp(f.from.z, f.to.z, e));
+      P[i ? 'ankR' : 'ankL'] = a;
+      P[i ? 'toeR' : 'toeL'] = madd(a, norm(add(fw, mul(UP, lerp(-0.6, 0.35, f.t)))), 0.15 * s);
+      f.ank = a;
+      if (lp >= sf || f.t >= 1) { f.sw = false; f.plant = V(f.to.x, heightAt(isl, f.to.x, f.to.z), f.to.z); f.to = null; }
+    }
+    if (!f.sw) {
+      f.plant.y = heightAt(isl, f.plant.x, f.plant.z);
+      const sp = clamp((lp - sf) / (1 - sf), 0, 1), heel = smooth((sp - 0.62) / 0.38) * 0.09 * s;
+      const a = V(f.plant.x + fw.x * heel * 0.4, f.plant.y + 0.08 * s + heel, f.plant.z + fw.z * heel * 0.4);
+      P[i ? 'ankR' : 'ankL'] = a; f.ank = a;
+      P[i ? 'toeR' : 'toeL'] = V(f.plant.x + fw.x * 0.13 * s, f.plant.y + 0.015, f.plant.z + fw.z * 0.13 * s);
+      ground += f.plant.y; nG++;
+      const hip = V(rig.x + side.x, 0, rig.z + side.z), hz = Math.hypot(a.x - hip.x, a.z - hip.z), L = 0.89 * s * 0.985;
+      maxPel = Math.min(maxPel, a.y + Math.sqrt(Math.max(0, L * L - hz * hz)) + 0.04 * s);
+    }
+  }
+  const g0 = heightAt(isl, rig.x, rig.z);
+  const bob = (ra > 0.5 ? -1 : 1) * Math.cos(rig.phase * Math.PI * 4) * lerp(0.018, 0.03, ra) * s;
+  let py = (nG ? Math.min(g0, ground / nG + 0.05) : g0) + lerp(0.92, 0.88, ra) * s + bob;
+  if (!skate) py = Math.min(py, maxPel);
+  rig.py = rig.py == null ? py : lerp(rig.py, py, 1 - Math.exp(-dt / 0.06));
+  if (!skate) rig.py = Math.min(rig.py, maxPel);
+  P.pelvis = V(rig.x, rig.py, rig.z);
+  const slope = (heightAt(isl, rig.x + fw.x, rig.z + fw.z) - heightAt(isl, rig.x - fw.x, rig.z - fw.z)) / 2;
+  P.lean = lerp(0.04, 0.16, ra) + clamp(slope, -0.3, 0.5) * 0.5;
+  const swing = Math.sin(rig.phase * Math.PI * 2) * lerp(0.35, 0.8, ra);
+  P.armL = { sw: swing, reach: lerp(0.52, 0.42, ra) * s, out: 0.07 * s }; P.armR = { sw: -swing, reach: lerp(0.52, 0.42, ra) * s, out: 0.07 * s };
+  if (ra > 0.3) { P.elbowPole = add(mul(fw, -1), mul(UP, -0.6)); }
+  P.twist = Math.sin(rig.phase * Math.PI * 2) * 0.12;
+  if (st.carry) carryArms(rig, P, fw, rt);
+}
+
+/* ------------------------------ flesh ------------------------------ */
+// Capsules: [ax,ay,az, bx,by,bz, r0,r1, colour] with colour 0 skin, 1 shirt, 2 pants,
+// 3 boots, 4 hair, 5 hat, 6 wood, 7 metal.
+rigCapsules = function rigCapsules(rig, st) {
+  const J = rig.J, s = rig.s, w = (st && st.look && st.look.width) || 1, look = st && st.look;
+  const out = [];
+  const cap = (a, b, r0, r1, c) => out.push(a.x, a.y, a.z, b.x, b.y, b.z, r0, r1 == null ? r0 : r1, c);
+  const [pel, spine, chest, neck, head, shL, elL, wrL, haL, shR, elR, wrR, haR, hipL, knL, anL, toeL, hipR, knR, anR, toeR, nose] = J;
+  cap(hipL, hipR, 0.115 * s * w, null, 2);
+  cap(pel, spine, 0.125 * s * w, 0.13 * s * w, 1);
+  cap(spine, chest, 0.135 * s * w, 0.125 * s * w, 1);
+  cap(shL, shR, 0.075 * s * w, null, 1);
+  cap(chest, neck, 0.05 * s, 0.045 * s, 0);
+  cap(shL, elL, 0.055 * s * w, 0.047 * s * w, 1); cap(shR, elR, 0.055 * s * w, 0.047 * s * w, 1);
+  cap(elL, wrL, 0.042 * s, 0.034 * s, 0); cap(elR, wrR, 0.042 * s, 0.034 * s, 0);
+  cap(wrL, haL, 0.036 * s, 0.03 * s, 0); cap(wrR, haR, 0.036 * s, 0.03 * s, 0);
+  cap(hipL, knL, 0.08 * s * w, 0.06 * s * w, 2); cap(hipR, knR, 0.08 * s * w, 0.06 * s * w, 2);
+  cap(knL, anL, 0.058 * s, 0.045 * s, 2); cap(knR, anR, 0.058 * s, 0.045 * s, 2);
+  cap(anL, toeL, 0.048 * s, 0.042 * s, 3); cap(anR, toeR, 0.048 * s, 0.042 * s, 3);
+  // head, nose, hair, hat
+  const hu = norm(sub(head, neck)), hf = norm(sub(nose, head));
+  cap(madd(head, hu, -0.02 * s), madd(head, hu, 0.02 * s), 0.105 * s, null, 0);
+  cap(madd(head, hf, 0.095 * s), madd(madd(head, hf, 0.115 * s), hu, -0.02 * s), 0.02 * s, 0.018 * s, 0);
+  const style = look ? look.hairStyle : 'short';
+  if (style !== 'bald') cap(madd(madd(head, hu, 0.035 * s), hf, -0.015 * s), madd(madd(head, hu, -0.01 * s), hf, -0.045 * s), 0.108 * s, 0.1 * s, 4);
+  if (style === 'long') cap(madd(head, hf, -0.06 * s), madd(madd(neck, hf, -0.07 * s), hu, -0.12 * s), 0.08 * s, 0.06 * s, 4);
+  if (style === 'pony') cap(madd(madd(head, hf, -0.1 * s), hu, 0.02 * s), madd(madd(head, hf, -0.16 * s), hu, -0.2 * s), 0.03 * s, 0.022 * s, 4);
+  if (style === 'bun') cap(madd(madd(head, hf, -0.08 * s), hu, 0.09 * s), madd(madd(head, hf, -0.1 * s), hu, 0.1 * s), 0.05 * s, null, 4);
+  if (look && look.beard) cap(madd(madd(head, hf, 0.07 * s), hu, -0.07 * s), madd(madd(head, hf, 0.02 * s), hu, -0.1 * s), 0.05 * s, 0.045 * s, 4);
+  if (look && look.hat) { cap(madd(head, hu, 0.07 * s), madd(head, hu, 0.13 * s), 0.11 * s, 0.1 * s, 5); cap(madd(madd(head, hu, 0.07 * s), hf, -0.12 * s), madd(madd(head, hu, 0.07 * s), hf, 0.16 * s), 0.035 * s, null, 5); }
+  // the tool in hand
+  const act = rig.act;
+  const tool = act === 'chop' ? 'axe' : act === 'mine' ? 'pick' : act === 'build' ? 'hammer' : act === 'fish' ? 'spear' : null;
+  if (tool) {
+    const two = act === 'chop' || act === 'mine';
+    let dir = two ? sub(haR, haL) : norm(sub(haR, wrR));
+    if (vlen(dir) < 1e-3) dir = sub(haR, wrR);
+    dir = norm(dir);
+    const len = tool === 'spear' ? 1.6 : tool === 'hammer' ? 0.35 : 0.8;
+    const butt = madd(two ? haL : haR, dir, two ? -0.12 : -0.08), tip = madd(two ? haL : haR, dir, len * s);
+    cap(butt, tip, 0.018 * s, null, 6);
+    const side = norm(cross(dir, UP));
+    if (tool === 'axe') cap(madd(tip, side, -0.02), madd(madd(tip, side, 0.12 * s), dir, -0.04), 0.035 * s, 0.025 * s, 7);
+    else if (tool === 'pick') cap(madd(madd(tip, side, -0.16 * s), dir, -0.03), madd(madd(tip, side, 0.16 * s), dir, -0.03), 0.02 * s, 0.012 * s, 7);
+    else if (tool === 'hammer') cap(madd(tip, side, -0.05 * s), madd(tip, side, 0.05 * s), 0.03 * s, null, 7);
+    else cap(tip, madd(tip, dir, 0.12 * s), 0.02 * s, 0.004, 7);
+  }
+  return out;
+}
+hand = (rig, right) => rig.J[right ? 12 : 8];
+headOf = (rig) => rig.J[4];
+
+}
 /* ===== render.js ===== */
-// render.js — placeholder (filled in a later task)
+{
+// render.js — hand-written WebGL2, deliberately blocky for this draft (CD: "rudimentary,
+// like Minecraft for now"). Terrain is flat-shaded 2 m cells over the same heightfield the
+// settlers walk on; everything else is instanced boxes, and settlers are instanced capsules
+// over their rigs (the Combat Simulator approach). It only reads the simulation.
 
+const VS_TERRAIN = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC;
+uniform mat4 uVP; out vec3 vW, vN, vC;
+void main(){ vW = aPos; vN = aN; vC = aC; gl_Position = uVP * vec4(aPos, 1.0); }`;
+const LIGHT = `
+uniform vec3 uSun, uSunCol, uAmbSky, uAmbGround, uFog, uEye, uFire; uniform float uFogD, uFireI, uTime;
+vec3 light(vec3 W, vec3 N, vec3 alb){
+  float d = max(dot(N, uSun), 0.0);
+  vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5);
+  vec3 c = alb * (amb + uSunCol * d);
+  vec3 fl = uFire - W; float fd = length(fl);
+  float fi = uFireI * (0.85 + 0.15 * sin(uTime * 13.0) * sin(uTime * 7.3)) / (1.0 + fd * fd * 0.02);
+  c += alb * vec3(1.0, 0.55, 0.22) * fi * max(dot(N, fl / max(fd, 0.01)), 0.0);
+  float f = 1.0 - exp(-length(W - uEye) / uFogD);
+  return mix(c, uFog, clamp(f, 0.0, 0.8));
+}`;
+const FS_TERRAIN = `#version 300 es
+precision highp float;
+in vec3 vW, vN, vC; out vec4 o;
+${LIGHT}
+void main(){ vec3 c = light(vW, normalize(vN), pow(vC, vec3(2.2))); o = vec4(pow(c, vec3(1.0/2.2)), 1.0); }`;
+const VS_BOX = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in vec3 aN;
+layout(location=2) in vec4 iP; layout(location=3) in vec3 iS; layout(location=4) in vec4 iC;
+uniform mat4 uVP; out vec3 vW, vN, vC; out float vE;
+void main(){
+  float cy = cos(iP.w), sy = sin(iP.w), cp = cos(iC.w), sp = sin(iC.w);
+  vec3 p = aPos * iS; vec3 n = aN;
+  p = vec3(p.x * cp - p.y * sp, p.x * sp + p.y * cp, p.z); n = vec3(n.x * cp - n.y * sp, n.x * sp + n.y * cp, n.z);
+  p = vec3(p.x * cy - p.z * sy, p.y, p.x * sy + p.z * cy); n = vec3(n.x * cy - n.z * sy, n.y, n.x * sy + n.z * cy);
+  vW = p + iP.xyz; vN = n; vC = abs(iC.rgb); vE = iC.r < 0.0 ? 1.0 : 0.0;
+  gl_Position = uVP * vec4(vW, 1.0);
+}`;
+const FS_BOX = `#version 300 es
+precision highp float;
+in vec3 vW, vN, vC; in float vE; out vec4 o;
+${LIGHT}
+void main(){ vec3 c = vE > 0.5 ? vC * (0.8 + 0.2 * sin(uTime * 17.0 + vW.y * 9.0)) : light(vW, normalize(vN), pow(vC, vec3(2.2))); o = vec4(pow(c, vec3(1.0/2.2)), 1.0); }`;
+const VS_CAP = `#version 300 es
+layout(location=0) in vec3 aDir; layout(location=1) in float aEnd;
+layout(location=2) in vec3 iA; layout(location=3) in vec3 iB; layout(location=4) in vec2 iR; layout(location=5) in vec3 iC;
+uniform mat4 uVP; out vec3 vW, vN, vC;
+void main(){
+  vec3 ax = iB - iA; float L = length(ax); ax = L > 1e-5 ? ax / L : vec3(0.0, 1.0, 0.0);
+  vec3 t = abs(ax.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+  vec3 u = normalize(cross(t, ax)), v = cross(ax, u);
+  vec3 n = u * aDir.x + ax * aDir.y + v * aDir.z;
+  vec3 w = mix(iA, iB, aEnd) + n * mix(iR.x, iR.y, aEnd);
+  vW = w; vN = n; vC = iC; gl_Position = uVP * vec4(w, 1.0);
+}`;
+const FS_CAP = `#version 300 es
+precision highp float;
+in vec3 vW, vN, vC; out vec4 o;
+${LIGHT}
+void main(){ vec3 N = normalize(vN); vec3 c = light(vW, N, vC); c += vec3(0.12, 0.13, 0.16) * pow(1.0 - max(dot(N, normalize(uEye - vW)), 0.0), 3.0); o = vec4(pow(c, vec3(1.0/2.2)), 1.0); }`;
+const VS_WATER = `#version 300 es
+layout(location=0) in vec3 aPos; layout(location=1) in float aK;
+uniform mat4 uVP; uniform float uTime; out vec3 vW; out float vK;
+void main(){ vec3 p = aPos; if (aK < 0.5) p.y += 0.05 * sin(p.x * 0.11 + uTime * 0.9) * cos(p.z * 0.13 + uTime * 0.7); vW = p; vK = aK; gl_Position = uVP * vec4(p, 1.0); }`;
+const FS_WATER = `#version 300 es
+precision highp float;
+in vec3 vW; in float vK; out vec4 o;
+${LIGHT}
+uniform sampler2D uDepth; uniform vec4 uMap;
+void main(){
+  vec2 uv = (vW.xz - uMap.xy) / uMap.zw; float ground = texture(uDepth, uv).r * 60.0 - 30.0;
+  float depth = max(vW.y - ground, 0.0);
+  vec3 deep = vec3(0.03, 0.18, 0.32), shallow = vec3(0.18, 0.55, 0.6);
+  if (vK > 1.5) { // the falls
+    float s = fract(vW.y * 0.6 + uTime * 2.6 + sin(vW.x * 3.0) * 0.3);
+    vec3 c = mix(vec3(0.75, 0.88, 0.95), vec3(0.95), step(0.6, s));
+    o = vec4(pow(light(vW, vec3(0.0, 0.3, 1.0), c), vec3(1.0/2.2)), 0.85); return;
+  }
+  vec3 V = normalize(uEye - vW);
+  float fres = pow(1.0 - max(V.y, 0.0), 3.0);
+  vec3 c = mix(shallow, deep, clamp(depth / 6.0, 0.0, 1.0));
+  vec3 N = normalize(vec3(0.04 * sin(vW.x * 0.7 + uTime * 1.3), 1.0, 0.04 * cos(vW.z * 0.6 + uTime * 1.1)));
+  float sp = pow(max(dot(reflect(-uSun, N), V), 0.0), 80.0);
+  c = light(vW, N, c) + uSunCol * sp * 0.8 + uAmbSky * fres * 0.4;
+  float foam = smoothstep(0.35, 0.0, depth) * (0.5 + 0.5 * sin(uTime * 2.0 + vW.x * 0.5 + vW.z * 0.3));
+  c = mix(c, vec3(0.9), foam * 0.5);
+  o = vec4(pow(c, vec3(1.0/2.2)), clamp(0.55 + depth * 0.15 + fres * 0.3, 0.0, 0.94));
+}`;
+const VS_SKY = `#version 300 es
+layout(location=0) in vec2 aP; out vec2 vP; void main(){ vP = aP; gl_Position = vec4(aP, 0.9999, 1.0); }`;
+const FS_SKY = `#version 300 es
+precision highp float;
+in vec2 vP; out vec4 o; uniform mat4 uInvVP; uniform vec3 uSun, uTop, uHor, uSunCol; uniform float uNight;
+void main(){
+  vec4 p = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(p.xyz / p.w);
+  vec3 c = mix(uHor, uTop, pow(max(d.y, 0.0), 0.6));
+  float s = max(dot(d, uSun), 0.0);
+  c += uSunCol * (pow(s, 900.0) * 6.0 + pow(s, 12.0) * 0.25);
+  if (uNight > 0.3) { vec2 g = floor(d.xz / max(d.y, 0.05) * 90.0); float h = fract(sin(dot(g, vec2(12.9898, 78.233))) * 43758.5); c += vec3(step(0.997, h) * uNight * smoothstep(0.0, 0.3, d.y)); }
+  o = vec4(pow(c, vec3(1.0/2.2)), 1.0);
+}`;
+const VS_DISC = `#version 300 es
+layout(location=0) in vec2 aP; layout(location=1) in vec4 iD; layout(location=2) in vec4 iC;
+uniform mat4 uVP; out vec2 vP; out vec4 vC;
+void main(){ vP = aP; vC = iC; vec3 w = vec3(iD.x + aP.x * iD.w, iD.y, iD.z + aP.y * iD.w); gl_Position = uVP * vec4(w, 1.0); }`;
+const FS_DISC = `#version 300 es
+precision highp float;
+in vec2 vP; in vec4 vC; out vec4 o;
+void main(){ float r = length(vP); if (r > 1.0) discard;
+  float a = vC.a > 0.0 ? (1.0 - smoothstep(0.3, 1.0, r)) * vC.a : smoothstep(0.78, 0.86, r) * (1.0 - smoothstep(0.92, 1.0, r)) * -vC.a;
+  o = vec4(vC.rgb, a); }`;
+
+/* ------------------------------ math ------------------------------ */
+function persp(fov, asp, n, f) { const t = 1 / Math.tan(fov / 2); return [t / asp, 0, 0, 0, 0, t, 0, 0, 0, 0, (f + n) / (n - f), -1, 0, 0, 2 * f * n / (n - f), 0]; }
+function lookAt(e, c) {
+  let zx = e[0] - c[0], zy = e[1] - c[1], zz = e[2] - c[2]; let l = Math.hypot(zx, zy, zz); zx /= l; zy /= l; zz /= l;
+  let xx = zz, xy = 0, xz = -zx; l = Math.hypot(xx, xz) || 1; xx /= l; xz /= l;
+  const yx = zy * xz - zz * xy, yy = zz * xx - zx * xz, yz = zx * xy - zy * xx;
+  return [xx, yx, zx, 0, xy, yy, zy, 0, xz, yz, zz, 0, -(xx * e[0] + xy * e[1] + xz * e[2]), -(yx * e[0] + yy * e[1] + yz * e[2]), -(zx * e[0] + zy * e[1] + zz * e[2]), 1];
+}
+function mmul(a, b) { const o = new Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += a[k * 4 + r] * b[c * 4 + k]; o[c * 4 + r] = s; } return o; }
+function inv(m) {
+  const a = m, o = new Array(16);
+  const b00 = a[0] * a[5] - a[1] * a[4], b01 = a[0] * a[6] - a[2] * a[4], b02 = a[0] * a[7] - a[3] * a[4], b03 = a[1] * a[6] - a[2] * a[5], b04 = a[1] * a[7] - a[3] * a[5], b05 = a[2] * a[7] - a[3] * a[6];
+  const b06 = a[8] * a[13] - a[9] * a[12], b07 = a[8] * a[14] - a[10] * a[12], b08 = a[8] * a[15] - a[11] * a[12], b09 = a[9] * a[14] - a[10] * a[13], b10 = a[9] * a[15] - a[11] * a[13], b11 = a[10] * a[15] - a[11] * a[14];
+  const d = 1 / (b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06);
+  o[0] = (a[5] * b11 - a[6] * b10 + a[7] * b09) * d; o[1] = (a[2] * b10 - a[1] * b11 - a[3] * b09) * d; o[2] = (a[13] * b05 - a[14] * b04 + a[15] * b03) * d; o[3] = (a[10] * b04 - a[9] * b05 - a[11] * b03) * d;
+  o[4] = (a[6] * b08 - a[4] * b11 - a[7] * b07) * d; o[5] = (a[0] * b11 - a[2] * b08 + a[3] * b07) * d; o[6] = (a[14] * b02 - a[12] * b05 - a[15] * b01) * d; o[7] = (a[8] * b05 - a[10] * b02 + a[11] * b01) * d;
+  o[8] = (a[4] * b10 - a[5] * b08 + a[7] * b06) * d; o[9] = (a[1] * b08 - a[0] * b10 - a[3] * b06) * d; o[10] = (a[12] * b04 - a[13] * b02 + a[15] * b00) * d; o[11] = (a[9] * b02 - a[8] * b04 - a[11] * b00) * d;
+  o[12] = (a[5] * b07 - a[4] * b09 - a[6] * b06) * d; o[13] = (a[0] * b09 - a[1] * b07 + a[2] * b06) * d; o[14] = (a[13] * b01 - a[12] * b03 - a[15] * b00) * d; o[15] = (a[8] * b03 - a[9] * b01 + a[10] * b00) * d;
+  return o;
+}
+const hex = (h) => { const n = parseInt(h.slice(1), 16); return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255].map((v) => Math.pow(v, 2.2)); };
+const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const COVER_COL = { 0: [0.32, 0.30, 0.22], 1: [0.86, 0.79, 0.55], 2: [0.48, 0.46, 0.43], 3: [0.36, 0.58, 0.22], 4: [0.2, 0.38, 0.14], 5: [0.42, 0.38, 0.35], 6: [0.5, 0.45, 0.3], 7: [0.5, 0.45, 0.3] };
+
+/* ------------------------------ the renderer ------------------------------ */
+makeRenderer = function makeRenderer(canvas, isl) {
+  const gl = canvas.getContext('webgl2', { antialias: true, alpha: false });
+  if (!gl) return null;
+  const prog = (vs, fs) => {
+    const p = gl.createProgram();
+    for (const [t, src] of [[gl.VERTEX_SHADER, vs], [gl.FRAGMENT_SHADER, fs]]) {
+      const sh = gl.createShader(t); gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+      gl.attachShader(p, sh);
+    }
+    gl.linkProgram(p); if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p));
+    const U = {}; const n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+    for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(p, i); U[u.name] = gl.getUniformLocation(p, u.name); }
+    return { p, U };
+  };
+  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), sky: prog(VS_SKY, FS_SKY), disc: prog(VS_DISC, FS_DISC) };
+
+  /* terrain: one flat-shaded quad per 2 m cell, coloured by land cover */
+  const W = isl.W, H = isl.H, C = isl.CELL;
+  const cellY = (cx, cz) => isl.h[Math.min(H - 1, Math.max(0, cz)) * W + Math.min(W - 1, Math.max(0, cx))];
+  const cornerY = (x, z) => (cellY(x - 1, z - 1) + cellY(x, z - 1) + cellY(x - 1, z) + cellY(x, z)) / 4;
+  const pos = [], nor = [], col = [], idx = [];
+  let vi = 0;
+  for (let cz = 0; cz < H; cz++) for (let cx = 0; cx < W; cx++) {
+    const y00 = cornerY(cx, cz), y10 = cornerY(cx + 1, cz), y01 = cornerY(cx, cz + 1), y11 = cornerY(cx + 1, cz + 1);
+    if (Math.max(y00, y10, y01, y11) < -4) continue;
+    const k = isl.cover[cz * W + cx], h = isl.h[cz * W + cx];
+    let c = COVER_COL[k];
+    if (k === COVER.SEA || h < 0.4) c = mix3(COVER_COL[1], [0.4, 0.38, 0.3], Math.min(1, -h / 4));
+    if (k === COVER.GRASS && h > 22) c = mix3(c, [0.42, 0.5, 0.28], Math.min(1, (h - 22) / 20));
+    const j = 0.94 + 0.12 * (((cx * 73856093) ^ (cz * 19349663)) % 1000 / 1000);
+    const x0 = cx * C, z0 = cz * C, x1 = x0 + C, z1 = z0 + C;
+    const ux = C, uy = y10 - y00, vx = C, vy = y01 - y00;
+    let nx = -uy * C, ny = C * C, nz = -vy * C; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+    pos.push(x0, y00, z0, x1, y10, z0, x0, y01, z1, x1, y11, z1);
+    for (let q = 0; q < 4; q++) { nor.push(nx * 127, ny * 127, nz * 127); col.push(Math.min(255, c[0] * j * 255), Math.min(255, c[1] * j * 255), Math.min(255, c[2] * j * 255)); }
+    idx.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3); vi += 4;
+  }
+  const tVAO = gl.createVertexArray(); gl.bindVertexArray(tVAO);
+  const buf = (data, loc, size, type, normd) => { const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, type, normd, 0, 0); return b; };
+  buf(new Float32Array(pos), 0, 3, gl.FLOAT, false); buf(new Int8Array(nor), 1, 3, gl.BYTE, true); buf(new Uint8Array(col), 2, 3, gl.UNSIGNED_BYTE, true);
+  const tIdx = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, tIdx); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint32Array(idx), gl.STATIC_DRAW);
+  const tCount = idx.length;
+
+  /* a depth map of the sea floor for water colour */
+  const dpx = new Uint8Array(W * H); for (let i = 0; i < W * H; i++) dpx[i] = Math.max(0, Math.min(255, (isl.h[i] + 30) / 60 * 255));
+  const dTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, dTex);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, W, H, 0, gl.RED, gl.UNSIGNED_BYTE, dpx);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+  /* water: the sea plane, the pond and river cells, the falls */
+  const wp = [], wk = [];
+  const quad = (x0, z0, x1, z1, y, k) => { wp.push(x0, y, z0, x1, y, z0, x0, y, z1, x1, y, z0, x1, y, z1, x0, y, z1); for (let i = 0; i < 6; i++) wk.push(k); };
+  quad(-3000, -3000, 4000, 3700, 0, 0);
+  const pondY = isl.falls.bottom.y + 0.1;
+  for (let cz = 0; cz < H; cz++) for (let cx = 0; cx < W; cx++) {
+    const k = isl.cover[cz * W + cx]; if (k !== COVER.POND && k !== COVER.RIVER) continue;
+    const y = k === COVER.POND ? pondY : Math.max(0.05, isl.h[cz * W + cx] + 0.45);
+    quad(cx * C, cz * C, cx * C + C, cz * C + C, y, 1);
+  }
+  { // the falls: a curtain from the lip to the pond
+    const t = isl.falls.top, b = isl.falls.bottom, dx = t.x - b.x, dz = t.z - b.z, L = Math.hypot(dx, dz) || 1, sx = -dz / L * 2.2, sz = dx / L * 2.2;
+    const lip = { x: b.x + dx / L * 4, z: b.z + dz / L * 4 };
+    const v = [[lip.x - sx, t.y + 0.4, lip.z - sz], [lip.x + sx, t.y + 0.4, lip.z + sz], [b.x - sx * 1.2, b.y, b.z - sz * 1.2], [b.x + sx * 1.2, b.y, b.z + sz * 1.2]];
+    for (const q of [0, 2, 1, 1, 2, 3]) { wp.push(...v[q]); wk.push(2); }
+  }
+  const wVAO = gl.createVertexArray(); gl.bindVertexArray(wVAO);
+  buf(new Float32Array(wp), 0, 3, gl.FLOAT, false); buf(new Float32Array(wk), 1, 1, gl.FLOAT, false);
+  const wCount = wp.length / 3;
+
+  /* sky quad */
+  const sVAO = gl.createVertexArray(); gl.bindVertexArray(sVAO); buf(new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), 0, 2, gl.FLOAT, false);
+
+  /* instanced boxes */
+  const cube = [];
+  const F = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [-1, 0, 0], [0, 0, 1], [0, 0, -1]];
+  for (const n of F) {
+    const a = n[0] ? [0, 1, 0] : [1, 0, 0], b = [n[1] * a[2] - n[2] * a[1], n[2] * a[0] - n[0] * a[2], n[0] * a[1] - n[1] * a[0]];
+    const c = (s, t) => [n[0] * 0.5 + a[0] * s + b[0] * t, n[1] * 0.5 + a[1] * s + b[1] * t + 0.5, n[2] * 0.5 + a[2] * s + b[2] * t];
+    for (const [s, t] of [[-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, -0.5], [0.5, 0.5], [-0.5, 0.5]]) cube.push(...c(s, t), ...n);
+  }
+  const mkInst = (baseData, stride, layout, perVertex) => {
+    const vao = gl.createVertexArray(); gl.bindVertexArray(vao);
+    const vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(baseData), gl.STATIC_DRAW);
+    let off = 0; for (const [loc, size] of perVertex) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, perVertex.reduce((a, b) => a + b[1], 0) * 4, off); off += size * 4; }
+    const ib = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, ib);
+    off = 0; for (const [loc, size] of layout) { gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride * 4, off); gl.vertexAttribDivisor(loc, 1); off += size * 4; }
+    return { vao, ib, n: 0, verts: baseData.length / perVertex.reduce((a, b) => a + b[1], 0) };
+  };
+  const boxStatic = mkInst(cube, 11, [[2, 4], [3, 3], [4, 4]], [[0, 3], [1, 3]]);
+  const boxDyn = mkInst(cube, 11, [[2, 4], [3, 3], [4, 4]], [[0, 3], [1, 3]]);
+  // capsule mesh: a unit sphere split into two hemispheres
+  const sph = []; const SEG = 12, RING = 8;
+  const sv = (i, j) => { const th = i / SEG * Math.PI * 2, ph = j / RING * Math.PI; return [Math.sin(ph) * Math.cos(th), Math.cos(ph), Math.sin(ph) * Math.sin(th)]; };
+  for (let j = 0; j < RING; j++) for (let i = 0; i < SEG; i++) {
+    const q = [sv(i, j), sv(i + 1, j), sv(i, j + 1), sv(i + 1, j), sv(i + 1, j + 1), sv(i, j + 1)];
+    const end = j < RING / 2 ? 1 : 0;
+    for (const p of q) sph.push(p[0], p[1], p[2], end);
+  }
+  // the cylinder between the two hemispheres: equator at end 0 joined to equator at end 1
+  for (let i = 0; i < SEG; i++) {
+    const a0 = sv(i, RING / 2), a1 = sv(i + 1, RING / 2);
+    for (const [p, e] of [[a0, 0], [a1, 0], [a0, 1], [a1, 0], [a1, 1], [a0, 1]]) sph.push(p[0], p[1], p[2], e);
+  }
+  const capI = mkInst(sph, 11, [[2, 3], [3, 3], [4, 2], [5, 3]], [[0, 3], [1, 1]]);
+  const discI = mkInst([-1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1], 8, [[1, 4], [2, 4]], [[0, 2]]);
+
+  /* static scenery: trees, rocks, bushes. Rebuilt when the world changes. */
+  let staticSig = '';
+  const S = [];
+  const box = (arr, x, y, z, sx, sy, sz, yaw, c, pitch = 0) => arr.push(x, y, z, yaw || 0, sx, sy, sz, c[0], c[1], c[2], pitch);
+  function buildStatic(sim) {
+    S.length = 0;
+    const W2 = sim ? sim.world : { felled: {}, rocks: {}, bushes: {} };
+    for (const t of isl.trees) {
+      const y = heightAt(isl, t.x, t.z), j = (t.id * 2654435761 % 1000) / 1000;
+      if (W2.felled[t.id]) { box(S, t.x, y - 0.1, t.z, 0.45, 0.5, 0.45, j, [0.35, 0.24, 0.13]); continue; }
+      if (t.kind === 'palm') {
+        box(S, t.x, y, t.z, 0.28, t.h, 0.28, j, [0.42, 0.32, 0.2]);
+        for (let k = 0; k < 4; k++) box(S, t.x + Math.cos(k * 1.57 + j) * 1.1, y + t.h - 0.2, t.z + Math.sin(k * 1.57 + j) * 1.1, 2.6, 0.18, 0.7, k * 1.57 + j, [0.25, 0.5, 0.16], -0.25);
+      } else if (t.kind === 'pine') {
+        box(S, t.x, y, t.z, 0.35, t.h * 0.4, 0.35, j, [0.36, 0.25, 0.15]);
+        for (let k = 0; k < 3; k++) { const w = 3.2 - k * 0.9; box(S, t.x, y + t.h * 0.3 + k * t.h * 0.22, t.z, w, t.h * 0.26, w, j + k * 0.4, [0.1 + 0.02 * k, 0.28 + 0.04 * j, 0.14]); }
+      } else {
+        box(S, t.x, y, t.z, 0.45, t.h * 0.55, 0.45, j, [0.38, 0.27, 0.15]);
+        box(S, t.x, y + t.h * 0.45, t.z, 3.6 + j, t.h * 0.45, 3.6 + j, j, [0.18 + 0.06 * j, 0.36 + 0.08 * j, 0.12]);
+        box(S, t.x + 0.6, y + t.h * 0.75, t.z - 0.4, 2.4, t.h * 0.3, 2.4, j + 0.7, [0.22 + 0.05 * j, 0.42, 0.15]);
+      }
+    }
+    for (const r of isl.rocks) {
+      const left = W2.rocks[r.id] ?? r.n; if (left <= 0) continue;
+      const y = heightAt(isl, r.x, r.z), sc = r.s * (0.6 + 0.4 * left / r.n);
+      box(S, r.x, y - 0.1, r.z, sc * 1.6, sc * 1.1, sc * 1.3, r.id, [0.5, 0.49, 0.46]);
+    }
+    for (const b of isl.bushes) {
+      const y = heightAt(isl, b.x, b.z), n = W2.bushes[b.id] ?? b.berries;
+      box(S, b.x, y, b.z, 1.4, 0.9, 1.4, b.id, [0.16, 0.34, 0.12]);
+      for (let k = 0; k < Math.min(6, n); k++) box(S, b.x + Math.cos(k * 2.1 + b.id) * 0.55, y + 0.5 + (k % 3) * 0.12, b.z + Math.sin(k * 2.1 + b.id) * 0.55, 0.16, 0.16, 0.16, 0, [0.7, 0.05, 0.12]);
+    }
+    gl.bindBuffer(gl.ARRAY_BUFFER, boxStatic.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(S), gl.STATIC_DRAW);
+    boxStatic.n = S.length / 11;
+  }
+  buildStatic(null);
+
+  /* camera */
+  const cam = { tx: isl.camp.x, ty: heightAt(isl, isl.camp.x, isl.camp.z), tz: isl.camp.z, yaw: Math.atan2(isl.camp.z - isl.landing.z, isl.camp.x - isl.landing.x) + Math.PI, pitch: 0.55, dist: 60, fly: null };
+  let VP = null, invVP = null, eye = [0, 0, 0], vw = 1, vh = 1;
+
+  function sunAt(hour) {
+    const a = (hour - 6) / 12 * Math.PI;
+    const el = Math.sin(a) * 1.05, az = a;
+    const fwd = { x: isl.camp.x - isl.landing.x, z: isl.camp.z - isl.landing.z };
+    const L = Math.hypot(fwd.x, fwd.z), rx = -fwd.z / L, rz = fwd.x / L;
+    const d = [Math.cos(az) * rx * Math.cos(Math.max(el, -0.3)), Math.sin(el), Math.cos(az) * rz * Math.cos(Math.max(el, -0.3))];
+    const l = Math.hypot(...d); return [d[0] / l, d[1] / l, d[2] / l];
+  }
+  function palette(hour) {
+    const sun = sunAt(hour), up = sun[1];
+    const day = Math.max(0, Math.min(1, (up + 0.08) / 0.35)), dusk = Math.max(0, 1 - Math.abs(up - 0.05) / 0.22);
+    const top = mix3(mix3([0.01, 0.015, 0.05], [0.22, 0.45, 0.85], day), [0.35, 0.25, 0.4], dusk * 0.4);
+    const hor = mix3(mix3([0.03, 0.04, 0.09], [0.62, 0.76, 0.92], day), [0.98, 0.55, 0.32], dusk * 0.7);
+    const sunCol = mix3([0, 0, 0], mix3([1.0, 0.94, 0.85], [1.0, 0.5, 0.25], dusk), day).map((v) => v * 1.25);
+    const ambSky = mix3([0.03, 0.04, 0.09], [0.32, 0.38, 0.48], day), ambGround = mix3([0.02, 0.02, 0.03], [0.2, 0.18, 0.14], day);
+    const moonLit = 1 - day;
+    return { sun: up > -0.05 ? sun : [-sun[0] * 0.5, 0.6, -sun[2] * 0.5].map((v, i, a) => v / Math.hypot(...a)), sunCol: up > -0.05 ? sunCol : [0.07 * moonLit, 0.09 * moonLit, 0.16 * moonLit], ambSky, ambGround, top, hor, night: 1 - day };
+  }
+
+  function setCommon(pg, U, pal, t, fire) {
+    gl.uniformMatrix4fv(U.uVP, false, VP);
+    if (U.uSun) gl.uniform3fv(U.uSun, pal.sun);
+    if (U.uSunCol) gl.uniform3fv(U.uSunCol, pal.sunCol);
+    if (U.uAmbSky) gl.uniform3fv(U.uAmbSky, pal.ambSky);
+    if (U.uAmbGround) gl.uniform3fv(U.uAmbGround, pal.ambGround);
+    if (U.uFog) gl.uniform3fv(U.uFog, pal.hor);
+    if (U.uFogD) gl.uniform1f(U.uFogD, 2200);
+    if (U.uEye) gl.uniform3fv(U.uEye, eye);
+    if (U.uTime) gl.uniform1f(U.uTime, t);
+    if (U.uFire) gl.uniform3fv(U.uFire, fire.p);
+    if (U.uFireI) gl.uniform1f(U.uFireI, fire.i);
+  }
+
+  const dyn = [], caps = [], discs = [];
+  function frame(sim, rigs, capsOf, t, opts = {}) {
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const cw = Math.floor(canvas.clientWidth * dpr), ch = Math.floor(canvas.clientHeight * dpr);
+    if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
+    vw = canvas.clientWidth; vh = canvas.clientHeight;
+    gl.viewport(0, 0, cw, ch);
+    const sig = Object.keys(sim.world.felled).length + ':' + JSON.stringify(sim.world.rocks).length + ':' + Object.values(sim.world.bushes).reduce((a, b) => a + b, 0);
+    if (sig !== staticSig) { staticSig = sig; buildStatic(sim); }
+    // camera
+    if (cam.fly) { const k = Math.min(1, cam.fly.k += 0.06); const e = k * k * (3 - 2 * k); for (const f of ['tx', 'ty', 'tz', 'dist']) cam[f] = cam.fly.from[f] + (cam.fly.to[f] - cam.fly.from[f]) * e; if (k >= 1) cam.fly = null; }
+    const ground = heightAt(isl, cam.tx, cam.tz);
+    const cp = Math.cos(cam.pitch), ex = cam.tx + Math.cos(cam.yaw) * cp * cam.dist, ez = cam.tz + Math.sin(cam.yaw) * cp * cam.dist;
+    let ey = cam.ty + Math.sin(cam.pitch) * cam.dist; ey = Math.max(ey, heightAt(isl, ex, ez) + 1.2, 0.8);
+    eye = [ex, ey, ez];
+    VP = mmul(persp(0.9, vw / vh, 0.25, 4000), lookAt(eye, [cam.tx, cam.ty, cam.tz]));
+    invVP = inv(VP);
+    const hour = (sim.t % 86400) / 3600, pal = palette(hour);
+    const fireSite = sim.sites.find((x) => x.type === 'campfire' && x.done);
+    const fire = { p: fireSite ? [fireSite.x, heightAt(isl, fireSite.x, fireSite.z) + 0.8, fireSite.z] : [0, -999, 0], i: fireSite ? 1.2 + pal.night * 6 : 0 };
+
+    gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
+    gl.clearColor(...pal.hor.map((v) => Math.pow(v, 1 / 2.2)), 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    // sky
+    gl.disable(gl.DEPTH_TEST); gl.useProgram(P.sky.p);
+    gl.uniformMatrix4fv(P.sky.U.uInvVP, false, invVP); gl.uniform3fv(P.sky.U.uSun, pal.sun); gl.uniform3fv(P.sky.U.uTop, pal.top); gl.uniform3fv(P.sky.U.uHor, pal.hor); gl.uniform3fv(P.sky.U.uSunCol, pal.sunCol); gl.uniform1f(P.sky.U.uNight, pal.night);
+    gl.bindVertexArray(sVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+    gl.enable(gl.DEPTH_TEST);
+    // terrain
+    gl.disable(gl.CULL_FACE);
+    gl.useProgram(P.terrain.p); setCommon(P.terrain, P.terrain.U, pal, t, fire);
+    gl.bindVertexArray(tVAO); gl.drawElements(gl.TRIANGLES, tCount, gl.UNSIGNED_INT, 0);
+    // scenery and buildings
+    gl.useProgram(P.box.p); setCommon(P.box, P.box.U, pal, t, fire);
+    gl.disable(gl.CULL_FACE);
+    gl.bindVertexArray(boxStatic.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, boxStatic.n);
+    dyn.length = 0; buildDynamic(sim, rigs, t, pal);
+    gl.bindBuffer(gl.ARRAY_BUFFER, boxDyn.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dyn), gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(boxDyn.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, dyn.length / 11);
+    // settlers
+    caps.length = 0;
+    for (let i = 0; i < rigs.length; i++) { const arr = capsOf(i); for (let k = 0; k < arr.length; k += 9) caps.push(arr[k], arr[k + 1], arr[k + 2], arr[k + 3], arr[k + 4], arr[k + 5], arr[k + 6], arr[k + 7], ...opts.colors[i][arr[k + 8]]); }
+    gl.useProgram(P.cap.p); setCommon(P.cap, P.cap.U, pal, t, fire);
+    gl.bindBuffer(gl.ARRAY_BUFFER, capI.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(caps), gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(capI.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, capI.verts, caps.length / 11);
+    // water (blended)
+    gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
+    gl.useProgram(P.water.p); setCommon(P.water, P.water.U, pal, t, fire);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, dTex); gl.uniform1i(P.water.U.uDepth, 0); gl.uniform4f(P.water.U.uMap, 0, 0, W * C, H * C);
+    gl.bindVertexArray(wVAO); gl.drawArrays(gl.TRIANGLES, 0, wCount);
+    // shadows and the selection ring
+    discs.length = 0;
+    for (let i = 0; i < rigs.length; i++) { const r = rigs[i], p = r.J[0]; discs.push(p.x, heightAt(isl, p.x, p.z) + 0.04, p.z, 0.5, 0, 0, 0, 0.45 * (1 - pal.night * 0.6)); if (opts.selected === i) discs.push(p.x, heightAt(isl, p.x, p.z) + 0.05, p.z, 0.85, 1, 0.82, 0.3, -0.95); }
+    gl.useProgram(P.disc.p); gl.uniformMatrix4fv(P.disc.U.uVP, false, VP);
+    gl.bindBuffer(gl.ARRAY_BUFFER, discI.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(discs), gl.DYNAMIC_DRAW);
+    gl.bindVertexArray(discI.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, discs.length / 8);
+    gl.depthMask(true); gl.disable(gl.BLEND);
+    return { night: pal.night };
+  }
+
+  /* buildings by stage, piles, carried loads, traps, the fire */
+  const WOOD = [0.52, 0.36, 0.2], LOG = [0.44, 0.3, 0.17], STONE = [0.52, 0.51, 0.48], THATCH = [0.66, 0.58, 0.32], CLOTH = [0.55, 0.45, 0.35];
+  function buildDynamic(sim, rigs, t) {
+    const L = sim.lay, fwd = L.fwd, right = L.right;
+    const local = (x, f, r, y, sx, sy, sz, c, pitch = 0, dyaw = 0) => {
+      const px = x.x + fwd.x * f + right.x * r, pz = x.z + fwd.z * f + right.z * r;
+      box(dyn, px, heightAt(isl, x.x, x.z) + y, pz, sx, sy, sz, (x.yaw == null ? L.yaw : x.yaw) + dyaw, c, pitch);
+    };
+    for (const x of sim.sites) {
+      const B = BUILDINGS[x.type], k = x.done ? 1 : x.prog / x.hours, [w, d, hgt] = B.size;
+      const fy = { ...x, yaw: Math.atan2(fwd.z, fwd.x) };
+      // materials waiting at the site
+      if (!x.done) {
+        for (let i = 0; i < Math.min(8, x.have.wood - Math.floor(k * x.need.wood)); i++) local(fy, -d / 2 - 1.2, -1 + (i % 4) * 0.5, 0.05 + Math.floor(i / 4) * 0.25, 1.6, 0.22, 0.22, LOG, 0, Math.PI / 2);
+        for (let i = 0; i < Math.min(6, x.have.stone - Math.floor(k * x.need.stone)); i++) local(fy, -d / 2 - 1.6, 1.2 + (i % 3) * 0.4, 0.0, 0.35, 0.28, 0.35, STONE);
+        if (k <= 0) { local(fy, 0, -w / 2, 0, 0.08, 0.5, 0.08, [0.8, 0.7, 0.4]); local(fy, 0, w / 2, 0, 0.08, 0.5, 0.08, [0.8, 0.7, 0.4]); continue; }
+      }
+      if (x.type === 'campfire') {
+        for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; local(fy, Math.cos(a) * 0.8, Math.sin(a) * 0.8, 0, 0.32, 0.24 * Math.min(1, k * 2), 0.32, STONE); }
+        if (k > 0.5) { local(fy, 0, 0, 0.05, 1.1, 0.16, 0.16, LOG, 0, 0.5); local(fy, 0, 0, 0.12, 1.1, 0.16, 0.16, LOG, 0, -0.6); }
+        if (x.done) for (let i = 0; i < 3; i++) { const fl = 0.5 + 0.25 * Math.sin(t * (7 + i) + i * 2); box(dyn, x.x + Math.sin(t * 3 + i) * 0.1, heightAt(isl, x.x, x.z) + 0.15, x.z + Math.cos(t * 2 + i) * 0.1, 0.35 - i * 0.08, fl + i * 0.1, 0.35 - i * 0.08, t + i, [-1.0, 0.45 + i * 0.15, 0.08]); }
+        continue;
+      }
+      if (x.type === 'bed') { local(fy, 0, 0, 0.0, d, 0.35 * Math.min(1, k * 2), w, WOOD); if (k > 0.6) local(fy, 0, 0, 0.35, d * 0.9, 0.12, w * 0.85, [0.5, 0.25, 0.22]); continue; }
+      // floor
+      local(fy, 0, 0, -0.05, d, 0.18 * Math.min(1, k * 4), w, WOOD);
+      const posts = Math.min(1, Math.max(0, (k - 0.15) / 0.2)), walls = Math.min(1, Math.max(0, (k - 0.35) / 0.35)), roof = Math.min(1, Math.max(0, (k - 0.7) / 0.3));
+      const ph = hgt * posts;
+      if (posts > 0) for (const [pf, pr] of [[-1, -1], [-1, 1], [1, -1], [1, 1]]) local(fy, pf * (d / 2 - 0.15), pr * (w / 2 - 0.15), 0.1, 0.2, ph, 0.2, WOOD);
+      const wallC = x.type === 'storage' || x.type === 'dryrack' || x.type === 'toolbench' ? null : WOOD;
+      if (walls > 0 && wallC && x.type !== 'leanto') {
+        const wh = (hgt - 0.3) * walls;
+        local(fy, d / 2 - 0.1, 0, 0.1, 0.14, wh, w, LOG);                 // back wall
+        local(fy, 0, -w / 2 + 0.1, 0.1, d, wh, 0.14, LOG); local(fy, 0, w / 2 - 0.1, 0.1, d, wh, 0.14, LOG);
+        local(fy, -d / 2 + 0.1, -w / 3, 0.1, 0.14, wh, w / 3, LOG); local(fy, -d / 2 + 0.1, w / 3, 0.1, 0.14, wh, w / 3, LOG); // a door in the front
+      }
+      if (x.type === 'leanto' && roof > 0) local(fy, 0, 0, hgt * 0.55, d * 1.1, 0.12, w * 1.05, THATCH, 0.55 * roof);
+      else if (roof > 0 && wallC) { local(fy, -d / 4, 0, hgt - 0.1, d * 0.62, 0.14, w * 1.1, THATCH, 0.5); local(fy, d / 4, 0, hgt - 0.1, d * 0.62, 0.14, w * 1.1, THATCH, -0.5); }
+      if (x.type === 'toolbench' && walls > 0) { local(fy, 0, 0, 0.8, d, 0.12, w, WOOD); if (x.done) { local(fy, 0, -0.4, 0.92, 0.1, 0.06, 0.5, [0.6, 0.6, 0.62]); local(fy, 0.1, 0.3, 0.92, 0.3, 0.06, 0.08, [0.4, 0.3, 0.2]); } }
+      if (x.type === 'dryrack' && walls > 0) { local(fy, 0, 0, hgt * 0.9, 0.1, 0.1, w, WOOD); }
+      if (x.type === 'storage' && walls > 0) { local(fy, 0, 0, 0.1, d * 0.98, 0.5 * walls, 0.1, LOG); }
+    }
+    // the stockpile: logs and stone at the storage spot
+    const pile = L.pile;
+    for (let i = 0; i < Math.min(40, sim.stock.wood); i++) local({ x: pile.x, z: pile.z, yaw: Math.atan2(fwd.z, fwd.x) }, -0.6 + (i % 4) * 0.3, -1.2 + Math.floor(i / 4 % 5) * 0.32, 0.15 + Math.floor(i / 20) * 0.3, 2.2, 0.26, 0.26, LOG, 0, 0);
+    for (let i = 0; i < Math.min(30, sim.stock.stone); i++) local({ x: pile.x, z: pile.z, yaw: Math.atan2(fwd.z, fwd.x) }, 1.2 + (i % 3) * 0.45, -1 + Math.floor(i / 3 % 5) * 0.45, 0.15 + Math.floor(i / 15) * 0.3, 0.38, 0.3, 0.38, STONE);
+    // food: baskets by the food store
+    const units = sim.food.reduce((a, b) => a + b.n, 0);
+    for (let i = 0; i < Math.min(12, Math.ceil(units / 3)); i++) local({ x: L.food.x, z: L.food.z, yaw: Math.atan2(fwd.z, fwd.x) }, -2.2, -1.5 + i * 0.4, 0, 0.35, 0.3, 0.35, [0.62, 0.5, 0.3]);
+    for (const p of sim.piles) for (let i = 0; i < Math.min(4, p.n); i++) box(dyn, p.x, heightAt(isl, p.x, p.z) + 0.1 + i * 0.24, p.z, p.item === 'wood' ? 1.8 : 0.4, 0.24, p.item === 'wood' ? 0.24 : 0.4, 0.4 * i, p.item === 'wood' ? LOG : STONE);
+    for (const tr of sim.traps) { box(dyn, tr.x, heightAt(isl, tr.x, tr.z), tr.z, 0.06, 0.5, 0.06, 0, WOOD); if (tr.catch) box(dyn, tr.x + 0.25, heightAt(isl, tr.x, tr.z), tr.z, 0.4, 0.22, 0.22, 0, [0.6, 0.5, 0.4]); }
+    // what each settler carries
+    sim.settlers.forEach((s, i) => {
+      if (!s.carry) return; const r = rigs[i]; if (!r) return;
+      const a = r.J[8], b = r.J[12], m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, z: (a.z + b.z) / 2 }, yaw = Math.atan2(b.z - a.z, b.x - a.x) - Math.PI / 2;
+      const it = s.carry.item, n = Math.min(4, s.carry.n);
+      for (let k = 0; k < n; k++) {
+        if (it === 'wood') box(dyn, m.x, m.y - 0.1 + k * 0.17, m.z, 0.4, 0.17, 1.4, yaw, LOG);
+        else if (it === 'stone') box(dyn, m.x, m.y - 0.12 + k * 0.2, m.z, 0.28, 0.2, 0.28, yaw + k, STONE);
+        else box(dyn, m.x, m.y - 0.15, m.z, 0.42, 0.3, 0.32, yaw, it === 'fish' ? [0.5, 0.6, 0.65] : it === 'meat' ? [0.55, 0.42, 0.32] : [0.62, 0.48, 0.28]);
+        if (it !== 'wood' && it !== 'stone') break;
+      }
+    });
+  }
+
+  function project(x, y, z) {
+    if (!VP) return null;
+    const m = VP, cx = m[0] * x + m[4] * y + m[8] * z + m[12], cy = m[1] * x + m[5] * y + m[9] * z + m[13], cw = m[3] * x + m[7] * y + m[11] * z + m[15];
+    if (cw <= 0.01) return null;
+    return { sx: (cx / cw * 0.5 + 0.5) * vw, sy: (1 - (cy / cw * 0.5 + 0.5)) * vh, depth: cw };
+  }
+  // Where a screen point meets the ground (a ray march over the heightfield).
+  function pickGround(sx, sy) {
+    if (!invVP) return null;
+    const nx = sx / vw * 2 - 1, ny = 1 - sy / vh * 2;
+    const un = (z) => { const m = invVP, x = m[0] * nx + m[4] * ny + m[8] * z + m[12], y = m[1] * nx + m[5] * ny + m[9] * z + m[13], zz = m[2] * nx + m[6] * ny + m[10] * z + m[14], w = m[3] * nx + m[7] * ny + m[11] * z + m[15]; return [x / w, y / w, zz / w]; };
+    const a = un(-1), b = un(1), d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], L = Math.hypot(...d);
+    for (let s = 0; s < Math.min(L, 3000); s += 1) { const p = [a[0] + d[0] / L * s, a[1] + d[1] / L * s, a[2] + d[2] / L * s]; if (p[1] < Math.max(0, heightAt(isl, p[0], p[2]))) return { x: p[0], z: p[2] }; }
+    return null;
+  }
+  return {
+    gl, cam, frame, project, pickGround,
+    orbit(dx, dy) { cam.yaw -= dx * 0.006; cam.pitch = Math.max(0.08, Math.min(1.45, cam.pitch + dy * 0.005)); },
+    pan(dx, dy) {
+      // drag the ground: the point under the cursor follows it
+      const k = cam.dist * 0.0016, fx = -Math.cos(cam.yaw), fz = -Math.sin(cam.yaw), rx = -fz, rz = fx;
+      cam.tx += (-rx * dx + fx * dy) * k; cam.tz += (-rz * dx + fz * dy) * k;
+      cam.tx = Math.max(-100, Math.min(1100, cam.tx)); cam.tz = Math.max(-100, Math.min(800, cam.tz));
+      cam.ty = Math.max(0, heightAt(isl, cam.tx, cam.tz));
+    },
+    zoom(f) { cam.dist = Math.max(3, Math.min(900, cam.dist * f)); },
+    flyTo(x, y, z, dist) { cam.fly = { k: 0, from: { tx: cam.tx, ty: cam.ty, tz: cam.tz, dist: cam.dist }, to: { tx: x, ty: y, tz: z, dist: dist == null ? cam.dist : dist } }; },
+    colorsFor: (look) => [hex(look.skin), hex(look.shirt), hex(look.pants), hex(look.boots), hex(look.hair), hex(look.hat || look.hair), [0.4, 0.28, 0.15], [0.55, 0.56, 0.6]],
+  };
+}
+
+}
 /* ===== audio.js ===== */
-// audio.js — placeholder (filled in a later task)
+{
+// audio.js — synthesized only (house rule): surf, birds by day, crickets at night, and the
+// thunk of an axe when the camera is close to someone chopping. Lazy context; mute persisted.
+makeAudio = function makeAudio() {
+  const A = { ctx: null, muted: localStorage.getItem('colonySim.mute') === '1' };
+  let master, surf, birds, crickets, noise;
+  A.init = () => {
+    if (A.ctx) { if (A.ctx.state === 'suspended') A.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+    const ctx = A.ctx = new AC();
+    master = ctx.createGain(); master.gain.value = A.muted ? 0 : 0.6; master.connect(ctx.destination);
+    noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+    const d = noise.getChannelData(0); let b = 0; for (let i = 0; i < d.length; i++) { b = 0.98 * b + 0.02 * (Math.random() * 2 - 1); d[i] = b * 6; }
+    const src = ctx.createBufferSource(); src.buffer = noise; src.loop = true;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+    surf = ctx.createGain(); surf.gain.value = 0; src.connect(lp); lp.connect(surf); surf.connect(master); src.start();
+    birds = ctx.createGain(); birds.gain.value = 0; birds.connect(master);
+    crickets = ctx.createGain(); crickets.gain.value = 0; crickets.connect(master);
+  };
+  A.setMuted = (m) => { A.muted = m; localStorage.setItem('colonySim.mute', m ? '1' : '0'); if (master) master.gain.value = m ? 0 : 0.6; };
+  const chirp = (g, f0, f1, dur, vol) => {
+    const ctx = A.ctx, o = ctx.createOscillator(), e = ctx.createGain(), t = ctx.currentTime;
+    o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    e.gain.setValueAtTime(0.0001, t); e.gain.exponentialRampToValueAtTime(vol, t + 0.01); e.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(e); e.connect(g); o.start(t); o.stop(t + dur + 0.02);
+  };
+  A.thunk = (vol) => {
+    if (!A.ctx || A.muted) return;
+    const ctx = A.ctx, s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), e = ctx.createGain(), t = ctx.currentTime;
+    s.buffer = noise; f.type = 'bandpass'; f.frequency.value = 420; f.Q.value = 2;
+    e.gain.setValueAtTime(vol, t); e.gain.exponentialRampToValueAtTime(0.0001, t + 0.18);
+    s.connect(f); f.connect(e); e.connect(master); s.start(t, Math.random()); s.stop(t + 0.2);
+  };
+  A.tick = (night, shore, dt) => {
+    if (!A.ctx || A.muted) return;
+    surf.gain.setTargetAtTime(0.05 + 0.12 * shore, A.ctx.currentTime, 0.5);
+    if (!night && Math.random() < dt * 0.5) chirp(birds, 2400 + Math.random() * 1600, 3800 + Math.random() * 900, 0.09 + Math.random() * 0.08, 0.05);
+    if (night && Math.random() < dt * 6) chirp(crickets, 4300, 4250, 0.04, 0.012);
+    birds.gain.value = 1; crickets.gain.value = 1;
+  };
+  document.addEventListener('visibilitychange', () => { if (!A.ctx) return; if (document.hidden) A.ctx.suspend(); else A.ctx.resume(); });
+  return A;
+}
 
+}
 /* ===== ui.js ===== */
-// ui.js — placeholder (filled in a later task)
+{
+// ui.js — the DOM around the canvas: control panel (clock, speed, follow), the goals board
+// (control A), the settler panel with their plan (control B), speech bubbles, overlays.
+// Panels are rebuilt from signatures, in parts, never while a pointer is down in them.
 
+
+
+
+const $ = (s) => document.querySelector(s);
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+SPEEDS = [0, 1, 2, 4, 8, 16];
+const METERS = [['health', 'Health'], ['energy', 'Energy'], ['hunger', 'Fed'], ['mood', 'Mood'], ['clean', 'Clean'], ['bladder', 'Bladder'], ['bowel', 'Bowel']];
+const ACT_WORD = { walk: 'walking', run: 'running', chop: 'chopping', mine: 'breaking stone', pick: 'picking up', build: 'building', cook: 'cooking', eat: 'eating', sleep: 'asleep', collapsed: 'collapsed', sit: 'resting', talk: 'talking', bathe: 'washing', forage: 'foraging', trap: 'setting snares', fish: 'fishing', squat: 'in private', maintain: 'sharpening tools', look: 'looking around', drop: 'setting down', idle: 'idle' };
+
+makeUI = function makeUI(api) {
+  const ui = { held: false, parts: {}, bubbleEls: new Map() };
+  document.addEventListener('pointerdown', (e) => { if (e.target.closest('.side')) ui.held = true; });
+  document.addEventListener('pointerup', () => { ui.held = false; });
+
+  // speeds
+  const sp = $('#speeds');
+  SPEEDS.forEach((v, i) => {
+    const b = document.createElement('button'); b.className = 'spd'; b.textContent = v ? v + '×' : '⏸'; b.dataset.i = i;
+    b.addEventListener('click', () => api.setSpeed(i)); sp.appendChild(b);
+  });
+  // follow
+  const fsel = $('#follow-sel');
+  api.sim().settlers.forEach((s) => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.name + ' · ' + s.title; fsel.appendChild(o); });
+  fsel.addEventListener('change', () => api.follow(fsel.value === '' ? null : +fsel.value));
+  $('#settler-close').addEventListener('click', () => api.follow(null));
+  // goals
+  $('#goal-add').addEventListener('change', (e) => { if (e.target.value) api.input({ type: 'goalAdd', id: e.target.value }); e.target.value = ''; });
+  $('#goal-list').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const sim = api.sim(), id = b.dataset.g, i = sim.goals.indexOf(id);
+    if (b.dataset.a === 'up') api.input({ type: 'goalMove', id, to: i - 1 });
+    if (b.dataset.a === 'down') api.input({ type: 'goalMove', id, to: i + 1 });
+    if (b.dataset.a === 'rm') api.input({ type: 'goalRemove', id });
+  });
+  $('#settler-body').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const sid = api.selected(); if (sid == null) return;
+    const i = +b.dataset.i;
+    if (b.dataset.a === 'now') api.input({ type: 'doNow', sid, idx: i });
+    if (b.dataset.a === 'up') api.input({ type: 'reorder', sid, from: i, to: i - 1 });
+    if (b.dataset.a === 'later') api.input({ type: 'later', sid, need: b.dataset.n, hours: 1 });
+  });
+  $('#info-btn').addEventListener('click', () => showInfo());
+  $('#gear-btn').addEventListener('click', () => showSettings());
+  $('#overlay').addEventListener('click', (e) => { if (e.target.id === 'overlay') hideOverlay(); });
+
+  function part(name, sig, el, html) {
+    if (ui.parts[name] === sig || (ui.held && el.closest('.side'))) return false;
+    const sc = el.closest('.side'), top = sc ? sc.scrollTop : 0;
+    el.innerHTML = html; ui.parts[name] = sig;
+    if (sc) sc.scrollTop = top;
+    return true;
+  }
+
+  function goals() {
+    const sim = api.sim();
+    const rows = sim.goals.map((g, i) => {
+      const G = GOALS[g]; if (!G) return '';
+      const done = goalDone(sim, g), open = goalOpen(sim, g);
+      let st = done ? 'done ✓' : !open ? 'waits for ' + G.prereq.filter((p) => !goalDone(sim, p)).map((p) => GOALS[p].label).join(', ') : '';
+      if (!done && open) {
+        if (G.food) st = mealUnits(sim).toFixed(0) + ' / ' + foodTarget(sim) + ' meals stored';
+        else {
+          const xs = sim.sites.filter((x) => x.goal === g);
+          if (!xs.length) st = 'not started';
+          else { const need = xs.reduce((a, x) => a + x.need.wood + x.need.stone, 0), have = xs.reduce((a, x) => a + x.have.wood + x.have.stone, 0), prog = xs.reduce((a, x) => a + x.prog, 0) / xs.reduce((a, x) => a + x.hours, 0); st = prog > 0 ? 'building ' + Math.round(prog * 100) + '%' : 'materials ' + have + ' / ' + need; }
+        }
+      }
+      return `<li class="${done ? 'done' : ''}"><span class="gl">${i + 1}. ${esc(G.label)}<span class="gs">${esc(st)}</span></span>` +
+        `<button class="mini" data-a="up" data-g="${g}" aria-label="Move up" ${i ? '' : 'disabled'}>▲</button><button class="mini" data-a="down" data-g="${g}" aria-label="Move down">▼</button><button class="mini" data-a="rm" data-g="${g}" aria-label="Remove">✕</button></li>`;
+    }).join('');
+    part('goals', rows, $('#goal-list'), rows);
+    const opts = Object.keys(GOALS).filter((g) => !sim.goals.includes(g));
+    const sig = opts.join();
+    part('goaladd', sig, $('#goal-add'), '<option value="">+ add a goal</option>' + opts.map((g) => `<option value="${g}">${esc(GOALS[g].label)}</option>`).join(''));
+  }
+
+  function settler() {
+    const sim = api.sim(), sid = api.selected(), box = $('#settler');
+    if (sid == null) { box.classList.add('hidden'); ui.parts.sHead = null; return; }
+    box.classList.remove('hidden');
+    const s = sim.settlers[sid], F = FOUNDERS[sid];
+    const body = $('#settler-body');
+    if (!body.querySelector('#s-head') || ui.parts.sId !== sid) {
+      ui.parts.sId = sid; ui.parts.sMeters = ui.parts.sMind = ui.parts.sPlan = null;
+      const L = s.look;
+      body.innerHTML = `<div id="s-head"></div><h3>Now</h3><div id="s-now"></div><h3>Next</h3><div id="s-next"></div><h3>Needs</h3><div id="s-meters"></div><div id="s-mind"></div>`;
+      $('#s-head').innerHTML = `<div class="who"><div class="swatch" style="background:linear-gradient(${L.hair} 0 18%,${L.skin} 18% 34%,${L.shirt} 34% 66%,${L.pants} 66% 92%,${L.boots} 92%)"></div><div><h2 style="margin:0">${esc(s.name)}</h2><div class="role">${esc(s.title)} · founder · perseverance</div></div></div>` +
+        `<h3>Attributes</h3><div class="attrs">${Object.entries(s.attrs).map(([k, v]) => `<div>${v}<small>${k}</small></div>`).join('')}</div>` +
+        `<h3>Character</h3><div class="tags"><em>Strengths:</em> ${esc(F.strengths.join(', '))}<br><em>Weaknesses:</em> ${esc(F.weaknesses.join(', '))}<br><em>Likes:</em> ${esc(F.prefs.join(', '))}<br><em>Goals:</em> ${esc(F.goals.join(', '))}<br><em>Fears:</em> ${esc(F.fears.join(', '))}</div>`;
+    }
+    // meters: values change every tick, so update in place
+    const mEl = $('#s-meters');
+    if (!mEl.children.length) mEl.innerHTML = METERS.map(([k, l]) => `<div class="meter" data-k="${k}"><span>${l}</span><div class="bar"><i></i><b style="left:50%"></b><b style="left:80%"></b></div><span class="v"></span></div>`).join('');
+    for (const row of mEl.children) {
+      const k = row.dataset.k, v = s.m[k], i = row.querySelector('i');
+      i.style.width = v.toFixed(1) + '%';
+      i.style.background = v < 25 ? 'var(--red)' : v < 50 ? 'var(--gold)' : v > 80 ? 'var(--blue)' : 'var(--green)';
+      row.querySelector('.v').textContent = Math.round(v) + '%';
+    }
+    // what they are doing now, and the plan
+    const T = s.task;
+    const nowSig = T ? T.id + ':' + T.i + ':' + s.act : 'none';
+    part('sNow', nowSig, $('#s-now'), T ? `<div class="task now"><div class="tl"><b>${esc(T.label)}</b>${T.pinned ? ' <span class="role">(your order)</span>' : ''} <span class="role">· ${esc(ACT_WORD[s.act] || s.act)}</span><div class="steps">${T.steps.map((st, j) => `<span class="${j === T.i ? 'cur' : ''}">${j < T.i ? '✓ ' : j === T.i ? '▸ ' : '· '}${esc(st.label || st.act || st.do)}</span>`).join('<br>')}</div></div></div>` : '<div class="log">thinking…</div>');
+    const fc = forecastNeeds(sim, s);
+    const planSig = s.plan.map((it) => it.id + it.kind + (it.owner || '')).join() + '|' + fc.map((f) => f.label).join() + '|' + (s.delay ? JSON.stringify(s.delay) : '');
+    part('sPlan', planSig, $('#s-next'), s.plan.map((it, i) => `<div class="task"><span class="tl">${esc(it.label || it.kind)}${it.owner === 'player' ? ' <span class="role">(moved by you)</span>' : it.steps ? ' <span class="role">(paused)</span>' : ''}</span><button class="mini" data-a="up" data-i="${i}" ${i ? '' : 'disabled'} aria-label="Earlier">▲</button><button class="mini" data-a="now" data-i="${i}">Do now</button></div>`).join('') +
+      fc.map((f) => `<div class="task"><span class="tl" style="color:var(--dim)">${esc(f.label)}</span><button class="mini" data-a="later" data-n="${f.kind}">Later</button></div>`).join(''));
+    // the mind: lessons, friends, recent log
+    const lessons = Object.entries(s.lessons).map(([k, l]) => `<li>✦ ${esc(LESSONS[k].label)} <span class="role">— ${esc(LESSONS[k].fmt(l.v))} (day ${l.day})</span></li>`).join('') || '<li class="role">none yet</li>';
+    const friends = Object.entries(s.rel).sort((a, b) => b[1] - a[1]).map(([id, v]) => `${esc(sim.settlers[id].name)} ${Math.round(v)}`).join(' · ');
+    const logs = s.log.slice(-6).reverse().map((l) => { const c = clockOf({ t: l.t }); return `<div>D${c.day} ${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')} ${esc(l.text)}</div>`; }).join('');
+    const mindSig = lessons + friends.replace(/\d+/g, (n) => Math.round(n / 5)) + logs;
+    part('sMind', mindSig, $('#s-mind'), `<h3>Lessons learned</h3><ul>${lessons}</ul><h3>Friends</h3><div class="tags">${friends}</div><h3>Recently</h3><div class="log">${logs || '—'}</div>`);
+  }
+
+  function topbar() {
+    const sim = api.sim(), c = clockOf(sim);
+    $('#clock').textContent = `Day ${c.day} · ${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}${api.nightSkip() ? ' ⏩' : ''}`;
+    for (const b of document.querySelectorAll('.spd')) b.classList.toggle('on', +b.dataset.i === api.speedIdx());
+    const v = api.selected() == null ? '' : String(api.selected());
+    if (fsel.value !== v) fsel.value = v;
+  }
+
+  // speech bubbles over heads, for 8 real seconds each
+  function bubbles(project, nowReal) {
+    const sim = api.sim(), root = $('#bubbles');
+    for (const b of sim.bubbles) if (!ui.bubbleEls.has(b.id) && b.t >= api.loadedAt()) {
+      const el = document.createElement('div'); el.className = 'bubble ' + (b.kind === 'refuse' ? 'refuse' : '');
+      el.innerHTML = `<span class="bn">${esc(sim.settlers[b.sid].name)}</span>${esc(b.text)}`;
+      root.appendChild(el); ui.bubbleEls.set(b.id, { el, born: nowReal, sid: b.sid });
+    }
+    const live = [...ui.bubbleEls.entries()];
+    const perSettler = {};
+    for (let i = live.length - 1; i >= 0; i--) {
+      const [id, o] = live[i];
+      const old = nowReal - o.born > 8 || (perSettler[o.sid] = (perSettler[o.sid] || 0) + 1) > 1 || live.length - i > 4;
+      if (old) { o.el.remove(); ui.bubbleEls.delete(id); continue; }
+      const p = project(o.sid);
+      if (!p) { o.el.style.display = 'none'; continue; }
+      o.el.style.display = ''; o.el.style.left = p.sx + 'px'; o.el.style.top = (p.sy - 14) + 'px';
+    }
+  }
+
+  function overlay(html) { $('#overlay-card').innerHTML = html; $('#overlay').classList.remove('hidden'); api.overlayOpen(true); }
+  function hideOverlay() { $('#overlay').classList.add('hidden'); api.overlayOpen(false); }
+  function showInfo() {
+    overlay(`<h1>Colony Sim</h1>
+<p>Four settlers, chosen by the people paying for their expedition, have landed on an island with one set of tools and a crate of rations. Watch them make a camp, learn from their mistakes and get ready for a fifth.</p>
+<h3>Camera</h3><p>Drag to orbit · right-drag or shift-drag to pan · wheel to zoom · WASD / arrows to move · Q / E to turn · click a settler to follow them · pick one from <em>follow</em> to fly to them.</p>
+<h3>Time</h3><p>A day is 30 minutes at 1×. Space pauses; 1–6 pick a speed. While everyone sleeps the night runs at 16× (⏩).</p>
+<h3>Goals (left)</h3><p>The leader turns these into jobs and hands them out. Reorder them with ▲▼, remove with ✕, add from the list. A goal waits until the ones it needs are done.</p>
+<h3>A settler (right)</h3><p>Needs: 50–80% is normal; below 50% they work worse; above 80% better, up to +20% at 100%. <b>Next</b> is their plan: ▲ moves a job earlier, <b>Do now</b> makes it their next order, <b>Later</b> puts off sleep or a meal. Until they have learned better they obey, even when it hurts them. Once a mistake has taught them a lesson, they refuse and say why.</p>
+<h3>Phase 1</h3><p>Done when the camp has a fire, a lean-to, storage, a food store, a latrine, two huts, five beds and a tool bench, holds three days of food for five, and nobody has dropped below 50% on health, energy, food, mood or cleanliness for two days.</p>
+<p class="role">First draft. Graphics are deliberately blocky for now.</p>
+<button class="btn" id="ov-ok">Back to the island</button>`);
+    $('#ov-ok').addEventListener('click', hideOverlay);
+  }
+  function showSettings() {
+    overlay(`<h1>Settings</h1>
+<p>Island seed: <b>${api.sim().seed}</b> · day ${clockOf(api.sim()).day}</p>
+<p><label>New island with seed <input id="seed-in" type="number" value="${Math.floor(Math.random() * 99999)}" style="width:110px;background:#141c16;color:var(--ink);border:1px solid var(--border);border-radius:5px;font:inherit;padding:2px 5px"></label></p>
+<button class="btn" id="ov-new">Start a new island</button><button class="btn alt" id="ov-ok">Back</button>`);
+    $('#ov-ok').addEventListener('click', hideOverlay);
+    $('#ov-new').addEventListener('click', () => { const v = Math.max(1, Math.floor(+$('#seed-in').value) || 1); hideOverlay(); api.newGame(v); });
+  }
+  function showPhase1(sim) {
+    const S = sim.settlers;
+    overlay(`<h1>Phase 1 complete</h1>
+<p>Day ${sim.phase1.day}: the camp is self-sufficient. It has shelter and beds for five, three days of food, and a tool bench. Everyone has stayed in good shape for two days running.</p>
+<p>${S.map((s) => `<b>${esc(s.name)}</b>: ${Object.keys(s.lessons).length} lessons, lowest ${Math.round(s.stats.lowest)}% (${s.stats.lowWhat})`).join('<br>')}</p>
+<p class="role">Inviting a fifth settler comes in a later draft. The colony carries on in the meantime.</p>
+<button class="btn" id="ov-ok">Keep watching</button>`);
+    $('#ov-ok').addEventListener('click', hideOverlay);
+  }
+  function showLoad(day, onGo, onNew) {
+    overlay(`<h1>Colony Sim</h1><p>Your island is waiting on day ${day}.</p><button class="btn" id="ov-go">Continue</button><button class="btn alt" id="ov-new">New island</button>`);
+    $('#ov-go').addEventListener('click', () => { hideOverlay(); onGo(); });
+    $('#ov-new').addEventListener('click', () => { hideOverlay(); onNew(); });
+  }
+  ui.update = (project, nowReal, full) => { topbar(); if (full) { goals(); } settler(); bubbles(project, nowReal); };
+  ui.refreshAll = () => { ui.parts = {}; $('#settler-body').innerHTML = ''; for (const [, o] of ui.bubbleEls) o.el.remove(); ui.bubbleEls.clear(); };
+  ui.showPhase1 = showPhase1; ui.showLoad = showLoad; ui.hideOverlay = hideOverlay; ui.showInfo = showInfo;
+  return ui;
+}
+
+}
 /* ===== main.js ===== */
-// main.js — boot (stub until Task 9)
-const cv = document.getElementById('view');
-const gl = cv.getContext('webgl2');
-if (gl) { gl.clearColor(0.05, 0.08, 0.06, 1); gl.clear(gl.COLOR_BUFFER_BIT); }
+{
+// main.js — boot, the frame loop, camera input, follow, save/load.
 
+const SAVE = 'colonySim.v1';
+const canvas = document.getElementById('view');
+const G = { sim: null, R: null, rigs: [], views: [], prev: [], colors: [], speedIdx: 1, selected: null, following: false, acc: 0, overlay: false, lastSave: 0, loadedAt: 0, shownP1: false, nightSkip: false };
+const audio = makeAudio();
+
+function viewOf(s, i, a, mult) {
+  const p = G.prev[i] || s, x = p.x + (s.x - p.x) * a, z = p.z + (s.z - p.z) * a;
+  return { x, z, yaw: s.yaw, speed: s.speed * 48 * mult, act: s.act, look: s.look, carry: s.carry, face: s.face };
+}
+function boot(sim) {
+  G.sim = sim; G.loadedAt = sim.t; G.shownP1 = !!sim.phase1;
+  if (!G.R) {
+    try { G.R = makeRenderer(canvas, sim.isl); } catch (e) { console.error(e); G.R = null; }
+    if (!G.R) { document.getElementById('overlay-card').innerHTML = '<h1>Colony Sim</h1><p>This page needs WebGL2, which this browser does not offer.</p>'; document.getElementById('overlay').classList.remove('hidden'); return false; }
+  } else G.R = makeRenderer(canvas, sim.isl);
+  G.prev = sim.settlers.map((s) => ({ x: s.x, z: s.z }));
+  G.views = sim.settlers.map((s, i) => viewOf(s, i, 1, 1));
+  G.rigs = sim.settlers.map((s, i) => makeRig(G.views[i], sim.isl));
+  G.colors = sim.settlers.map((s) => G.R.colorsFor(s.look));
+  G.R.cam.tx = sim.isl.camp.x; G.R.cam.tz = sim.isl.camp.z; G.R.cam.ty = heightAt(sim.isl, sim.isl.camp.x, sim.isl.camp.z);
+  G.R.cam.dist = 70; G.R.cam.pitch = 0.6;
+  G.acc = 0; G.selected = null; G.following = false;
+  return true;
+}
+function save() {
+  try { localStorage.setItem(SAVE, JSON.stringify({ v: 1, snap: snapshot(G.sim) })); } catch (e) { /* storage full: keep playing */ }
+}
+function load() {
+  const raw = localStorage.getItem(SAVE); if (!raw) return null;
+  try {
+    const o = JSON.parse(raw);
+    if (!o || o.v !== 1 || !o.snap || typeof o.snap.seed !== 'number') throw new Error('unknown save');
+    return restore(o.snap);
+  } catch (e) { localStorage.setItem('colonySim.bad', raw); localStorage.removeItem(SAVE); return null; }
+}
+
+const api = {
+  sim: () => G.sim, selected: () => G.selected, speedIdx: () => G.speedIdx, nightSkip: () => G.nightSkip, loadedAt: () => G.loadedAt,
+  setSpeed(i) { G.speedIdx = i; audio.init(); },
+  follow(id) {
+    G.selected = id; G.following = id != null;
+    if (id != null) { const r = G.rigs[id], p = r.J[0]; G.R.flyTo(p.x, p.y, p.z, Math.min(G.R.cam.dist, 9)); }
+  },
+  input(rec) { const out = applyInput(G.sim, rec); ui.parts = {}; return out; },
+  overlayOpen(v) { G.overlay = v; },
+  newGame(seed) { localStorage.removeItem(SAVE); boot(createSim(seed)); ui.refreshAll(); save(); },
+};
+let ui = null;
+
+/* ------------------------------ input ------------------------------ */
+let drag = null;
+canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+canvas.addEventListener('mousedown', (e) => { audio.init(); drag = { x: e.clientX, y: e.clientY, b: e.button, shift: e.shiftKey, moved: 0 }; canvas.classList.add('drag'); });
+window.addEventListener('mousemove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+  if (drag.b === 2 || drag.shift) { G.R.pan(dx, dy); G.following = false; } else G.R.orbit(dx, dy);
+});
+window.addEventListener('mouseup', (e) => {
+  canvas.classList.remove('drag');
+  if (drag && drag.moved < 5 && drag.b === 0) clickAt(e.clientX, e.clientY);
+  drag = null;
+});
+canvas.addEventListener('wheel', (e) => { e.preventDefault(); G.R.zoom(Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+function clickAt(x, y) {
+  const r = canvas.getBoundingClientRect(); x -= r.left; y -= r.top;
+  let best = null, bd = 46;
+  G.rigs.forEach((rig, i) => {
+    for (const j of [0, 2, 4]) { const p = G.R.project(rig.J[j].x, rig.J[j].y, rig.J[j].z); if (!p) continue; const d = Math.hypot(p.sx - x, p.sy - y); if (d < bd) { bd = d; best = i; } }
+  });
+  if (best != null) api.follow(best); else { G.selected = null; G.following = false; }
+}
+// touch: one finger orbits, two pan and pinch (phones still work, PC is the target)
+let touch = null;
+canvas.addEventListener('touchstart', (e) => { e.preventDefault(); audio.init(); touch = tsnap(e); touch.moved = 0; touch.t0 = performance.now(); }, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault(); if (!touch) return; const n = tsnap(e);
+  if (n.n === 1 && touch.n === 1) { G.R.orbit(n.x - touch.x, n.y - touch.y); touch.moved += Math.abs(n.x - touch.x) + Math.abs(n.y - touch.y); }
+  if (n.n === 2 && touch.n === 2) { G.R.pan(n.x - touch.x, n.y - touch.y); G.R.zoom(touch.d / n.d); touch.moved += 99; G.following = false; }
+  Object.assign(touch, n);
+}, { passive: false });
+canvas.addEventListener('touchend', (e) => { e.preventDefault(); if (touch && touch.moved < 8 && e.touches.length === 0 && performance.now() - touch.t0 < 400) clickAt(touch.x, touch.y); touch = e.touches.length ? Object.assign(tsnap(e), { moved: 99 }) : null; }, { passive: false });
+function tsnap(e) { const t = e.touches, n = t.length; if (!n) return { n: 0, x: 0, y: 0, d: 1 }; let x = 0, y = 0; for (const p of t) { x += p.clientX; y += p.clientY; } return { n, x: x / n, y: y / n, d: n > 1 ? Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY) || 1 : 1 }; }
+const keys = new Set();
+window.addEventListener('keydown', (e) => {
+  const a = document.activeElement; if (a && (a.tagName === 'INPUT' || a.tagName === 'SELECT' || a.tagName === 'TEXTAREA')) return;
+  if (e.code === 'Space') { e.preventDefault(); G.speedIdx = G.speedIdx ? 0 : (G.lastSpeed || 1); if (G.speedIdx) G.lastSpeed = G.speedIdx; }
+  if (/^Digit[1-6]$/.test(e.code)) G.speedIdx = +e.code.slice(5) - 1;
+  keys.add(e.code); audio.init();
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+document.getElementById('mute-btn').addEventListener('click', (e) => { audio.init(); audio.setMuted(!audio.muted); e.currentTarget.textContent = audio.muted ? '🔇' : '🔊'; });
+document.getElementById('mute-btn').textContent = audio.muted ? '🔇' : '🔊';
+
+/* ------------------------------ the loop ------------------------------ */
+let last = null, uiT = 0, chopT = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  if (!G.sim || !G.R) return;
+  const dt = last == null ? 0 : Math.min(0.1, Math.max(0, (now - last) / 1000)); last = now;
+  const sim = G.sim;
+  // keyboard camera
+  const kp = 300 * dt;
+  if (keys.has('KeyW') || keys.has('ArrowUp')) { G.R.pan(0, kp); G.following = false; }
+  if (keys.has('KeyS') || keys.has('ArrowDown')) { G.R.pan(0, -kp); G.following = false; }
+  if (keys.has('KeyA') || keys.has('ArrowLeft')) { G.R.pan(kp, 0); G.following = false; }
+  if (keys.has('KeyD') || keys.has('ArrowRight')) { G.R.pan(-kp, 0); G.following = false; }
+  if (keys.has('KeyQ')) G.R.orbit(-200 * dt, 0); if (keys.has('KeyE')) G.R.orbit(200 * dt, 0);
+  // time
+  let mult = SPEEDS[G.speedIdx];
+  G.nightSkip = mult > 0 && mult < 16 && sim.settlers.every((s) => s.act === 'sleep' || s.act === 'collapsed');
+  if (G.nightSkip) mult = 16;
+  if (G.overlay && document.querySelector('#ov-go')) mult = 0;
+  G.acc += dt * 48 * mult;
+  let n = 0;
+  while (G.acc >= TICK && n < 400) {
+    if (G.acc < 2 * TICK) G.prev = sim.settlers.map((s) => ({ x: s.x, z: s.z }));
+    step(sim); G.acc -= TICK; n++;
+  }
+  if (n >= 400) { G.acc = 0; G.prev = sim.settlers.map((s) => ({ x: s.x, z: s.z })); }
+  const a = Math.min(1, G.acc / TICK);
+  // bodies
+  sim.settlers.forEach((s, i) => { G.views[i] = viewOf(s, i, a, Math.max(mult, 0.001)); updateRig(G.rigs[i], G.views[i], dt, sim.isl); });
+  if (G.following && G.selected != null && !G.R.cam.fly) {
+    const p = G.rigs[G.selected].J[0], k = 1 - Math.exp(-dt * 6);
+    G.R.cam.tx += (p.x - G.R.cam.tx) * k; G.R.cam.ty += (p.y - G.R.cam.ty) * k; G.R.cam.tz += (p.z - G.R.cam.tz) * k;
+  }
+  const out = G.R.frame(sim, G.rigs, (i) => rigCapsules(G.rigs[i], G.views[i]), now / 1000, { colors: G.colors, selected: G.selected });
+  // sound: the shore is loud when the camera is near the sea
+  const c = G.R.cam, shore = Math.max(0, 1 - (sim.isl.seaD[Math.floor(c.tz / 2) * sim.isl.W + Math.floor(c.tx / 2)] * 2) / 120) * Math.max(0, 1 - c.dist / 400);
+  audio.tick(out.night > 0.5, shore, dt);
+  chopT += dt;
+  if (chopT > 0.7 && mult > 0) { chopT = 0; for (const s of sim.settlers) if ((s.act === 'chop' || s.act === 'mine' || s.act === 'build') && Math.hypot(s.x - c.tx, s.z - c.tz) < 40 && c.dist < 80) audio.thunk(0.25 * (1 - c.dist / 80)); }
+  // the panels
+  uiT += dt;
+  const proj = (sid) => { const h = G.rigs[sid].J[4]; return G.R.project(h.x, h.y + 0.35, h.z); };
+  ui.update(proj, now / 1000, uiT > 0.25);
+  if (uiT > 0.25) uiT = 0;
+  if (sim.phase1 && !G.shownP1) { G.shownP1 = true; ui.showPhase1(sim); }
+  if (sim.t - G.lastSave > 3600) { G.lastSave = sim.t; save(); }
+}
+window.addEventListener('beforeunload', () => { if (G.sim) save(); });
+
+const loaded = load();
+if (loaded) {
+  boot(loaded); G.lastSave = loaded.t; ui = makeUI(api);
+  ui.showLoad(clockOf(loaded).day, () => {}, () => api.newGame(Math.floor(Math.random() * 99999) + 1));
+} else { boot(createSim(Math.floor(Math.random() * 99999) + 1)); ui = makeUI(api); }
+window.__CS = { G, api, step, applyInput };
+requestAnimationFrame(frame);
+
+}
 })();
 </script>
 </body>
