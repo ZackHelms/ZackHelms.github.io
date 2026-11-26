@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Colony Sim</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Black+Ops+One&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build PENDING</div>
+<canvas id="view"></canvas>
+<div id="bubbles"></div>
+
+<a id="back-btn" class="chrome" href="../index.html" aria-label="Back to games">←</a>
+<button id="mute-btn" class="chrome" aria-label="Sound">🔊</button>
+
+<div id="topbar" class="panel">
+  <span id="clock">Day 1 · 06:00</span>
+  <span id="speeds"></span>
+  <select id="follow-sel" aria-label="Follow a settler"><option value="">follow: none</option></select>
+  <button id="info-btn" class="tb" aria-label="About">ⓘ</button>
+  <button id="gear-btn" class="tb" aria-label="Settings">⚙</button>
+</div>
+
+<div id="goals" class="panel side left">
+  <h2>Goals</h2>
+  <ol id="goal-list"></ol>
+  <select id="goal-add" aria-label="Add a goal"><option value="">+ add a goal</option></select>
+</div>
+
+<div id="settler" class="panel side right hidden">
+  <button id="settler-close" class="x" aria-label="Close">✕</button>
+  <div id="settler-body"></div>
+</div>
+
+<div id="overlay" class="hidden"><div id="overlay-card" class="panel"></div></div>
+
+<script type="module" src="main.js"></script>
+</body>
+</html>
