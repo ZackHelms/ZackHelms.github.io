@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const ORDER = ['rng.js', 'island.js', 'nav.js', 'data.js', 'sim.js', 'rig.js', 'render.js', 'audio.js', 'ui.js', 'main.js'];
+const ORDER = ['rng.js', 'island.js', 'nav.js', 'data.js', 'brain.js', 'sim.js', 'rig.js', 'render.js', 'audio.js', 'ui.js', 'main.js'];
 const src = (f) => readFileSync(join(here, 'src', f), 'utf8');
 
 const strip = (f) => src(f)

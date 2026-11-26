@@ -134,6 +134,64 @@ section('nav', async () => {
   check('200 random paths under 2 s', ms < 2000, ms + ' ms');
 });
 
+/* ---------------- sim core ---------------- */
+const DAY = 86400;
+section('sim', async () => {
+  const S = await import('../src/sim.js');
+  const { createSim, step, runFor, snapshot, restore, simHash, eff, clockOf } = S;
+  const e = [0, 25, 50, 65, 80, 90, 100].map(eff), want = [0, 0.5, 1, 1, 1, 1.1, 1.2];
+  check('eff at 0/25/50/65/80/90/100', e.every((v, i) => Math.abs(v - want[i]) < 1e-9), e.join(','));
+  check('clock starts day 1 06:00', (() => { const c = clockOf(createSim(1)); return c.day === 1 && c.hour === 6 && c.minute === 0; })());
+
+  const hashes = () => { const sim = createSim(7), out = []; for (let h = 0; h < 72; h++) { runFor(sim, 3600); out.push(simHash(sim)); } return out; };
+  const A = hashes(), B = hashes();
+  check('determinism: same seed, same hash every game hour for 3 days', A.join() === B.join(), A.findIndex((v, i) => v !== B[i]));
+
+  const s1 = createSim(11); runFor(s1, DAY);
+  const s2 = restore(JSON.parse(JSON.stringify(snapshot(s1))));
+  runFor(s1, DAY); runFor(s2, DAY);
+  check('snapshot/restore round trip replays identically', simHash(s1) === simHash(s2));
+
+  const bad = [], cad = [], longT = [];
+  const t0 = Date.now();
+  for (let seed = 1; seed <= 5; seed++) {
+    const sim = createSim(seed);
+    let maxTask = 0, pee0, poo0;
+    for (let tk = 0; tk < 10 * DAY / S.TICK; tk++) {
+      step(sim);
+      if (tk === Math.round((DAY + 0) / S.TICK)) { pee0 = sim.settlers.map(s => s.stats.pee); poo0 = sim.settlers.map(s => s.stats.poo); }
+      if (tk === Math.round(5 * DAY / S.TICK)) sim.settlers.forEach((s, i) => cad.push({ seed, n: s.name, pee: (s.stats.pee - pee0[i]) / 4, poo: (s.stats.poo - poo0[i]) / 4 }));
+      if (tk % 60 === 0) for (const s of sim.settlers) {
+        if (!Number.isFinite(s.x) || !Number.isFinite(s.z) || Object.values(s.m).some(v => !Number.isFinite(v))) bad.push(seed + ':' + s.name + '@' + tk);
+        if (s.task) maxTask = Math.max(maxTask, sim.t - s.task.started);
+      }
+    }
+    if (maxTask > 12 * 3600) longT.push(seed + ':' + (maxTask / 3600).toFixed(1) + 'h');
+  }
+  const secs = (Date.now() - t0) / 1000;
+  check('no NaN in positions or meters (5 seeds x 10 days)', !bad.length, bad.slice(0, 5).join(' '));
+  check('10 game days run in under 4 s per seed', secs / 5 < 4, (secs / 5).toFixed(2) + ' s');
+  const offPee = cad.filter(c => c.pee < 1.5 || c.pee > 2.5), offPoo = cad.filter(c => c.poo < 0.7 || c.poo > 1.3);
+  check('2 pees a day (1.5-2.5) days 2-6', !offPee.length, offPee.map(c => c.seed + c.n + ':' + c.pee).join(' '));
+  check('1 poo a day (0.7-1.3) days 2-6', !offPoo.length, offPoo.map(c => c.seed + c.n + ':' + c.poo).join(' '));
+  check('no task runs longer than 12 game hours', !longT.length, longT.join(' '));
+
+  // ocean bath caps at 70
+  const sb = createSim(2), sbs = sb.settlers[1];
+  sbs.m.clean = 10; S.assignTask(sb, sbs, 'bathe', { pinned: true });
+  let maxClean = 0; for (let i = 0; i < 6 * 3600 / S.TICK; i++) { step(sb); maxClean = Math.max(maxClean, sbs.m.clean); if (sbs.stats.baths) break; }
+  check('ocean bath happened and cleanliness stayed ≤ 70', sbs.stats.baths >= 1 && maxClean <= 70.0001, 'baths ' + sbs.stats.baths + ' max ' + maxClean.toFixed(1));
+
+  // collapse from exhaustion in the forest: sleeps there, wakes at ≤ 50
+  const sc = createSim(3), sct = sc.settlers[2];
+  const far = sc.isl.trees.find(t => Math.hypot(t.x - sc.isl.camp.x, t.z - sc.isl.camp.z) > 150);
+  sct.x = far.x + 1.5; sct.z = far.z; sct.m.energy = 0.5; sct.m.hunger = 90; sct.task = null; sct.plan = [];
+  let slept = false, woke = null;
+  for (let i = 0; i < 16 * 3600 / S.TICK; i++) { step(sc); if (sct.act === 'collapsed') slept = true; if (slept && sct.act !== 'collapsed') { woke = sct.m.energy; break; } }
+  check('exhausted settler sleeps where they fell', slept);
+  check('…and wakes at ≤ 50% energy', woke !== null && woke <= 50.0001, woke);
+});
+
 for (const s of sections) {
   if (only.length && !only.includes(s.name)) continue;
   console.log('[' + s.name + ']');
