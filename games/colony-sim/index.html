@@ -71,7 +71,7 @@ ol,ul{margin:0;padding:0;list-style:none}
 @media (max-width:820px){.side.left{display:none}.side.right{width:calc(100% - 16px);top:auto;height:45%}#topbar{right:8px;left:96px;top:calc(44px + env(safe-area-inset-top))}#speeds .spd:nth-child(n+5){display:none}}</style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:35 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:39 UTC</div>
 <canvas id="view"></canvas>
 <div id="bubbles"></div>
 
@@ -384,7 +384,8 @@ walkCost = function walkCost(isl, x, z) {
 /* ===== nav.js ===== */
 {
 // nav.js — walking routes over the island: A* on a 4 m grid whose cost is the
-// slowest ground in each cell, then string-pulled where the straight line is no slower.
+// slowest ground in each cell, then string-pulled where the straight line is no slower.
+
 
 NAV_CELL = 4;
 WALK = 1 / 30;            // metres per game second (1.6 m/s real at 1x = 120 m per game hour)
@@ -664,7 +665,11 @@ LEARNED = {
 /* ===== brain.js ===== */
 {
 // brain.js — what each settler decides to do: their needs, the leader's assignments,
-// lessons learned by trial and error, refusals, and the player's orders (controls A and B).
+// lessons learned by trial and error, refusals, and the player's orders (controls A and B).
+
+
+
+
 
 const HOUR = 3600, DAYS = 86400;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -1176,7 +1181,12 @@ forecastNeeds = function forecastNeeds(sim, s) {
 {
 // sim.js — the colony simulation. DOM-free, render-free, seeded: the same seed and the
 // same inputs always play out the same. A tick is 10 game seconds. Settlers know where
-// they are, how fast they move and what they are doing; joints are the renderer's business.
+// they are, how fast they move and what they are doing; joints are the renderer's business.
+
+
+
+
+
 
 TICK = 10;
 const HOUR = 3600, DAYS = 86400;
@@ -2163,7 +2173,9 @@ headOf = (rig) => rig.J[4];
 // render.js — hand-written WebGL2, deliberately blocky for this draft (CD: "rudimentary,
 // like Minecraft for now"). Terrain is flat-shaded 2 m cells over the same heightfield the
 // settlers walk on; everything else is instanced boxes, and settlers are instanced capsules
-// over their rigs (the Combat Simulator approach). It only reads the simulation.
+// over their rigs (the Combat Simulator approach). It only reads the simulation.
+
+
 
 const VS_TERRAIN = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC;
@@ -2687,7 +2699,10 @@ makeAudio = function makeAudio() {
 {
 // ui.js — the DOM around the canvas: control panel (clock, speed, follow), the goals board
 // (control A), the settler panel with their plan (control B), speech bubbles, overlays.
-// Panels are rebuilt from signatures, in parts, never while a pointer is down in them.
+// Panels are rebuilt from signatures, in parts, never while a pointer is down in them.
+
+
+
 
 const $ = (s) => document.querySelector(s);
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
@@ -2879,7 +2894,13 @@ makeUI = function makeUI(api) {
 }
 /* ===== main.js ===== */
 {
-// main.js — boot, the frame loop, camera input, follow, save/load.
+// main.js — boot, the frame loop, camera input, follow, save/load.
+
+
+
+
+
+
 
 const SAVE = 'colonySim.v1';
 const canvas = document.getElementById('view');

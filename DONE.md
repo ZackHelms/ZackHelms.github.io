@@ -1,7 +1,7 @@
 # DONE — done log
 
 - 2026-11-26 [colony-sim] **Colony Sim, phase 1 first draft** (new game, CD commission; live at
-  `build 2026-11-26 23:35 UTC`). Designed with the CD in a brainstorm (design:
+  `build 2026-11-26 23:39 UTC`). Designed with the CD in a brainstorm (design:
   `.claude/colony-sim.md`), then built on "use your best judgment". Four founders (Ada,
   leader; Bram, gatherer; Kit, hunter; Ines, architect) land on a seeded 1 km island with a
   cliff band, a waterfall pond and a river. Sims-like needs on the CD's 0/50/80/100 scale,
