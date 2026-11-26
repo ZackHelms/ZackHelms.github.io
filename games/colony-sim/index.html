@@ -71,7 +71,7 @@ ol,ul{margin:0;padding:0;list-style:none}
 @media (max-width:820px){.side.left{display:none}.side.right{width:calc(100% - 16px);top:auto;height:45%}#topbar{right:8px;left:96px;top:calc(44px + env(safe-area-inset-top))}#speeds .spd:nth-child(n+5){display:none}}</style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:11 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:17 UTC</div>
 <canvas id="view"></canvas>
 <div id="bubbles"></div>
 
@@ -2124,7 +2124,7 @@ vec3 light(vec3 W, vec3 N, vec3 alb){
   vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5);
   vec3 c = alb * (amb + uSunCol * d);
   vec3 fl = uFire - W; float fd = length(fl);
-  float fi = uFireI * (0.85 + 0.15 * sin(uTime * 13.0) * sin(uTime * 7.3)) / (1.0 + fd * fd * 0.02);
+  float fi = uFireI * (0.85 + 0.15 * sin(uTime * 13.0) * sin(uTime * 7.3)) / (1.0 + fd * fd * 0.09);
   c += alb * vec3(1.0, 0.55, 0.22) * fi * max(dot(N, fl / max(fd, 0.01)), 0.0);
   float f = 1.0 - exp(-length(W - uEye) / uFogD);
   return mix(c, uFog, clamp(f, 0.0, 0.8));
@@ -2447,7 +2447,7 @@ makeRenderer = function makeRenderer(canvas, isl) {
     invVP = inv(VP);
     const hour = (sim.t % 86400) / 3600, pal = palette(hour);
     const fireSite = sim.sites.find((x) => x.type === 'campfire' && x.done);
-    const fire = { p: fireSite ? [fireSite.x, heightAt(isl, fireSite.x, fireSite.z) + 0.8, fireSite.z] : [0, -999, 0], i: fireSite ? 1.2 + pal.night * 6 : 0 };
+    const fire = { p: fireSite ? [fireSite.x, heightAt(isl, fireSite.x, fireSite.z) + 0.8, fireSite.z] : [0, -999, 0], i: fireSite ? 0.3 + pal.night * 2.2 : 0 };
 
     gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
     gl.clearColor(...pal.hor.map((v) => Math.pow(v, 1 / 2.2)), 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);

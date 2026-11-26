@@ -280,15 +280,22 @@ build order, instead of being spread over the buckets. Each step ends in a page 
 plays; from CS-2 on, also a headless report over many seeds. Design, the CD's decisions
 and every call made for them: `.claude/colony-sim.md`.
 
-- [colony-sim] **Phase 1 first draft** (In progress; the CD's go-ahead 2026-11-26: "use your
-  best judgment", rudimentary Minecraft-like graphics, capsule bodies with varied clothing
-  colours, Claude tunes). Covers CS-1 to CS-3 below in one rough pass. Design:
+- [colony-sim] **Play the phase 1 first draft** (Needs Zack; built 2026-11-26 on the CD's
+  "use your best judgment"). Live at tythos.com/games/colony-sim/. Watch a colony from landing to
+  the phase 1 screen (about 13 game days, 1.5 h at 4x); follow each founder; try the goals board
+  and "Do now" / "Later" on someone tired, then again after they learn their lesson. The calls
+  made for you are listed in `.claude/colony-sim.md` § Calls made while building; the known
+  limits (people walk through walls, no animals you can see) are in § Known limits. Say what
+  is off, and what phase 2 should be when you are ready. Design:
   `.claude/colony-sim.md`: four immortal
   founders (leader, gatherer, hunter, architect) with perseverance; Sims-like meters on the
   CD's 0 / 50 / 80 / 100% scale; lessons learned by trial and error at an INT/WIS rate;
   refusals; goals board (A) and list reordering (B), direct orders (C) unlocked later; a
   1 km x 0.7 km island, 30-minute days at 1x-16x; separate source files built into one page,
-  hand-written WebGL2; seeded, replayable, measured headless.
+  hand-written WebGL2; seeded, replayable, measured headless (30/30 seeds finish phase 1,
+  median day 13).
+- *CS-1 to CS-3 were built together as the first draft (2026-11-26); they stay listed as the
+  shape of what exists, to be revisited after the CD plays it.*
 - [colony-sim] **CS-1 Landing**: first playable. Build pipeline; island v1 (shores, rocky
   stretches, cliffs, forest, loose rock, the waterfall and pond unexplored); sky and
   day/night; four fleshed-out settlers on the Animation Rigs skeleton walking on terrain;

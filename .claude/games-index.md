@@ -31,6 +31,7 @@ local-2p.
 | Animation Rigs | `animation-rigs/` | animation-sandbox | orbit-drag, pinch-zoom, two-finger-pan, tap | open-sandbox | procedural-animation, inverse-kinematics, simulated-agents, real-time-3d | solo | `.claude/animation-rigs.md` |
 | Driving Simulator | `driving-simulator/` | driving-sim | steering-wheel, pedal-hold, multi-touch-chord, orbit-drag | open-sandbox | vehicle-physics, simulated-agents, procedural-generation, real-time-3d, day-night-cycle | solo | `.claude/driving-simulator.md` |
 | Combat Simulator | `combat-simulator/` | melee-duel | virtual-joystick, tap, multi-touch-chord | level-campaign | parry-timing, iframe-dodge, combo-chains, real-time-3d, inverse-kinematics, art-styles | vs-ai | `.claude/combat-simulator.md` |
+| Colony Sim | `colony-sim/` | colony-sim | orbit-drag, pinch-zoom, tap | save-campaign | simulated-agents, agent-learning, procedural-generation, seeded-determinism, real-time-3d, inverse-kinematics | solo | `.claude/colony-sim.md` |
 | Interlock | `interlock/` | disassembly-puzzle | orbit-drag, pinch-zoom, tap | endless-levels | procedural-generation, real-time-3d, spatial-reasoning, day-night-cycle | solo | `.claude/interlock.md` |
 | Music Mixer | `music-mixer/` | music-instrument | hold, tap, multi-touch-chord | open-sandbox | procedural-audio, stem-mixing, direct-manipulation, user-authoring | solo | `.claude/music-mixer.md` |
 | Verlet Ragdoll | `verlet-physics-ragdoll/` | physics-toy | drag-grab, drag-steer | open-sandbox | physics-sim, verlet-constraints, direct-manipulation | solo | `.claude/verlet-physics-ragdoll.md` |
@@ -86,7 +87,7 @@ local-2p.
 | Wayfinder | `wayfinder/` | exploration-sim | twin-stick, drag-slider | skill-campaign, open-sandbox | first-person-3d, map-and-compass, day-night-cycle, skill-teaching | solo | `.claude/wayfinder.md` |
 | Phasic | `phasic/` | phase-puzzle | drag-place, tap | level-campaign, endless-levels, daily-challenge | phase-change, soft-body-physics, point-gravity, resource-economy | solo | `.claude/phasic.md` |
 
-60 games (58 in-repo + 2 external builds).
+61 games (59 in-repo + 2 external builds).
 
 ## Coverage summary (read this first when picking new games)
 
@@ -155,6 +156,17 @@ local-2p.
   levels forever: 16 authored, then endless seeded drawers, each beaten by
   the in-game solver before it is served; earmarked as the first web-first
   prototype of a future iOS title).
+
+### Newly opened by the 2026-11-26 Colony Sim build
+- **`colony-sim`** genre + **`agent-learning`** mechanic (colony-sim, a direct CD commission,
+  first draft of phase 1). Four settlers with D&D-style attributes and Sims-like needs run
+  themselves on a seeded 1 km island; the player mostly watches, reorders a goals board the
+  leader delegates from, and can push a settler's plan around. `agent-learning` is the new
+  idea: a written catalogue of lessons whose numbers each settler learns from their own
+  mistakes (at an INT/WIS rate), after which they refuse orders that repeat the mistake. It
+  is also the second game, after TAAS, tuned by headless runs over many seeds
+  (`games/colony-sim/tools/run.mjs`). A second colony game would want a different spin
+  (a city scale, a hostile island, players who are the settlers).
 
 ### Newly opened by the 2026-10-27 split
 - **`agent-programming`** mechanic (robot factory, TAAS's factory given its own hub card at the

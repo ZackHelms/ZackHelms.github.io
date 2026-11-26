@@ -1,7 +1,7 @@
 # Colony Sim — design and context
 
 `games/colony-sim/`. CD commission 2026-11-26, designed in a brainstorm the same
-day. **Status: first draft of phase 1 in progress.**
+day. **Status: first draft of phase 1 built 2026-11-26 (see § As built); awaiting the CD's play.**
 
 **The CD's go-ahead (2026-11-26), verbatim in substance:** "Use your best judgment to
 proceed with a first draft of the game. Make any decisions on your own without
@@ -418,3 +418,110 @@ lesson data model; job/task planner design (utility scoring, GOAP or hand-writte
 planners); exact terrain generator; capsule counts and clothing shapes; UI layout;
 save format; numbers in every tuning table (set by headless measurement, never
 guessed). Each is recorded in this file when decided.
+
+## As built (first draft, 2026-11-26)
+
+Plan: `.claude/plans/colonysim.phase1-draft.md`. Everything the plan or this file left open was
+decided by Claude on the CD's instruction ("Make any decisions on your own"); the calls are
+listed under § Calls made while building.
+
+### Files
+| File | What it holds |
+|---|---|
+| `src/rng.js` | sfc32 named streams with saveable state; `hashState` |
+| `src/island.js` | `genIsland(seed)`: heightfield + cover grid (2 m cells, 500 x 350), the camp flattened on the south shore, a 20 m scarp ~420 m inland with two 80 m ramps, the pond and falls at its foot, a river to the west coast, rocky shores and scree; trees, loose rocks, berry bushes. `heightAt`, `coverAt`, `slopeAt`, `walkCost` |
+| `src/nav.js` | 4 m A* grid (cost = slowest ground in the cell), connected regions (`comp`/`main`), string-pulling, `pathTime`; `WALK` = 1/30 m per game second |
+| `src/data.js` | every number (`TUNE`), the founders, buildings (cost, hours, slot), goals, lessons, refusal and learned lines |
+| `src/brain.js` | decisions: `needOf` (urgent vs soft needs), `think`, `checkInterrupts`, the leader (`ensureSites`, `nextWork` by role), `makeTask` (every job as steps), lessons (`learnEvent`, `learnChance`), the player's inputs (`applyPlayerInput`) |
+| `src/sim.js` | the engine: clock, `drain` (needs, accidents, collapse, perseverance), movement, step execution and effects (`FX`), food batches and spoilage, buildings, tools, nightly review, discovery, the phase 1 check, `step`/`runFor`/`replay`, `snapshot`/`restore` |
+| `src/rig.js` | `ik2` + `buildPose` copied from Animation Rigs (A002 form); planted feet on the heightfield; work poses (chop, mine, build, crouch jobs, sit/eat, lie, bathe, fish, look, talk); `rigCapsules` (body, hair styles, beard, hat, the tool in hand) |
+| `src/render.js` | WebGL2: terrain mesh, sea/pond/river/falls, instanced boxes (scenery, buildings by stage, piles, loads), instanced capsules, sky and sun from the clock, firelight, blob shadows and the selection ring; orbit/pan/zoom/flyTo, `project`, `pickGround` |
+| `src/ui.js` | top bar, goals board (A), settler panel with Now/Next (B), speech bubbles, info/settings/phase 1/continue overlays; panels rebuilt by part from signatures |
+| `src/audio.js` | surf, birds, crickets, axe thunks; mute persisted |
+| `src/main.js` | boot, fixed-step accumulator (48 game seconds per real second at 1x, at most 400 ticks a frame), interpolation, input, follow, autosave every game hour |
+| `build.mjs` | each module becomes its own `{ }` block; exported names are declared once outside (the build fails if two modules export one name); imports are dropped |
+| `tools/test-sim.mjs` | 61 headless checks (rng, island, nav, sim, minds, economy, rig) |
+| `tools/run.mjs` | the tuning runner: `--seeds N --from S --days D [--bad]` |
+
+### Architecture notes
+- **A tick is 10 game seconds.** The page runs `48 x speed` game seconds per real second
+  (a 30-minute day at 1x) and interpolates positions between ticks; at 16x a frame may run
+  about 8 ticks, and any backlog over 400 ticks in one frame is dropped (a hidden tab never bursts).
+- **Needs: urgent vs soft.** Urgent ones (bladder, bowel, energy below the learned stop point,
+  hunger below the learned eat point) interrupt work every 5 game minutes. Soft ones
+  (bedtime, mealtimes, washing, rest) wait for the current task to end, except that mealtimes
+  and bedtime also interrupt a long job.
+- **A player's order is "pinned"**: it suppresses every need until done (that is how the CD
+  can make things worse: accidents, collapses), unless the settler has learned the lesson
+  that covers the need, in which case they refuse with a bubble and put the need first; the
+  order then waits behind it.
+- **The plan list** keeps the player's items and any paused task, and refills the leader's
+  forecast (two items) every time the settler picks a new task. "Later" puts off sleep, a
+  meal or a wash by an hour.
+- **Lessons**: a lesson's number moves 60% of the way to its target each time it is learned;
+  the chance to learn is `0.15 + 0.04 x ((INT + WIS)/2 - 10)` (0.1-0.6), multiplied by
+  `1 + 0.3 x (times the mistake was made - 1)`, at most 0.9. Triggers: a collapse, an injury
+  while exhausted or in the dark, a bad night after a late one, and a **nightly review** at
+  21:00 in which any of energy, hunger, cleanliness or health that fell below 50 that day is
+  a chance to learn its habit (lateNight, skipMeal, hygiene, overwork). When the leader learns
+  "keep tools sharp" they move the tool bench to the top of the goals board.
+- **Food**: batches with expiry (meals 2 days, 5 in the food store; dried 10-14). Three
+  mealtimes; someone heading out after breakfast packs a lunch if the store can spare it; a
+  forager or fisher far from camp eats from the basket. An empty larder sends a hungry
+  settler to a berry bush.
+- **One set of tools**: a job that needs the axe or the spear waits for it; the hammer and
+  knife are optional (without them the work is 0.6x).
+- **Determinism**: every random draw comes from a named stream in `sim.R`; inputs are stored
+  with the tick they arrived on; `replay(seed, inputs, tick)` reproduces a game, and the save
+  is a `snapshot` (streams included).
+
+## Measured (2026-11-26, `node games/colony-sim/tools/run.mjs`)
+| Set | Finished | Median day | Range | A struggle (< 30 on a meter) | Median lessons |
+|---|---|---|---|---|---|
+| seeds 1-30 (tuned on) | 30/30 | 12.3 | 9-19.7 | 22/30 | 11 |
+| seeds 31-60 (held out) | 30/30 | 13.0 | 9-16.4 | 25/30 | 11 |
+| seeds 31-60, bad player (`--bad`) | 30/30 | 12.9 | 9-19.8 | 30/30 | 12 |
+
+The bad player orders everyone to keep working at 22:30 and puts off sleep for three nights,
+and moves the tool bench to last. It makes runs more miserable (3 collapses and 1 accident
+over 30 runs, a struggle in every run) and widens the range (the slowest run goes from 16.4
+to 19.8 days) without moving the median. It doesn't stall them. Earlier in tuning it
+cost about a day of median, so the effect is small and noisy: a bad player hurts the
+founders more than the schedule. Typical
+shape: the camp is built by day 6-9; the rest is the founders learning to keep every meter
+above 50 for two days (washing and bedtime are the usual last lessons).
+
+## How to add
+- **A job**: a `case` in `makeTask` (`brain.js`) made of `go`/`work` steps; any effect as an
+  `FX` entry in `sim.js`; a label in `LABEL`; a pose in `workPose` (`rig.js`) if it needs one;
+  then let a role pick it in `nextWork`.
+- **A lesson**: a row in `LESSONS` (param, start, target, fmt) plus lines in `REFUSALS` and
+  `LEARNED`; read it with `lessonParam(s, key)` where it matters; call
+  `learnEvent(sim, s, key)` where the mistake shows (or map a meter to it in `REVIEW`).
+- **A building**: a row in `BUILDINGS` (cost, hours, f/r slot, size, sleeps), a goal in
+  `GOALS` (+ `DEFAULT_GOALS` if it should be on the board), and its parts in
+  `buildDynamic` (`render.js`). Add it to `PHASE1_BUILDS` only if the finish line needs it.
+- After any balance change: `node games/colony-sim/tools/run.mjs --seeds 30 --from 31` and
+  the `--bad` run; update the table above.
+
+## Calls made while building (the CD's to overrule)
+- 30-minute days (the 15 first proposed would have made the waterfall a 10-hour walk).
+- Phase 1's finish line excludes bladder and bowel; the drying rack is on the board but not
+  required.
+- The nightly review and the experience-weighted learning chance (without them the
+  48-hour window almost never closed).
+- Three mealtimes, packed lunches, eating from the basket.
+- Building costs and hours (x1.5 and x1.6 over the first numbers, so the camp is the main arc).
+- The hunter scouts inland once two days of food are stored; finding the pond gives a swim and
+  a mood lift. The pond is about four hours away, so it is not a regular bath yet.
+- Buildings do not block walking. Their walls have door gaps drawn, but the nav grid ignores them.
+- A sun on a simple arc, not the zmh-sky kit's real sky.
+- Speech bubbles last 8 real seconds, one per settler, four at most.
+
+## Known limits of the draft
+- Settlers walk through buildings and each other.
+- No weather, seasons, visible animals (rabbits are a number in a snare) or animals that hurt
+  (CS-4).
+- No inviting settler 5: the phase 1 screen says so. Everything after phase 1 is undecided (CD).
+- At 16x, walkers whose on-screen speed passes 6 m/s switch to a sliding gait cycle.
+- Saves are kept in this browser only.
