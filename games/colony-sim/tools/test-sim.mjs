@@ -33,6 +33,65 @@ section('rng', async () => {
   check('hashState stable', hashState({ a: 1, b: [2, 3] }) === hashState({ a: 1, b: [2, 3] }) && hashState({ a: 1 }) !== hashState({ a: 2 }));
 });
 
+/* ---------------- island ---------------- */
+const islands = {};
+export async function island(seed) {
+  const { genIsland } = await import('../src/island.js');
+  return islands[seed] || (islands[seed] = genIsland(seed));
+}
+section('island', async () => {
+  const I = await import('../src/island.js');
+  const { COVER, heightAt, coverAt, walkCost } = I;
+  const t0 = Date.now(); await island(1); const ms = Date.now() - t0;
+  check('generation under 1.5 s', ms < 1500, ms + ' ms');
+  const bad = { flat: [], trees: [], rocks: [], falls: [], drop: [], cliff: [], rocky: [], river: [], bush: [] };
+  for (let seed = 1; seed <= 20; seed++) {
+    const isl = await island(seed), c = isl.camp;
+    let lo = 1e9, hi = -1e9;
+    for (let a = 0; a < 64; a++) for (let r = 0; r <= 30; r += 3) {
+      const y = heightAt(isl, c.x + Math.cos(a / 64 * 6.283) * r, c.z + Math.sin(a / 64 * 6.283) * r);
+      lo = Math.min(lo, y); hi = Math.max(hi, y);
+    }
+    if (hi - lo > 0.6 || lo < 1.5) bad.flat.push(seed + ':' + lo.toFixed(2) + '..' + hi.toFixed(2));
+    const near = (arr, r0, r1) => arr.filter(o => { const d = Math.hypot(o.x - c.x, o.z - c.z); return d >= r0 && d <= r1; }).length;
+    if (near(isl.trees, 0, 60) < 40) bad.trees.push(seed + ':' + near(isl.trees, 0, 60));
+    if (near(isl.trees, 0, 20) > 0) bad.trees.push(seed + ': tree inside camp');
+    if (near(isl.rocks, 0, 60) < 25) bad.rocks.push(seed + ':' + near(isl.rocks, 0, 60));
+    if (near(isl.bushes, 0, 150) < 25) bad.bush.push(seed + ':' + near(isl.bushes, 0, 150));
+    const dp = Math.hypot(isl.pond.x - isl.landing.x, isl.pond.z - isl.landing.z);
+    if (dp < 350 || dp > 550) bad.falls.push(seed + ':' + dp.toFixed(0));
+    if (isl.falls.top.y - isl.falls.bottom.y < 12) bad.drop.push(seed + ':' + (isl.falls.top.y - isl.falls.bottom.y).toFixed(1));
+    let land = 0, cliff = 0, rocky = 0, riverNear = 0;
+    for (let i = 0; i < isl.cover.length; i++) {
+      const k = isl.cover[i];
+      if (k !== COVER.SEA) land++;
+      if (k === COVER.CLIFF) cliff++;
+      if (k === COVER.ROCKY) rocky++;
+      if (k === COVER.RIVER) {
+        const x = (i % isl.W + 0.5) * isl.CELL, z = (Math.floor(i / isl.W) + 0.5) * isl.CELL;
+        if (Math.hypot(x - c.x, z - c.z) < 50) riverNear++;
+      }
+    }
+    if (cliff / land < 0.01) bad.cliff.push(seed + ':' + (cliff / land * 100).toFixed(2) + '%');
+    if (rocky < 200) bad.rocky.push(seed + ':' + rocky);
+    if (riverNear) bad.river.push(seed + ':' + riverNear);
+    if (coverAt(isl, isl.pond.x, isl.pond.z) !== COVER.POND) bad.falls.push(seed + ': pond centre not POND');
+    if (walkCost(isl, c.x, c.z) !== 1) bad.flat.push(seed + ': camp centre cost ' + walkCost(isl, c.x, c.z));
+  }
+  check('landing site flat (±0.3 m over 30 m, above 1.5 m)', !bad.flat.length, bad.flat.join(' '));
+  check('≥40 trees within 60 m of camp, none within 20 m', !bad.trees.length, bad.trees.join(' '));
+  check('≥25 loose rocks within 60 m of camp', !bad.rocks.length, bad.rocks.join(' '));
+  check('≥25 berry bushes within 150 m of camp', !bad.bush.length, bad.bush.join(' '));
+  check('pond 350-550 m from landing', !bad.falls.length, bad.falls.join(' '));
+  check('waterfall drop ≥ 12 m', !bad.drop.length, bad.drop.join(' '));
+  check('cliffs ≥ 1% of land', !bad.cliff.length, bad.cliff.join(' '));
+  check('rocky shore exists (≥200 cells)', !bad.rocky.length, bad.rocky.join(' '));
+  check('no river within 50 m of camp', !bad.river.length, bad.river.join(' '));
+  const isl = await island(1);
+  check('walkCost: sea impassable', walkCost(isl, 2, 2) === Infinity);
+  check('deterministic', JSON.stringify((await import('../src/island.js')).genIsland(3).trees.slice(0, 20)) === JSON.stringify((await island(3)).trees.slice(0, 20)));
+});
+
 for (const s of sections) {
   if (only.length && !only.includes(s.name)) continue;
   console.log('[' + s.name + ']');
