@@ -4,7 +4,8 @@ Buckets in order: In progress · Now · Needs Zack · Next · Later · Icebox.
 Done log: `DONE.md`. Created 2026-07-31 scoped to **Phasic**; since then other
 games' entries have joined, each tagged with its game (`[taas]`, `[cyoa2]`,
 `[driving-sim]`...). Work that has not earned an entry here is tracked per game
-in `.claude/<game>.md`.
+in `.claude/<game>.md`. **Exception:** Colony Sim keeps its whole roadmap in its own
+`## Colony Sim` section before Icebox (CD, 2026-11-26); grooming leaves it in place.
 
 ## In progress
 
@@ -270,6 +271,46 @@ in `.claude/<game>.md`.
   backlog it, Later). Leaves come out in late March and April, colour peaks in late October,
   and trees are bare by December, instead of one look per season. After DS-8 and DS-9. Spec:
   `.claude/driving-simulator.md` DS-13.
+
+## Colony Sim
+
+A dedicated section by the CD's request (2026-11-26): the whole roadmap of the new
+**Colony Sim** game (`games/colony-sim/`, not yet built) lives here as one list, in
+build order, instead of being spread over the buckets. Each step ends in a page the CD
+plays; from CS-2 on, also a headless report over many seeds. Design, the CD's decisions
+and every call made for them: `.claude/colony-sim.md`.
+
+- [colony-sim] **Phase 1 first draft** (In progress; the CD's go-ahead 2026-11-26: "use your
+  best judgment", rudimentary Minecraft-like graphics, capsule bodies with varied clothing
+  colours, Claude tunes). Covers CS-1 to CS-3 below in one rough pass. Design:
+  `.claude/colony-sim.md`: four immortal
+  founders (leader, gatherer, hunter, architect) with perseverance; Sims-like meters on the
+  CD's 0 / 50 / 80 / 100% scale; lessons learned by trial and error at an INT/WIS rate;
+  refusals; goals board (A) and list reordering (B), direct orders (C) unlocked later; a
+  1 km x 0.7 km island, 30-minute days at 1x-16x; separate source files built into one page,
+  hand-written WebGL2; seeded, replayable, measured headless.
+- [colony-sim] **CS-1 Landing**: first playable. Build pipeline; island v1 (shores, rocky
+  stretches, cliffs, forest, loose rock, the waterfall and pond unexplored); sky and
+  day/night; four fleshed-out settlers on the Animation Rigs skeleton walking on terrain;
+  camera, follow dropdown, settler panel; all meters, sleep, eat, bathroom, ocean bath,
+  forage, chop, gather rock, campfire, lean-to; the leader cooking and tidying; speed and
+  pause; determinism and the headless runner's first report.
+- [colony-sim] **CS-2 Minds and control**: attributes, preferences, fears, goals; lessons
+  and refusals with speech bubbles; relationships; leader delegation from the goals board
+  (A); reordering a settler's list (B).
+- [colony-sim] **CS-3 Building and tools**: the architect's staged builds (hut, beds, food
+  store, storage, latrine, drying rack, tool maintenance bench); tool wear 100% to 50%; the
+  phase 1 finish line; first tuning pass (phase 1 always succeeds, days vary).
+- *CS-4 onward is on the back burner (CD, 2026-11-26): settler counts, unlocks, tech and
+  buildings after phase 1 are undecided. The steps below are placeholders only.*
+- [colony-sim] **CS-4 The wild island**: hunting, trapping, fishing, fauna that can hurt;
+  difficult rocky terrain; exploration and discovery (the waterfall pond); temporary camps.
+- [colony-sim] **CS-5 Phase 2, newcomers**: unlocks, invites and the supply boat, ordered
+  gear; mortal newcomers, noticing the missing, rescue by two or by one with aid, death;
+  teaching lessons; food pressure and hunting parties.
+- [colony-sim] **CS-6 Caves and special buildings**: special materials and the buildings and
+  equipment that need them; the leader's micromanage skill unlocks direct orders (C).
+- [colony-sim] **CS-7 Power**: hydro / solar / thermal generation, then ordered power tools.
 
 ## Icebox
 
