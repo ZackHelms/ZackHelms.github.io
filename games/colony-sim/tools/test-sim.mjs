@@ -280,6 +280,42 @@ section('economy', async () => {
   check('…and not before 48 h', p.phase1 && p.phase1.t - 6 * 3600 >= 48 * 3600 - 3600, p.phase1 && (p.phase1.t / 3600).toFixed(1));
 });
 
+/* ---------------- rig ---------------- */
+section('rig', async () => {
+  const R = await import('../src/rig.js'), I = await import('../src/island.js'), D = await import('../src/data.js');
+  const isl = await island(1);
+  const look = D.FOUNDERS[1].look, s = look.height;
+  const LEN = [[13, 14, 0.45 * s], [14, 15, 0.44 * s], [17, 18, 0.45 * s], [18, 19, 0.44 * s], [5, 6, 0.29 * s], [6, 7, 0.26 * s], [9, 10, 0.29 * s], [10, 11, 0.26 * s]];
+  const ACTS = ['idle', 'walk', 'run', 'chop', 'mine', 'pick', 'build', 'cook', 'forage', 'trap', 'eat', 'sit', 'sleep', 'collapsed', 'talk', 'bathe', 'squat', 'fish', 'look', 'maintain', 'drop'];
+  let worst = 0, bad = [], nonFinite = [];
+  for (const act of ACTS) {
+    const st = { x: isl.camp.x, z: isl.camp.z, yaw: 0.3, speed: act === 'walk' ? 1.6 : act === 'run' ? 3.5 : 0, act, look, carry: act === 'walk' ? { item: 'wood', n: 2 } : null, face: { x: isl.camp.x + 2, z: isl.camp.z } };
+    const rig = R.makeRig(st, isl);
+    for (let i = 0; i < 100; i++) {
+      if (st.speed) { st.x += Math.cos(st.yaw) * st.speed / 60; st.z += Math.sin(st.yaw) * st.speed / 60; }
+      R.updateRig(rig, st, i === 0 ? 0 : (i % 7 ? 1 / 60 : 0.1), isl);
+      const J = rig.J;
+      if (i > 30) for (const [a, b, L] of LEN) { const d = Math.hypot(J[a].x - J[b].x, J[a].y - J[b].y, J[a].z - J[b].z); const e = Math.abs(d - L); if (e > worst) worst = e; if (e > 1e-6 && bad.length < 3) bad.push(act + ' ' + a + '-' + b + ' ' + e.toExponential(1)); }
+      const caps = R.rigCapsules(rig);
+      if (!caps.every(Number.isFinite)) nonFinite.push(act);
+    }
+  }
+  check('IK bones keep their exact lengths in every activity (after blends settle)', worst < 1e-6, bad.join(' '));
+  check('every capsule is finite at dt 0, 1/60 and 0.1', !nonFinite.length, [...new Set(nonFinite)].join(','));
+  // walking up a slope: stance ankles sit on the ground
+  const path = { x: isl.camp.x, z: isl.camp.z, yaw: Math.atan2(isl.pond.z - isl.camp.z, isl.pond.x - isl.camp.x), speed: 1.6, act: 'walk', look };
+  const rig = R.makeRig(path, isl);
+  let maxErr = 0, n = 0;
+  for (let i = 0; i < 60 * 60; i++) {
+    path.x += Math.cos(path.yaw) * 1.6 / 60; path.z += Math.sin(path.yaw) * 1.6 / 60;
+    R.updateRig(rig, path, 1 / 60, isl);
+    for (let f = 0; f < 2; f++) if (!rig.feet[f].sw) { const a = rig.J[f ? 19 : 15]; const e = Math.abs(a.y - 0.08 * look.height - I.heightAt(isl, a.x, a.z)); maxErr = Math.max(maxErr, e); n++; }
+  }
+  check('walking 60 s over the island: stance ankles within 0.1 m of the ground', maxErr < 0.1 && n > 1000, maxErr.toFixed(3) + ' over ' + n);
+  const strides = rig.steps / 60;
+  check('walking cadence is human (0.7-1.2 steps per foot per second)', strides / 2 > 0.7 && strides / 2 < 1.2, (strides / 2).toFixed(2));
+});
+
 for (const s of sections) {
   if (only.length && !only.includes(s.name)) continue;
   console.log('[' + s.name + ']');
