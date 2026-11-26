@@ -71,7 +71,7 @@ ol,ul{margin:0;padding:0;list-style:none}
 @media (max-width:820px){.side.left{display:none}.side.right{width:calc(100% - 16px);top:auto;height:45%}#topbar{right:8px;left:96px;top:calc(44px + env(safe-area-inset-top))}#speeds .spd:nth-child(n+5){display:none}}</style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 22:23 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 22:39 UTC</div>
 <canvas id="view"></canvas>
 <div id="bubbles"></div>
 
@@ -105,47 +105,1559 @@ ol,ul{margin:0;padding:0;list-style:none}
 /* ===== rng.js ===== */
 // rng.js — seeded randomness. sfc32 core; named streams so one system's draws
 // never shift another's (a test can then force one outcome without moving the rest).
+// A stream's state is four uint32s, so a whole simulation can be saved and restored.
 function fnv1a(str) {
   let h = 0x811c9dc5;
   for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 0x01000193); }
   return h >>> 0;
 }
-function sfc32(a, b, c, d) {
-  return function () {
-    a >>>= 0; b >>>= 0; c >>>= 0; d >>>= 0;
-    let t = (a + b) | 0; a = b ^ (b >>> 9); b = (c + (c << 3)) | 0;
-    c = (c << 21) | (c >>> 11); d = (d + 1) | 0; t = (t + d) | 0; c = (c + t) | 0;
-    return (t >>> 0) / 4294967296;
+function wrap(seed, name, st) {
+  const r = {
+    s: st,
+    next() {
+      const s = r.s;
+      let a = s[0] >>> 0, b = s[1] >>> 0, c = s[2] >>> 0, d = s[3] >>> 0;
+      let t = (a + b) | 0; a = b ^ (b >>> 9); b = (c + (c << 3)) | 0;
+      c = (c << 21) | (c >>> 11); d = (d + 1) | 0; t = (t + d) | 0; c = (c + t) | 0;
+      s[0] = a >>> 0; s[1] = b >>> 0; s[2] = c >>> 0; s[3] = d >>> 0;
+      return (t >>> 0) / 4294967296;
+    },
+    range: (a, b) => a + r.next() * (b - a),
+    int: (a, b) => a + Math.floor(r.next() * (b - a + 1)),
+    pick: (arr) => arr[Math.floor(r.next() * arr.length)],
+    chance: (p) => r.next() < p,
+    stream: (n) => gen(seed, name + '/' + n),
+    save: () => r.s.slice(),
+    load: (arr) => { r.s = arr.slice(); return r; },
   };
+  return r;
 }
 function gen(seed, name) {
   const h = fnv1a(String(seed) + '|' + name);
-  const f = sfc32(h, h ^ 0x9e3779b9, (h * 31) ^ 0x85ebca6b, fnv1a(name + '#' + seed));
-  for (let i = 0; i < 12; i++) f();
-  const r = {
-    next: f,
-    range: (a, b) => a + f() * (b - a),
-    int: (a, b) => a + Math.floor(f() * (b - a + 1)),
-    pick: (arr) => arr[Math.floor(f() * arr.length)],
-    chance: (p) => f() < p,
-    stream: (n) => gen(seed, name + '/' + n),
-  };
+  const r = wrap(seed, name, [h, h ^ 0x9e3779b9, (Math.imul(h, 31) ^ 0x85ebca6b) >>> 0, fnv1a(name + '#' + seed)]);
+  for (let i = 0; i < 12; i++) r.next();
   return r;
 }
 function makeRng(seed) { return gen(seed >>> 0, 'root'); }
 function hashState(obj) { return fnv1a(JSON.stringify(obj)).toString(16).padStart(8, '0'); }
 
 /* ===== island.js ===== */
-// island.js — placeholder (filled in a later task)
+// island.js — the island, generated from a seed. A heightfield + a land-cover grid
+// baked once; everything (rendering, walking, jobs) samples these same arrays so
+// they can never disagree (the Wayfinder rule).
+
+const CELL = 2, IW = 500, IH = 350;           // 1000 m x 700 m
+const COVER = { SEA: 0, SAND: 1, ROCKY: 2, GRASS: 3, FOREST: 4, CLIFF: 5, POND: 6, RIVER: 7 };
+const CAMP_Y = 2.8;
+
+const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const lerp = (a, b, t) => a + (b - a) * t;
+const wrapA = (a) => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; };
+
+function makeNoise(rng) {
+  const P = new Uint16Array(512), V = new Float32Array(256);
+  for (let i = 0; i < 256; i++) { P[i] = i; V[i] = rng.next(); }
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rng.next() * (i + 1)); const t = P[i]; P[i] = P[j]; P[j] = t; }
+  for (let i = 0; i < 256; i++) P[i + 256] = P[i];
+  const v = (x, z) => V[P[(P[x & 255] + z) & 511] & 255];
+  const n2 = (x, z) => {
+    const xi = Math.floor(x), zi = Math.floor(z), fx = x - xi, fz = z - zi;
+    const u = fx * fx * (3 - 2 * fx), w = fz * fz * (3 - 2 * fz);
+    return lerp(lerp(v(xi, zi), v(xi + 1, zi), u), lerp(v(xi, zi + 1), v(xi + 1, zi + 1), u), w);
+  };
+  return (x, z, oct = 4) => {
+    let s = 0, a = 1, f = 1, n = 0;
+    for (let o = 0; o < oct; o++) { s += a * n2(x * f + o * 17.3, z * f - o * 9.1); n += a; a *= 0.5; f *= 2; }
+    return s / n;
+  };
+}
+
+function genIsland(seed) {
+  const rng = makeRng(seed), R = rng.stream('island');
+  const fbm = makeNoise(rng.stream('noise'));
+  const W = IW, H = IH, N = W * H;
+  const h = new Float32Array(N), cover = new Uint8Array(N);
+  const cx0 = 500, cz0 = 350, rx = 440, rz = 300;
+  const cellX = (i) => (i % W + 0.5) * CELL, cellZ = (i) => (Math.floor(i / W) + 0.5) * CELL;
+  const mask = (x, z) => {
+    const dx = (x - cx0) / rx, dz = (z - cz0) / rz;
+    return 1 - Math.hypot(dx, dz) - 0.16 * (fbm(x / 170, z / 170) - 0.5) * 2;
+  };
+
+  // landing on the south shore (z+), camp 48 m inland
+  const la = Math.PI / 2 + R.range(-0.3, 0.3);
+  const dir = { x: Math.cos(la), z: Math.sin(la) };
+  let sr = 0; while (mask(cx0 + dir.x * sr, cz0 + dir.z * sr) > 0 && sr < 600) sr += 1;
+  const shore = { x: cx0 + dir.x * sr, z: cz0 + dir.z * sr };
+  const landing = { x: shore.x - dir.x * 6, z: shore.z - dir.z * 6 };
+  const camp = { x: shore.x - dir.x * 48, z: shore.z - dir.z * 48, r: 32 };
+  const north = { x: -dir.x, z: -dir.z }, northA = Math.atan2(north.z, north.x);
+
+  // the scarp: a cliff band ~430 m inland, on the far side of the island from camp, with two ramps
+  const R0 = 418 + R.range(-8, 8), HS = 20 + R.range(0, 4);
+  const ramp = [R.range(0.45, 0.6), -R.range(0.45, 0.6)];
+  let pondA = R.range(-0.25, 0.25);
+  const scarpAt = (x, z) => {
+    const d = Math.hypot(x - camp.x, z - camp.z), a = wrapA(Math.atan2(z - camp.z, x - camp.x) - northA);
+    const t = sstep(1.15, 0.85, Math.abs(a));
+    let g = 1; for (const q of ramp) g *= sstep(0.04, 0.11, Math.abs(a - q));
+    const r0 = R0 + 18 * (fbm(a * 2.2 + 40, 3.3, 2) - 0.5), w = lerp(80, 5, g);   // a ramp is the same rise over 80 m
+    return HS * t * sstep(r0 - w / 2, r0 + w / 2, d);
+  };
+
+  for (let i = 0; i < N; i++) {
+    const x = cellX(i), z = cellZ(i), m = mask(x, z);
+    if (m < 0) { h[i] = -1.2 - 24 * Math.min(1, -m * 5); continue; }
+    const back = Math.max(0, ((x - camp.x) * north.x + (z - camp.z) * north.z) / 600);
+    const nf = 0.45 + 0.9 * Math.min(1, back);
+    let y = 1.0 + 34 * Math.pow(sstep(0, 0.7, m), 1.3) * (0.5 + 0.7 * fbm(x / 260, z / 260)) * nf;
+    y += 5 * (fbm(x / 55, z / 55, 3) - 0.5) * sstep(0, 0.15, m);
+    y += scarpAt(x, z) * sstep(0, 0.04, m);
+    h[i] = Math.max(y, 0.6);
+  }
+  // flatten the camp
+  for (let i = 0; i < N; i++) {
+    const d = Math.hypot(cellX(i) - camp.x, cellZ(i) - camp.z);
+    const w = 1 - sstep(34, 62, d);
+    if (w > 0) h[i] = lerp(h[i], CAMP_Y + 0.08 * (fbm(cellX(i) / 9, cellZ(i) / 9, 2) - 0.5), w);
+  }
+  const idx = (x, z) => Math.min(H - 1, Math.max(0, Math.floor(z / CELL))) * W + Math.min(W - 1, Math.max(0, Math.floor(x / CELL)));
+
+  // pond at the foot of the scarp, the falls above it
+  const pdir = { x: Math.cos(northA + pondA), z: Math.sin(northA + pondA) };
+  let pd = R0 - 30; while (pd < R0 + 40 && scarpAt(camp.x + pdir.x * pd, camp.z + pdir.z * pd) < 0.5) pd += 0.5;
+  const footD = pd - 16;
+  const pond = { x: camp.x + pdir.x * footD, z: camp.z + pdir.z * footD, r: 13 };
+  const ph = h[idx(pond.x, pond.z)] - 0.6;
+  for (let i = 0; i < N; i++) {
+    const d = Math.hypot(cellX(i) - pond.x, cellZ(i) - pond.z);
+    if (d < pond.r) { h[i] = ph - 1.6; cover[i] = 255; }
+    else if (d < pond.r + 8) h[i] = lerp(ph + 0.2, h[i], sstep(pond.r, pond.r + 8, d));
+  }
+  const topP = { x: camp.x + pdir.x * (pd + 9), z: camp.z + pdir.z * (pd + 9) };
+  const falls = { top: { x: topP.x, z: topP.z, y: h[idx(topP.x, topP.z)] }, bottom: { x: camp.x + pdir.x * (footD + pond.r - 2), z: camp.z + pdir.z * (footD + pond.r - 2), y: ph } };
+  // the stream that feeds the falls, cut into the plateau
+  for (let s = 9; s < 60; s += 1) {
+    const x = camp.x + pdir.x * (pd + s), z = camp.z + pdir.z * (pd + s), i = idx(x, z);
+    if (h[i] > 0) cover[i] = 254;
+  }
+
+  // the river from the pond to the sea, bending away from camp
+  const side = pondA >= 0 ? 1 : -1;
+  const rA = Math.atan2(camp.z - pond.z, camp.x - pond.x) + side * 0.95;
+  const river = [];
+  let rx_ = pond.x + Math.cos(rA) * pond.r, rz_ = pond.z + Math.sin(rA) * pond.r;
+  for (let s = 0; s < 900; s += 2) {
+    const a = rA + 0.35 * Math.sin(s / 37) + 0.25 * (fbm(s / 60, 7.7, 2) - 0.5);
+    rx_ += Math.cos(a) * 2; rz_ += Math.sin(a) * 2;
+    if (rx_ < 2 || rz_ < 2 || rx_ > W * CELL - 2 || rz_ > H * CELL - 2) break;
+    river.push({ x: rx_, z: rz_ });
+    if (h[idx(rx_, rz_)] < -0.5) break;
+  }
+  let prevY = ph;
+  for (const p of river) {
+    const i0 = idx(p.x, p.z), y = Math.max(h[i0] - 0.6, -0.4); prevY = y;   // the bed follows the ground: no canyon walls
+    for (let dz = -3; dz <= 3; dz += CELL) for (let dx = -3; dx <= 3; dx += CELL) {
+      if (dx * dx + dz * dz > 9) continue;
+      const i = idx(p.x + dx, p.z + dz);
+      if (cover[i] === 255) continue;
+      if (h[i] > -0.3) { h[i] = Math.min(h[i], y); cover[i] = 253; }
+    }
+  }
+
+  // distance to the sea, in cells (8-neighbour BFS)
+  const seaD = new Uint16Array(N).fill(65535), q = new Int32Array(N);
+  let qh = 0, qt = 0;
+  for (let i = 0; i < N; i++) if (h[i] < 0 && cover[i] === 0) { seaD[i] = 0; q[qt++] = i; }
+  while (qh < qt) {
+    const i = q[qh++], cx = i % W, cz = (i - cx) / W, nd = seaD[i] + 1;
+    for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
+      const x = cx + ox, z = cz + oz; if (x < 0 || z < 0 || x >= W || z >= H) continue;
+      const j = z * W + x; if (seaD[j] > nd) { seaD[j] = nd; q[qt++] = j; }
+    }
+  }
+
+  // land cover
+  const slopeCell = (i) => {
+    const cx = i % W, cz = (i - cx) / W; let m = 0;
+    for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const x = cx + ox, z = cz + oz; if (x < 0 || z < 0 || x >= W || z >= H) continue;
+      m = Math.max(m, Math.abs(h[z * W + x] - h[i]) / CELL);
+    }
+    return m;
+  };
+  for (let i = 0; i < N; i++) {
+    const x = cellX(i), z = cellZ(i), dc = Math.hypot(x - camp.x, z - camp.z), sd = seaD[i] * CELL;
+    if (cover[i] === 255) { cover[i] = COVER.POND; continue; }
+    if (cover[i] === 254 || cover[i] === 253) { cover[i] = COVER.RIVER; continue; }
+    if (h[i] < 0) { cover[i] = COVER.SEA; continue; }
+    if (dc < 36) { cover[i] = COVER.GRASS; continue; }
+    if (slopeCell(i) > 1.1) { cover[i] = COVER.CLIFF; continue; }
+    const dl = Math.hypot(x - landing.x, z - landing.z);
+    if (sd < 16 && fbm(x / 40, z / 40, 3) > 0.6 && dl > 110) { cover[i] = COVER.ROCKY; continue; }
+    if (sd < 22 && h[i] < 4.5) { cover[i] = COVER.SAND; continue; }
+    if (scarpAt(x, z) > HS * 0.15 && scarpAt(x, z) < HS * 0.9 && fbm(x / 12, z / 12, 2) > 0.45) { cover[i] = COVER.ROCKY; continue; }
+    if (fbm(x / 140 + 50, z / 140, 4) > 0.45 + 0.1 * sstep(160, 40, dc)) { cover[i] = COVER.FOREST; continue; }
+    cover[i] = COVER.GRASS;
+  }
+  // scree: rocky ground at the scarp's foot
+  for (let i = 0; i < N; i++) {
+    if (cover[i] !== COVER.GRASS && cover[i] !== COVER.FOREST) continue;
+    const x = cellX(i), z = cellZ(i);
+    if (scarpAt(x, z) < 0.3 && scarpAt(x + north.x * 8, z + north.z * 8) > HS * 0.5 && fbm(x / 9, z / 9, 2) > 0.5) cover[i] = COVER.ROCKY;
+  }
+
+  const isl = { seed, CELL, W, H, h, cover, seaD, landing, camp, pond, falls, river, trees: [], rocks: [], bushes: [] };
+  const O = rng.stream('objects');
+  const free = (x, z, r) => Math.hypot(x - camp.x, z - camp.z) > r && Math.hypot(x - pond.x, z - pond.z) > pond.r + 6;
+  const okLand = (x, z) => { const k = isl.cover[idx(x, z)]; return k === COVER.GRASS || k === COVER.FOREST || k === COVER.SAND; };
+  const addTree = (x, z) => {
+    const k = cover[idx(x, z)], y = h[idx(x, z)];
+    const kind = k === COVER.SAND ? 'palm' : (y > 26 || fbm(x / 90, z / 90 + 9, 2) > 0.62) ? 'pine' : 'oak';
+    isl.trees.push({ id: isl.trees.length, x, z, h: kind === 'palm' ? O.range(6, 9) : O.range(7, 13), kind, wood: 3 });
+  };
+  for (let z = 3; z < H * CELL; z += 5) for (let x = 3; x < W * CELL; x += 5) {
+    const px = x + O.range(-2, 2), pz = z + O.range(-2, 2), k = cover[idx(px, pz)];
+    const p = k === COVER.FOREST ? 0.55 : k === COVER.GRASS ? 0.04 : (k === COVER.SAND && seaD[idx(px, pz)] > 3) ? 0.035 : 0;
+    if (p && O.chance(p) && free(px, pz, 22) && slopeAt(isl, px, pz) < 0.7) addTree(px, pz);
+  }
+  // the grove behind camp
+  for (let z = -62; z <= 62; z += 6) for (let x = -62; x <= 62; x += 6) {
+    const px = camp.x + x + O.range(-2.5, 2.5), pz = camp.z + z + O.range(-2.5, 2.5), d = Math.hypot(px - camp.x, pz - camp.z);
+    const back = ((px - camp.x) * north.x + (pz - camp.z) * north.z) / Math.max(d, 1);
+    if (d >= 25 && d <= 60 && back > -0.25 && okLand(px, pz) && O.chance(0.6)) addTree(px, pz);
+  }
+  // loose rocks: clusters near camp, scattered on rocky ground
+  for (let c = 0; c < 4; c++) {
+    const a = northA + O.range(-1.6, 1.6), d = O.range(28, 52), ccx = camp.x + Math.cos(a) * d, ccz = camp.z + Math.sin(a) * d;
+    for (let k = 0; k < 9; k++) {
+      const px = ccx + O.range(-6, 6), pz = ccz + O.range(-6, 6);
+      if (h[idx(px, pz)] > 0.5 && free(px, pz, 21)) isl.rocks.push({ id: isl.rocks.length, x: px, z: pz, s: O.range(0.25, 0.5), n: 2 });
+    }
+  }
+  for (let i = 0; i < N; i += 1) if (cover[i] === COVER.ROCKY && O.chance(0.05)) isl.rocks.push({ id: isl.rocks.length, x: cellX(i) + O.range(-0.8, 0.8), z: cellZ(i) + O.range(-0.8, 0.8), s: O.range(0.3, 0.8), n: 3 });
+  // berry bushes: forest edges, thicker 40-150 m out
+  for (let z = 4; z < H * CELL; z += 7) for (let x = 4; x < W * CELL; x += 7) {
+    const px = x + O.range(-3, 3), pz = z + O.range(-3, 3), k = cover[idx(px, pz)], d = Math.hypot(px - camp.x, pz - camp.z);
+    if (!(k === COVER.GRASS || k === COVER.FOREST) || !free(px, pz, 30)) continue;
+    const p = (k === COVER.FOREST ? 0.05 : 0.02) + (d > 40 && d < 150 ? 0.06 : 0);
+    if (O.chance(p)) isl.bushes.push({ id: isl.bushes.length, x: px, z: pz, berries: 6 });
+  }
+  return isl;
+}
+
+function heightAt(isl, x, z) {
+  const fx = x / isl.CELL - 0.5, fz = z / isl.CELL - 0.5;
+  const x0 = Math.max(0, Math.min(isl.W - 2, Math.floor(fx))), z0 = Math.max(0, Math.min(isl.H - 2, Math.floor(fz)));
+  const tx = Math.min(1, Math.max(0, fx - x0)), tz = Math.min(1, Math.max(0, fz - z0)), W = isl.W, h = isl.h;
+  const a = h[z0 * W + x0], b = h[z0 * W + x0 + 1], c = h[(z0 + 1) * W + x0], d = h[(z0 + 1) * W + x0 + 1];
+  return lerp(lerp(a, b, tx), lerp(c, d, tx), tz);
+}
+function coverAt(isl, x, z) {
+  const cx = Math.floor(x / isl.CELL), cz = Math.floor(z / isl.CELL);
+  if (cx < 0 || cz < 0 || cx >= isl.W || cz >= isl.H) return COVER.SEA;
+  return isl.cover[cz * isl.W + cx];
+}
+function slopeAt(isl, x, z) {
+  const e = 1;
+  return Math.hypot(heightAt(isl, x + e, z) - heightAt(isl, x - e, z), heightAt(isl, x, z + e) - heightAt(isl, x, z - e)) / (2 * e);
+}
+// Seconds-per-metre multiplier for walking; Infinity where nobody can walk.
+function walkCost(isl, x, z) {
+  const k = coverAt(isl, x, z);
+  if (k === COVER.SEA || k === COVER.CLIFF || k === COVER.POND) return Infinity;
+  if (slopeAt(isl, x, z) > 0.9) return Infinity;
+  if (k === COVER.ROCKY) return 1 / 0.35;
+  if (k === COVER.RIVER) return 1 / 0.4;
+  if (k === COVER.FOREST) return 1 / 0.8;
+  return 1;
+}
 
 /* ===== nav.js ===== */
-// nav.js — placeholder (filled in a later task)
+// nav.js — walking routes over the island: A* on a 4 m grid whose cost is the
+// slowest ground in each cell, then string-pulled where the straight line is no slower.
+
+const NAV_CELL = 4;
+const WALK = 1 / 30;            // metres per game second (1.6 m/s real at 1x = 120 m per game hour)
+
+function makeNav(isl) {
+  const NW = Math.floor(isl.W * isl.CELL / NAV_CELL), NH = Math.floor(isl.H * isl.CELL / NAV_CELL), N = NW * NH;
+  const cost = new Float32Array(N);
+  for (let cz = 0; cz < NH; cz++) for (let cx = 0; cx < NW; cx++) {
+    let m = 0;
+    for (const [ox, oz] of [[1, 1], [3, 1], [1, 3], [3, 3], [2, 2]]) m = Math.max(m, walkCost(isl, cx * NAV_CELL + ox, cz * NAV_CELL + oz));
+    cost[cz * NW + cx] = m;
+  }
+  // connected regions (4-connectivity, matching A*'s no-corner-cutting rule)
+  const comp = new Int32Array(N).fill(-1), stack = new Int32Array(N);
+  let nc = 0;
+  for (let i = 0; i < N; i++) {
+    if (comp[i] >= 0 || !Number.isFinite(cost[i])) continue;
+    let sp = 0; stack[sp++] = i; comp[i] = nc;
+    while (sp) {
+      const c = stack[--sp], cx = c % NW, cz = (c - cx) / NW;
+      if (cx > 0 && comp[c - 1] < 0 && Number.isFinite(cost[c - 1])) { comp[c - 1] = nc; stack[sp++] = c - 1; }
+      if (cx < NW - 1 && comp[c + 1] < 0 && Number.isFinite(cost[c + 1])) { comp[c + 1] = nc; stack[sp++] = c + 1; }
+      if (cz > 0 && comp[c - NW] < 0 && Number.isFinite(cost[c - NW])) { comp[c - NW] = nc; stack[sp++] = c - NW; }
+      if (cz < NH - 1 && comp[c + NW] < 0 && Number.isFinite(cost[c + NW])) { comp[c + NW] = nc; stack[sp++] = c + NW; }
+    }
+    nc++;
+  }
+  const size = new Int32Array(nc); for (let i = 0; i < N; i++) if (comp[i] >= 0) size[comp[i]]++;
+  let main = 0; for (let k = 1; k < nc; k++) if (size[k] > size[main]) main = k;
+  const nav = { isl, NW, NH, cost, comp, main, g: new Float32Array(N), from: new Int32Array(N), seen: new Uint32Array(N), shut: new Uint32Array(N), gen: 0, heap: new Int32Array(N * 8), hf: new Float32Array(N * 8) };
+  nav.cellOf = (x, z) => {
+    const cx = Math.floor(x / NAV_CELL), cz = Math.floor(z / NAV_CELL);
+    return cx < 0 || cz < 0 || cx >= NW || cz >= NH ? -1 : cz * NW + cx;
+  };
+  nav.costAt = (x, z) => { const c = nav.cellOf(x, z); return c < 0 ? Infinity : cost[c]; };
+  return nav;
+}
+
+const centre = (nav, c) => ({ x: (c % nav.NW + 0.5) * NAV_CELL, z: (Math.floor(c / nav.NW) + 0.5) * NAV_CELL });
+
+// The nearest walkable point in region `comp` (default: the island's main region).
+function nearestPassable(nav, p, comp) {
+  if (comp === undefined) comp = nav.main;
+  const c0 = nav.cellOf(p.x, p.z);
+  if (c0 >= 0 && nav.comp[c0] === comp) return { x: p.x, z: p.z };
+  const cx = Math.floor(p.x / NAV_CELL), cz = Math.floor(p.z / NAV_CELL);
+  for (let r = 1; r < 80; r++) {
+    let best = null, bd = 1e9;
+    for (let oz = -r; oz <= r; oz++) for (let ox = -r; ox <= r; ox++) {
+      if (Math.max(Math.abs(ox), Math.abs(oz)) !== r) continue;
+      const x = cx + ox, z = cz + oz; if (x < 0 || z < 0 || x >= nav.NW || z >= nav.NH) continue;
+      const c = z * nav.NW + x; if (nav.comp[c] !== comp) continue;
+      const q = centre(nav, c), d = Math.hypot(q.x - p.x, q.z - p.z);
+      if (d < bd) { bd = d; best = q; }
+    }
+    if (best) return best;
+  }
+  return null;
+}
+
+// Max cost along a straight segment (1 m samples); Infinity if it leaves the walkable ground.
+function lineCost(nav, a, b) {
+  const L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(L));
+  let m = 0;
+  for (let i = 0; i <= n; i++) { const c = nav.costAt(a.x + (b.x - a.x) * i / n, a.z + (b.z - a.z) * i / n); if (c > m) m = c; if (m === Infinity) break; }
+  return m;
+}
+
+function findPath(nav, from, to) {
+  const fc = nav.cellOf(from.x, from.z), home = fc >= 0 && nav.comp[fc] >= 0 ? nav.comp[fc] : nav.main;
+  const s0 = nearestPassable(nav, from, home), t0 = nearestPassable(nav, to, home);
+  if (!s0 || !t0) return null;
+  const S = nav.cellOf(s0.x, s0.z), T = nav.cellOf(t0.x, t0.z), NW = nav.NW, cost = nav.cost;
+  if (S === T) return [t0];
+  const gen = ++nav.gen, g = nav.g, fr = nav.from, seen = nav.seen, shut = nav.shut, heap = nav.heap, hf = nav.hf;
+  let hn = 0;
+  const tx = T % NW, tz = (T - tx) / NW;
+  const hfun = (c) => { const dx = Math.abs(c % NW - tx), dz = Math.abs(Math.floor(c / NW) - tz); return (Math.max(dx, dz) + 0.4142 * Math.min(dx, dz)) * NAV_CELL; };
+  const push = (c, f) => { let i = hn++; while (i > 0) { const p = (i - 1) >> 1; if (hf[p] <= f) break; heap[i] = heap[p]; hf[i] = hf[p]; i = p; } heap[i] = c; hf[i] = f; };
+  const pop = () => {
+    const top = heap[0], lc = heap[--hn], lf = hf[hn]; let i = 0;
+    for (;;) { let l = 2 * i + 1; if (l >= hn) break; if (l + 1 < hn && hf[l + 1] < hf[l]) l++; if (hf[l] >= lf) break; heap[i] = heap[l]; hf[i] = hf[l]; i = l; }
+    heap[i] = lc; hf[i] = lf; return top;
+  };
+  seen[S] = gen; g[S] = 0; fr[S] = -1; push(S, hfun(S));
+  let found = false;
+  while (hn > 0) {
+    const c = pop();
+    if (shut[c] === gen) continue;
+    shut[c] = gen;
+    if (c === T) { found = true; break; }
+    const cx = c % NW, cz = (c - cx) / NW;
+    for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
+      if (!ox && !oz) continue;
+      const x = cx + ox, z = cz + oz; if (x < 0 || z < 0 || x >= NW || z >= nav.NH) continue;
+      const n = z * NW + x, cn = cost[n]; if (!Number.isFinite(cn) || shut[n] === gen) continue;
+      if (ox && oz && (!Number.isFinite(cost[cz * NW + x]) || !Number.isFinite(cost[z * NW + cx]))) continue;   // no corner cutting
+      const ng = g[c] + (ox && oz ? 1.4142 : 1) * NAV_CELL * (cn + cost[c]) * 0.5;
+      if (seen[n] !== gen || ng < g[n]) { seen[n] = gen; g[n] = ng; fr[n] = c; push(n, ng + hfun(n)); }
+      if (hn >= heap.length - 8) return null;
+    }
+  }
+  if (!found) return null;
+  const cells = []; for (let c = T; c >= 0; c = fr[c]) cells.push(c);
+  cells.reverse();
+  const pts = cells.map((c) => centre(nav, c));
+  pts[0] = s0; pts[pts.length - 1] = t0;
+  // string-pull: skip ahead while the straight line is no slower than the slowest cell it replaces
+  const out = []; let i = 0;
+  while (i < pts.length - 1) {
+    let j = pts.length - 1;
+    for (; j > i + 1; j--) {
+      let mx = 0; for (let k = i; k <= j; k++) mx = Math.max(mx, nav.costAt(pts[k].x, pts[k].z));
+      if (lineCost(nav, pts[i], pts[j]) <= mx) break;
+    }
+    out.push(pts[j]); i = j;
+  }
+  return out;
+}
+
+// Game seconds to walk a polyline at walking pace over its ground.
+function pathTime(nav, pts) {
+  let t = 0;
+  for (let i = 1; i < pts.length; i++) {
+    const a = pts[i - 1], b = pts[i], L = Math.hypot(b.x - a.x, b.z - a.z), n = Math.max(1, Math.ceil(L / 2));
+    for (let k = 0; k < n; k++) {
+      const c = nav.costAt(a.x + (b.x - a.x) * (k + 0.5) / n, a.z + (b.z - a.z) * (k + 0.5) / n);
+      t += (L / n) * (Number.isFinite(c) ? c : 3) / WALK;
+    }
+  }
+  return t;
+}
 
 /* ===== data.js ===== */
-// data.js — placeholder (filled in a later task)
+// data.js — every number and every written thing the simulation reads.
+// Tuned by headless runs (tools/run.mjs); see .claude/colony-sim.md § Measured.
+
+const TUNE = {
+  // per game hour
+  energyWork: 5.4, energyLight: 3.2, energyIdle: 2.2,
+  hungerAwake: 3.6, hungerSleep: 1.4,
+  bladderAwake: 6.2, bladderSleep: 1.6,
+  bowelAwake: 3.3, bowelSleep: 1.2,
+  cleanAwake: 1.0, cleanDirty: 1.9, cleanSleep: 0.4,
+  moodRate: 3,
+  healIdle: 0.8, healSleep: 1.6, healWork: 0.25,
+  // sleep: energy per hour and the cap each place allows
+  sleep: { bed: [12, 100], leanto: [10, 90], hut: [10, 92], ground: [8, 72], wild: [6, 50] },
+  meal: 36, berry: 5, rawFish: 10,
+  peeAt: 40, pooAt: 34,
+  wakeHour: 6, latestWake: 9,
+  injuryPerHour: 0.012,
+  toolWear: 1.4, toolFloor: 50, toolFix: 25,
+  spoil: { berries: 3, meat: 1.2, fish: 1, meal: 2, dried: 10 },     // days, outside the food store
+  spoilStored: { berries: 5, meat: 2, fish: 1.6, meal: 5, dried: 14 },
+  mealsPerDay: 2,
+  foodGoalDays: 3,
+  startMeals: 14,
+  bushRegrowDays: 3,
+  trapCatchPerDay: 0.35,
+  fishPerHour: 1.4,
+  carry: { wood: 2, stone: 3 },
+};
+
+// The founders (CD: a leader, a gatherer, a hunter and an architect, chosen by the
+// expedition's backers for a well-rounded set of skills). Immortal, with perseverance.
+const FOUNDERS = [
+  {
+    id: 0, name: 'Ada', role: 'leader', title: 'Leader',
+    attrs: { STR: 10, DEX: 11, CON: 12, INT: 15, WIS: 16, CHA: 16 },
+    strengths: ['Sees the critical path', 'Keeps people talking', 'Good cook'],
+    weaknesses: ['Takes on too much herself', 'Weak swimmer'],
+    prefs: ['Coffee at dawn', 'Everyone eating together', 'A tidy camp'],
+    goals: ['Bring all four through the first season', 'Have the camp ready for newcomers'],
+    fears: ['Losing someone on her watch', 'Deep water'],
+    look: { skin: '#c99a76', hair: '#3b2a1f', hairStyle: 'bun', beard: false, shirt: '#2f6f8f', pants: '#4a4237', boots: '#3a2a1c', hat: null, height: 1.0, width: 0.97 },
+  },
+  {
+    id: 1, name: 'Bram', role: 'gatherer', title: 'Gatherer',
+    attrs: { STR: 16, DEX: 12, CON: 16, INT: 11, WIS: 12, CHA: 10 },
+    strengths: ['Strong and tireless', 'Fells a tree fast', 'Carries more'],
+    weaknesses: ['Pushes on when he should stop', 'Impatient with planning'],
+    prefs: ['Working outdoors', 'A big dinner', 'Sleeping by the fire'],
+    goals: ['A woodpile that never runs low', 'A proper axe of his own one day'],
+    fears: ['Being idle', 'Heights'],
+    look: { skin: '#7a4e2d', hair: '#151010', hairStyle: 'short', beard: true, shirt: '#a0452d', pants: '#3d4a5c', boots: '#2b211a', hat: null, height: 1.06, width: 1.12 },
+  },
+  {
+    id: 2, name: 'Kit', role: 'hunter', title: 'Hunter',
+    attrs: { STR: 12, DEX: 16, CON: 13, INT: 12, WIS: 15, CHA: 11 },
+    strengths: ['Reads tracks and weather', 'Patient with traps', 'Knows edible plants'],
+    weaknesses: ['Roams too far', 'Forgets to eat while out'],
+    prefs: ['Dawn and dusk', 'Quiet', 'Fish over meat'],
+    goals: ['Three days of food in store', 'Find fresh water inland'],
+    fears: ['Being lost after dark', 'Snakes'],
+    look: { skin: '#e0b48e', hair: '#a8642a', hairStyle: 'pony', beard: false, shirt: '#4f6b34', pants: '#5b4a33', boots: '#3d2e20', hat: '#6b5a3a', height: 0.96, width: 0.95 },
+  },
+  {
+    id: 3, name: 'Ines', role: 'architect', title: 'Architect',
+    attrs: { STR: 12, DEX: 15, CON: 12, INT: 16, WIS: 13, CHA: 12 },
+    strengths: ['Designs and builds', 'Measures twice', 'Steady hands'],
+    weaknesses: ['Perfectionist: slow to call a job done', 'Hates being dirty'],
+    prefs: ['Straight lines', 'A clean shirt', 'Quiet evenings'],
+    goals: ['A hut for everyone before the rains', 'A real workshop'],
+    fears: ['Fire getting loose', 'The dark'],
+    look: { skin: '#a8754f', hair: '#1c1612', hairStyle: 'long', beard: false, shirt: '#d8c9a3', pants: '#2c3e50', boots: '#4a3322', hat: null, height: 1.0, width: 0.96 },
+  },
+];
+
+// Tools (CD): one indestructible set whose effectiveness wears from 100% to 50%.
+const TOOLS = ['axe', 'pick', 'hammer', 'knife', 'spear'];
+
+// Buildings; f = metres toward the island's interior from the campfire, r = metres to its right.
+const BUILDINGS = {
+  campfire: { label: 'Campfire', cost: { wood: 3, stone: 6 }, hours: 1.0, f: 0, r: 0, size: [1.8, 1.8, 0.5] },
+  leanto: { label: 'Lean-to', cost: { wood: 8, stone: 0 }, hours: 3.0, f: 7, r: -9, size: [5, 3, 2.2], sleeps: 4, sleep: 'leanto' },
+  storage: { label: 'Storage', cost: { wood: 6, stone: 2 }, hours: 2.0, f: 6, r: 10, size: [4, 4, 1.2] },
+  foodstore: { label: 'Food store', cost: { wood: 8, stone: 6 }, hours: 4.0, f: -6, r: 9, size: [3, 3, 2.4] },
+  latrine: { label: 'Latrine', cost: { wood: 5, stone: 0 }, hours: 2.0, f: 24, r: 18, size: [1.6, 1.6, 2.2] },
+  hut1: { label: 'Hut', cost: { wood: 20, stone: 10 }, hours: 9.0, f: 16, r: -7, size: [5.5, 4.5, 3], sleeps: 3, sleep: 'hut' },
+  hut2: { label: 'Second hut', cost: { wood: 20, stone: 10 }, hours: 9.0, f: 16, r: 7, size: [5.5, 4.5, 3], sleeps: 3, sleep: 'hut' },
+  bed: { label: 'Bed', cost: { wood: 4, stone: 0 }, hours: 1.5, size: [0.9, 2, 0.5], sleeps: 1, sleep: 'bed' },
+  toolbench: { label: 'Tool bench', cost: { wood: 8, stone: 4 }, hours: 3.0, f: -5, r: -9, size: [2.4, 1.2, 1] },
+  dryrack: { label: 'Drying rack', cost: { wood: 6, stone: 0 }, hours: 2.0, f: -9, r: 1, size: [2.4, 1, 1.6] },
+};
+
+// Colony goals the leader works from (CD: goals board, control A).
+const GOALS = {
+  campfire: { label: 'Campfire', builds: ['campfire'], prereq: [] },
+  leanto: { label: 'Lean-to shelter', builds: ['leanto'], prereq: ['campfire'] },
+  storage: { label: 'Storage area', builds: ['storage'], prereq: ['campfire'] },
+  food3: { label: '3 days of food', food: true, prereq: [] },
+  foodstore: { label: 'Food store', builds: ['foodstore'], prereq: ['campfire'] },
+  latrine: { label: 'Latrine', builds: ['latrine'], prereq: ['campfire'] },
+  hut1: { label: 'Hut', builds: ['hut1'], prereq: ['leanto'] },
+  hut2: { label: 'Second hut', builds: ['hut2'], prereq: ['leanto'] },
+  beds5: { label: '5 beds', builds: ['bed', 'bed', 'bed', 'bed', 'bed'], prereq: ['hut1', 'hut2'] },
+  toolbench: { label: 'Tool bench', builds: ['toolbench'], prereq: ['campfire'] },
+  dryrack: { label: 'Drying rack', builds: ['dryrack'], prereq: ['campfire'] },
+};
+const DEFAULT_GOALS = ['campfire', 'leanto', 'food3', 'storage', 'foodstore', 'latrine', 'hut1', 'toolbench', 'hut2', 'beds5', 'dryrack'];
+const PHASE1_BUILDS = ['campfire', 'leanto', 'storage', 'foodstore', 'latrine', 'hut1', 'hut2', 'toolbench'];
+
+// Lessons (CD: learned by trial and error, at a rate set by INT and WIS). The list of
+// what can be learned is written here; the number inside each lesson is learned.
+const LESSONS = {
+  overwork: { label: 'Stop before exhaustion', param: 'stopEnergy', start: 10, target: 32, fmt: (v) => 'stops work at ' + v.toFixed(0) + '% energy' },
+  lateNight: { label: 'Bed at a sane hour', param: 'bedHour', start: 23.6, target: 21.4, fmt: (v) => 'in bed by ' + hhmm(v) },
+  skipMeal: { label: "Don't skip meals", param: 'eatHunger', start: 12, target: 38, fmt: (v) => 'eats below ' + v.toFixed(0) + '% hunger' },
+  hygiene: { label: 'Wash regularly', param: 'washAt', start: 18, target: 42, fmt: (v) => 'bathes below ' + v.toFixed(0) + '% clean' },
+  farAtDusk: { label: 'Head home before dark', param: 'homeHour', start: 19.8, target: 17.6, fmt: (v) => 'heads home by ' + hhmm(v) },
+  dullTools: { label: 'Keep tools sharp', param: 'fixAt', start: 0, target: 70, fmt: (v) => 'sharpens tools below ' + v.toFixed(0) + '%' },
+};
+function hhmm(h) { const H = Math.floor(h), M = Math.round((h - H) * 60); return String(H % 24).padStart(2, '0') + ':' + String(M % 60).padStart(2, '0'); }
+
+// What a settler says when they refuse an order a lesson tells them is a mistake.
+const REFUSALS = {
+  overwork: "I'm running on empty. Last time I pushed on like this I got hurt. Sleep first.",
+  lateNight: "It's late. Every time I stay up, tomorrow is wasted. I'm going to bed.",
+  skipMeal: "I need to eat first. I collapsed the last time I worked through hunger.",
+  hygiene: "I'm filthy, and it's getting to me. I'm washing first.",
+  farAtDusk: "Not this late. I got caught out after dark once already.",
+  dullTools: "These tools are dull enough to be dangerous. They get sharpened first.",
+};
+const LEARNED = {
+  overwork: 'Lesson learned: stop before I drop.',
+  lateNight: 'Lesson learned: no more late nights.',
+  skipMeal: 'Lesson learned: eat before I fade.',
+  hygiene: 'Lesson learned: a wash keeps me sane.',
+  farAtDusk: 'Lesson learned: start home before dusk.',
+  dullTools: 'Lesson learned: sharp tools, safe hands.',
+};
+
+/* ===== brain.js ===== */
+// brain.js — what each settler decides to do: their needs, the leader's assignments,
+// lessons learned by trial and error, refusals, and the player's orders (controls A and B).
+
+const HOUR = 3600, DAYS = 86400;
+const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+
+/* ------------------------------ lessons ------------------------------ */
+function lessonParam(s, key) { return s.lessons[key] ? s.lessons[key].v : LESSONS[key].start; }
+const learned = (s, key) => !!s.lessons[key];
+function learnChance(s) { return clamp(0.15 + 0.04 * ((s.attrs.INT + s.attrs.WIS) / 2 - 10), 0.1, 0.6); }
+function learnEvent(sim, s, key) {
+  const L = LESSONS[key]; if (!L) return false;
+  s.exp[key] = (s.exp[key] || 0) + 1;
+  if (sim.R.learn.next() >= learnChance(s)) return false;
+  const cur = lessonParam(s, key), v = cur + 0.6 * (L.target - cur);
+  const first = !s.lessons[key];
+  s.lessons[key] = { v, times: (s.lessons[key] ? s.lessons[key].times : 0) + 1, day: dayOf(sim) };
+  s.stats.learned++;
+  event(sim, s, 'learn', s.name + (first ? ' learned: ' : ' refined: ') + L.label + ' (' + L.fmt(v) + ').');
+  if (first) say(sim, s, LEARNED[key], 'learn');
+  return true;
+}
+
+/* ------------------------------ needs ------------------------------ */
+// Returns the most pressing need: {kind, urgent, lesson}. Urgent needs interrupt work.
+function needOf(sim, s, softToo = true) {
+  const m = s.m, h = hourOf(sim), delayed = (k) => s.delay && s.delay[k] > sim.t;
+  if (m.bladder < TUNE.peeAt) return { kind: 'pee', urgent: true };
+  if (m.bowel < TUNE.pooAt) return { kind: 'poo', urgent: true };
+  if (m.energy < lessonParam(s, 'overwork')) return { kind: 'sleep', urgent: true, lesson: 'overwork', why: 'energy' };
+  if (m.hunger < lessonParam(s, 'skipMeal')) return { kind: 'eat', urgent: true, lesson: 'skipMeal' };
+  if (!softToo) return null;
+  const bed = lessonParam(s, 'lateNight');
+  if ((h >= bed || h < 4.5) && !delayed('sleep')) return { kind: 'sleep', urgent: false, lesson: 'lateNight', why: 'bedtime' };
+  const meal = (h >= 6.8 && h < 8.2) || (h >= 18.7 && h < 20.2) || (h >= 12.2 && h < 13 && m.hunger < 55);
+  if (meal && m.hunger < 72 && mealUnits(sim) >= 1 && dist(s, sim.lay.fire) < 120 && !delayed('eat')) return { kind: 'eat', urgent: false, lesson: 'skipMeal' };
+  if (m.clean < lessonParam(s, 'hygiene') && h > 7 && h < 18 && !delayed('bathe')) return { kind: 'bathe', urgent: false, lesson: 'hygiene' };
+  if ((m.mood < 32 || m.health < 35) && !delayed('rest')) return { kind: 'rest', urgent: false };
+  return null;
+}
+const NEED_KINDS = new Set(['pee', 'poo', 'sleep', 'eat', 'bathe', 'rest', 'collapse', 'persevere', 'home']);
+
+function think(sim, s) {
+  const n = needOf(sim, s);
+  let T = null;
+  if (n) T = makeTask(sim, s, n.kind, { need: n });
+  if (!T) {
+    while (s.plan.length && !T) {
+      const it = s.plan[0];
+      if (it.steps) { T = s.plan.shift(); break; }                       // a preempted task resumes
+      if (it.owner === 'player' || it.pinned) { s.plan.shift(); T = makeTask(sim, s, it.kind, it.opts || {}); if (T) { T.pinned = !!it.pinned; T.owner = 'player'; } continue; }
+      break;
+    }
+  }
+  if (!T) { const k = nextWork(sim, s); if (k) T = makeTask(sim, s, k.kind, k.opts || {}); }
+  if (!T) T = makeTask(sim, s, 'idle');
+  T.started = sim.t; s.task = T;
+  forecast(sim, s);
+}
+
+// Keep a short "what I plan to do next" list: the player's own items stay put, the leader's are refreshed.
+function forecast(sim, s) {
+  s.plan = s.plan.filter((it) => it.steps || it.owner === 'player' || it.pinned);
+  const k1 = nextWork(sim, s, { dry: true, skip: s.task && s.task.kind });
+  if (k1) s.plan.push({ id: sim.nextId++, kind: k1.kind, label: LABEL[k1.kind] || k1.kind, owner: 'leader', opts: k1.opts });
+  const k2 = nextWork(sim, s, { dry: true, skip: k1 && k1.kind, skip2: s.task && s.task.kind });
+  if (k2 && (!k1 || k2.kind !== k1.kind)) s.plan.push({ id: sim.nextId++, kind: k2.kind, label: LABEL[k2.kind] || k2.kind, owner: 'leader', opts: k2.opts });
+  if (s.plan.length > 8) s.plan.length = 8;
+}
+
+// Called every 5 game minutes: urgent needs interrupt work, unless the player pinned it.
+function checkInterrupts(sim, s) {
+  const T = s.task; if (!T || NEED_KINDS.has(T.kind)) return;
+  // out late, far from camp
+  if (dist(s, sim.lay.fire) > 110 && hourOf(sim) >= lessonParam(s, 'farAtDusk') && hourOf(sim) < 23 && !T.pinned && T.kind !== 'explore') {
+    if (T.kind === 'explore' && !learned(s, 'farAtDusk')) return;
+    preempt(sim, s, makeTask(sim, s, 'home')); return;
+  }
+  const n = needOf(sim, s, false);
+  if (!n) return;
+  if (T.pinned) {
+    if (n.lesson && learned(s, n.lesson)) { refuse(sim, s, n.lesson); T.pinned = false; preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); }
+    return;                                                    // obeying the player: pushing through
+  }
+  preempt(sim, s, makeTask(sim, s, n.kind, { need: n }));
+}
+
+function refuse(sim, s, key) {
+  s.stats.refusals++;
+  say(sim, s, REFUSALS[key], 'refuse');
+  event(sim, s, 'refuse', s.name + ' refused: ' + REFUSALS[key]);
+}
+
+/* ------------------------------ the leader ------------------------------ */
+// Sites for the first open build goals, in the order of the goals board.
+function ensureSites(sim) {
+  let opened = 0;
+  for (const g of sim.goals) {
+    const G = GOALS[g]; if (!G || G.food || goalDone(sim, g)) continue;
+    if (!goalOpen(sim, g)) continue;
+    const have = sim.sites.filter((x) => x.goal === g);
+    const want = {}; for (const b of G.builds) want[b] = (want[b] || 0) + 1;
+    for (const b in want) {
+      let n = have.filter((x) => x.type === b).length;
+      while (n < want[b]) {
+        const B = BUILDINGS[b];
+        let pos;
+        if (b === 'bed') { const used = sim.sites.filter((x) => x.type === 'bed').length; pos = sim.lay.beds[used % sim.lay.beds.length]; }
+        else pos = sim.lay.slots[b];
+        sim.sites.push({ id: sim.nextId++, type: b, goal: g, x: pos.x, z: pos.z, yaw: pos.yaw, need: { ...B.cost }, have: { wood: 0, stone: 0 }, prog: 0, hours: B.hours, done: false });
+        n++;
+      }
+    }
+    if (++opened >= 2) break;
+  }
+}
+const activeSites = (sim) => sim.sites.filter((x) => !x.done).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
+function shortfall(sim) {
+  const act = activeSites(sim);
+  const need = { wood: 0, stone: 0 };
+  for (const x of act) { need.wood += x.need.wood - x.have.wood; need.stone += x.need.stone - x.have.stone; }
+  // look one goal ahead so the gatherer is never idle at a hand-over
+  const next = sim.goals.find((g) => GOALS[g] && !GOALS[g].food && !goalDone(sim, g) && !sim.sites.some((x) => x.goal === g));
+  if (next) for (const b of GOALS[next].builds) { need.wood += BUILDINGS[b].cost.wood; need.stone += BUILDINGS[b].cost.stone; }
+  const piles = sim.piles.reduce((a, p) => { a[p.item] = (a[p.item] || 0) + p.n; return a; }, {});
+  return { wood: need.wood - sim.stock.wood - (piles.wood || 0), stone: need.stone - sim.stock.stone - (piles.stone || 0) };
+}
+function leaderTick(sim) {
+  ensureSites(sim);
+  for (const s of sim.settlers) if (s.delay) for (const k in s.delay) if (s.delay[k] <= sim.t) delete s.delay[k];
+}
+
+const buildable = (sim) => activeSites(sim).filter((x) => {
+  const frac = Math.min(x.have.wood / Math.max(1, x.need.wood), x.need.stone ? x.have.stone / x.need.stone : 1);
+  return frac * x.hours > x.prog + 0.05;
+});
+const deliverable = (sim) => activeSites(sim).find((x) => (x.need.wood > x.have.wood && sim.stock.wood > 0) || (x.need.stone > x.have.stone && sim.stock.stone > 0));
+const toolFree = (sim, k, s) => sim.tools[k].by == null || sim.tools[k].by === s.id;
+const anyPile = (sim) => sim.piles.some((p) => !sim.world.reserved['p' + p.id]);
+const trapsReady = (sim) => sim.traps.some((t) => t.catch || sim.t - (t.checked || t.set) > 20 * HOUR);
+const rawFood = (sim) => foodCount(sim, 'meat') + foodCount(sim, 'fish');
+
+function nextWork(sim, s, o = {}) {
+  const skip = (k) => o.skip === k || o.skip2 === k;
+  const sh = shortfall(sim), food = mealUnits(sim), target = foodTarget(sim), h = hourOf(sim), N = sim.settlers.length;
+  const B = buildable(sim), D = deliverable(sim);
+  const pick = (...opts) => { for (const [cond, kind] of opts) if (cond && !skip(kind)) return { kind }; return null; };
+  const foodJob = () => {
+    if (trapsReady(sim)) return 'checktraps';
+    if (sim.traps.length < 4) return 'trap';
+    if (toolFree(sim, 'spear', s) && h < 17.5) return 'fish';
+    return 'forage';
+  };
+  const lowTool = TOOLS.some((k) => sim.tools[k].cond < Math.max(55, lessonParam(s, 'dullTools')));
+  if (s.role === 'leader') {
+    const sad = sim.settlers.find((o2) => o2 !== s && o2.m.mood < 50 && o2.act !== 'sleep');
+    return pick(
+      [((h >= 6 && h < 7.5) || (h >= 17.6 && h < 19.2) || (h >= 11.5 && h < 12.3)) && (rawFood(sim) > 0 || (foodCount(sim, 'meal') < N && foodCount(sim, 'berries') >= 3)), 'cook'],
+      [built(sim, 'dryrack') && rawFood(sim) > 2 && foodCount(sim, 'meal') >= N * 2, 'dry'],
+      [sad && s.m.mood > 55, 'cheer'],
+      [s.m.mood < 70 && h > 14, 'rest'],
+      [built(sim, 'toolbench') && lowTool, 'maintain'],
+      [anyPile(sim), 'tidy'],
+      [D, 'deliver'],
+      [B.length && !sim.settlers.some((o2) => o2.role === 'architect' && o2.task && o2.task.kind === 'build' && o2.task.site === B[0].id) , 'build'],
+      [food < target * 0.6, 'forage'],
+      [sh.stone > 0, 'gather'],
+      [true, 'rest'],
+    );
+  }
+  if (s.role === 'hunter') {
+    const explore = !sim.discovered.pond && food >= N * 4 && h >= 6 && h < 8.5 && dayOf(sim) >= 2;
+    return pick(
+      [explore, 'explore'],
+      [food < target + 4, foodJob()],
+      [sh.stone > 0, 'gather'],
+      [D, 'deliver'],
+      [sh.wood > 0 && toolFree(sim, 'axe', s), 'chop'],
+      [B.length, 'build'],
+      [true, foodJob()],
+    );
+  }
+  if (s.role === 'gatherer') {
+    return pick(
+      [sh.wood > 0 && toolFree(sim, 'axe', s), 'chop'],
+      [sh.stone > 0, 'gather'],
+      [anyPile(sim), 'tidy'],
+      [D, 'deliver'],
+      [B.length, 'build'],
+      [sim.stock.wood < 12 && toolFree(sim, 'axe', s), 'chop'],
+      [food < target, foodJob()],
+      [true, 'gather'],
+    );
+  }
+  // architect
+  return pick(
+    [B.length, 'build'],
+    [D, 'deliver'],
+    [built(sim, 'toolbench') && lowTool, 'maintain'],
+    [sh.stone > 0, 'gather'],
+    [anyPile(sim), 'tidy'],
+    [sh.wood > 0 && toolFree(sim, 'axe', s), 'chop'],
+    [food < target * 0.7, 'forage'],
+    [true, 'rest'],
+  );
+}
+
+/* ------------------------------ tasks ------------------------------ */
+const LABEL = {
+  sleep: 'Sleep', collapse: 'Collapsed', persevere: 'Get back to camp', eat: 'Eat', pee: 'Pee', poo: 'Bathroom',
+  bathe: 'Wash', rest: 'Rest by the fire', chop: 'Chop a tree', gather: 'Gather stone', forage: 'Forage berries',
+  fish: 'Fish from the shore', trap: 'Set a snare', checktraps: 'Check the snares', cook: 'Cook', dry: 'Dry meat and fish',
+  deliver: 'Bring materials to a build', build: 'Build', tidy: 'Tidy up loose materials', cheer: 'Talk with someone',
+  maintain: 'Sharpen the tools', explore: 'Scout inland', home: 'Head back to camp', idle: 'Take a breather',
+};
+const go = (to, label, extra) => ({ do: 'go', to: { x: to.x, z: to.z }, label, ...extra });
+const work = (act, mins, label, extra) => ({ do: 'work', act, mins, label, ...extra });
+const nearest = (arr, p, ok) => { let best = null, bd = 1e9; for (const o of arr) { if (!ok(o)) continue; const d = dist(o, p); if (d < bd) { bd = d; best = o; } } return best; };
+
+function sleepSpot(sim, s) {
+  const lay = sim.lay;
+  const beds = sim.sites.filter((x) => x.type === 'bed' && x.done);
+  if (s.bed != null && !beds.some((b) => b.id === s.bed)) s.bed = null;
+  if (s.bed == null) { const taken = new Set(sim.settlers.map((o) => o.bed)); const b = beds.find((x) => !taken.has(x.id)); if (b) s.bed = b.id; }
+  if (s.bed != null) { const b = site(sim, s.bed); return { at: b, place: 'bed' }; }
+  for (const hk of ['hut1', 'hut2']) {
+    const hut = sim.sites.find((x) => x.type === hk && x.done);
+    if (!hut) continue;
+    const users = sim.settlers.filter((o) => o !== s && o.sleep && o.sleep.slot === hk && o.act === 'sleep').length;
+    if (users < BUILDINGS[hk].sleeps) { const k = sim.settlers.indexOf(s); return { at: { x: hut.x + Math.cos(k * 1.7) * 1.2, z: hut.z + Math.sin(k * 1.7) * 1.2 }, place: 'hut', slot: hk }; }
+  }
+  const lean = sim.sites.find((x) => x.type === 'leanto' && x.done);
+  if (lean) { const k = sim.settlers.indexOf(s); return { at: sim.lay.at(BUILDINGS.leanto.f + 0.3, BUILDINGS.leanto.r - 1.8 + k * 1.2), place: 'leanto', slot: 'leanto' }; }
+  return { at: lay.ground[sim.settlers.indexOf(s) % lay.ground.length], place: 'ground', slot: 'ground' };
+}
+function bathroomSpot(sim, s) {
+  const lat = sim.sites.find((x) => x.type === 'latrine' && x.done);
+  if (dist(s, sim.lay.fire) < 70) {
+    if (lat) return lat;
+    return nearestPassable(sim.nav, sim.lay.at(26 + (s.id % 2) * 4, -24 + s.id * 14));
+  }
+  return nearestPassable(sim.nav, { x: s.x + 7 * Math.cos(s.id * 2.1), z: s.z + 7 * Math.sin(s.id * 2.1) });
+}
+
+function makeTask(sim, s, kind, opts = {}) {
+  const lay = sim.lay, fire = lay.fire, seat = lay.seats[sim.settlers.indexOf(s) % lay.seats.length];
+  const T = { id: sim.nextId++, kind, label: LABEL[kind] || kind, steps: [], i: 0, started: sim.t, owner: opts.owner || 'self' };
+  const S = T.steps;
+  switch (kind) {
+    case 'sleep': {
+      const sp = sleepSpot(sim, s);
+      T.label = sp.place === 'bed' ? 'Sleep in bed' : sp.place === 'hut' ? 'Sleep in the hut' : sp.place === 'leanto' ? 'Sleep under the lean-to' : 'Sleep by the fire';
+      S.push(go(sp.at, 'walk to bed'), work('sleep', 480, 'sleep', { place: sp.place, slot: sp.slot, start: 'sleepStart', until: 'rested', fx: 'wake', outdoor: false, meters: [] }));
+      break;
+    }
+    case 'collapse':
+      S.push(work('collapsed', 600, 'out cold', { start: 'collapseStart', until: 'recovered', outdoor: false, meters: [] }));
+      break;
+    case 'persevere':
+      S.push(go(fire, 'drag themselves home'), work('sit', 60, 'recover at the fire', { each: 'restEach', fx: 'rest', outdoor: false, meters: [] }));
+      if (s.m.hunger < 30) S.push(work('eat', 25, 'eat', { fx: 'eat', outdoor: false, meters: [] }));
+      break;
+    case 'home':
+      S.push(go(fire, 'walk back to camp'));
+      break;
+    case 'eat': {
+      if (mealUnits(sim) >= 0.34 && dist(s, fire) < 150) {
+        S.push(go(seat, 'walk to the fire'), work('eat', 25, 'eat', { fx: 'eat', outdoor: false, meters: [] }));
+      } else {
+        const bush = nearest(sim.isl.bushes, s, (b) => (sim.world.bushes[b.id] ?? b.berries) >= 2 && !sim.world.reserved['b' + b.id]);
+        if (!bush) return null;
+        T.label = 'Eat berries off a bush';
+        S.push(go(nearestPassable(sim.nav, bush), 'walk to a berry bush'), work('forage', 15, 'eat berries', { fx: 'eatBerries', bush: bush.id, face: bush, meters: [] }));
+      }
+      break;
+    }
+    case 'pee': case 'poo': {
+      const sp = bathroomSpot(sim, s);
+      S.push(go(sp, kind === 'pee' ? 'find a private spot' : 'head for the latrine'), work('squat', kind === 'pee' ? 3 : 8, kind, { fx: kind, outdoor: false, meters: [] }));
+      break;
+    }
+    case 'bathe': {
+      S.push(go(lay.bath, 'walk down to the sea'), work('bathe', 30, 'wash in the sea', { fx: 'bathe', outdoor: false, meters: [] }), go(fire, 'walk back up'));
+      break;
+    }
+    case 'rest':
+      S.push(go(seat, 'walk to the fire'), work('sit', 45, 'sit and rest', { each: 'restEach', fx: 'rest', outdoor: false, meters: [] }));
+      break;
+    case 'idle':
+      S.push(go(seat, 'wander to the fire'), work('sit', 10, 'catch their breath', { fx: 'idle', outdoor: false, meters: [] }));
+      break;
+    case 'chop': {
+      if (!toolFree(sim, 'axe', s)) return null;
+      const tr = nearest(sim.isl.trees, lay.pile, (t) => !sim.world.felled[t.id] && !sim.world.reserved['t' + t.id] && dist(t, fire) < 160);
+      if (!tr) return null;
+      sim.world.reserved['t' + tr.id] = s.id;
+      const stand = nearestPassable(sim.nav, { x: tr.x - 1.3, z: tr.z + 0.4 });
+      S.push(go(stand, 'walk to a tree'), work('chop', 40, 'chop it down', { tool: 'axe', attr: 'STR', fx: 'fell', tree: tr.id, face: tr, heavy: true, role: 'gatherer' }),
+        go(lay.pile, 'carry logs to storage'), work('drop', 1, 'stack them', { fx: 'dropStock', outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'gather': {
+      const big = toolFree(sim, 'pick', s);
+      const rk = nearest(sim.isl.rocks, lay.pile, (r) => (sim.world.rocks[r.id] ?? r.n) > 0 && !sim.world.reserved['r' + r.id] && (big || r.s <= 0.5) && dist(r, fire) < 220);
+      if (!rk) return null;
+      sim.world.reserved['r' + rk.id] = s.id;
+      const mine = rk.s > 0.5;
+      S.push(go(nearestPassable(sim.nav, { x: rk.x - 0.9, z: rk.z }), 'walk to loose rock'),
+        work(mine ? 'mine' : 'pick', mine ? 22 : 9, mine ? 'break stone off' : 'pick up stones', { tool: mine ? 'pick' : null, attr: 'STR', fx: 'takeRock', rock: rk.id, face: rk, heavy: true, role: 'gatherer' }),
+        go(lay.pile, 'carry stone to storage'), work('drop', 1, 'stack it', { fx: 'dropStock', outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'tidy': {
+      const p = nearest(sim.piles, s, (q) => !sim.world.reserved['p' + q.id]);
+      if (!p) return null;
+      sim.world.reserved['p' + p.id] = s.id;
+      S.push(go(p, 'walk to loose ' + p.item), work('pick', 1, 'pick it up', { fx: 'pickPile', pile: p.id, outdoor: false, meters: [] }),
+        go(lay.pile, 'carry it to storage'), work('drop', 1, 'stack it', { fx: 'dropStock', outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'forage': {
+      const bush = nearest(sim.isl.bushes, fire, (b) => (sim.world.bushes[b.id] ?? b.berries) >= 2 && !sim.world.reserved['b' + b.id] && dist(b, fire) < 260);
+      if (!bush) return null;
+      sim.world.reserved['b' + bush.id] = s.id;
+      S.push(go(nearestPassable(sim.nav, bush), 'walk to a berry bush'), work('forage', 20, 'pick berries', { tool: toolFree(sim, 'knife', s) ? 'knife' : null, optTool: true, attr: 'DEX', fx: 'pickBerries', bush: bush.id, face: bush, role: 'hunter' }),
+        go(lay.food, 'carry them to the food store'), work('drop', 1, 'store them', { fx: 'dropFood', outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'fish': {
+      if (!toolFree(sim, 'spear', s)) return null;
+      const spots = lay.fishing.slice().sort((a, b) => dist(a, fire) - dist(b, fire));
+      const sp = spots[(sim.tick >> 6) % Math.min(3, spots.length)] || lay.bath;
+      S.push(go(nearestPassable(sim.nav, sp), 'walk to the shore'), work('fish', 75, 'fish with the spear', { tool: 'spear', attr: 'DEX', each: 'fishEach', fx: 'fishDone', face: { x: sp.x + (sp.x - fire.x), z: sp.z + (sp.z - fire.z) }, role: 'hunter' }),
+        go(lay.food, 'carry the catch home'), work('drop', 1, 'store it', { fx: 'dropFood', outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'trap': {
+      const near = (p) => sim.traps.some((t) => dist(t, p) < 45);
+      const tr = nearest(sim.isl.trees, fire, (t) => dist(t, fire) > 70 && dist(t, fire) < 220 && !near(t) && coverAt(sim.isl, t.x, t.z) === COVER.FOREST);
+      if (!tr) return null;
+      const at = nearestPassable(sim.nav, { x: tr.x + 1.6, z: tr.z });
+      S.push(go(at, 'walk into the woods'), work('trap', 30, 'set a snare', { tool: toolFree(sim, 'knife', s) ? 'knife' : null, optTool: true, attr: 'DEX', fx: 'setTrap', at, face: tr, role: 'hunter' }));
+      break;
+    }
+    case 'checktraps': {
+      const list = sim.traps.filter((t) => t.catch || sim.t - (t.checked || t.set) > 20 * HOUR).sort((a, b) => dist(a, fire) - dist(b, fire)).slice(0, 4);
+      if (!list.length) return null;
+      for (const t of list) S.push(go(t, 'walk to a snare'), work('trap', 6, 'check the snare', { fx: 'checkTrap', trap: t.id, attr: 'DEX', role: 'hunter' }));
+      S.push(go(lay.food, 'carry any catch home'), work('drop', 1, 'store it', { fx: 'dropFood', outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'cook':
+      S.push(go(seat, 'walk to the fire'), work('cook', 35, 'cook a meal', { fx: 'cook', tool: toolFree(sim, 'knife', s) ? 'knife' : null, optTool: true, outdoor: false, meters: ['energy'] }));
+      break;
+    case 'dry': {
+      const r = sim.sites.find((x) => x.type === 'dryrack' && x.done); if (!r) return null;
+      S.push(go(r, 'walk to the drying rack'), work('cook', 25, 'hang meat and fish to dry', { fx: 'dryFood', outdoor: false, meters: [] }));
+      break;
+    }
+    case 'deliver': {
+      const x = activeSites(sim).find((q) => (q.need.wood > q.have.wood && sim.stock.wood > 0) || (q.need.stone > q.have.stone && sim.stock.stone > 0));
+      if (!x) return null;
+      const item = x.need.wood > x.have.wood && sim.stock.wood > 0 ? 'wood' : 'stone';
+      T.site = x.id; T.label = 'Bring ' + item + ' to the ' + BUILDINGS[x.type].label.toLowerCase();
+      S.push(go(lay.pile, 'walk to storage'), work('pick', 1, 'load up ' + item, { fx: 'takeStock', site: x.id, item, outdoor: false, meters: [] }),
+        go(x, 'carry it to the site'), work('drop', 1, 'set it down', { fx: 'toSite', site: x.id, outdoor: false, meters: [] }));
+      T.keepCarry = true;
+      break;
+    }
+    case 'build': {
+      const x = (opts.site && site(sim, opts.site)) || buildable(sim)[0];
+      if (!x || x.done) return null;
+      T.site = x.id; T.label = 'Build the ' + BUILDINGS[x.type].label.toLowerCase();
+      S.push(go(nearestPassable(sim.nav, { x: x.x + 1.5, z: x.z + 1.5 }), 'walk to the site'),
+        work('build', 90, 'build', { tool: toolFree(sim, 'hammer', s) ? 'hammer' : null, optTool: true, attr: 'DEX', each: 'buildEach', until: 'siteDone', site: x.id, face: x, heavy: true, role: 'architect' }));
+      break;
+    }
+    case 'cheer': {
+      const o = sim.settlers.filter((q) => q !== s && q.act !== 'sleep' && q.act !== 'collapsed').sort((a, b) => a.m.mood - b.m.mood)[0];
+      if (!o) return null;
+      T.label = 'Talk with ' + o.name;
+      S.push(go(o, 'go and find ' + o.name, { toId: o.id }), work('talk', 15, 'talk it through', { fx: 'cheer', toId: o.id, face: o, outdoor: false, meters: ['mood'] }));
+      break;
+    }
+    case 'maintain': {
+      const b = sim.sites.find((x) => x.type === 'toolbench' && x.done); if (!b) return null;
+      S.push(go(b, 'walk to the tool bench'), work('maintain', 90, 'sharpen and oil the tools', { each: 'fixEach', until: 'fixed', attr: 'DEX', outdoor: false, face: b }));
+      break;
+    }
+    case 'explore': {
+      const p = sim.isl.pond, toward = nearestPassable(sim.nav, { x: p.x + (fire.x - p.x) * 0.06, z: p.z + (fire.z - p.z) * 0.06 });
+      S.push(go(toward, 'head inland toward the sound of water'), work('look', 15, 'look around', { fx: 'look', outdoor: true, meters: [] }),
+        work('bathe', 30, 'swim in the pond', { fx: 'bathe', pond: true, outdoor: false, meters: [] }), go(fire, 'walk back to camp'));
+      break;
+    }
+    default: return null;
+  }
+  return T;
+}
+
+/* ------------------------------ the player's orders ------------------------------ */
+function applyPlayerInput(sim, rec) {
+  const s = rec.sid != null ? sim.settlers[rec.sid] : null;
+  switch (rec.type) {
+    case 'goalMove': {
+      const i = sim.goals.indexOf(rec.id); if (i < 0) return false;
+      sim.goals.splice(i, 1); sim.goals.splice(clamp(rec.to, 0, sim.goals.length), 0, rec.id); return true;
+    }
+    case 'goalAdd': if (!GOALS[rec.id] || sim.goals.includes(rec.id)) return false; sim.goals.push(rec.id); return true;
+    case 'goalRemove': { const i = sim.goals.indexOf(rec.id); if (i < 0) return false; sim.goals.splice(i, 1); return true; }
+    case 'reorder': {
+      if (!s) return false;
+      const it = s.plan[rec.from]; if (!it) return false;
+      s.plan.splice(rec.from, 1); it.owner = 'player'; s.plan.splice(clamp(rec.to, 0, s.plan.length), 0, it); return true;
+    }
+    case 'doNow': {
+      if (!s) return false;
+      const it = s.plan[rec.idx]; if (!it) return false;
+      s.plan.splice(rec.idx, 1);
+      const n = needOf(sim, s);
+      const T = it.steps ? it : makeTask(sim, s, it.kind, { ...(it.opts || {}), owner: 'player' });
+      if (!T) { say(sim, s, "I can't do that right now.", 'refuse'); return false; }
+      T.pinned = true; T.owner = 'player';
+      if (n && n.lesson && learned(s, n.lesson) && (n.urgent || n.why === 'bedtime' || n.kind === 'eat')) {
+        refuse(sim, s, n.lesson); T.pinned = false; s.plan.unshift(T);
+        preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); return 'refused';
+      }
+      preempt(sim, s, T); return true;
+    }
+    case 'later': {
+      if (!s) return false;
+      const n = needOf(sim, s);
+      const key = rec.need === 'sleep' ? 'lateNight' : rec.need === 'eat' ? 'skipMeal' : rec.need === 'bathe' ? 'hygiene' : null;
+      if (key && learned(s, key) && n && n.kind === rec.need) { refuse(sim, s, key); return 'refused'; }
+      s.delay = s.delay || {}; s.delay[rec.need] = sim.t + (rec.hours || 1) * HOUR;
+      if (s.task && s.task.kind === rec.need && s.task.steps[s.task.i] && s.task.steps[s.task.i].do === 'go') { s.task = null; }
+      return true;
+    }
+  }
+  return false;
+}
+function forecastNeeds(sim, s) {
+  const out = [], h = hourOf(sim);
+  const bed = lessonParam(s, 'lateNight');
+  out.push({ kind: 'sleep', at: bed, label: 'Sleep around ' + hhmm(bed) });
+  const nextMeal = h < 7 ? 7 : h < 19 ? 19 : 31;
+  out.push({ kind: 'eat', at: nextMeal, label: 'Eat at ' + hhmm(nextMeal % 24) });
+  return out;
+}
 
 /* ===== sim.js ===== */
-// sim.js — placeholder (filled in a later task)
+// sim.js — the colony simulation. DOM-free, render-free, seeded: the same seed and the
+// same inputs always play out the same. A tick is 10 game seconds. Settlers know where
+// they are, how fast they move and what they are doing; joints are the renderer's business.
+
+const TICK = 10;
+const HOUR = 3600, DAYS = 86400;
+const DAY = DAYS;
+
+function eff(v) { return v < 50 ? Math.max(0, v) / 50 : v <= 80 ? 1 : 1 + 0.2 * (Math.min(100, v) - 80) / 20; }
+const hourOf = (sim) => (sim.t % DAYS) / HOUR;
+const dayOf = (sim) => Math.floor(sim.t / DAYS) + 1;
+function clockOf(sim) { const s = sim.t % DAYS; return { day: dayOf(sim), hour: Math.floor(s / HOUR), minute: Math.floor((s % HOUR) / 60) }; }
+const isDark = (sim) => { const h = hourOf(sim); return h < 5.9 || h > 19.6; };
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const dist = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+
+/* ------------------------------ camp layout ------------------------------ */
+function layoutOf(isl) {
+  const c = isl.camp, L = isl.landing, dl = Math.hypot(c.x - L.x, c.z - L.z) || 1;
+  const fwd = { x: (c.x - L.x) / dl, z: (c.z - L.z) / dl }, right = { x: -fwd.z, z: fwd.x };
+  const at = (f, r) => ({ x: c.x + fwd.x * f + right.x * r, z: c.z + fwd.z * f + right.z * r });
+  const yaw = Math.atan2(fwd.z, fwd.x);
+  const slots = {};
+  for (const k in BUILDINGS) if (BUILDINGS[k].f !== undefined) slots[k] = { ...at(BUILDINGS[k].f, BUILDINGS[k].r), yaw };
+  // beds inside the huts: three in the first, two (room for three) in the second
+  const beds = [];
+  for (const [hk, n] of [['hut1', 3], ['hut2', 3]]) {
+    const b = BUILDINGS[hk];
+    for (let i = 0; i < n; i++) beds.push({ ...at(b.f + 0.9, b.r - 1.7 + i * 1.7), yaw: yaw + Math.PI / 2, hut: hk });
+  }
+  const seats = []; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + 0.3; seats.push(at(Math.cos(a) * 2.6, Math.sin(a) * 2.6)); }
+  const ground = []; for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; ground.push(at(Math.cos(a) * 4.2 + 1, Math.sin(a) * 4.2)); }
+  // a bathing spot: the beach just above the waterline, straight down from camp
+  let bx = L.x, bz = L.z; for (let s = 0; s < 40; s++) { const x = L.x + fwd.x * -s, z = L.z + fwd.z * -s; if (heightAt(isl, x, z) < 0.3) break; bx = x; bz = z; }
+  // fishing spots along the shore within 160 m of the landing
+  const fishing = [];
+  for (let a = 0; a < 48; a++) {
+    const ang = a / 48 * Math.PI * 2;
+    for (let r = 30; r < 170; r += 10) {
+      const x = L.x + Math.cos(ang) * r, z = L.z + Math.sin(ang) * r, k = coverAt(isl, x, z);
+      if ((k === COVER.SAND || k === COVER.ROCKY) && coverAt(isl, x + Math.cos(ang) * 4, z + Math.sin(ang) * 4) === COVER.SEA) { fishing.push({ x, z }); break; }
+    }
+  }
+  return { fwd, right, at, yaw, slots, beds, seats, ground, bath: { x: bx, z: bz }, fishing, fire: at(0, 0), pile: at(BUILDINGS.storage.f, BUILDINGS.storage.r), food: at(BUILDINGS.foodstore.f, BUILDINGS.foodstore.r) };
+}
+
+/* ------------------------------ creation ------------------------------ */
+function createSim(seed, opts = {}) {
+  const isl = genIsland(seed), nav = makeNav(isl), lay = layoutOf(isl), root = makeRng(seed);
+  const sim = {
+    v: 1, seed, tick: 0, t: 6 * HOUR, isl, nav, lay,
+    R: { life: root.stream('life'), work: root.stream('work'), learn: root.stream('learn'), food: root.stream('food'), social: root.stream('social') },
+    settlers: [], stock: { wood: 0, stone: 0 }, food: [], piles: [], sites: [], traps: [],
+    world: { felled: {}, rocks: {}, bushes: {}, reserved: {} },
+    goals: DEFAULT_GOALS.slice(), tools: {}, inputs: [], events: [], bubbles: [], seen: {}, discovered: {},
+    phase1: null, okSince: null, nextId: 1, speedHint: 1,
+  };
+  for (const k of TOOLS) sim.tools[k] = { cond: 100, by: null };
+  addFood(sim, 'meal', TUNE.startMeals);
+  FOUNDERS.forEach((f, i) => {
+    const a = (i - 1.5) * 1.6;
+    const p = nearestPassable(nav, { x: isl.landing.x + lay.right.x * a - lay.fwd.x * 0, z: isl.landing.z + lay.right.z * a });
+    sim.settlers.push({
+      id: f.id, name: f.name, role: f.role, title: f.title, attrs: { ...f.attrs }, look: f.look, founder: true,
+      x: p.x, z: p.z, yaw: Math.atan2(lay.fwd.z, lay.fwd.x), speed: 0, act: 'idle', face: null,
+      m: { health: 100, energy: 88, hunger: 82, mood: 78, bladder: 92, bowel: 86, clean: 92 },
+      carry: null, task: null, plan: [], lessons: {}, exp: {}, rel: {}, log: [],
+      sleep: null, ateHot: -1e9, bathT: 0, persevere: false,
+      stats: { pee: 0, poo: 0, baths: 0, injuries: 0, collapses: 0, refusals: 0, meals: 0, accidents: 0, learned: 0, lowest: 100, lowWhat: '' },
+    });
+  });
+  for (const s of sim.settlers) for (const o of sim.settlers) if (o !== s) s.rel[o.id] = 40 + Math.floor(sim.R.social.next() * 21);
+  event(sim, null, 'landed', 'The four come ashore with one crate of rations and one set of tools.');
+  return sim;
+}
+
+/* ------------------------------ helpers ------------------------------ */
+function event(sim, s, type, text) {
+  sim.events.push({ t: sim.t, sid: s ? s.id : null, type, text });
+  if (sim.events.length > 400) sim.events.splice(0, sim.events.length - 400);
+  if (s && text) { s.log.push({ t: sim.t, text }); if (s.log.length > 40) s.log.shift(); }
+}
+function say(sim, s, text, kind = 'say') {
+  sim.bubbles.push({ id: sim.nextId++, sid: s.id, t: sim.t, text, kind });
+  if (sim.bubbles.length > 30) sim.bubbles.shift();
+}
+const site = (sim, id) => sim.sites.find((x) => x.id === id);
+const built = (sim, type) => sim.sites.some((x) => x.type === type && x.done);
+function goalDone(sim, g) {
+  const G = GOALS[g];
+  if (G.food) return mealUnits(sim) >= foodTarget(sim);
+  const need = {}; for (const b of G.builds) need[b] = (need[b] || 0) + 1;
+  for (const b in need) if (sim.sites.filter((x) => x.type === b && x.done && x.goal === g).length < need[b]) return false;
+  return true;
+}
+const goalOpen = (sim, g) => GOALS[g].prereq.every((p) => goalDone(sim, p)) && !goalDone(sim, g);
+
+/* food: batches with an expiry; the food store keeps them longer */
+function addFood(sim, kind, n) {
+  if (n <= 0) return;
+  const stored = built(sim, 'foodstore') || (kind === 'dried');
+  const days = (stored ? TUNE.spoilStored : TUNE.spoil)[kind];
+  sim.food.push({ kind, n, exp: sim.t + days * DAYS });
+}
+const foodCount = (sim, kind) => sim.food.reduce((a, b) => a + (b.kind === kind ? b.n : 0), 0);
+function takeFood(sim, kind, n) {
+  let got = 0;
+  sim.food.sort((a, b) => a.exp - b.exp);
+  for (const b of sim.food) { if (b.kind !== kind || got >= n) continue; const k = Math.min(b.n, n - got); b.n -= k; got += k; }
+  sim.food = sim.food.filter((b) => b.n > 1e-9);
+  return got;
+}
+const mealUnits = (sim) => foodCount(sim, 'meal') + foodCount(sim, 'dried') + foodCount(sim, 'meat') * 2 + foodCount(sim, 'fish') * 1.5 + foodCount(sim, 'berries') / 3;
+const foodTarget = (sim) => TUNE.foodGoalDays * (sim.settlers.length + 1) * TUNE.mealsPerDay;
+
+function toolEff(sim, name) { return name ? sim.tools[name].cond / 100 : 1; }
+
+/* ------------------------------ needs ------------------------------ */
+const HEAVY = new Set(['chop', 'mine', 'build', 'carry']);
+const LIGHT = new Set(['forage', 'cook', 'trap', 'fish', 'tidy', 'bathe', 'talk', 'maintain', 'pick', 'walk', 'run', 'look']);
+const DIRTY = new Set(['chop', 'mine', 'build', 'trap', 'forage', 'carry']);
+
+function moodTarget(sim, s) {
+  let t = 62;
+  if (s.sleep && s.sleep.place && s.sleep.place !== 'wild') t += s.sleep.place === 'bed' ? 10 : s.sleep.place === 'ground' ? 2 : 6;
+  if (sim.t - s.ateHot < 10 * HOUR) t += 6;
+  const rels = Object.values(s.rel).sort((a, b) => b - a).slice(0, 2);
+  t += (rels.reduce((a, b) => a + b, 0) / Math.max(1, rels.length) - 50) / 4;
+  if (s.cheerUntil > sim.t) t += 10;
+  if (s.pondUntil > sim.t) t += 8;
+  for (const k of ['health', 'energy', 'hunger', 'clean']) if (s.m[k] < 25) t -= 12;
+  if (sim.stock && built(sim, 'latrine')) t += 2;
+  if (s.role === 'leader' && s.act === 'sit') t += 8;
+  return clamp(t, 5, 100);
+}
+
+function drain(sim, s, dt) {
+  const h = dt / HOUR, m = s.m, asleep = s.act === 'sleep' || s.act === 'collapsed';
+  const act = s.act, heavy = HEAVY.has(act) || (s.carry && (act === 'walk' || act === 'run')), light = LIGHT.has(act);
+  const con = 1 - 0.03 * (s.attrs.CON - 10);
+  if (asleep) {
+    const [rate, cap] = TUNE.sleep[s.sleep ? s.sleep.place : 'ground'];
+    if (m.energy < cap) m.energy = Math.min(cap, m.energy + rate * h);
+  } else m.energy -= (heavy ? TUNE.energyWork : light ? TUNE.energyLight : TUNE.energyIdle) * h * con * (act === 'run' ? 1.6 : 1);
+  m.hunger -= (asleep ? TUNE.hungerSleep : TUNE.hungerAwake * (heavy ? 1.25 : 1)) * h;
+  m.bladder -= (asleep ? TUNE.bladderSleep : TUNE.bladderAwake) * h;
+  m.bowel -= (asleep ? TUNE.bowelSleep : TUNE.bowelAwake) * h;
+  m.clean -= (asleep ? TUNE.cleanSleep : DIRTY.has(act) ? TUNE.cleanDirty : TUNE.cleanAwake) * h;
+  m.health += (asleep ? TUNE.healSleep : heavy ? TUNE.healWork : TUNE.healIdle) * h * (m.hunger > 20 ? 1 : 0.2);
+  const mt = moodTarget(sim, s);
+  m.mood += clamp(mt - m.mood, -TUNE.moodRate * h, TUNE.moodRate * h);
+  for (const k in m) m[k] = clamp(m[k], 0, 100);
+  for (const k of ['health', 'energy', 'hunger', 'mood', 'clean']) if (m[k] < s.stats.lowest) { s.stats.lowest = m[k]; s.stats.lowWhat = k; }
+
+  // things that happen at zero
+  if (m.bladder <= 0 || m.bowel <= 0) {
+    const k = m.bladder <= 0 ? 'bladder' : 'bowel';
+    m[k] = 100; m.clean = Math.max(0, m.clean - 40); m.mood = Math.max(0, m.mood - 15); s.stats.accidents++;
+    event(sim, s, 'accident', s.name + ' had an accident.'); say(sim, s, 'Oh no. That was humiliating.', 'refuse');
+  }
+  if (!asleep && m.energy <= 0) {
+    s.stats.collapses++; event(sim, s, 'collapse', s.name + ' collapsed from exhaustion and slept where they fell.');
+    learnEvent(sim, s, 'overwork');
+    if (s.sleep && s.sleep.lateStart) learnEvent(sim, s, 'lateNight');
+    replaceTask(sim, s, makeTask(sim, s, 'collapse'));
+  } else if (!s.persevere && (m.hunger <= 0 || m.health <= 0)) {
+    const why = m.hunger <= 0 ? 'hunger' : 'injury';
+    s.stats.collapses++; s.persevere = true;
+    event(sim, s, 'collapse', s.name + ' collapsed (' + why + ') and is dragging themselves back to camp.');
+    say(sim, s, why === 'hunger' ? "Can't... think. Need food. Back to camp." : 'I need to get back to camp.', 'refuse');
+    if (why === 'hunger') learnEvent(sim, s, 'skipMeal'); else learnEvent(sim, s, 'overwork');
+    replaceTask(sim, s, makeTask(sim, s, 'persevere'));
+  }
+}
+
+/* ------------------------------ movement ------------------------------ */
+function moveAlong(sim, s, step, dt) {
+  if (!step.path) {
+    const to = step.toId != null ? sim.settlers[step.toId] : step.to;
+    step.path = findPath(sim.nav, s, to) || null;
+    step.pi = 0;
+    if (!step.path) return 'fail';
+  }
+  const terrain = sim.nav.costAt(s.x, s.z);
+  const mob = Math.max(0.45, Math.min(1, eff(s.m.energy) * 0.5 + 0.5) * Math.min(1, eff(s.m.health) * 0.6 + 0.4));
+  let sp = (step.run ? 2.2 : 1) * WALK * mob / (Number.isFinite(terrain) ? terrain : 2.5) * (s.carry ? 0.85 : 1) * (s.persevere ? 0.5 : 1);
+  if (isDark(sim)) sp *= 0.85;
+  let left = sp * dt, moved = 0;
+  while (left > 1e-6 && step.pi < step.path.length) {
+    const q = step.path[step.pi], dx = q.x - s.x, dz = q.z - s.z, d = Math.hypot(dx, dz);
+    if (d <= left) { s.x = q.x; s.z = q.z; left -= d; moved += d; step.pi++; }
+    else { s.x += dx / d * left; s.z += dz / d * left; moved += left; left = 0; }
+    if (d > 1e-4) s.yaw = Math.atan2(dz, dx);
+  }
+  s.speed = moved / dt;
+  s.act = step.run ? 'run' : 'walk';
+  if (step.pi >= step.path.length) { s.speed = 0; return 'done'; }
+  return 'go';
+}
+
+/* ------------------------------ steps ------------------------------ */
+function workRate(sim, s, st) {
+  let r = 1;
+  for (const k of st.meters || ['energy', 'health']) r *= eff(s.m[k]);
+  r *= 0.85 + 0.15 * Math.min(1.2, eff(s.m.mood));
+  if (st.attr) r *= 0.75 + 0.05 * (s.attrs[st.attr] - 10);
+  if (st.tool) r *= toolEff(sim, st.tool);
+  if (st.outdoor !== false && isDark(sim) && st.act !== 'sleep' && st.act !== 'collapsed') r *= 0.6;
+  if (st.role && st.role !== s.role) r *= 0.75;
+  if (st.slow) r *= st.slow;
+  return Math.max(0.05, r);
+}
+
+function execStep(sim, s, dt) {
+  const T = s.task, st = T.steps[T.i];
+  if (!st) return 'done';
+  if (st.do === 'go') {
+    const r = moveAlong(sim, s, st, dt);
+    if (r === 'fail') return 'fail';
+    return r === 'done' ? 'next' : 'busy';
+  }
+  if (st.do === 'work') {
+    s.speed = 0; s.act = st.act; if (st.face) s.yaw = Math.atan2(st.face.z - s.z, st.face.x - s.x);
+    if (st.tool && sim.tools[st.tool].by !== s.id) {
+      if (sim.tools[st.tool].by != null) { if (!st.optTool) return 'fail'; st.tool = null; st.slow = 0.6; }
+      else sim.tools[st.tool].by = s.id;
+    }
+    if (!st.began) { st.began = sim.t; if (st.start && FX[st.start](sim, s, st, T) === false) return 'fail'; }
+    const rate = workRate(sim, s, st);
+    st.done = (st.done || 0) + dt * rate;
+    if (st.each && FX[st.each](sim, s, st, T, dt, rate) === false) return 'fail';
+    if (st.tool) sim.tools[st.tool].cond = Math.max(TUNE.toolFloor, sim.tools[st.tool].cond - TUNE.toolWear * dt / HOUR);
+    if (st.heavy || HEAVY.has(st.act)) maybeInjure(sim, s, st, dt);
+    const finished = st.until ? UNTIL[st.until](sim, s, st) : st.done >= st.mins * 60;
+    if (finished) {
+      if (st.tool && sim.tools[st.tool].by === s.id) sim.tools[st.tool].by = null;
+      if (st.fx && FX[st.fx](sim, s, st, T) === false) return 'fail';
+      return 'next';
+    }
+    return 'busy';
+  }
+  return 'next';
+}
+
+function maybeInjure(sim, s, st, dt) {
+  const p = TUNE.injuryPerHour * dt / HOUR * (1 + 3 * (1 - Math.min(1, eff(s.m.energy))) + (isDark(sim) ? 2 : 0) + (s.attrs.DEX < 12 ? 0.3 : 0));
+  if (sim.R.life.next() < p) {
+    const dmg = 8 + sim.R.life.next() * 20;
+    s.m.health = Math.max(0, s.m.health - dmg); s.stats.injuries++;
+    event(sim, s, 'injury', s.name + ' was hurt while working (' + st.act + ', -' + dmg.toFixed(0) + ' health).');
+    say(sim, s, s.m.energy < 30 ? 'Argh! My hands are shaking, I should have stopped.' : 'Ouch! That one hurt.', 'refuse');
+    if (s.m.energy < 30) learnEvent(sim, s, 'overwork');
+    if (isDark(sim)) learnEvent(sim, s, 'farAtDusk');
+    if (st.tool && sim.tools[st.tool].cond < 65) learnEvent(sim, sim.settlers.find((x) => x.role === 'leader') || s, 'dullTools');
+  }
+}
+
+function dropCarry(sim, s) {
+  if (!s.carry) return;
+  if (s.carry.food) addFood(sim, s.carry.item, s.carry.n);
+  else sim.piles.push({ id: sim.nextId++, x: s.x, z: s.z, item: s.carry.item, n: s.carry.n });
+  s.carry = null;
+}
+
+function releaseTask(sim, s, T) {
+  if (!T) return;
+  for (const k in sim.tools) if (sim.tools[k].by === s.id) sim.tools[k].by = null;
+  for (const k in sim.world.reserved) if (sim.world.reserved[k] === s.id) delete sim.world.reserved[k];
+}
+
+function runSettler(sim, s, dt) {
+  if (!s.task) { think(sim, s); if (!s.task) return; }
+  if (sim.tick % 30 === s.id % 30) checkInterrupts(sim, s);
+  const r = execStep(sim, s, dt);
+  if (r === 'next') { s.task.i++; if (s.task.i >= s.task.steps.length) { finishTask(sim, s, true); } }
+  else if (r === 'fail') finishTask(sim, s, false);
+  else if (r === 'done') finishTask(sim, s, true);
+  else if (sim.t - s.task.started > 12 * HOUR && s.task.kind !== 'sleep' && s.task.kind !== 'collapse') {
+    event(sim, s, 'abandon', s.name + ' gave up on "' + s.task.label + '" (too long).'); finishTask(sim, s, false);
+  }
+}
+function finishTask(sim, s, ok) {
+  const T = s.task;
+  releaseTask(sim, s, T);
+  if (!ok) { dropCarry(sim, s); if (T) event(sim, s, 'fail', null); }
+  if (T && T.kind === 'sleep' || T && T.kind === 'collapse') { s.sleep = s.sleep ? { ...s.sleep, end: sim.t } : null; }
+  if (T && T.kind === 'persevere') s.persevere = false;
+  s.task = null; s.act = 'idle';
+}
+function replaceTask(sim, s, T2) {
+  if (s.task) { releaseTask(sim, s, s.task); dropCarry(sim, s); }
+  s.task = T2; T2.started = sim.t;
+}
+function preempt(sim, s, T2) {
+  const T = s.task;
+  if (T && T.kind !== 'collapse' && T.kind !== 'persevere') {
+    releaseTask(sim, s, T);
+    const st = T.steps[T.i]; if (st && st.do === 'go') st.path = null;
+    if (!s.carry || T.keepCarry) s.plan.unshift(T); else { dropCarry(sim, s); }
+  }
+  s.task = T2; T2.started = sim.t;
+}
+
+/* ------------------------------ effects ------------------------------ */
+const UNTIL = {
+  rested(sim, s, st) {
+    const h = hourOf(sim), cap = TUNE.sleep[s.sleep ? s.sleep.place : 'ground'][1];
+    if (h >= TUNE.latestWake && h < 18) return true;
+    if (h >= TUNE.wakeHour && h < 18 && s.m.energy >= Math.min(cap - 1, 60)) return true;
+    const full = s.m.energy >= cap - 0.5, slept = s.sleep ? sim.t - s.sleep.start : 0;
+    if (full && (slept >= 10 * HOUR || (h >= 4.5 && h < 18))) return true;
+    return false;
+  },
+  recovered(sim, s) { return s.m.energy >= TUNE.sleep.wild[1] - 0.01; },
+  napped(sim, s, st) { return st.done >= st.mins * 60 || s.m.energy >= 70; },
+  siteDone(sim, s, st) { const x = site(sim, st.site); return !x || x.done || st.done >= st.mins * 60; },
+  fixed(sim, s, st) { return TOOLS.every((k) => sim.tools[k].cond >= 98 || (sim.tools[k].by != null && sim.tools[k].by !== s.id)) || st.done >= st.mins * 60; },
+};
+
+const FX = {
+  sleepStart(sim, s, st) {
+    const h = hourOf(sim);
+    s.sleep = { place: st.place, slot: st.slot, start: sim.t, lateStart: h >= 23.25 || h < 4, startEnergy: s.m.energy };
+    if (s.sleep.lateStart) s.exp.lateStarts = (s.exp.lateStarts || 0) + 1;
+  },
+  wake(sim, s) {
+    const sl = s.sleep;
+    if (sl && sl.lateStart && s.m.energy < 72) { event(sim, s, 'badnight', s.name + ' slept badly after a late night.'); say(sim, s, 'Ugh. Too late to bed again.', 'say'); learnEvent(sim, s, 'lateNight'); }
+  },
+  collapseStart(sim, s, st) { s.sleep = { place: 'wild', start: sim.t, lateStart: false, startEnergy: s.m.energy }; say(sim, s, 'Can’t... keep... going...', 'refuse'); },
+  eat(sim, s) {
+    let got = 0, hot = false;
+    if (takeFood(sim, 'meal', 1)) { got = TUNE.meal; hot = true; }
+    else if (takeFood(sim, 'dried', 1)) got = TUNE.meal;
+    else { const b = takeFood(sim, 'berries', 4); got = b * TUNE.berry; if (!b) { const f = takeFood(sim, 'fish', 1); got = f * TUNE.rawFish; } }
+    if (!got) { say(sim, s, 'Nothing to eat at camp.', 'refuse'); return; }
+    s.m.hunger = Math.min(100, s.m.hunger + got); s.stats.meals++;
+    if (hot) s.ateHot = sim.t;
+    for (const o of sim.settlers) if (o !== s && o.act === 'eat' && dist(o, s) < 8) { s.rel[o.id] = Math.min(100, s.rel[o.id] + 2); }
+  },
+  eatBerries(sim, s, st) {
+    const b = sim.world.bushes[st.bush] ?? sim.isl.bushes[st.bush].berries;
+    const k = Math.min(b, 4); sim.world.bushes[st.bush] = b - k;
+    if (b - k <= 0) sim.world.bushes['r' + st.bush] = sim.t + TUNE.bushRegrowDays * DAYS;
+    s.m.hunger = Math.min(100, s.m.hunger + k * TUNE.berry); if (k) s.stats.meals++;
+  },
+  pee(sim, s) { s.m.bladder = 100; s.stats.pee++; if (!built(sim, 'latrine')) s.m.mood = Math.max(0, s.m.mood - 1); },
+  poo(sim, s) { s.m.bowel = 100; s.stats.poo++; if (!built(sim, 'latrine')) { s.m.mood = Math.max(0, s.m.mood - 2); s.m.clean = Math.max(0, s.m.clean - 3); } },
+  bathe(sim, s, st) {
+    const cap = st.pond ? 100 : 70;
+    s.m.clean = Math.max(s.m.clean, Math.min(cap, s.m.clean + 70)); s.stats.baths++; s.bathT = sim.t;
+    s.m.mood = Math.min(100, s.m.mood + (st.pond ? 8 : 3));
+    if (st.pond) s.pondUntil = sim.t + 12 * HOUR;
+  },
+  fell(sim, s, st) {
+    const tr = sim.isl.trees[st.tree];
+    sim.world.felled[tr.id] = sim.t;
+    delete sim.world.reserved['t' + tr.id];
+    const n = 3, take = Math.min(n, carryCap(s, 'wood'));
+    s.carry = { item: 'wood', n: take };
+    if (n - take > 0) sim.piles.push({ id: sim.nextId++, x: tr.x + 1, z: tr.z, item: 'wood', n: n - take });
+    event(sim, s, 'fell', null);
+  },
+  takeRock(sim, s, st) {
+    const rk = sim.isl.rocks[st.rock], left = sim.world.rocks[rk.id] ?? rk.n;
+    const take = Math.min(left, carryCap(s, 'stone'));
+    sim.world.rocks[rk.id] = left - take; delete sim.world.reserved['r' + rk.id];
+    s.carry = { item: 'stone', n: take };
+  },
+  pickPile(sim, s, st) {
+    const p = sim.piles.find((x) => x.id === st.pile); if (!p) return false;
+    const take = Math.min(p.n, carryCap(s, p.item)); p.n -= take; s.carry = { item: p.item, n: take };
+    if (p.n <= 0) sim.piles = sim.piles.filter((x) => x !== p);
+    delete sim.world.reserved['p' + p.id];
+  },
+  dropStock(sim, s) { if (s.carry && !s.carry.food) { sim.stock[s.carry.item] = (sim.stock[s.carry.item] || 0) + s.carry.n; s.carry = null; } },
+  dropFood(sim, s) { if (s.carry && s.carry.food) { addFood(sim, s.carry.item, s.carry.n); s.carry = null; } },
+  pickBerries(sim, s, st) {
+    const b = sim.world.bushes[st.bush] ?? sim.isl.bushes[st.bush].berries;
+    const k = Math.min(b, 4); sim.world.bushes[st.bush] = b - k;
+    if (b - k <= 0) sim.world.bushes['r' + st.bush] = sim.t + TUNE.bushRegrowDays * DAYS;
+    delete sim.world.reserved['b' + st.bush];
+    if (s.carry && s.carry.item === 'berries') s.carry.n += k; else if (k) s.carry = { item: 'berries', n: k, food: true };
+  },
+  fishEach(sim, s, st, T, dt, rate) {
+    if (sim.R.food.next() < TUNE.fishPerHour * dt / HOUR * rate) st.caught = (st.caught || 0) + 1;
+  },
+  fishDone(sim, s, st) {
+    if (st.caught) { s.carry = { item: 'fish', n: st.caught, food: true }; event(sim, s, 'fish', s.name + ' caught ' + st.caught + ' fish.'); }
+    else event(sim, s, 'fish', s.name + ' caught nothing.');
+  },
+  setTrap(sim, s, st) { sim.traps.push({ id: sim.nextId++, x: st.at.x, z: st.at.z, set: sim.t, catch: 0, owner: s.id }); },
+  checkTrap(sim, s, st) {
+    const tr = sim.traps.find((x) => x.id === st.trap); if (!tr) return;
+    if (tr.catch) { if (s.carry && s.carry.item === 'meat') s.carry.n += tr.catch; else s.carry = { item: 'meat', n: tr.catch, food: true }; event(sim, s, 'trap', s.name + ' found a rabbit in a trap.'); tr.catch = 0; }
+    tr.checked = sim.t;
+  },
+  cook(sim, s) {
+    const meat = takeFood(sim, 'meat', 99), fish = takeFood(sim, 'fish', 99);
+    const meals = meat * 2 + Math.floor(fish * 1.5);
+    let ber = 0; if (meals < 4) { ber = takeFood(sim, 'berries', Math.floor(foodCount(sim, 'berries') / 3) * 3); }
+    const total = meals + ber / 3;
+    if (total) { addFood(sim, 'meal', total); event(sim, s, 'cook', s.name + ' cooked ' + total.toFixed(0) + ' meals.'); }
+  },
+  dryFood(sim, s) {
+    const meat = takeFood(sim, 'meat', 4), fish = takeFood(sim, 'fish', 4);
+    const n = meat * 2 + fish * 1.5; if (n) addFood(sim, 'dried', n);
+  },
+  takeStock(sim, s, st) {
+    const x = site(sim, st.site); if (!x) return false;
+    const item = st.item, want = Math.min(carryCap(s, item), x.need[item] - x.have[item], sim.stock[item]);
+    if (want <= 0) return false;
+    sim.stock[item] -= want; s.carry = { item, n: want };
+  },
+  toSite(sim, s, st) {
+    const x = site(sim, st.site);
+    if (!x || !s.carry) { dropCarry(sim, s); return; }
+    const room = x.need[s.carry.item] - x.have[s.carry.item], put = Math.min(room, s.carry.n);
+    x.have[s.carry.item] += put; s.carry.n -= put;
+    if (s.carry.n > 0) sim.stock[s.carry.item] += s.carry.n;
+    s.carry = null;
+  },
+  buildEach(sim, s, st, T, dt, rate) {
+    const x = site(sim, st.site); if (!x || x.done) return;
+    const frac = Math.min(x.have.wood / Math.max(1, x.need.wood), x.need.stone ? x.have.stone / x.need.stone : 1);
+    const allowed = frac * x.hours + 1e-9;
+    if (x.prog >= allowed) { st.done = st.mins * 60; return; }
+    x.prog = Math.min(allowed, x.prog + dt * rate * (s.role === 'architect' ? 1 : 0.6) / HOUR);
+    if (x.prog >= x.hours - 1e-9) completeSite(sim, x, s);
+  },
+  rest(sim, s) { s.m.mood = Math.min(100, s.m.mood + 4); },
+  restEach(sim, s, st, T, dt) { s.m.energy = Math.min(85, s.m.energy + 3 * dt / HOUR); },
+  cheer(sim, s, st) {
+    const o = sim.settlers[st.toId]; if (!o) return;
+    const lift = 6 + (s.attrs.CHA - 10) * 1.2;
+    o.m.mood = Math.min(100, o.m.mood + lift); o.cheerUntil = sim.t + 8 * HOUR;
+    o.rel[s.id] = Math.min(100, (o.rel[s.id] || 50) + 5); s.rel[o.id] = Math.min(100, (s.rel[o.id] || 50) + 3);
+    event(sim, s, 'cheer', s.name + ' talked things through with ' + o.name + '.');
+  },
+  fixEach(sim, s, st, T, dt, rate) {
+    const k = TOOLS.filter((t) => sim.tools[t].by == null || sim.tools[t].by === s.id).sort((a, b) => sim.tools[a].cond - sim.tools[b].cond)[0];
+    if (k) sim.tools[k].cond = Math.min(100, sim.tools[k].cond + TUNE.toolFix * rate * dt / HOUR);
+  },
+  look(sim, s) { discover(sim, s); },
+  idle() {},
+};
+
+function carryCap(s, item) { return (TUNE.carry[item] || 4) + (item === 'wood' && s.attrs.STR >= 15 ? 1 : 0) + (item === 'stone' && s.attrs.STR >= 15 ? 1 : 0); }
+
+function completeSite(sim, x, s) {
+  x.done = true; x.prog = x.hours; x.doneT = sim.t;
+  event(sim, s, 'built', (BUILDINGS[x.type].label) + ' finished.');
+  say(sim, s, BUILDINGS[x.type].label + ' is done!', 'say');
+  if (x.type === 'foodstore') for (const b of sim.food) b.exp = Math.max(b.exp, b.exp + (TUNE.spoilStored[b.kind] - TUNE.spoil[b.kind]) * DAYS);
+  for (const o of sim.settlers) o.m.mood = Math.min(100, o.m.mood + 2);
+}
+
+/* ------------------------------ the world ticking ------------------------------ */
+function worldHourly(sim) {
+  // spoilage
+  const before = mealUnits(sim);
+  sim.food = sim.food.filter((b) => b.exp > sim.t);
+  const lost = before - mealUnits(sim);
+  if (lost > 0.5) event(sim, null, 'spoil', lost.toFixed(1) + ' meals worth of food spoiled.');
+  // bushes regrow
+  for (const k in sim.world.bushes) if (k[0] === 'r' && sim.world.bushes[k] <= sim.t) { const id = +k.slice(1); delete sim.world.bushes[k]; sim.world.bushes[id] = sim.isl.bushes[id].berries; }
+  // traps catch
+  for (const tr of sim.traps) if (!tr.catch && sim.R.food.next() < TUNE.trapCatchPerDay / 24 * trapRichness(sim, tr)) tr.catch = 1;
+}
+function trapRichness(sim, tr) {
+  const d = Math.hypot(tr.x - sim.isl.camp.x, tr.z - sim.isl.camp.z);
+  const crowd = sim.traps.filter((o) => o !== tr && Math.hypot(o.x - tr.x, o.z - tr.z) < 40).length;
+  return Math.min(1.4, 0.4 + d / 200) / (1 + crowd * 0.5);
+}
+function discover(sim, s) {
+  const isl = sim.isl;
+  if (!sim.discovered.pond && Math.hypot(s.x - isl.pond.x, s.z - isl.pond.z) < 48) {
+    sim.discovered.pond = sim.t;
+    event(sim, s, 'discover', s.name + ' found a waterfall falling into a clear pond. Fresh water, and safe to swim.');
+    say(sim, s, 'A waterfall! And a pond you could swim in!', 'say');
+    s.m.mood = Math.min(100, s.m.mood + 15);
+  }
+}
+function markSeen(sim, s) {
+  const k = Math.floor(s.x / 16) + ',' + Math.floor(s.z / 16);
+  if (!sim.seen[k]) sim.seen[k] = 1;
+}
+
+function social(sim) {
+  const S = sim.settlers;
+  for (let i = 0; i < S.length; i++) for (let j = i + 1; j < S.length; j++) {
+    const a = S[i], b = S[j];
+    if (a.act === 'sleep' || b.act === 'sleep') continue;
+    if (dist(a, b) < 15) { a.rel[b.id] = Math.min(100, a.rel[b.id] + 0.5 / 60); b.rel[a.id] = Math.min(100, b.rel[a.id] + 0.5 / 60); }
+  }
+}
+
+function phase1Check(sim) {
+  if (sim.phase1) return;
+  const builtAll = PHASE1_BUILDS.every((b) => built(sim, b)) && sim.sites.filter((x) => x.type === 'bed' && x.done).length >= 5;
+  const food = mealUnits(sim) >= foodTarget(sim);
+  const ok = sim.settlers.every((s) => ['health', 'energy', 'hunger', 'mood', 'clean'].every((k) => s.m[k] >= 50));
+  if (!ok) sim.okSince = null; else if (sim.okSince == null) sim.okSince = sim.t;
+  sim.p1 = { builtAll, food, okHours: sim.okSince == null ? 0 : (sim.t - sim.okSince) / HOUR };
+  if (builtAll && food && sim.okSince != null && sim.t - sim.okSince >= 48 * HOUR) {
+    sim.phase1 = { done: true, t: sim.t, day: dayOf(sim) };
+    event(sim, null, 'phase1', 'Phase 1 complete: the camp can take a fifth settler.');
+  }
+}
+
+/* ------------------------------ the tick ------------------------------ */
+function step(sim) {
+  sim.tick++; sim.t += TICK;
+  for (const s of sim.settlers) drain(sim, s, TICK);
+  for (const s of sim.settlers) runSettler(sim, s, TICK);
+  if (sim.tick % 6 === 0) { social(sim); for (const s of sim.settlers) { markSeen(sim, s); discover(sim, s); } }
+  if (sim.tick % 60 === 0) leaderTick(sim);
+  if (sim.tick % 360 === 0) { worldHourly(sim); phase1Check(sim); }
+  // the hour as ticks: pin any player input to the tick it arrived on
+}
+function runFor(sim, secs) { const n = Math.round(secs / TICK); for (let i = 0; i < n; i++) step(sim); }
+
+function applyInput(sim, input) {
+  const rec = { ...input, tick: sim.tick };
+  sim.inputs.push(rec);
+  return applyPlayerInput(sim, rec);
+}
+function assignTask(sim, s, kind, opts = {}) {
+  const T = makeTask(sim, s, kind, opts);
+  if (!T) return null;
+  if (opts.pinned) T.pinned = true;
+  preempt(sim, s, T);
+  return T;
+}
+
+/* ------------------------------ save / load ------------------------------ */
+function snapshot(sim) {
+  const o = {};
+  for (const k in sim) if (k !== 'isl' && k !== 'nav' && k !== 'lay' && k !== 'R') o[k] = sim[k];
+  o.R = {}; for (const k in sim.R) o.R[k] = sim.R[k].save();
+  return JSON.parse(JSON.stringify(o));
+}
+function restore(snap) {
+  const sim = createSim(snap.seed);
+  for (const k in snap) if (k !== 'R') sim[k] = snap[k];
+  for (const k in snap.R) sim.R[k].load(snap.R[k]);
+  for (const s of sim.settlers) s.look = FOUNDERS[s.id] ? FOUNDERS[s.id].look : s.look;
+  return sim;
+}
+function simHash(sim) { return hashState(snapshot(sim)); }
 
 /* ===== rig.js ===== */
 // rig.js — placeholder (filled in a later task)

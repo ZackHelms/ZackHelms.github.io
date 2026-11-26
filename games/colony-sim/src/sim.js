@@ -538,6 +538,18 @@ export function assignTask(sim, s, kind, opts = {}) {
   return T;
 }
 
+// Re-run a game from its seed, applying each recorded input on the tick it arrived.
+export function replay(seed, inputs, toTick) {
+  const sim = createSim(seed);
+  let k = 0;
+  while (sim.tick < toTick || (k < inputs.length && inputs[k].tick <= sim.tick)) {
+    while (k < inputs.length && inputs[k].tick === sim.tick) { const rec = inputs[k++]; sim.inputs.push(rec); applyPlayerInput(sim, rec); }
+    if (sim.tick >= toTick) break;
+    step(sim);
+  }
+  return sim;
+}
+
 /* ------------------------------ save / load ------------------------------ */
 export function snapshot(sim) {
   const o = {};

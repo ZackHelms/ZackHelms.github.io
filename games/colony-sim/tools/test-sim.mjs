@@ -192,6 +192,55 @@ section('sim', async () => {
   check('…and wakes at ≤ 50% energy', woke !== null && woke <= 50.0001, woke);
 });
 
+/* ---------------- minds ---------------- */
+section('minds', async () => {
+  const S = await import('../src/sim.js'), B = await import('../src/brain.js');
+  const { LESSONS } = await import('../src/data.js');
+  const sim = S.createSim(3), bram = sim.settlers[1];
+  let tries = 0; while (!bram.lessons.overwork && tries < 40) { B.learnEvent(sim, bram, 'overwork'); tries++; }
+  check('a lesson is learned by repeating its mistake', !!bram.lessons.overwork, tries + ' tries');
+  check('…and moves its number toward the target', bram.lessons.overwork && B.lessonParam(bram, 'overwork') > LESSONS.overwork.start);
+  check('…and the settler says so', sim.bubbles.some(b => b.sid === bram.id && b.kind === 'learn'));
+  const wise = { attrs: { INT: 16, WIS: 16 } }, slow = { attrs: { INT: 8, WIS: 8 } };
+  check('INT/WIS set the learning speed', B.learnChance(wise) > B.learnChance(slow), B.learnChance(wise) + ' vs ' + B.learnChance(slow));
+
+  // refusal: learned overwork, exhausted, ordered to chop now
+  const r = S.createSim(5); S.runFor(r, 3600);
+  const g = r.settlers[1]; g.lessons.overwork = { v: 30, times: 1, day: 1 };
+  g.m.energy = 20; g.plan.unshift({ id: 999, kind: 'chop', label: 'Chop a tree', owner: 'leader' });
+  const out = S.applyInput(r, { type: 'doNow', sid: g.id, idx: 0 });
+  check('a learned lesson makes them refuse', out === 'refused' && g.task.kind === 'sleep', out + ' / ' + (g.task && g.task.kind));
+  check('…with a speech bubble', r.bubbles.some(b => b.sid === g.id && b.kind === 'refuse'));
+  check('…and the order waits behind the need', g.plan[0] && g.plan[0].kind === 'chop');
+  check('…and the refusal is logged with the input', r.inputs.length === 1 && g.stats.refusals === 1);
+
+  // before learning: they obey and push through
+  const o = S.createSim(5); S.runFor(o, 3600);
+  const g2 = o.settlers[1]; g2.m.energy = 6; g2.plan.unshift({ id: 998, kind: 'chop', label: 'Chop a tree', owner: 'leader' });
+  const out2 = S.applyInput(o, { type: 'doNow', sid: g2.id, idx: 0 });
+  check('without the lesson they obey', out2 === true && g2.task.kind === 'chop' && g2.task.pinned);
+  let collapsed = false; for (let i = 0; i < 6 * 360 && !collapsed; i++) { S.step(o); if (g2.act === 'collapsed') collapsed = true; }
+  check('…and pushing through ends in a collapse', collapsed);
+
+  // goal order is respected
+  const go = S.createSim(8);
+  S.applyInput(go, { type: 'goalMove', id: 'toolbench', to: 0 });
+  S.runFor(go, 8 * DAY);
+  const order = go.sites.filter(x => x.done).sort((a, b) => a.doneT - b.doneT).map(x => x.type);
+  check('the leader follows the goals board (tool bench moved first: built before the lean-to)', order.indexOf('toolbench') >= 0 && order.indexOf('toolbench') < order.indexOf('leanto'), order.join(','));
+
+  // replay: seed + recorded inputs reproduce the run
+  const live = S.createSim(9), R = (await import('../src/rng.js')).makeRng(77);
+  for (let k = 0; k < 20; k++) {
+    S.runFor(live, R.range(600, 12000));
+    const s = live.settlers[R.int(0, 3)];
+    if (s.plan.length > 1) S.applyInput(live, { type: 'reorder', sid: s.id, from: s.plan.length - 1, to: 0 });
+    else S.applyInput(live, { type: 'goalMove', id: R.pick(live.goals), to: R.int(0, 5) });
+  }
+  const again = S.replay(9, JSON.parse(JSON.stringify(live.inputs)), live.tick);
+  check('replaying seed + inputs reproduces the run', S.simHash(again) === S.simHash(live), live.inputs.length + ' inputs');
+});
+
 for (const s of sections) {
   if (only.length && !only.includes(s.name)) continue;
   console.log('[' + s.name + ']');

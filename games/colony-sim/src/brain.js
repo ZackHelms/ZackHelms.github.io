@@ -119,7 +119,7 @@ function ensureSites(sim) {
     if (++opened >= 2) break;
   }
 }
-const activeSites = (sim) => sim.sites.filter((x) => !x.done).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
+export const activeSites = (sim) => sim.sites.filter((x) => !x.done).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
 function shortfall(sim) {
   const act = activeSites(sim);
   const need = { wood: 0, stone: 0 };
@@ -135,7 +135,7 @@ export function leaderTick(sim) {
   for (const s of sim.settlers) if (s.delay) for (const k in s.delay) if (s.delay[k] <= sim.t) delete s.delay[k];
 }
 
-const buildable = (sim) => activeSites(sim).filter((x) => {
+export const buildable = (sim) => activeSites(sim).filter((x) => {
   const frac = Math.min(x.have.wood / Math.max(1, x.need.wood), x.need.stone ? x.have.stone / x.need.stone : 1);
   return frac * x.hours > x.prog + 0.05;
 });
@@ -408,7 +408,6 @@ export function makeTask(sim, s, kind, opts = {}) {
   }
   return T;
 }
-export { activeSites, buildable };
 
 /* ------------------------------ the player's orders ------------------------------ */
 export function applyPlayerInput(sim, rec) {
