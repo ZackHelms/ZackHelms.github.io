@@ -84,19 +84,36 @@ function forecast(sim, s) {
 export function checkInterrupts(sim, s) {
   const T = s.task; if (!T || NEED_KINDS.has(T.kind)) return;
   // out late, far from camp
-  if (dist(s, sim.lay.fire) > 110 && hourOf(sim) >= lessonParam(s, 'farAtDusk') && hourOf(sim) < 23 && !T.pinned && T.kind !== 'explore') {
-    if (T.kind === 'explore' && !learned(s, 'farAtDusk')) return;
+  if (dist(s, sim.lay.fire) > 110 && hourOf(sim) >= lessonParam(s, 'farAtDusk') && hourOf(sim) < 23 && !T.pinned && (T.kind !== 'explore' || learned(s, 'farAtDusk'))) {
     preempt(sim, s, makeTask(sim, s, 'home')); return;
   }
   let n = needOf(sim, s, false);
   if (!n) { const soft = needOf(sim, s, true); if (soft && (soft.meal || soft.why === 'bedtime') && !T.pinned && T.kind !== 'explore') n = soft; }
   if (!n) return;
   if (T.pinned) {
-    if (n.lesson && learned(s, n.lesson)) { refuse(sim, s, n.lesson); T.pinned = false; preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); }
+    const L = learnedNeed(sim, s, true);
+    if (L) { refuse(sim, s, L.lesson); T.pinned = false; preempt(sim, s, makeTask(sim, s, L.kind, { need: L })); }
     return;                                                    // obeying the player: pushing through
   }
   preempt(sim, s, makeTask(sim, s, n.kind, { need: n }));
 }
+
+// The first need that a lesson this settler has learned says to look after, whatever is more
+// urgent and whatever the player has put off. urgentOnly: just the ones that interrupt work.
+export function learnedNeed(sim, s, urgentOnly) {
+  const m = s.m, h = hourOf(sim);
+  if (learned(s, 'overwork') && m.energy < lessonParam(s, 'overwork')) return { kind: 'sleep', urgent: true, lesson: 'overwork', why: 'energy' };
+  if (learned(s, 'skipMeal') && m.hunger < lessonParam(s, 'skipMeal')) return { kind: 'eat', urgent: true, lesson: 'skipMeal' };
+  if (urgentOnly) return null;
+  if (learned(s, 'lateNight') && (h >= lessonParam(s, 'lateNight') || h < 4.5)) return { kind: 'sleep', urgent: false, lesson: 'lateNight', why: 'bedtime' };
+  if (learned(s, 'skipMeal') && isMealtime(h) && m.hunger < 72 && mealUnits(sim) >= 1) return { kind: 'eat', urgent: false, lesson: 'skipMeal', meal: true };
+  if (learned(s, 'hygiene') && m.clean < lessonParam(s, 'hygiene') && h > 6.5 && h < 20) return { kind: 'bathe', urgent: false, lesson: 'hygiene' };
+  return null;
+}
+const planIndex = (s, rec, idx) => {
+  if (rec.itemId == null) return idx;
+  return s.plan.findIndex((it) => it.id === rec.itemId);
+};
 
 function refuse(sim, s, key) {
   s.stats.refusals++;
@@ -127,7 +144,7 @@ function ensureSites(sim) {
     if (++opened >= 2) break;
   }
 }
-export const activeSites = (sim) => sim.sites.filter((x) => !x.done).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
+export const activeSites = (sim) => sim.sites.filter((x) => !x.done && sim.goals.includes(x.goal)).sort((a, b) => sim.goals.indexOf(a.goal) - sim.goals.indexOf(b.goal));
 function shortfall(sim) {
   const act = activeSites(sim);
   const need = { wood: 0, stone: 0 };
@@ -327,7 +344,7 @@ export function makeTask(sim, s, kind, opts = {}) {
       if (!tr) return null;
       sim.world.reserved['t' + tr.id] = s.id;
       const stand = nearestPassable(sim.nav, { x: tr.x - 1.3, z: tr.z + 0.4 });
-      S.push(go(stand, 'walk to a tree'), work('chop', 40, 'chop it down', { tool: 'axe', attr: 'STR', fx: 'fell', tree: tr.id, face: tr, heavy: true, role: 'gatherer' }),
+      S.push(go(stand, 'walk to a tree'), work('chop', 40, 'chop it down', { tool: 'axe', attr: 'STR', fx: 'fell', each: 'treeStanding', tree: tr.id, face: tr, heavy: true, role: 'gatherer' }),
         go(lay.pile, 'carry logs to storage'), work('drop', 1, 'stack them', { fx: 'dropStock', outdoor: false, meters: [] }));
       T.keepCarry = true;
       break;
@@ -445,21 +462,28 @@ export function applyPlayerInput(sim, rec) {
       sim.goals.splice(i, 1); sim.goals.splice(clamp(rec.to, 0, sim.goals.length), 0, rec.id); return true;
     }
     case 'goalAdd': if (!GOALS[rec.id] || sim.goals.includes(rec.id)) return false; sim.goals.push(rec.id); return true;
-    case 'goalRemove': { const i = sim.goals.indexOf(rec.id); if (i < 0) return false; sim.goals.splice(i, 1); return true; }
+    case 'goalRemove': {
+      const i = sim.goals.indexOf(rec.id); if (i < 0) return false;
+      sim.goals.splice(i, 1);
+      // its unfinished sites go; what was delivered to them goes back to storage
+      for (const x of sim.sites.filter((q) => q.goal === rec.id && !q.done)) { sim.stock.wood += x.have.wood; sim.stock.stone += x.have.stone; }
+      sim.sites = sim.sites.filter((q) => q.goal !== rec.id || q.done);
+      return true;
+    }
     case 'reorder': {
       if (!s) return false;
-      const it = s.plan[rec.from]; if (!it) return false;
-      s.plan.splice(rec.from, 1); it.owner = 'player'; s.plan.splice(clamp(rec.to, 0, s.plan.length), 0, it); return true;
+      const from = planIndex(s, rec, rec.from), it = s.plan[from]; if (!it) return false;
+      s.plan.splice(from, 1); it.owner = 'player'; s.plan.splice(clamp(rec.to, 0, s.plan.length), 0, it); return true;
     }
     case 'doNow': {
       if (!s) return false;
-      const it = s.plan[rec.idx]; if (!it) return false;
-      s.plan.splice(rec.idx, 1);
-      const n = needOf(sim, s);
+      const idx = planIndex(s, rec, rec.idx), it = s.plan[idx]; if (!it) return false;
+      s.plan.splice(idx, 1);
+      const n = learnedNeed(sim, s, false);
       const T = it.steps ? it : makeTask(sim, s, it.kind, { ...(it.opts || {}), owner: 'player' });
       if (!T) { say(sim, s, "I can't do that right now.", 'refuse'); return false; }
       T.pinned = true; T.owner = 'player';
-      if (n && n.lesson && learned(s, n.lesson) && (n.urgent || n.why === 'bedtime' || n.kind === 'eat')) {
+      if (n) {
         refuse(sim, s, n.lesson); T.pinned = false;
         preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); s.plan.unshift(T); return 'refused';
       }
@@ -467,9 +491,9 @@ export function applyPlayerInput(sim, rec) {
     }
     case 'later': {
       if (!s) return false;
-      const n = needOf(sim, s);
-      const key = rec.need === 'sleep' ? 'lateNight' : rec.need === 'eat' ? 'skipMeal' : rec.need === 'bathe' ? 'hygiene' : null;
-      if (key && learned(s, key) && n && n.kind === rec.need) { refuse(sim, s, key); return 'refused'; }
+      // judged on the need itself, not on whether an earlier Later is still hiding it
+      const n = learnedNeed(sim, s, false);
+      if (n && n.kind === rec.need) { refuse(sim, s, n.lesson); return 'refused'; }
       s.delay = s.delay || {}; s.delay[rec.need] = sim.t + (rec.hours || 1) * HOUR;
       if (s.task && s.task.kind === rec.need && s.task.steps[s.task.i] && s.task.steps[s.task.i].do === 'go') { s.task = null; }
       return true;

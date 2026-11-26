@@ -27,7 +27,7 @@ function boot(sim) {
   G.colors = sim.settlers.map((s) => G.R.colorsFor(s.look));
   G.R.cam.tx = sim.isl.camp.x; G.R.cam.tz = sim.isl.camp.z; G.R.cam.ty = heightAt(sim.isl, sim.isl.camp.x, sim.isl.camp.z);
   G.R.cam.dist = 70; G.R.cam.pitch = 0.6;
-  G.acc = 0; G.selected = null; G.following = false;
+  G.acc = 0; G.selected = null; G.following = false; G.lastSave = sim.t;
   return true;
 }
 function save() {
@@ -38,6 +38,8 @@ function load() {
   try {
     const o = JSON.parse(raw);
     if (!o || o.v !== 1 || !o.snap || typeof o.snap.seed !== 'number') throw new Error('unknown save');
+    const probe = restore(JSON.parse(JSON.stringify(o.snap)));   // one step on a copy: a save that cannot run is not loaded
+    step(probe);
     return restore(o.snap);
   } catch (e) { localStorage.setItem('colonySim.bad', raw); localStorage.removeItem(SAVE); return null; }
 }
@@ -135,7 +137,9 @@ function frame(now) {
   }
   const out = G.R.frame(sim, G.rigs, (i) => rigCapsules(G.rigs[i], G.views[i]), now / 1000, { colors: G.colors, selected: G.selected });
   // sound: the shore is loud when the camera is near the sea
-  const c = G.R.cam, shore = Math.max(0, 1 - (sim.isl.seaD[Math.floor(c.tz / 2) * sim.isl.W + Math.floor(c.tx / 2)] * 2) / 120) * Math.max(0, 1 - c.dist / 400);
+  const c = G.R.cam, cx = Math.floor(c.tx / 2), cz = Math.floor(c.tz / 2);
+  const sd = cx >= 0 && cz >= 0 && cx < sim.isl.W && cz < sim.isl.H ? sim.isl.seaD[cz * sim.isl.W + cx] : 0;   // off the map is open sea
+  const shore = Math.max(0, 1 - (sd * 2) / 120) * Math.max(0, 1 - c.dist / 400);
   audio.tick(out.night > 0.5, shore, dt);
   chopT += dt;
   if (chopT > 0.7 && mult > 0) { chopT = 0; for (const s of sim.settlers) if ((s.act === 'chop' || s.act === 'mine' || s.act === 'build') && Math.hypot(s.x - c.tx, s.z - c.tz) < 40 && c.dist < 80) audio.thunk(0.25 * (1 - c.dist / 80)); }
@@ -148,11 +152,15 @@ function frame(now) {
   if (sim.t - G.lastSave > 3600) { G.lastSave = sim.t; save(); }
 }
 window.addEventListener('beforeunload', () => { if (G.sim) save(); });
+window.addEventListener('pagehide', () => { if (G.sim) save(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && G.sim) save(); });
 
 const loaded = load();
-if (loaded) {
-  boot(loaded); G.lastSave = loaded.t; ui = makeUI(api);
+let booted = false;
+if (loaded) { try { booted = boot(loaded); } catch (e) { console.warn('saved island would not start; starting fresh', e); localStorage.setItem('colonySim.bad', localStorage.getItem(SAVE) || ''); localStorage.removeItem(SAVE); } }
+if (loaded && booted) {
+  ui = makeUI(api);
   ui.showLoad(clockOf(loaded).day, () => {}, () => api.newGame(Math.floor(Math.random() * 99999) + 1));
 } else { boot(createSim(Math.floor(Math.random() * 99999) + 1)); ui = makeUI(api); }
-window.__CS = { G, api, step, applyInput };
+window.__CS = { G, api, step, applyInput, audio };
 requestAnimationFrame(frame);

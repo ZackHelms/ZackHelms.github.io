@@ -241,6 +241,72 @@ section('minds', async () => {
   check('replaying seed + inputs reproduces the run', S.simHash(again) === S.simHash(live), live.inputs.length + ' inputs');
 });
 
+/* ---------------- review fixes (2026-11-26 final review) ---------------- */
+section('review', async () => {
+  const S = await import('../src/sim.js'), B = await import('../src/brain.js');
+  const at = (sim, hour) => { while (Math.abs((sim.t % 86400) / 3600 - hour) > 1e-6) S.step(sim); };
+  // "Later" on sleep after the late-night lesson: refused, even when an earlier Later is still running
+  const a = S.createSim(4), k = a.settlers[2];
+  at(a, 20);
+  k.lessons.lateNight = { v: 21.4, times: 1, day: 1 };
+  const first = S.applyInput(a, { type: 'later', sid: k.id, need: 'sleep', hours: 1 });
+  at(a, 20 + 50 / 60);
+  const second = S.applyInput(a, { type: 'later', sid: k.id, need: 'sleep', hours: 1 });   // before bedtime: fine
+  at(a, 21 + 40 / 60);                                                                      // past bedtime, the last delay still running
+  const third = S.applyInput(a, { type: 'later', sid: k.id, need: 'sleep', hours: 1 });
+  check('Later on sleep past the learned bedtime is refused even while an earlier Later runs', first === true && second === true && third === 'refused', [first, second, third].join(','));
+
+  // removing a goal drops its unfinished sites and gives their materials back
+  const g = S.createSim(5); S.runFor(g, 1.5 * DAY);
+  const st = g.sites.find((x) => !x.done && (x.have.wood || x.have.stone));
+  if (!st) check('removing a goal: a part-built site exists to test', false);
+  else {
+    const before = g.stock.wood + g.stock.stone + st.have.wood + st.have.stone;
+    S.applyInput(g, { type: 'goalRemove', id: st.goal });
+    check('removing a goal removes its unfinished site', !g.sites.includes(st));
+    check('…and returns its materials to storage', g.stock.wood + g.stock.stone >= before - 1e-9, before + ' -> ' + (g.stock.wood + g.stock.stone));
+    S.runFor(g, DAY);
+    check('…and nobody builds it afterwards', !g.sites.some((x) => x.goal === st.goal));
+  }
+
+  // Do now names the job, not its row
+  const d = S.createSim(6); S.runFor(d, 3600);
+  const s = d.settlers[1];
+  s.plan = [{ id: 501, kind: 'gather', label: 'Gather stone', owner: 'leader' }, { id: 502, kind: 'forage', label: 'Forage berries', owner: 'leader' }];
+  s.m.energy = 90;
+  s.plan.reverse();                                   // the list moved under the cursor
+  S.applyInput(d, { type: 'doNow', sid: s.id, idx: 1, itemId: 502 });
+  check('Do now acts on the job that was clicked, even if the list moved', s.task && s.task.kind === 'forage', s.task && s.task.kind);
+
+  // a chop resumed on a tree someone else felled is given up
+  const c = S.createSim(7), bram = c.settlers[1];
+  S.assignTask(c, bram, 'chop', { pinned: true });
+  while (bram.task.i === 0) S.step(c);                // walked to the tree, now chopping
+  const tree = bram.task.steps[1].tree;
+  c.world.felled[tree] = c.t;                         // someone else got there first
+  for (let i = 0; i < 6; i++) S.step(c);
+  check('a chop on an already-felled tree is abandoned', !(bram.task && bram.task.kind === 'chop' && bram.task.steps[1] && bram.task.steps[1].tree === tree && bram.act === 'chop'), bram.act);
+
+  // a learned lesson is refused even when another need (bladder) is more urgent
+  const r = S.createSim(8); S.runFor(r, 3600);
+  const w = r.settlers[3]; w.lessons.overwork = { v: 30, times: 1, day: 1 };
+  w.m.energy = 10; w.m.bladder = 20;
+  w.plan.unshift({ id: 601, kind: 'gather', label: 'Gather stone', owner: 'leader' });
+  const out = S.applyInput(r, { type: 'doNow', sid: w.id, idx: 0, itemId: 601 });
+  check('an exhausted settler who has learned overwork refuses even when they also need the latrine', out === 'refused', out);
+
+  // a broken save is refused by restore, never half-loaded
+  const good = S.snapshot(S.createSim(9));
+  const broken = [
+    (o) => { delete o.settlers[0].m; }, (o) => { delete o.settlers[1].m.energy; }, (o) => { o.settlers[2].x = 'x'; },
+    (o) => { delete o.tools.axe; }, (o) => { o.settlers[0].task = { kind: 'chop', i: 0 }; }, (o) => { o.settlers.pop(); },
+  ];
+  const leaked = broken.filter((f) => { const o = JSON.parse(JSON.stringify(good)); f(o); try { S.restore(o); return true; } catch (e) { return false; } });
+  check('restore rejects saves with missing meters, tools, steps or settlers', leaked.length === 0, leaked.length + ' of ' + broken.length + ' loaded');
+  let ok = true; try { S.restore(JSON.parse(JSON.stringify(good))); } catch (e) { ok = false; }
+  check('…and still accepts a good save', ok);
+});
+
 /* ---------------- economy ---------------- */
 section('economy', async () => {
   const S = await import('../src/sim.js'), D = await import('../src/data.js');

@@ -31,7 +31,7 @@ export function makeAudio() {
     s.connect(f); f.connect(e); e.connect(master); s.start(t, Math.random()); s.stop(t + 0.2);
   };
   A.tick = (night, shore, dt) => {
-    if (!A.ctx || A.muted) return;
+    if (!A.ctx || A.muted || !Number.isFinite(shore)) return;
     surf.gain.setTargetAtTime(0.05 + 0.12 * shore, A.ctx.currentTime, 0.5);
     if (!night && Math.random() < dt * 0.5) chirp(birds, 2400 + Math.random() * 1600, 3800 + Math.random() * 900, 0.09 + Math.random() * 0.08, 0.05);
     if (night && Math.random() < dt * 6) chirp(crickets, 4300, 4250, 0.04, 0.012);

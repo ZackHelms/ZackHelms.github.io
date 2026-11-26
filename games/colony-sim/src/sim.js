@@ -372,6 +372,13 @@ export const FX = {
     s.m.mood = Math.min(100, s.m.mood + (st.pond ? 8 : 3));
     if (st.pond) s.pondUntil = sim.t + 12 * HOUR;
   },
+  // a resumed chop: the tree may have been felled, or claimed, while this settler was away
+  treeStanding(sim, s, st) {
+    if (sim.world.felled[st.tree]) return false;
+    const k = 't' + st.tree, who = sim.world.reserved[k];
+    if (who != null && who !== s.id) return false;
+    sim.world.reserved[k] = s.id;
+  },
   fell(sim, s, st) {
     const tr = sim.isl.trees[st.tree];
     sim.world.felled[tr.id] = sim.t;
@@ -585,7 +592,28 @@ export function snapshot(sim) {
   o.R = {}; for (const k in sim.R) o.R[k] = sim.R[k].save();
   return JSON.parse(JSON.stringify(o));
 }
+// A save is only loaded whole: anything missing or malformed throws, and the page starts fresh.
+const METER_KEYS = ['health', 'energy', 'hunger', 'mood', 'bladder', 'bowel', 'clean'];
+export function validateSnap(o) {
+  const bad = (why) => { throw new Error('bad save: ' + why); };
+  if (!o || typeof o !== 'object') bad('not an object');
+  if (!Number.isInteger(o.seed) || !Number.isFinite(o.t) || !Number.isInteger(o.tick)) bad('clock');
+  for (const k of ['settlers', 'food', 'sites', 'piles', 'traps', 'goals', 'inputs', 'events', 'bubbles']) if (!Array.isArray(o[k])) bad(k);
+  if (o.settlers.length !== FOUNDERS.length) bad('settler count');
+  for (const s of o.settlers) {
+    if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.z) || !Number.isFinite(s.yaw)) bad('settler position');
+    if (!s.m || METER_KEYS.some((k) => !Number.isFinite(s.m[k]))) bad('settler meters');
+    if (!Array.isArray(s.plan) || !s.stats || !s.lessons || !s.rel || !s.exp || !Array.isArray(s.log)) bad('settler fields');
+    for (const T of [s.task, ...s.plan.filter((it) => it && it.steps !== undefined)]) if (T && (!Array.isArray(T.steps) || !Number.isInteger(T.i))) bad('task steps');
+  }
+  if (!o.tools || TOOLS.some((k) => !o.tools[k] || !Number.isFinite(o.tools[k].cond))) bad('tools');
+  if (!o.stock || !Number.isFinite(o.stock.wood) || !Number.isFinite(o.stock.stone)) bad('stock');
+  if (!o.world || !o.world.felled || !o.world.rocks || !o.world.bushes || !o.world.reserved) bad('world');
+  if (!o.R) bad('random streams');
+  for (const k of ['life', 'work', 'learn', 'food', 'social']) if (!Array.isArray(o.R[k]) || o.R[k].length !== 4 || o.R[k].some((v) => !Number.isFinite(v))) bad('random stream ' + k);
+}
 export function restore(snap) {
+  validateSnap(snap);
   const sim = createSim(snap.seed);
   for (const k in snap) if (k !== 'R') sim[k] = snap[k];
   for (const k in snap.R) sim.R[k].load(snap.R[k]);

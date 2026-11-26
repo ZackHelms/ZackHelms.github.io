@@ -120,6 +120,42 @@ const check = (n, c, d) => { if (c) { passes++; console.log('  ok   ' + n); } el
   const fresh = await page.evaluate(() => ({ day: window.__CS.G.sim && Math.floor(window.__CS.G.sim.t / 86400) + 1, bad: !!localStorage.getItem('colonySim.bad'), overlay: !!document.getElementById('ov-go') }));
   check('a corrupt save starts a fresh island, keeps the bad blob aside, no error', fresh.day === 1 && fresh.bad && !fresh.overlay && errs.length === 0, JSON.stringify(fresh) + ' ' + errs.join('|'));
 
+  // a save that parses but is structurally wrong (an older build's shape) also starts fresh
+  await page.evaluate(() => { const snap = JSON.parse(localStorage.getItem('colonySim.v1') || 'null') || null; window.__CS.G.sim = null; localStorage.removeItem('colonySim.bad');
+    const o = snap || { v: 1, snap: { seed: 5, t: 0, tick: 0, settlers: [{}] } }; if (o.snap.settlers && o.snap.settlers[0]) delete o.snap.settlers[0].m; localStorage.setItem('colonySim.v1', JSON.stringify(o)); });
+  errs.length = 0;
+  await page.reload(); await frames(8);
+  const half = await page.evaluate(() => ({ day: window.__CS.G.sim && Math.floor(window.__CS.G.sim.t / 86400) + 1, bad: !!localStorage.getItem('colonySim.bad'), overlay: !!document.getElementById('ov-go') }));
+  check('a save with a settler missing its meters starts a fresh island, no error', half.day === 1 && half.bad && !half.overlay && errs.length === 0, JSON.stringify(half) + ' ' + errs.join('|'));
+
+  // speech bubbles: shown once, gone after 8 real seconds, no churn
+  const bub = await page.evaluate(async () => {
+    const G = window.__CS.G, sim = G.sim; G.speedIdx = 0;
+    sim.bubbles.push({ id: 900001, sid: 0, t: sim.t, text: 'first line', kind: 'say' }, { id: 900002, sid: 0, t: sim.t, text: 'second line', kind: 'say' });
+    let created = 0; const root = document.getElementById('bubbles');
+    const mo = new MutationObserver((ms) => { for (const m of ms) created += m.addedNodes.length; }); mo.observe(root, { childList: true });
+    await new Promise((r) => setTimeout(r, 1500)); const early = root.children.length;
+    await new Promise((r) => setTimeout(r, 8500)); mo.disconnect();
+    return { early, late: root.children.length, created };
+  });
+  check('a speech bubble shows, then is gone after 8 s while paused', bub.early >= 1 && bub.late === 0, JSON.stringify(bub));
+  check('…and is created once, not re-created every frame', bub.created <= 2, JSON.stringify(bub));
+
+  // panning off the north edge with sound on must not stop the page
+  errs.length = 0;
+  const edge = await page.evaluate(async () => {
+    const G = window.__CS.G, A = window.__CS.audio; A.init(); if (A.muted) A.setMuted(false); if (!A.ctx) return { noAudio: true };
+    G.speedIdx = 3; G.R.cam.tz = -90; G.R.cam.tx = 500; G.R.cam.dist = 30;
+    const t0 = G.sim.t, c0 = document.getElementById('clock').textContent;
+    await new Promise((r) => setTimeout(r, 2500));
+    return { advanced: G.sim.t - t0, clock: c0 !== document.getElementById('clock').textContent };
+  });
+  check('panned off the island with sound on: no errors and the clock still runs', errs.length === 0 && edge.advanced > 0 && edge.clock, JSON.stringify(edge) + ' ' + errs.join('|'));
+
+  // a new island autosaves on its own clock
+  const ng = await page.evaluate(() => { const G = window.__CS.G; for (let i = 0; i < 8640 * 2; i++) window.__CS.step(G.sim); G.lastSave = G.sim.t; window.__CS.api.newGame(4242); return { lastSave: G.lastSave, t: G.sim.t }; });
+  check('starting a new island resets the autosave clock', ng.lastSave === ng.t, JSON.stringify(ng));
+
   // a time backlog (a hidden tab) is capped
   const cap = await page.evaluate(async () => {
     const G = window.__CS.G; G.speedIdx = 5; const k0 = G.sim.tick; G.acc = 1e9;

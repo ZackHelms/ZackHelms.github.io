@@ -12,7 +12,7 @@ const METERS = [['health', 'Health'], ['energy', 'Energy'], ['hunger', 'Fed'], [
 const ACT_WORD = { walk: 'walking', run: 'running', chop: 'chopping', mine: 'breaking stone', pick: 'picking up', build: 'building', cook: 'cooking', eat: 'eating', sleep: 'asleep', collapsed: 'collapsed', sit: 'resting', talk: 'talking', bathe: 'washing', forage: 'foraging', trap: 'setting snares', fish: 'fishing', squat: 'in private', maintain: 'sharpening tools', look: 'looking around', drop: 'setting down', idle: 'idle' };
 
 export function makeUI(api) {
-  const ui = { held: false, parts: {}, bubbleEls: new Map() };
+  const ui = { held: false, parts: {}, bubbleEls: new Map(), shown: new Set() };
   document.addEventListener('pointerdown', (e) => { if (e.target.closest('.side')) ui.held = true; });
   document.addEventListener('pointerup', () => { ui.held = false; });
 
@@ -39,9 +39,9 @@ export function makeUI(api) {
   $('#settler-body').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const sid = api.selected(); if (sid == null) return;
-    const i = +b.dataset.i;
-    if (b.dataset.a === 'now') api.input({ type: 'doNow', sid, idx: i });
-    if (b.dataset.a === 'up') api.input({ type: 'reorder', sid, from: i, to: i - 1 });
+    const i = +b.dataset.i, itemId = b.dataset.id == null ? null : +b.dataset.id;
+    if (b.dataset.a === 'now') api.input({ type: 'doNow', sid, idx: i, itemId });
+    if (b.dataset.a === 'up') api.input({ type: 'reorder', sid, from: i, to: i - 1, itemId });
     if (b.dataset.a === 'later') api.input({ type: 'later', sid, need: b.dataset.n, hours: 1 });
   });
   $('#info-btn').addEventListener('click', () => showInfo());
@@ -108,7 +108,7 @@ export function makeUI(api) {
     part('sNow', nowSig, $('#s-now'), T ? `<div class="task now"><div class="tl"><b>${esc(T.label)}</b>${T.pinned ? ' <span class="role">(your order)</span>' : ''} <span class="role">· ${esc(ACT_WORD[s.act] || s.act)}</span><div class="steps">${T.steps.map((st, j) => `<span class="${j === T.i ? 'cur' : ''}">${j < T.i ? '✓ ' : j === T.i ? '▸ ' : '· '}${esc(st.label || st.act || st.do)}</span>`).join('<br>')}</div></div></div>` : '<div class="log">thinking…</div>');
     const fc = forecastNeeds(sim, s);
     const planSig = s.plan.map((it) => it.id + it.kind + (it.owner || '')).join() + '|' + fc.map((f) => f.label).join() + '|' + (s.delay ? JSON.stringify(s.delay) : '');
-    part('sPlan', planSig, $('#s-next'), s.plan.map((it, i) => `<div class="task"><span class="tl">${esc(it.label || it.kind)}${it.owner === 'player' ? ' <span class="role">(moved by you)</span>' : it.steps ? ' <span class="role">(paused)</span>' : ''}</span><button class="mini" data-a="up" data-i="${i}" ${i ? '' : 'disabled'} aria-label="Earlier">▲</button><button class="mini" data-a="now" data-i="${i}">Do now</button></div>`).join('') +
+    part('sPlan', planSig, $('#s-next'), s.plan.map((it, i) => `<div class="task"><span class="tl">${esc(it.label || it.kind)}${it.owner === 'player' ? ' <span class="role">(moved by you)</span>' : it.steps ? ' <span class="role">(paused)</span>' : ''}</span><button class="mini" data-a="up" data-i="${i}" data-id="${it.id}" ${i ? '' : 'disabled'} aria-label="Earlier">▲</button><button class="mini" data-a="now" data-i="${i}" data-id="${it.id}">Do now</button></div>`).join('') +
       fc.map((f) => `<div class="task"><span class="tl" style="color:var(--dim)">${esc(f.label)}</span><button class="mini" data-a="later" data-n="${f.kind}">Later</button></div>`).join(''));
     // the mind: lessons, friends, recent log
     const lessons = Object.entries(s.lessons).map(([k, l]) => `<li>✦ ${esc(LESSONS[k].label)} <span class="role">— ${esc(LESSONS[k].fmt(l.v))} (day ${l.day})</span></li>`).join('') || '<li class="role">none yet</li>';
@@ -129,7 +129,11 @@ export function makeUI(api) {
   // speech bubbles over heads, for 8 real seconds each
   function bubbles(project, nowReal) {
     const sim = api.sim(), root = $('#bubbles');
-    for (const b of sim.bubbles) if (!ui.bubbleEls.has(b.id) && b.t >= api.loadedAt()) {
+    // a line is shown once: `shown` remembers it for as long as the sim still holds it
+    const held = new Set(sim.bubbles.map((b) => b.id));
+    for (const id of ui.shown) if (!held.has(id)) ui.shown.delete(id);
+    for (const b of sim.bubbles) if (!ui.shown.has(b.id) && b.t >= api.loadedAt()) {
+      ui.shown.add(b.id);
       const el = document.createElement('div'); el.className = 'bubble ' + (b.kind === 'refuse' ? 'refuse' : '');
       el.innerHTML = `<span class="bn">${esc(sim.settlers[b.sid].name)}</span>${esc(b.text)}`;
       root.appendChild(el); ui.bubbleEls.set(b.id, { el, born: nowReal, sid: b.sid });
@@ -183,7 +187,7 @@ export function makeUI(api) {
     $('#ov-new').addEventListener('click', () => { hideOverlay(); onNew(); });
   }
   ui.update = (project, nowReal, full) => { topbar(); if (full) { goals(); } settler(); bubbles(project, nowReal); };
-  ui.refreshAll = () => { ui.parts = {}; $('#settler-body').innerHTML = ''; for (const [, o] of ui.bubbleEls) o.el.remove(); ui.bubbleEls.clear(); };
+  ui.refreshAll = () => { ui.parts = {}; ui.shown.clear(); $('#settler-body').innerHTML = ''; for (const [, o] of ui.bubbleEls) o.el.remove(); ui.bubbleEls.clear(); };
   ui.showPhase1 = showPhase1; ui.showLoad = showLoad; ui.hideOverlay = hideOverlay; ui.showInfo = showInfo;
   return ui;
 }

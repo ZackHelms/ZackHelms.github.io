@@ -440,7 +440,7 @@ listed under § Calls made while building.
 | `src/audio.js` | surf, birds, crickets, axe thunks; mute persisted |
 | `src/main.js` | boot, fixed-step accumulator (48 game seconds per real second at 1x, at most 400 ticks a frame), interpolation, input, follow, autosave every game hour |
 | `build.mjs` | each module becomes its own `{ }` block; exported names are declared once outside (the build fails if two modules export one name); imports are dropped |
-| `tools/test-sim.mjs` | 61 headless checks (rng, island, nav, sim, minds, economy, rig) |
+| `tools/test-sim.mjs` | 70 headless checks (rng, island, nav, sim, minds, review fixes, economy, rig) |
 | `tools/run.mjs` | the tuning runner: `--seeds N --from S --days D [--bad]` |
 
 ### Architecture notes
@@ -452,8 +452,9 @@ listed under § Calls made while building.
   (bedtime, mealtimes, washing, rest) wait for the current task to end, except that mealtimes
   and bedtime also interrupt a long job.
 - **A player's order is "pinned"**: it suppresses every need until done (that is how the CD
-  can make things worse: accidents, collapses), unless the settler has learned the lesson
-  that covers the need, in which case they refuse with a bubble and put the need first; the
+  can make things worse: accidents, collapses), unless the settler has learned a lesson
+  that covers any of their current needs (`learnedNeed`, which looks past a more urgent
+  need and past a "Later" still running), in which case they refuse with a bubble and put the need first; the
   order then waits behind it.
 - **The plan list** keeps the player's items and any paused task, and refills the leader's
   forecast (two items) every time the settler picks a new task. "Later" puts off sleep, a
@@ -478,16 +479,15 @@ listed under § Calls made while building.
 ## Measured (2026-11-26, `node games/colony-sim/tools/run.mjs`)
 | Set | Finished | Median day | Range | A struggle (< 30 on a meter) | Median lessons |
 |---|---|---|---|---|---|
-| seeds 1-30 (tuned on) | 30/30 | 12.3 | 9-19.7 | 22/30 | 11 |
-| seeds 31-60 (held out) | 30/30 | 13.0 | 9-16.4 | 25/30 | 11 |
-| seeds 31-60, bad player (`--bad`) | 30/30 | 12.9 | 9-19.8 | 30/30 | 12 |
+| seeds 1-30 (tuned on) | 30/30 | 12.4 | 9-19.7 | 21/30 | 11 |
+| seeds 31-60 (held out) | 30/30 | 12.9 | 9-16.4 | 24/30 | 11 |
+| seeds 31-60, bad player (`--bad`) | 30/30 | 12.4 | 10-15.3 | 30/30 | 11 |
 
 The bad player orders everyone to keep working at 22:30 and puts off sleep for three nights,
-and moves the tool bench to last. It makes runs more miserable (3 collapses and 1 accident
-over 30 runs, a struggle in every run) and widens the range (the slowest run goes from 16.4
-to 19.8 days) without moving the median. It doesn't stall them. Earlier in tuning it
-cost about a day of median, so the effect is small and noisy: a bad player hurts the
-founders more than the schedule. Typical
+and moves the tool bench to last. It makes runs more miserable (7 collapses and 2 accidents
+over 30 runs, a struggle in every run) without slowing them: the median and range barely
+move, and earlier tuning runs put it anywhere from a day slower to a day faster. A bad player
+hurts the founders more than the schedule. It doesn't stall them. Typical
 shape: the camp is built by day 6-9; the rest is the founders learning to keep every meter
 above 50 for two days (washing and bedtime are the usual last lessons).
 
@@ -524,4 +524,6 @@ above 50 for two days (washing and bedtime are the usual last lessons).
   (CS-4).
 - No inviting settler 5: the phase 1 screen says so. Everything after phase 1 is undecided (CD).
 - At 16x, walkers whose on-screen speed passes 6 m/s switch to a sliding gait cycle.
-- Saves are kept in this browser only.
+- Saves are kept in this browser only. A save is checked whole (`validateSnap`) and run one
+  step on a copy before it is loaded; one that fails is set aside under `colonySim.bad`.
+- Removing a goal removes its unfinished sites and returns their materials to storage.
