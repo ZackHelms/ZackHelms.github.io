@@ -1,5 +1,19 @@
 # DONE — done log
 
+- 2026-11-26 [colony-sim] **Colony Sim, phase 1 first draft** (new game, CD commission; live at
+  `build 2026-11-26 23:35 UTC`). Designed with the CD in a brainstorm (design:
+  `.claude/colony-sim.md`), then built on "use your best judgment". Four founders (Ada,
+  leader; Bram, gatherer; Kit, hunter; Ines, architect) land on a seeded 1 km island with a
+  cliff band, a waterfall pond and a river. Sims-like needs on the CD's 0/50/80/100 scale,
+  accidents, collapses and perseverance. Jobs from chopping to snares to cooking. Eleven goals
+  on a board the leader delegates from. One set of tools wearing to 50% and a tool bench.
+  Lessons learned by trial and error at an INT/WIS rate, and refusals in speech bubbles.
+  "Do now", ▲ and "Later" on each settler's plan; follow menu, orbit camera, 1x-16x, autosave.
+  Hand-written blocky WebGL2 with capsule bodies on the Animation Rigs skeleton, built from
+  `src/` by `build.mjs`. Measured on held-out seeds: phase 1 finishes 30/30, median day 12.9.
+  Suites: `games/colony-sim/tools/test-sim.mjs` (70) and `.claude/tests/drive-colony-sim.cjs`
+  (18). Plan: `.claude/plans/DONE/colonysim.phase1-draft.md`.
+
 - 2026-11-05 [driving-sim] **Weather: rain, fog and snow, Auto or picked, and green winter lawns**
   (DS-8 + DS-11, live at `build 2026-11-05 13:22 UTC`). A Weather row in settings (Auto, a pure
   function of the date and hour weighted by season, or a fixed Clear / Rain / Fog / Snow, Snow in
