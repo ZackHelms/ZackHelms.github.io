@@ -88,6 +88,10 @@
   `[taas]`, `[cyoa2]`, `[driving-sim]`...), and an entry's detail lives in that
   game's `.claude/<game>.md` (the entry points at the section). Work that has
   not earned a CD-facing entry stays in the game's file only.
+- **Exception (CD, 2026-11-26):** a `## Colony Sim` section sits between
+  Later and Icebox holding that game's whole roadmap in build order. It is not
+  a priority bucket: grooming and plan-gen read it, but never re-bucket or
+  flatten it.
 
 ## Plans
 - Plans dir: `.claude/plans/` (archive: `.claude/plans/DONE/`)

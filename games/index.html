@@ -141,7 +141,7 @@ h1 {
 </style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-02 22:04 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:14 UTC</div>
   <h1>GAMES</h1>
   <div class="sub">-- PICK YOUR BATTLE --</div>
   <button id="stats-btn">📊 COVERAGE HEURISTICS</button>
@@ -200,6 +200,14 @@ h1 {
       <div class="game-info">
         <div class="game-name">COMBAT SIMULATOR</div>
         <div class="game-desc">Katana duels in 3D up a ladder of ten masters. Chain five-cut combos, parry to stagger, dodge through blades, bank power attacks.</div>
+      </div>
+    </a>
+
+    <a class="game-card" href="colony-sim/">
+      <div class="game-icon">🏝️</div>
+      <div class="game-info">
+        <div class="game-name">COLONY SIM</div>
+        <div class="game-desc">Four settlers land on an island, build a camp and learn from their mistakes. Watch, set their goals, or reorder their plans.</div>
       </div>
     </a>
 
@@ -652,6 +660,7 @@ const GAMES = [
   { n: 'ANIMATION RIGS', i: '🩻', h: 'animation-rigs/', genre: ['animation-sandbox'], input: ['orbit-drag', 'pinch-zoom', 'two-finger-pan', 'tap'], session: ['open-sandbox'], mech: ['procedural-animation', 'inverse-kinematics', 'simulated-agents', 'real-time-3d'], players: ['solo'] },
   { n: 'DRIVING SIMULATOR', i: '🚗', h: 'driving-simulator/', genre: ['driving-sim'], input: ['steering-wheel', 'pedal-hold', 'multi-touch-chord', 'orbit-drag'], session: ['open-sandbox'], mech: ['vehicle-physics', 'simulated-agents', 'procedural-generation', 'real-time-3d', 'day-night-cycle'], players: ['solo'] },
   { n: 'COMBAT SIMULATOR', i: '🤺', h: 'combat-simulator/', genre: ['melee-duel'], input: ['virtual-joystick', 'tap', 'multi-touch-chord'], session: ['level-campaign'], mech: ['parry-timing', 'iframe-dodge', 'combo-chains', 'real-time-3d', 'inverse-kinematics', 'art-styles'], players: ['vs-ai'] },
+  { n: 'COLONY SIM', i: '🏝️', h: 'colony-sim/', genre: ['colony-sim'], input: ['orbit-drag', 'pinch-zoom', 'tap'], session: ['save-campaign'], mech: ['simulated-agents', 'agent-learning', 'procedural-generation', 'seeded-determinism', 'real-time-3d', 'inverse-kinematics'], players: ['solo'] },
   { n: 'INTERLOCK', i: '🧊', h: 'interlock/', genre: ['disassembly-puzzle'], input: ['orbit-drag', 'pinch-zoom', 'tap'], session: ['endless-levels'], mech: ['procedural-generation', 'real-time-3d', 'spatial-reasoning', 'day-night-cycle'], players: ['solo'] },
   { n: 'MUSIC MIXER', i: '🎛️', h: 'music-mixer/', genre: ['music-instrument'], input: ['hold', 'tap', 'multi-touch-chord'], session: ['open-sandbox'], mech: ['procedural-audio', 'stem-mixing', 'direct-manipulation', 'user-authoring'], players: ['solo'] },
   { n: 'VERLET RAGDOLL', i: '🦖', h: 'verlet-physics-ragdoll/', genre: ['physics-toy'], input: ['drag-grab', 'drag-steer'], session: ['open-sandbox'], mech: ['physics-sim', 'verlet-constraints', 'direct-manipulation'], players: ['solo'] },
