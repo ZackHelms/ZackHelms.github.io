@@ -16,13 +16,20 @@ export function learnChance(s) { return clamp(0.15 + 0.04 * ((s.attrs.INT + s.at
 export function learnEvent(sim, s, key) {
   const L = LESSONS[key]; if (!L) return false;
   s.exp[key] = (s.exp[key] || 0) + 1;
-  if (sim.R.learn.next() >= learnChance(s)) return false;
+  // the same mistake again makes the lesson likelier to stick
+  if (sim.R.learn.next() >= Math.min(0.9, learnChance(s) * (1 + 0.3 * (s.exp[key] - 1)))) return false;
   const cur = lessonParam(s, key), v = cur + 0.6 * (L.target - cur);
   const first = !s.lessons[key];
   s.lessons[key] = { v, times: (s.lessons[key] ? s.lessons[key].times : 0) + 1, day: dayOf(sim) };
   s.stats.learned++;
   event(sim, s, 'learn', s.name + (first ? ' learned: ' : ' refined: ') + L.label + ' (' + L.fmt(v) + ').');
   if (first) say(sim, s, LEARNED[key], 'learn');
+  if (key === 'dullTools' && s.role === 'leader' && !goalDone(sim, 'toolbench')) {
+    const i = sim.goals.indexOf('toolbench'); if (i > 0) { sim.goals.splice(i, 1); sim.goals.unshift('toolbench'); }
+    else if (i < 0) sim.goals.unshift('toolbench');
+    say(sim, s, 'These tools are getting dangerous. The tool bench comes first now.', 'say');
+    event(sim, s, 'goal', s.name + ' moved the tool bench to the top of the goals.');
+  }
   return true;
 }
 
@@ -37,12 +44,12 @@ export function needOf(sim, s, softToo = true) {
   if (!softToo) return null;
   const bed = lessonParam(s, 'lateNight');
   if ((h >= bed || h < 4.5) && !delayed('sleep')) return { kind: 'sleep', urgent: false, lesson: 'lateNight', why: 'bedtime' };
-  const meal = (h >= 6.8 && h < 8.2) || (h >= 18.7 && h < 20.2) || (h >= 12.2 && h < 13 && m.hunger < 55);
-  if (meal && m.hunger < 72 && mealUnits(sim) >= 1 && dist(s, sim.lay.fire) < 120 && !delayed('eat')) return { kind: 'eat', urgent: false, lesson: 'skipMeal' };
-  if (m.clean < lessonParam(s, 'hygiene') && h > 7 && h < 18 && !delayed('bathe')) return { kind: 'bathe', urgent: false, lesson: 'hygiene' };
+  if (isMealtime(h) && m.hunger < 80 && ((mealUnits(sim) >= 1 && dist(s, sim.lay.fire) < 120) || s.packed > 0 || (s.carry && s.carry.food && s.carry.item !== 'meat')) && !delayed('eat') && !(s.ateAt > sim.t - 2 * HOUR)) return { kind: 'eat', urgent: false, lesson: 'skipMeal', meal: true };
+  if (m.clean < lessonParam(s, 'hygiene') && h > 6.5 && h < 20 && !delayed('bathe')) return { kind: 'bathe', urgent: false, lesson: 'hygiene' };
   if ((m.mood < 32 || m.health < 35) && !delayed('rest')) return { kind: 'rest', urgent: false };
   return null;
 }
+export const isMealtime = (h) => (h >= 6.8 && h < 8.2) || (h >= 12 && h < 13.6) || (h >= 18.6 && h < 20.2);
 const NEED_KINDS = new Set(['pee', 'poo', 'sleep', 'eat', 'bathe', 'rest', 'collapse', 'persevere', 'home']);
 
 export function think(sim, s) {
@@ -81,7 +88,8 @@ export function checkInterrupts(sim, s) {
     if (T.kind === 'explore' && !learned(s, 'farAtDusk')) return;
     preempt(sim, s, makeTask(sim, s, 'home')); return;
   }
-  const n = needOf(sim, s, false);
+  let n = needOf(sim, s, false);
+  if (!n) { const soft = needOf(sim, s, true); if (soft && (soft.meal || soft.why === 'bedtime') && !T.pinned && T.kind !== 'explore') n = soft; }
   if (!n) return;
   if (T.pinned) {
     if (n.lesson && learned(s, n.lesson)) { refuse(sim, s, n.lesson); T.pinned = false; preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); }
@@ -156,6 +164,11 @@ export function nextWork(sim, s, o = {}) {
     if (toolFree(sim, 'spear', s) && h < 17.5) return 'fish';
     return 'forage';
   };
+  const allBuilt = !sim.goals.some((g) => GOALS[g] && !GOALS[g].food && !goalDone(sim, g));
+  if (allBuilt && s.role !== 'leader' && s.role !== 'hunter' && food < target + 10 && !skip('forage')) {
+    if (s.role === 'gatherer' && toolFree(sim, 'spear', s) && h < 17.5 && !skip('fish')) return { kind: 'fish' };
+    return { kind: 'forage' };
+  }
   const lowTool = TOOLS.some((k) => sim.tools[k].cond < Math.max(55, lessonParam(s, 'dullTools')));
   if (s.role === 'leader') {
     const sad = sim.settlers.find((o2) => o2 !== s && o2.m.mood < 50 && o2.act !== 'sleep');
@@ -168,7 +181,7 @@ export function nextWork(sim, s, o = {}) {
       [anyPile(sim), 'tidy'],
       [D, 'deliver'],
       [B.length && !sim.settlers.some((o2) => o2.role === 'architect' && o2.task && o2.task.kind === 'build' && o2.task.site === B[0].id) , 'build'],
-      [food < target * 0.6, 'forage'],
+      [food < target * (allBuilt ? 1.2 : 0.6), 'forage'],
       [sh.stone > 0, 'gather'],
       [true, 'rest'],
     );
@@ -269,8 +282,22 @@ export function makeTask(sim, s, kind, opts = {}) {
       S.push(go(fire, 'walk back to camp'));
       break;
     case 'eat': {
-      if (mealUnits(sim) >= 0.34 && dist(s, fire) < 150) {
+      if (s.carry && s.carry.food && s.carry.item !== 'meat' && dist(s, fire) >= 60 && !(s.packed > 0)) {
+        T.label = 'Eat some of what they gathered';
+        S.push(work('eat', 10, 'eat from the basket', { fx: 'eatCarry', outdoor: false, meters: [] }));
+        break;
+      }
+      if (s.packed > 0 && dist(s, fire) >= 60) {
+        T.label = 'Eat a packed lunch';
+        S.push(work('eat', 15, 'eat the packed lunch', { fx: 'eatPacked', outdoor: false, meters: [] }));
+        break;
+      }
+      const ready = foodCount(sim, 'meal') + foodCount(sim, 'dried') + foodCount(sim, 'fish') + foodCount(sim, 'berries') / 4;
+      if (ready >= 0.25 && dist(s, fire) < 150) {
         S.push(go(seat, 'walk to the fire'), work('eat', 25, 'eat', { fx: 'eat', outdoor: false, meters: [] }));
+      } else if (foodCount(sim, 'meat') > 0 && dist(s, fire) < 150) {
+        T.label = 'Cook something and eat';
+        S.push(go(seat, 'walk to the fire'), work('cook', 20, 'cook', { fx: 'cook', outdoor: false, meters: [] }), work('eat', 25, 'eat', { fx: 'eat', outdoor: false, meters: [] }));
       } else {
         const bush = nearest(sim.isl.bushes, s, (b) => (sim.world.bushes[b.id] ?? b.berries) >= 2 && !sim.world.reserved['b' + b.id]);
         if (!bush) return null;
@@ -433,8 +460,8 @@ export function applyPlayerInput(sim, rec) {
       if (!T) { say(sim, s, "I can't do that right now.", 'refuse'); return false; }
       T.pinned = true; T.owner = 'player';
       if (n && n.lesson && learned(s, n.lesson) && (n.urgent || n.why === 'bedtime' || n.kind === 'eat')) {
-        refuse(sim, s, n.lesson); T.pinned = false; s.plan.unshift(T);
-        preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); return 'refused';
+        refuse(sim, s, n.lesson); T.pinned = false;
+        preempt(sim, s, makeTask(sim, s, n.kind, { need: n })); s.plan.unshift(T); return 'refused';
       }
       preempt(sim, s, T); return true;
     }

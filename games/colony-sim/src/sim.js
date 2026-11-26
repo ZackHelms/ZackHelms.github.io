@@ -155,7 +155,11 @@ function drain(sim, s, dt) {
   const mt = moodTarget(sim, s);
   m.mood += clamp(mt - m.mood, -TUNE.moodRate * h, TUNE.moodRate * h);
   for (const k in m) m[k] = clamp(m[k], 0, 100);
-  for (const k of ['health', 'energy', 'hunger', 'mood', 'clean']) if (m[k] < s.stats.lowest) { s.stats.lowest = m[k]; s.stats.lowWhat = k; }
+  for (const k of ['health', 'energy', 'hunger', 'mood', 'clean']) {
+    if (m[k] < s.stats.lowest) { s.stats.lowest = m[k]; s.stats.lowWhat = k; }
+    if (!s.dayMin) s.dayMin = {};
+    if (!(s.dayMin[k] <= m[k])) s.dayMin[k] = m[k];
+  }
 
   // things that happen at zero
   if (m.bladder <= 0 || m.bowel <= 0) {
@@ -168,9 +172,9 @@ function drain(sim, s, dt) {
     learnEvent(sim, s, 'overwork');
     if (s.sleep && s.sleep.lateStart) learnEvent(sim, s, 'lateNight');
     replaceTask(sim, s, makeTask(sim, s, 'collapse'));
-  } else if (!s.persevere && (m.hunger <= 0 || m.health <= 0)) {
+  } else if (!s.persevere && !(s.persevereUntil > sim.t) && (m.hunger <= 0 || m.health <= 0)) {
     const why = m.hunger <= 0 ? 'hunger' : 'injury';
-    s.stats.collapses++; s.persevere = true;
+    s.stats.collapses++; s.persevere = true; s.persevereUntil = sim.t + 6 * HOUR;
     event(sim, s, 'collapse', s.name + ' collapsed (' + why + ') and is dragging themselves back to camp.');
     say(sim, s, why === 'hunger' ? "Can't... think. Need food. Back to camp." : 'I need to get back to camp.', 'refuse');
     if (why === 'hunger') learnEvent(sim, s, 'skipMeal'); else learnEvent(sim, s, 'overwork');
@@ -339,10 +343,21 @@ export const FX = {
     else if (takeFood(sim, 'dried', 1)) got = TUNE.meal;
     else { const b = takeFood(sim, 'berries', 4); got = b * TUNE.berry; if (!b) { const f = takeFood(sim, 'fish', 1); got = f * TUNE.rawFish; } }
     if (!got) { say(sim, s, 'Nothing to eat at camp.', 'refuse'); return; }
-    s.m.hunger = Math.min(100, s.m.hunger + got); s.stats.meals++;
+    s.m.hunger = Math.min(100, s.m.hunger + got); s.stats.meals++; s.ateAt = sim.t;
+    // heading out for the day: pack a lunch if the store can spare it
+    if (hourOf(sim) < 9.5 && !(s.packed > 0) && s.role !== 'leader' && foodCount(sim, 'meal') + foodCount(sim, 'dried') >= sim.settlers.length + 1) {
+      if (takeFood(sim, 'meal', 1) || takeFood(sim, 'dried', 1)) s.packed = 1;
+    }
     if (hot) s.ateHot = sim.t;
     for (const o of sim.settlers) if (o !== s && o.act === 'eat' && dist(o, s) < 8) { s.rel[o.id] = Math.min(100, s.rel[o.id] + 2); }
   },
+  eatCarry(sim, s) {
+    if (!s.carry || !s.carry.food) return;
+    const per = s.carry.item === 'fish' ? TUNE.rawFish : TUNE.berry, k = Math.min(s.carry.n, s.carry.item === 'fish' ? 1 : 4);
+    s.carry.n -= k; s.m.hunger = Math.min(100, s.m.hunger + k * per); s.stats.meals++; s.ateAt = sim.t;
+    if (s.carry.n <= 0) s.carry = null;
+  },
+  eatPacked(sim, s) { if (s.packed > 0) { s.packed--; s.m.hunger = Math.min(100, s.m.hunger + TUNE.meal); s.stats.meals++; s.ateAt = sim.t; } },
   eatBerries(sim, s, st) {
     const b = sim.world.bushes[st.bush] ?? sim.isl.bushes[st.bush].berries;
     const k = Math.min(b, 4); sim.world.bushes[st.bush] = b - k;
@@ -461,7 +476,17 @@ export function completeSite(sim, x, s) {
 }
 
 /* ------------------------------ the world ticking ------------------------------ */
+// Each evening a settler looks back on the day: a meter that fell out of the normal
+// range (below 50) is a chance to learn the habit that would have kept it there.
+const REVIEW = { energy: 'lateNight', hunger: 'skipMeal', clean: 'hygiene', health: 'overwork' };
+function nightlyReview(sim) {
+  for (const s of sim.settlers) {
+    for (const k in REVIEW) if (s.dayMin && s.dayMin[k] < 50) learnEvent(sim, s, REVIEW[k]);
+    s.dayMin = {};
+  }
+}
 function worldHourly(sim) {
+  if (Math.abs(hourOf(sim) - 21) < 1e-6) nightlyReview(sim);
   // spoilage
   const before = mealUnits(sim);
   sim.food = sim.food.filter((b) => b.exp > sim.t);
@@ -505,7 +530,10 @@ function phase1Check(sim) {
   const builtAll = PHASE1_BUILDS.every((b) => built(sim, b)) && sim.sites.filter((x) => x.type === 'bed' && x.done).length >= 5;
   const food = mealUnits(sim) >= foodTarget(sim);
   const ok = sim.settlers.every((s) => ['health', 'energy', 'hunger', 'mood', 'clean'].every((k) => s.m[k] >= 50));
-  if (!ok) sim.okSince = null; else if (sim.okSince == null) sim.okSince = sim.t;
+  if (!ok) {
+    sim.okSince = null;
+    if (builtAll) { const b = sim.settlers.flatMap((s) => ['health', 'energy', 'hunger', 'mood', 'clean'].filter((k) => s.m[k] < 50).map((k) => s.name + ' ' + k)); sim.breakers = sim.breakers || {}; for (const k of b) sim.breakers[k] = (sim.breakers[k] || 0) + 1; }
+  } else if (sim.okSince == null) sim.okSince = sim.t;
   sim.p1 = { builtAll, food, okHours: sim.okSince == null ? 0 : (sim.t - sim.okSince) / HOUR };
   if (builtAll && food && sim.okSince != null && sim.t - sim.okSince >= 48 * HOUR) {
     sim.phase1 = { done: true, t: sim.t, day: dayOf(sim) };

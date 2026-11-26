@@ -241,6 +241,45 @@ section('minds', async () => {
   check('replaying seed + inputs reproduces the run', S.simHash(again) === S.simHash(live), live.inputs.length + ' inputs');
 });
 
+/* ---------------- economy ---------------- */
+section('economy', async () => {
+  const S = await import('../src/sim.js'), D = await import('../src/data.js');
+  const forceBuilt = (sim, type, goal) => {
+    const pos = sim.lay.slots[type] || sim.lay.beds[sim.sites.filter(x => x.type === 'bed').length];
+    const B = D.BUILDINGS[type];
+    sim.sites.push({ id: sim.nextId++, type, goal: goal || type, x: pos.x, z: pos.z, yaw: 0, need: { ...B.cost }, have: { ...B.cost }, prog: B.hours, hours: B.hours, done: true, doneT: sim.t });
+  };
+  const a = S.createSim(4); let lean = false;
+  for (let i = 0; i < 6 * 8640 && !lean; i++) { S.step(a); lean = a.settlers.some(s => s.sleep && s.sleep.place === 'leanto' && s.act === 'sleep'); }
+  check('the lean-to gets built and slept in', lean);
+
+  const w = S.createSim(6); S.runFor(w, 20 * DAY);
+  check('tools never wear below 50%', Object.values(w.tools).every(t => t.cond >= 50), JSON.stringify(Object.fromEntries(Object.entries(w.tools).map(([k, t]) => [k, t.cond.toFixed(0)]))));
+  const wore = S.createSim(6); wore.tools.axe.cond = 50.2;
+  const g = wore.settlers[1]; S.assignTask(wore, g, 'chop', { pinned: true });
+  for (let i = 0; i < 400; i++) S.step(wore);
+  check('a worn tool stops at exactly 50%', wore.tools.axe.cond === 50, wore.tools.axe.cond);
+
+  const f = S.createSim(7); forceBuilt(f, 'campfire'); forceBuilt(f, 'toolbench');
+  for (const k in f.tools) f.tools[k].cond = 50;
+  const ines = f.settlers[3]; S.assignTask(f, ines, 'maintain', { pinned: true });
+  for (let i = 0; i < 2 * 360; i++) S.step(f);
+  check('the tool bench restores tools', Object.values(f.tools).some(t => t.cond > 70), JSON.stringify(Object.fromEntries(Object.entries(f.tools).map(([k, t]) => [k, t.cond.toFixed(0)]))));
+
+  const sp = S.createSim(2); sp.settlers = []; sp.food = []; S.addFood(sp, 'meal', 5); S.runFor(sp, 2.2 * DAY);
+  check('meals spoil after 2 days outside the food store', S.foodCount(sp, 'meal') === 0);
+  const st = S.createSim(2); st.settlers = []; st.food = []; forceBuilt(st, 'foodstore'); S.addFood(st, 'meal', 5); S.runFor(st, 2.2 * DAY);
+  check('…and keep inside it', S.foodCount(st, 'meal') === 5);
+
+  const p = S.createSim(3);
+  for (const b of D.PHASE1_BUILDS) forceBuilt(p, b, b);
+  for (let i = 0; i < 5; i++) forceBuilt(p, 'bed', 'beds5');
+  S.addFood(p, 'dried', 40);
+  for (let i = 0; i < 60 * 360 && !p.phase1; i++) { S.step(p); for (const s of p.settlers) for (const k in s.m) s.m[k] = Math.max(s.m[k], 60); }
+  check('the phase 1 finish line is recognised after 48 h at ≥ 50%', p.phase1 && p.phase1.done, JSON.stringify(p.p1));
+  check('…and not before 48 h', p.phase1 && p.phase1.t - 6 * 3600 >= 48 * 3600 - 3600, p.phase1 && (p.phase1.t / 3600).toFixed(1));
+});
+
 for (const s of sections) {
   if (only.length && !only.includes(s.name)) continue;
   console.log('[' + s.name + ']');
