@@ -46,7 +46,7 @@
 set -u
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || { echo "NEGTEST=not-a-git-repo"; exit 1; }
 cd "$ROOT" || exit 1
-STORE=.git/negtest
+STORE="$(git rev-parse --git-dir)/negtest"  # per-worktree: in a worktree .git is a file (2026-11-26)
 
 cmd=${1:-}; shift 2>/dev/null || true
 
