@@ -71,7 +71,7 @@ ol,ul{margin:0;padding:0;list-style:none}
 @media (max-width:820px){.side.left{display:none}.side.right{width:calc(100% - 16px);top:auto;height:45%}#topbar{right:8px;left:96px;top:calc(44px + env(safe-area-inset-top))}#speeds .spd:nth-child(n+5){display:none}}</style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-27 04:41 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-27 05:09 UTC</div>
 <canvas id="view"></canvas>
 <div id="bubbles"></div>
 
@@ -4228,19 +4228,34 @@ return {
 // like Minecraft for now"). Terrain is flat-shaded 2 m cells over the same heightfield the
 // settlers walk on; everything else is instanced boxes, and settlers are instanced capsules
 // over their rigs (the Combat Simulator approach). It only reads the simulation.
+// The sky is zmh-sky's (src/sky.js, generated): its sun, moon and ambient light the scene.
+// This file is the only place a calendar date exists; the sim stays date-free.
 
 
+
+
+
+// Plan colonysimc's calls (the CD's to overrule):
+const SKY_OBSERVER = { latDeg: -15, lonEastDeg: -150, heightM: 0 };     // a South Pacific island at 15°S, 150°W
+const SKY_START = { y: 2027, m: 7, d: 5 };                                // game day 1: two days after a new moon
+const SKY_FRAME = { east: [1, 0, 0], up: [0, 1, 0], north: [0, 0, -1] }; // the island's own compass: +x east, +y up, -z north
+// Tuned against screenshots: the July sun at 15°S stands 52° up in the north at noon and the
+// land rises northward, away from it, so the sun and ambient gains are what keep midday as
+// bright as the old overhead sun.
+const SUN_GAIN = 1.8;                                                     // sunlight on the scene, x the kit's sun colour
+const AMB_GAIN = 1.4;                                                     // sky ambient, x the kit's ambient
+const NIGHT_FLOOR = [0.035, 0.042, 0.075];                                // a moonless night still shows the settlers (a watched sim)
 
 const VS_TERRAIN = `#version 300 es
 layout(location=0) in vec3 aPos; layout(location=1) in vec3 aN; layout(location=2) in vec3 aC;
 uniform mat4 uVP; out vec3 vW, vN, vC;
 void main(){ vW = aPos; vN = aN; vC = aC; gl_Position = uVP * vec4(aPos, 1.0); }`;
 const LIGHT = `
-uniform vec3 uSun, uSunCol, uAmbSky, uAmbGround, uFog, uEye, uFire; uniform float uFogD, uFireI, uTime;
+uniform vec3 uSun, uSunCol, uMoon, uMoonCol, uAmbSky, uAmbGround, uFog, uEye, uFire; uniform float uFogD, uFireI, uTime;
 vec3 light(vec3 W, vec3 N, vec3 alb){
   float d = max(dot(N, uSun), 0.0);
   vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5);
-  vec3 c = alb * (amb + uSunCol * d);
+  vec3 c = alb * (amb + uSunCol * d + uMoonCol * max(dot(N, uMoon), 0.0));
   vec3 fl = uFire - W; float fd = length(fl);
   float fi = uFireI * (0.85 + 0.15 * sin(uTime * 13.0) * sin(uTime * 7.3)) / (1.0 + fd * fd * 0.09);
   c += alb * vec3(1.0, 0.55, 0.22) * fi * max(dot(N, fl / max(fd, 0.01)), 0.0);
@@ -4309,23 +4324,11 @@ void main(){
   vec3 c = mix(shallow, deep, clamp(depth / 6.0, 0.0, 1.0));
   vec3 N = normalize(vec3(0.04 * sin(vW.x * 0.7 + uTime * 1.3), 1.0, 0.04 * cos(vW.z * 0.6 + uTime * 1.1)));
   float sp = pow(max(dot(reflect(-uSun, N), V), 0.0), 80.0);
-  c = light(vW, N, c) + uSunCol * sp * 0.8 + uAmbSky * fres * 0.4;
+  float mp = pow(max(dot(reflect(-uMoon, N), V), 0.0), 80.0);
+  c = light(vW, N, c) + uSunCol * sp * 0.8 + uMoonCol * mp * 0.8 + uAmbSky * fres * 0.4;
   float foam = smoothstep(0.35, 0.0, depth) * (0.5 + 0.5 * sin(uTime * 2.0 + vW.x * 0.5 + vW.z * 0.3));
   c = mix(c, vec3(0.9), foam * 0.5);
   o = vec4(pow(c, vec3(1.0/2.2)), clamp(0.55 + depth * 0.15 + fres * 0.3, 0.0, 0.94));
-}`;
-const VS_SKY = `#version 300 es
-layout(location=0) in vec2 aP; out vec2 vP; void main(){ vP = aP; gl_Position = vec4(aP, 0.9999, 1.0); }`;
-const FS_SKY = `#version 300 es
-precision highp float;
-in vec2 vP; out vec4 o; uniform mat4 uInvVP; uniform vec3 uSun, uTop, uHor, uSunCol; uniform float uNight;
-void main(){
-  vec4 p = uInvVP * vec4(vP, 1.0, 1.0); vec3 d = normalize(p.xyz / p.w);
-  vec3 c = mix(uHor, uTop, pow(max(d.y, 0.0), 0.6));
-  float s = max(dot(d, uSun), 0.0);
-  c += uSunCol * (pow(s, 900.0) * 6.0 + pow(s, 12.0) * 0.25);
-  if (uNight > 0.3) { vec2 g = floor(d.xz / max(d.y, 0.05) * 90.0); float h = fract(sin(dot(g, vec2(12.9898, 78.233))) * 43758.5); c += vec3(step(0.997, h) * uNight * smoothstep(0.0, 0.3, d.y)); }
-  o = vec4(pow(c, vec3(1.0/2.2)), 1.0);
 }`;
 const VS_DISC = `#version 300 es
 layout(location=0) in vec2 aP; layout(location=1) in vec4 iD; layout(location=2) in vec4 iC;
@@ -4378,7 +4381,10 @@ makeRenderer = function makeRenderer(canvas, isl) {
     for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(p, i); U[u.name] = gl.getUniformLocation(p, u.name); }
     return { p, U };
   };
-  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), sky: prog(VS_SKY, FS_SKY), disc: prog(VS_DISC, FS_DISC) };
+  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), disc: prog(VS_DISC, FS_DISC) };
+  // The sky: zmh-sky's pass, created once. A bad config (a mirrored frame) throws here.
+  let skyDpr = Math.min(2, window.devicePixelRatio || 1);
+  const sky = ZMH_SKY_WEBGL.createSky(gl, { data: SKY_DATA, observer: SKY_OBSERVER, frame: SKY_FRAME, dpr: skyDpr });
 
   /* terrain: one flat-shaded quad per 2 m cell, coloured by land cover */
   const W = isl.W, H = isl.H, C = isl.CELL;
@@ -4434,9 +4440,6 @@ makeRenderer = function makeRenderer(canvas, isl) {
   const wVAO = gl.createVertexArray(); gl.bindVertexArray(wVAO);
   buf(new Float32Array(wp), 0, 3, gl.FLOAT, false); buf(new Float32Array(wk), 1, 1, gl.FLOAT, false);
   const wCount = wp.length / 3;
-
-  /* sky quad */
-  const sVAO = gl.createVertexArray(); gl.bindVertexArray(sVAO); buf(new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), 0, 2, gl.FLOAT, false);
 
   /* instanced boxes */
   const cube = [];
@@ -4513,32 +4516,61 @@ makeRenderer = function makeRenderer(canvas, isl) {
   const cam = { tx: isl.camp.x, ty: heightAt(isl, isl.camp.x, isl.camp.z), tz: isl.camp.z, yaw: Math.atan2(isl.camp.z - isl.landing.z, isl.camp.x - isl.landing.x) + Math.PI, pitch: 0.55, dist: 60, fly: null };
   let VP = null, invVP = null, eye = [0, 0, 0], vw = 1, vh = 1;
 
-  function sunAt(hour) {
-    const a = (hour - 6) / 12 * Math.PI;
-    const el = Math.sin(a) * 1.05, az = a;
-    const fwd = { x: isl.camp.x - isl.landing.x, z: isl.camp.z - isl.landing.z };
-    const L = Math.hypot(fwd.x, fwd.z), rx = -fwd.z / L, rz = fwd.x / L;
-    const d = [Math.cos(az) * rx * Math.cos(Math.max(el, -0.3)), Math.sin(el), Math.cos(az) * rz * Math.cos(Math.max(el, -0.3))];
-    const l = Math.hypot(...d); return [d[0] / l, d[1] / l, d[2] / l];
+  /* Fog: the sky's colour at the horizon, from the kit's disc-free radiance (never sampled
+     from the pass, which would put the sun and moon in the fog). The mean over 8 azimuths at
+     2° altitude, exposed and mapped 1 - exp(-x) like the pass's zmhAtmosphere, plus the night
+     airglow: the pass's own value before its gamma, so the fog meets the horizon. Recomputed
+     only when the clock has moved more than a game minute. */
+  let fogJd = NaN, fogCol = [0, 0, 0];
+  function skyFog(light) {
+    if (Math.abs(light.jdUT - fogJd) <= 1 / 1440) return fogCol;
+    const d = light.sun.dir, sunEnu = [d[0], d[1], -d[2]];   // host -> ENU under SKY_FRAME
+    const alt = 2 * Math.PI / 180, sum = [0, 0, 0];
+    for (let k = 0; k < 8; k++) {
+      const az = k / 8 * Math.PI * 2, L = ZMH_SKY.skyRadiance([Math.cos(alt) * Math.sin(az), Math.sin(alt), Math.cos(alt) * Math.cos(az)], sunEnu, { quality: 'low' });
+      for (let c = 0; c < 3; c++) sum[c] += 1 - Math.exp(-L[c] * light.exposure);
+    }
+    const ns = ZMH_SKY_WEBGL.SKY_DEFAULTS.nightSky;
+    fogJd = light.jdUT; fogCol = sum.map((v, c) => v / 8 + light.nightFade * ns[c]);
+    return fogCol;
   }
-  function palette(hour) {
-    const sun = sunAt(hour), up = sun[1];
-    const day = Math.max(0, Math.min(1, (up + 0.08) / 0.35)), dusk = Math.max(0, 1 - Math.abs(up - 0.05) / 0.22);
-    const top = mix3(mix3([0.01, 0.015, 0.05], [0.22, 0.45, 0.85], day), [0.35, 0.25, 0.4], dusk * 0.4);
-    const hor = mix3(mix3([0.03, 0.04, 0.09], [0.62, 0.76, 0.92], day), [0.98, 0.55, 0.32], dusk * 0.7);
-    const sunCol = mix3([0, 0, 0], mix3([1.0, 0.94, 0.85], [1.0, 0.5, 0.25], dusk), day).map((v) => v * 1.25);
-    const ambSky = mix3([0.03, 0.04, 0.09], [0.32, 0.38, 0.48], day), ambGround = mix3([0.02, 0.02, 0.03], [0.2, 0.18, 0.14], day);
-    const moonLit = 1 - day;
-    return { sun: up > -0.05 ? sun : [-sun[0] * 0.5, 0.6, -sun[2] * 0.5].map((v, i, a) => v / Math.hypot(...a)), sunCol: up > -0.05 ? sunCol : [0.07 * moonLit, 0.09 * moonLit, 0.16 * moonLit], ambSky, ambGround, top, hor, night: 1 - day };
+  /* The framebuffer rows the sky can show in, as [y, height] for gl.scissor. A software GPU
+     (SwiftShader, which the gates run on) shades a full-screen pass in full even where the
+     depth test then rejects it, and the kit's atmosphere is costly per pixel: unscissored it
+     nearly doubled the frame (210 -> 400 ms at noon) with no sky in view. Below an elevation
+     of -dip every ray meets the island or the sea plane, which reaches at least 1.5 km past any
+     eye, so the sky cannot show there. The camera never rolls, so a band of rows is exact, and
+     a below-horizon elevation is reached lowest on the screen's side edge (ndc x = 1). */
+  const unproj = (nx, ny, z) => { const m = invVP, w = m[3] * nx + m[7] * ny + m[11] * z + m[15]; return [(m[0] * nx + m[4] * ny + m[8] * z + m[12]) / w, (m[1] * nx + m[5] * ny + m[9] * z + m[13]) / w, (m[2] * nx + m[6] * ny + m[10] * z + m[14]) / w]; };
+  const rayElev = (ny) => { const a = unproj(1, ny, -1), b = unproj(1, ny, 1), d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; return d[1] / Math.hypot(d[0], d[1], d[2]); };
+  function skyRows(ch) {
+    const s = -Math.sin(Math.atan2(Math.max(0, eye[1]), 1500) + 0.01);
+    if (rayElev(1) < s) return [0, 0];       // no sky in view: draw nothing, still check the frame
+    if (rayElev(-1) >= s) return [0, ch];
+    let lo = -1, hi = 1;
+    for (let i = 0; i < 24; i++) { const m = (lo + hi) / 2; if (rayElev(m) >= s) hi = m; else lo = m; }
+    const y0 = Math.max(0, Math.floor((lo + 1) / 2 * ch) - 2);
+    return [y0, ch - y0];
+  }
+  // Everything the lit programs need, from the kit's lighting for this frame.
+  function sceneLight(light) {
+    const ambSky = light.ambient.map((a, c) => Math.max(a * AMB_GAIN, NIGHT_FLOOR[c]));
+    return {
+      sun: light.sun.dir, sunCol: light.sun.color.map((v) => v * SUN_GAIN),
+      moon: light.moon.dir, moonCol: light.moon.color,
+      ambSky, ambGround: ambSky.map((v) => v * 0.5), fog: skyFog(light),
+    };
   }
 
-  function setCommon(pg, U, pal, t, fire) {
+  function setCommon(pg, U, env, t, fire) {
     gl.uniformMatrix4fv(U.uVP, false, VP);
-    if (U.uSun) gl.uniform3fv(U.uSun, pal.sun);
-    if (U.uSunCol) gl.uniform3fv(U.uSunCol, pal.sunCol);
-    if (U.uAmbSky) gl.uniform3fv(U.uAmbSky, pal.ambSky);
-    if (U.uAmbGround) gl.uniform3fv(U.uAmbGround, pal.ambGround);
-    if (U.uFog) gl.uniform3fv(U.uFog, pal.hor);
+    if (U.uSun) gl.uniform3fv(U.uSun, env.sun);
+    if (U.uSunCol) gl.uniform3fv(U.uSunCol, env.sunCol);
+    if (U.uMoon) gl.uniform3fv(U.uMoon, env.moon);
+    if (U.uMoonCol) gl.uniform3fv(U.uMoonCol, env.moonCol);
+    if (U.uAmbSky) gl.uniform3fv(U.uAmbSky, env.ambSky);
+    if (U.uAmbGround) gl.uniform3fv(U.uAmbGround, env.ambGround);
+    if (U.uFog) gl.uniform3fv(U.uFog, env.fog);
     if (U.uFogD) gl.uniform1f(U.uFogD, 2200);
     if (U.uEye) gl.uniform3fv(U.uEye, eye);
     if (U.uTime) gl.uniform1f(U.uTime, t);
@@ -4549,6 +4581,7 @@ makeRenderer = function makeRenderer(canvas, isl) {
   const dyn = [], caps = [], discs = [];
   function frame(sim, rigs, capsOf, t, opts = {}) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (dpr !== skyDpr) { skyDpr = dpr; sky.setConfig({ dpr }); }
     const cw = Math.floor(canvas.clientWidth * dpr), ch = Math.floor(canvas.clientHeight * dpr);
     if (canvas.width !== cw || canvas.height !== ch) { canvas.width = cw; canvas.height = ch; }
     vw = canvas.clientWidth; vh = canvas.clientHeight;
@@ -4563,47 +4596,56 @@ makeRenderer = function makeRenderer(canvas, isl) {
     eye = [ex, ey, ez];
     VP = mmul(persp(0.9, vw / vh, 0.25, 4000), lookAt(eye, [cam.tx, cam.ty, cam.tz]));
     invVP = inv(VP);
-    const hour = (sim.t % 86400) / 3600, pal = palette(hour);
+    // the sky's clock: game day 1 is SKY_START, game noon is local mean solar noon
+    const dayIndex = Math.floor(sim.t / DAY), hour = (sim.t % DAY) / 3600;
+    const jdUT = ZMH_SKY.gameClockToJd(SKY_START, dayIndex, hour, SKY_OBSERVER.lonEastDeg);
+    const light = sky.update(jdUT);   // this frame's sun lights the opaque pass below
+    const env = sceneLight(light);
+    const night = 1 - Math.max(0, Math.min(1, (Math.sin(light.sun.altDeg * Math.PI / 180) + 0.08) / 0.35));
     const fireSite = sim.sites.find((x) => x.type === 'campfire' && x.done);
-    const fire = { p: fireSite ? [fireSite.x, heightAt(isl, fireSite.x, fireSite.z) + 0.8, fireSite.z] : [0, -999, 0], i: fireSite ? 0.3 + pal.night * 2.2 : 0 };
+    const fire = { p: fireSite ? [fireSite.x, heightAt(isl, fireSite.x, fireSite.z) + 0.8, fireSite.z] : [0, -999, 0], i: fireSite ? 0.3 + night * 2.2 : 0 };
 
-    gl.enable(gl.DEPTH_TEST); gl.enable(gl.CULL_FACE); gl.cullFace(gl.BACK);
-    gl.clearColor(...pal.hor.map((v) => Math.pow(v, 1 / 2.2)), 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
-    // sky
-    gl.disable(gl.DEPTH_TEST); gl.useProgram(P.sky.p);
-    gl.uniformMatrix4fv(P.sky.U.uInvVP, false, invVP); gl.uniform3fv(P.sky.U.uSun, pal.sun); gl.uniform3fv(P.sky.U.uTop, pal.top); gl.uniform3fv(P.sky.U.uHor, pal.hor); gl.uniform3fv(P.sky.U.uSunCol, pal.sunCol); gl.uniform1f(P.sky.U.uNight, pal.night);
-    gl.bindVertexArray(sVAO); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-    gl.enable(gl.DEPTH_TEST);
+    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); gl.depthMask(true); gl.disable(gl.BLEND);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     // terrain
     gl.disable(gl.CULL_FACE);
-    gl.useProgram(P.terrain.p); setCommon(P.terrain, P.terrain.U, pal, t, fire);
+    gl.useProgram(P.terrain.p); setCommon(P.terrain, P.terrain.U, env, t, fire);
     gl.bindVertexArray(tVAO); gl.drawElements(gl.TRIANGLES, tCount, gl.UNSIGNED_INT, 0);
     // scenery and buildings
-    gl.useProgram(P.box.p); setCommon(P.box, P.box.U, pal, t, fire);
+    gl.useProgram(P.box.p); setCommon(P.box, P.box.U, env, t, fire);
     gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(boxStatic.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, boxStatic.n);
-    dyn.length = 0; buildDynamic(sim, rigs, t, pal);
+    dyn.length = 0; buildDynamic(sim, rigs, t);
     gl.bindBuffer(gl.ARRAY_BUFFER, boxDyn.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dyn), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(boxDyn.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, dyn.length / 11);
     // settlers
     caps.length = 0;
     for (let i = 0; i < rigs.length; i++) { const arr = capsOf(i); for (let k = 0; k < arr.length; k += 9) caps.push(arr[k], arr[k + 1], arr[k + 2], arr[k + 3], arr[k + 4], arr[k + 5], arr[k + 6], arr[k + 7], ...opts.colors[i][arr[k + 8]]); }
-    gl.useProgram(P.cap.p); setCommon(P.cap, P.cap.U, pal, t, fire);
+    gl.useProgram(P.cap.p); setCommon(P.cap, P.cap.U, env, t, fire);
     gl.bindBuffer(gl.ARRAY_BUFFER, capI.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(caps), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(capI.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, capI.verts, caps.length / 11);
+    // the sky, at the far plane behind the opaque pass and BEFORE the water: the water writes
+    // no depth, so a sky drawn after it would paint over open sea. It leaves BLEND off,
+    // DEPTH_TEST on, LESS, depthMask true, and no program, VAO or ARRAY_BUFFER bound.
+    // Scissored to the rows where it can show (skyRows); always called, so the kit checks the
+    // frame's handedness every frame even when no row of sky is in view.
+    const rows = skyRows(ch);
+    gl.enable(gl.SCISSOR_TEST); gl.scissor(0, rows[0], cw, rows[1]);
+    sky.draw({ viewProj: VP, jdUT });
+    gl.disable(gl.SCISSOR_TEST);
     // water (blended)
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
-    gl.useProgram(P.water.p); setCommon(P.water, P.water.U, pal, t, fire);
+    gl.useProgram(P.water.p); setCommon(P.water, P.water.U, env, t, fire);
     gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, dTex); gl.uniform1i(P.water.U.uDepth, 0); gl.uniform4f(P.water.U.uMap, 0, 0, W * C, H * C);
     gl.bindVertexArray(wVAO); gl.drawArrays(gl.TRIANGLES, 0, wCount);
     // shadows and the selection ring
     discs.length = 0;
-    for (let i = 0; i < rigs.length; i++) { const r = rigs[i], p = r.J[0]; discs.push(p.x, heightAt(isl, p.x, p.z) + 0.04, p.z, 0.5, 0, 0, 0, 0.45 * (1 - pal.night * 0.6)); if (opts.selected === i) discs.push(p.x, heightAt(isl, p.x, p.z) + 0.05, p.z, 0.85, 1, 0.82, 0.3, -0.95); }
+    for (let i = 0; i < rigs.length; i++) { const r = rigs[i], p = r.J[0]; discs.push(p.x, heightAt(isl, p.x, p.z) + 0.04, p.z, 0.5, 0, 0, 0, 0.45 * (1 - night * 0.6)); if (opts.selected === i) discs.push(p.x, heightAt(isl, p.x, p.z) + 0.05, p.z, 0.85, 1, 0.82, 0.3, -0.95); }
     gl.useProgram(P.disc.p); gl.uniformMatrix4fv(P.disc.U.uVP, false, VP);
     gl.bindBuffer(gl.ARRAY_BUFFER, discI.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(discs), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(discI.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, discs.length / 8);
     gl.depthMask(true); gl.disable(gl.BLEND);
-    return { night: pal.night };
+    return { night, light };
   }
 
   /* buildings by stage, piles, carried loads, traps, the fire */
