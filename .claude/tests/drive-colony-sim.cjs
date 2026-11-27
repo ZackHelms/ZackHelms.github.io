@@ -15,7 +15,8 @@
  * G.R.frame itself at a set clock and camera and reading pixels in the same task: the frame handed to
  * the kit is right-handed; day 1 06:30's sun is east, north of east, and a hot disc sits where the kit
  * says (none on the anti-sun side); the sky does not change when only the camera slides; stars show
- * on a dark night; the moon waxes new (day 1) to full (day 15); the ⓘ panel credits the star data
+ * on a dark night; the moon waxes new (day 1) to full (day 15); the sea reaches the sky with no black
+ * band from high up; the ⓘ panel credits the star data
  * and its licence file ships. Prints DRIVE: GREEN / RED.
  */
 'use strict';
@@ -144,6 +145,20 @@ const check = (n, c, d, show) => { if (c) { passes++; console.log('  ok   ' + n 
   // 5. the calendar: each game day is the next date, so the moon waxes from new to full
   const moon = await sky((T) => ({ d1: T.draw(20 * 3600, {}).light.moon.illuminatedFraction, d15: T.draw(14 * 86400 + 20 * 3600, {}).light.moon.illuminatedFraction }));
   check('the calendar advances the moon (new on day 1, full on day 15)', !moon.err && moon.d1 < 0.1 && moon.d15 > 0.9, JSON.stringify(f2(moon)), true);
+
+  // 5b. the sea reaches the sky: no black band between the far water and the horizon. The kit shades
+  // below the horizon black and the sea mesh ends a few km out, so from high up a band showed there
+  // (CD, 2026-11-27). In daylight from 900 m out and up, nothing on screen is near-black.
+  const band = await sky((T) => {
+    const out = {};
+    for (const [name, t, pitch] of [['noon', 12 * 3600, 0.5], ['17:30', 17.5 * 3600, 0.3]]) {
+      T.draw(t, { dist: 900, pitch }); const im = T.px(); let n = 0;
+      for (let i = 0; i < im.data.length; i += 4) if (T.lum(im.data, i) < 12) n++;
+      out[name] = n;
+    }
+    return out;
+  });
+  check('the sea reaches the sky (no near-black pixels from high up in daylight)', !band.err && band.noon === 0 && band['17:30'] === 0, JSON.stringify(band), true);
 
   // 6. the credit for the star data is on the info page and the licence it links to ships beside index.html
   const credit = await page.evaluate(() => {

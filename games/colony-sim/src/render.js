@@ -104,6 +104,40 @@ void main(){
   c = mix(c, vec3(0.9), foam * 0.5);
   o = vec4(pow(c, vec3(1.0/2.2)), clamp(0.55 + depth * 0.15 + fres * 0.3, 0.0, 0.94));
 }`;
+/* The sea beyond the sea mesh, out to the horizon. zmh-sky shades every direction below the
+   horizon black (it is ground to the kit), and the sea mesh ends a few km out, so without this
+   a black band shows between the far water and the sky, wider the higher the camera. A
+   full-screen triangle at the far plane (LEQUAL, after the sky, before the water) shades only
+   background pixels whose ray points down: the ray meets y = 0, that point is lit and fogged as
+   the water is, then blended into the sky's own horizon colour at that compass bearing
+   (uRing, 16 bearings, east = +x, north = -z) as the distance grows past the mesh, so the sea
+   meets the sky with no seam. */
+const VS_FAR = `#version 300 es
+uniform mat4 uInvVP; out vec3 vRay;
+vec3 unp(vec3 p){ vec4 h = uInvVP * vec4(p, 1.0); return h.xyz / h.w; }
+void main(){
+  vec2 ndc = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2)) * 2.0 - 1.0;
+  gl_Position = vec4(ndc, 1.0, 1.0);
+  vRay = unp(vec3(ndc, 1.0)) - unp(vec3(ndc, -1.0));
+}`;
+const FS_FAR = `#version 300 es
+precision highp float;
+in vec3 vRay; out vec4 o;
+${LIGHT}
+uniform vec3 uRing[16];
+void main(){
+  vec3 d = normalize(vRay);
+  if (d.y > -1e-5) discard;
+  float t = uEye.y / -d.y; vec3 W = vec3(uEye.x + d.x * t, 0.0, uEye.z + d.z * t);
+  vec3 V = -d, N = normalize(vec3(0.04 * sin(W.x * 0.7 + uTime * 1.3), 1.0, 0.04 * cos(W.z * 0.6 + uTime * 1.1)));
+  float fres = pow(1.0 - max(V.y, 0.0), 3.0);
+  float sp = pow(max(dot(reflect(-uSun, N), V), 0.0), 80.0), mp = pow(max(dot(reflect(-uMoon, N), V), 0.0), 80.0);
+  vec3 c = light(W, N, vec3(0.03, 0.18, 0.32)) + uSunCol * sp * 0.8 + uMoonCol * mp * 0.8 + uAmbSky * fres * 0.4;
+  float a = atan(d.x, -d.z) / 6.2831853 * 16.0; a = a < 0.0 ? a + 16.0 : a;
+  int i = int(floor(a)) & 15; vec3 hz = mix(uRing[i], uRing[(i + 1) & 15], fract(a));
+  c = mix(c, hz, smoothstep(4500.0, 40000.0, t));
+  o = vec4(pow(max(c, 0.0), vec3(1.0/2.2)), 1.0);
+}`;
 const VS_DISC = `#version 300 es
 layout(location=0) in vec2 aP; layout(location=1) in vec4 iD; layout(location=2) in vec4 iC;
 uniform mat4 uVP; out vec2 vP; out vec4 vC;
@@ -155,7 +189,8 @@ export function makeRenderer(canvas, isl) {
     for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(p, i); U[u.name] = gl.getUniformLocation(p, u.name); }
     return { p, U };
   };
-  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), disc: prog(VS_DISC, FS_DISC) };
+  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), disc: prog(VS_DISC, FS_DISC), far: prog(VS_FAR, FS_FAR) };
+  const farVAO = gl.createVertexArray();   // the far sea's triangle comes from gl_VertexID alone
   // The sky: zmh-sky's pass, created once. A bad config (a mirrored frame) throws here.
   let skyDpr = Math.min(2, window.devicePixelRatio || 1);
   const sky = ZMH_SKY_WEBGL.createSky(gl, { data: SKY_DATA, observer: SKY_OBSERVER, frame: SKY_FRAME, dpr: skyDpr });
@@ -296,6 +331,7 @@ export function makeRenderer(canvas, isl) {
      airglow: the pass's own value before its gamma, so the fog meets the horizon. Recomputed
      only when the clock has moved more than a game minute. */
   let fogJd = NaN, fogCol = [0, 0, 0];
+  const horRing = new Float32Array(48);
   function skyFog(light) {
     if (Math.abs(light.jdUT - fogJd) <= 1 / 1440) return fogCol;
     const d = light.sun.dir, sunEnu = [d[0], d[1], -d[2]];   // host -> ENU under SKY_FRAME
@@ -306,14 +342,21 @@ export function makeRenderer(canvas, isl) {
     }
     const ns = ZMH_SKY_WEBGL.SKY_DEFAULTS.nightSky;
     fogJd = light.jdUT; fogCol = sum.map((v, c) => v / 8 + light.nightFade * ns[c]);
+    // the horizon ring for the far sea: the same disc-free colour just above the horizon
+    // (0.5°) at 16 bearings, bearing k at azimuth k/16 turn east of north
+    const lo = 0.5 * Math.PI / 180;
+    for (let k = 0; k < 16; k++) {
+      const az = k / 16 * Math.PI * 2, L = ZMH_SKY.skyRadiance([Math.cos(lo) * Math.sin(az), Math.sin(lo), Math.cos(lo) * Math.cos(az)], sunEnu, { quality: 'low' });
+      for (let c = 0; c < 3; c++) horRing[k * 3 + c] = 1 - Math.exp(-L[c] * light.exposure) + light.nightFade * ns[c];
+    }
     return fogCol;
   }
   /* The framebuffer rows the sky can show in, as [y, height] for gl.scissor. A software GPU
      (SwiftShader, which the gates run on) shades a full-screen pass in full even where the
      depth test then rejects it, and the kit's atmosphere is costly per pixel: unscissored it
      nearly doubled the frame (210 -> 400 ms at noon) with no sky in view. Below an elevation
-     of -dip every ray meets the island or the sea plane, which reaches at least 1.5 km past any
-     eye, so the sky cannot show there. The camera never rolls, so a band of rows is exact, and
+     of -dip the kit only draws black anyway (it is ground to the kit); whatever background is
+     left down there is the far sea's (VS_FAR), drawn unscissored after this. The camera never rolls, so a band of rows is exact, and
      a below-horizon elevation is reached lowest on the screen's side edge (ndc x = 1). */
   const unproj = (nx, ny, z) => { const m = invVP, w = m[3] * nx + m[7] * ny + m[11] * z + m[15]; return [(m[0] * nx + m[4] * ny + m[8] * z + m[12]) / w, (m[1] * nx + m[5] * ny + m[9] * z + m[13]) / w, (m[2] * nx + m[6] * ny + m[10] * z + m[14]) / w]; };
   const rayElev = (ny) => { const a = unproj(1, ny, -1), b = unproj(1, ny, 1), d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]; return d[1] / Math.hypot(d[0], d[1], d[2]); };
@@ -407,6 +450,12 @@ export function makeRenderer(canvas, isl) {
     gl.enable(gl.SCISSOR_TEST); gl.scissor(0, rows[0], cw, rows[1]);
     sky.draw({ viewProj: VP, jdUT });
     gl.disable(gl.SCISSOR_TEST);
+    // the far sea: background pixels below the horizon (the kit leaves them black); see VS_FAR
+    gl.depthFunc(gl.LEQUAL); gl.depthMask(false);
+    gl.useProgram(P.far.p); setCommon(P.far, P.far.U, env, t, fire);
+    gl.uniformMatrix4fv(P.far.U.uInvVP, false, invVP); gl.uniform3fv(P.far.U['uRing[0]'], horRing);
+    gl.bindVertexArray(farVAO); gl.drawArrays(gl.TRIANGLES, 0, 3);
+    gl.depthFunc(gl.LESS); gl.depthMask(true);
     // water (blended)
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA); gl.depthMask(false);
     gl.useProgram(P.water.p); setCommon(P.water, P.water.U, env, t, fire);
