@@ -297,36 +297,17 @@ and every call made for them: `.claude/colony-sim.md`.
 - *The CD's first feedback on the draft (2026-11-26), to be planned with
   `/zmh-producer:backlog-plan-gen colony-sim`. The CD's answers to the questions asked
   that day are written into each entry.*
-- [colony-sim] **A real sky from zmh-sky** (CD, 2026-11-26: "The sky looks weird when I
-  rotate the camera; use the zmh-sky plugin ... sun, moon (with phases & earthshine & etc),
-  stars, milkyway"). The CD chose to add a **drop-in sky renderer to zmh-sky first**, with
-  Colony Sim as its first user; it **shipped 2026-11-26** (zmhstudio plan `zmhskyb`,
-  `0cbed49..aabbc22`: `createSky`, the ES-module emit, the game clock). **CD answers (2026-11-26):** a tropical island at about **15°S** in the South
-  Pacific (Southern Cross; the longitude is a call for the plan), on an **advancing
-  calendar**: game day 1 is a fixed date, each game day is the next calendar day, so the
-  moon runs through its phases over about 30 game days. **What is weird now (traced in the
-  code, not yet screenshotted):** `FS_SKY` in `src/render.js` takes the view direction as
-  the far-plane point itself (`normalize(p.xyz / p.w)`) instead of that point minus the eye,
-  so the sun's disc and glow shift as the camera orbits 60 m from its target. The stars
-  are a hash grid over a flat projection (`d.xz / d.y * 90`): about 0.6° square blocks
-  overhead and sparkling slivers near the horizon. They never turn with the night. The
-  night "moonlight" is a fixed fake direction with no moon drawn. The sun runs on a simple
-  arc (`sunAt()`). **The adoption:**
-  - Replace `sunAt()` / `palette()` with the kit's one sun and its moonlight, so the light,
-    the sun disc and the moon's terminator agree.
-  - Map the kit's east/up/north onto the island's world frame, with an on-screen check that
-    the sun rises where it should.
-  - Keep the sim's clock: the sky is visual only, and `sim.t` becomes a date and time only
-    at the renderer.
-  - Keep the fog and the water reflections free of the discs (the trap Driving Sim hit).
-  - Show the kit's star-data attribution in the ⓘ panel and ship
-    `LICENSE-d3-celestial.txt`.
-  - Add a drive check that the sky does not change when only the camera moves.
-  Calls the plan makes (the CD's to overrule): 150°W; day 1 = 5 July 2027, so the moon is full
-  around days 14-16; the frame +x east / −z north (the island's own compass); a night ambient
-  floor.
-  **Plan ready (2026-11-26)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/colonysimc.zmh-sky.md`
+- [colony-sim] **Playtest the real sky** (shipped 2026-11-27, see `DONE.md`). Watch day 1 from
+  landing into night at 4x-16x: the sun rises on the right of the default view, a little north
+  of east, and orbiting never moves it against the land; at night, stars, the Milky Way, the
+  thin crescent after sunset and the planets; jump ahead to the full moon around day 14; the
+  fire still glows and the settlers stay readable on a moonless night; the ⓘ Sky section and
+  its licence link; on the phone, whether the stars read. Calls to overrule (all in
+  `.claude/colony-sim.md` § Calls made while building): 15°S 150°W, day 1 = 5 July 2027,
+  frame +x east / −z north, no constellation lines, the night ambient floor and the two
+  gains. Known: at nautical twilight the glow ends in a hard edge away from the sun; that is
+  the zmh-sky kit (single scattering), not this page. Review:
+  `.claude/plans/DONE/colonysimc.zmh-sky.follow-up.md`.
 - [colony-sim] **Campfire from zmh-vfx** (CD, 2026-11-26: "The campfire looks pretty
   good"; better versions will be asked for later). The fire is going into a new zmhstudio
   plugin, **zmh-vfx** (CD's choice), as its first asset, with a library of rotating-camera
