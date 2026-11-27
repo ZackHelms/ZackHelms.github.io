@@ -1,6 +1,6 @@
 # colonysimb — invert Colony Sim's horizontal drag rotation
 
-**Status:** DRAFT
+**Status:** implemented 2026-11-26 (8a7243d..HEAD on `worktree-oversee+colonysimb`, landed as one commit)
 **Requested:** 2026-11-26.
 **Scope:** `games/colony-sim/src/render.js`, `games/colony-sim/src/main.js`, the generated
 `games/colony-sim/index.html`, `.claude/tests/drive-colony-sim.cjs`, `.claude/colony-sim.md`.

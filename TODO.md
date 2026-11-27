@@ -297,16 +297,6 @@ and every call made for them: `.claude/colony-sim.md`.
 - *The CD's first feedback on the draft (2026-11-26), to be planned with
   `/zmh-producer:backlog-plan-gen colony-sim`. The CD's answers to the questions asked
   that day are written into each entry.*
-- [colony-sim] **Invert horizontal camera rotation** (CD, 2026-11-26: "Invert horizontal
-  (left/right) rotation from what it currently is"). Every drag goes through `orbit(dx, dy)`
-  in `games/colony-sim/src/render.js` (`cam.yaw -= dx * 0.006`): left-button mouse drag
-  (`src/main.js`, the pointer-move handler) and one-finger touch. Flip the sign for the
-  drags. The Q/E keys also call `orbit` (`main.js`, the key loop); they keep their current
-  direction unless the CD says otherwise (call, 2026-11-26: the CD named drag rotation, and Q
-  should still turn the view left). Vertical tilt is unchanged. Add a drive check that a
-  rightward drag moves the camera the new way, and a negative test that reverts the sign.
-  **Plan ready (2026-11-26)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/colonysimb.invert-drag-rotation.md`
 - [colony-sim] **A real sky from zmh-sky** (CD, 2026-11-26: "The sky looks weird when I
   rotate the camera; use the zmh-sky plugin ... sun, moon (with phases & earthshine & etc),
   stars, milkyway"). **Blocked on zmhstudio:** zmh-sky is not yet a drop-in sky, so
