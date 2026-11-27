@@ -160,6 +160,7 @@ export function makeUI(api) {
 <h3>Goals (left)</h3><p>The leader turns these into jobs and hands them out. Reorder them with ▲▼, remove with ✕, add from the list. A goal waits until the ones it needs are done.</p>
 <h3>A settler (right)</h3><p>Needs: 50–80% is normal; below 50% they work worse; above 80% better, up to +20% at 100%. <b>Next</b> is their plan: ▲ moves a job earlier, <b>Do now</b> makes it their next order, <b>Later</b> puts off sleep or a meal. Until they have learned better they obey, even when it hurts them. Once a mistake has taught them a lesson, they refuse and say why.</p>
 <h3>Phase 1</h3><p>Done when the camp has a fire, a lean-to, storage, a food store, a latrine, two huts, five beds and a tool bench, holds three days of food for five, and nobody has dropped below 50% on health, energy, food, mood or cleanliness for two days.</p>
+<h3>Sky</h3><p>The real sky over an island at 15°S in the South Pacific, from 5 July 2027 on: each game day is the next date, so the moon runs through its phases. Drawn by zmh-sky. Star data: XHIP (Anderson &amp; Francis 2012) via d3-celestial, (c) 2015 Olaf Frohn, BSD-3-Clause; constellation lines after the IAU figures, modified by O. Frohn; planet elements: JPL (Standish), Table 1. <a href="LICENSE-d3-celestial.txt" target="_blank" rel="noopener">Licence</a>.</p>
 <p class="role">First draft. Graphics are deliberately blocky for now.</p>
 <button class="btn" id="ov-ok">Back to the island</button>`);
     $('#ov-ok').addEventListener('click', hideOverlay);
