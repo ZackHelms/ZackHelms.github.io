@@ -1,10 +1,4 @@
 {
-  "extraKnownMarketplaces": {
-    "zmhstudio": {
-      "source": { "source": "github", "repo": "ZackHelms/zmhstudio" }
-    }
-  },
-  "enabledPlugins": { "zmh-producer@zmhstudio": true, "zmh-3d@zmhstudio": true, "zmh-sky@zmhstudio": true },
   "hooks": {
     "SessionStart": [
       {
@@ -16,5 +10,20 @@
         ]
       }
     ]
+  },
+  "enabledPlugins": {
+    "zmh-producer@zmhstudio": true,
+    "zmh-3d@zmhstudio": true,
+    "zmh-sky@zmhstudio": true,
+    "zmh-synth@zmhstudio": true,
+    "zmh-pixart@zmhstudio": true
+  },
+  "extraKnownMarketplaces": {
+    "zmhstudio": {
+      "source": {
+        "source": "github",
+        "repo": "ZackHelms/zmhstudio"
+      }
+    }
   }
 }
