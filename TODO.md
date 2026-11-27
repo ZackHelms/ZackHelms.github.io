@@ -275,7 +275,7 @@ in `.claude/<game>.md`. **Exception:** Colony Sim keeps its whole roadmap in its
 ## Colony Sim
 
 A dedicated section by the CD's request (2026-11-26): the whole roadmap of the new
-**Colony Sim** game (`games/colony-sim/`, not yet built) lives here as one list, in
+**Colony Sim** game (`games/colony-sim/`, phase 1 first draft shipped 2026-11-26) lives here as one list, in
 build order, instead of being spread over the buckets. Each step ends in a page the CD
 plays; from CS-2 on, also a headless report over many seeds. Design, the CD's decisions
 and every call made for them: `.claude/colony-sim.md`.
@@ -294,6 +294,49 @@ and every call made for them: `.claude/colony-sim.md`.
   1 km x 0.7 km island, 30-minute days at 1x-16x; separate source files built into one page,
   hand-written WebGL2; seeded, replayable, measured headless (30/30 seeds finish phase 1,
   median day 13).
+- *The CD's first feedback on the draft (2026-11-26), to be planned with
+  `/zmh-producer:backlog-plan-gen colony-sim`. The CD's answers to the questions asked
+  that day are written into each entry.*
+- [colony-sim] **Invert horizontal camera rotation** (CD, 2026-11-26: "Invert horizontal
+  (left/right) rotation from what it currently is"). Every drag goes through `orbit(dx, dy)`
+  in `games/colony-sim/src/render.js` (`cam.yaw -= dx * 0.006`): left-button mouse drag
+  (`src/main.js`, the pointer-move handler) and one-finger touch. Flip the sign for the
+  drags. The Q/E keys also call `orbit` (`main.js`, the key loop); they keep their current
+  direction unless the CD says otherwise (call, 2026-11-26: the CD named drag rotation, and Q
+  should still turn the view left). Vertical tilt is unchanged. Add a drive check that a
+  rightward drag moves the camera the new way, and a negative test that reverts the sign.
+- [colony-sim] **A real sky from zmh-sky** (CD, 2026-11-26: "The sky looks weird when I
+  rotate the camera; use the zmh-sky plugin ... sun, moon (with phases & earthshine & etc),
+  stars, milkyway"). **Blocked on zmhstudio:** zmh-sky is not yet a drop-in sky, so
+  the CD chose to add a **drop-in sky renderer to zmh-sky first**, with Colony Sim as its
+  first user (`D:\gitrepos\zmhstudio\TODO.md` § Initiative: sky kit, "zmh-sky: a drop-in
+  sky"). **CD answers (2026-11-26):** a tropical island at about **15°S** in the South
+  Pacific (Southern Cross; the longitude is a call for the plan), on an **advancing
+  calendar**: game day 1 is a fixed date, each game day is the next calendar day, so the
+  moon runs through its phases over about 30 game days. **What is weird now (traced in the
+  code, not yet screenshotted):** `FS_SKY` in `src/render.js` takes the view direction as
+  the far-plane point itself (`normalize(p.xyz / p.w)`) instead of that point minus the eye,
+  so the sun's disc and glow shift as the camera orbits 60 m from its target. The stars
+  are a hash grid over a flat projection (`d.xz / d.y * 90`): about 0.6° square blocks
+  overhead and sparkling slivers near the horizon. They never turn with the night. The
+  night "moonlight" is a fixed fake direction with no moon drawn. The sun runs on a simple
+  arc (`sunAt()`). **The adoption:**
+  - Replace `sunAt()` / `palette()` with the kit's one sun and its moonlight, so the light,
+    the sun disc and the moon's terminator agree.
+  - Map the kit's east/up/north onto the island's world frame, with an on-screen check that
+    the sun rises where it should.
+  - Keep the sim's clock: the sky is visual only, and `sim.t` becomes a date and time only
+    at the renderer.
+  - Keep the fog and the water reflections free of the discs (the trap Driving Sim hit).
+  - Show the kit's star-data attribution in the ⓘ panel and ship
+    `LICENSE-d3-celestial.txt`.
+  - Add a drive check that the sky does not change when only the camera moves.
+- [colony-sim] **Campfire from zmh-vfx** (CD, 2026-11-26: "The campfire looks pretty
+  good"; better versions will be asked for later). The fire is going into a new zmhstudio
+  plugin, **zmh-vfx** (CD's choice), as its first asset, with a library of rotating-camera
+  GIFs (`D:\gitrepos\zmhstudio\TODO.md` § Initiative: effects kit). Nothing to do here
+  until the CD picks a technique from that library; then Colony Sim swaps its hand-written
+  fire for the plugin's. *Parked until then.*
 - *CS-1 to CS-3 were built together as the first draft (2026-11-26); they stay listed as the
   shape of what exists, to be revisited after the CD plays it.*
 - [colony-sim] **CS-1 Landing**: first playable. Build pipeline; island v1 (shores, rocky
