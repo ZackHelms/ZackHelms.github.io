@@ -1,5 +1,11 @@
 # DONE — done log
 
+- 2026-11-26 [colony-sim] **Horizontal drag rotation inverted** (CD feedback on the phase 1 draft,
+  live at `build 2026-11-27 01:32 UTC`). `orbit()` now turns yaw up for a rightward drag, with the
+  mouse and one finger; Q / E keep their direction (the CD named the drag only). Three drive rows
+  (mouse, one finger, Q / E), each shown red by a deliberate break; suite 18 -> 21. Also fixed
+  `negtest.sh` for git worktrees. Plan: `.claude/plans/DONE/colonysimb.invert-drag-rotation.md`.
+
 - 2026-11-26 [colony-sim] **Colony Sim, phase 1 first draft** (new game, CD commission; live at
   `build 2026-11-26 23:39 UTC`). Designed with the CD in a brainstorm (design:
   `.claude/colony-sim.md`), then built on "use your best judgment". Four founders (Ada,

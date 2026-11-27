@@ -115,7 +115,7 @@ function frame(now) {
   if (keys.has('KeyS') || keys.has('ArrowDown')) { G.R.pan(0, -kp); G.following = false; }
   if (keys.has('KeyA') || keys.has('ArrowLeft')) { G.R.pan(kp, 0); G.following = false; }
   if (keys.has('KeyD') || keys.has('ArrowRight')) { G.R.pan(-kp, 0); G.following = false; }
-  if (keys.has('KeyQ')) G.R.orbit(-200 * dt, 0); if (keys.has('KeyE')) G.R.orbit(200 * dt, 0);
+  if (keys.has('KeyQ')) G.R.orbit(200 * dt, 0); if (keys.has('KeyE')) G.R.orbit(-200 * dt, 0); // Q / E keep their direction after the drag was inverted (CD, 2026-11-26)
   // time
   let mult = SPEEDS[G.speedIdx];
   G.nightSkip = mult > 0 && mult < 16 && sim.settlers.every((s) => s.act === 'sleep' || s.act === 'collapsed');

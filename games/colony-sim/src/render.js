@@ -462,7 +462,7 @@ export function makeRenderer(canvas, isl) {
   }
   return {
     gl, cam, frame, project, pickGround,
-    orbit(dx, dy) { cam.yaw -= dx * 0.006; cam.pitch = Math.max(0.08, Math.min(1.45, cam.pitch + dy * 0.005)); },
+    orbit(dx, dy) { cam.yaw += dx * 0.006; cam.pitch = Math.max(0.08, Math.min(1.45, cam.pitch + dy * 0.005)); },
     pan(dx, dy) {
       // drag the ground: the point under the cursor follows it
       const k = cam.dist * 0.0016, fx = -Math.cos(cam.yaw), fz = -Math.sin(cam.yaw), rx = -fz, rz = fx;

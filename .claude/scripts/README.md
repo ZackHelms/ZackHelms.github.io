@@ -467,7 +467,9 @@ Deterministic helpers for working on this repo.
   break made without the script; the point of the new check is to make the
   correct workflow the self-enforcing one.
   `save` snapshots into `.git/negtest/`, which cannot be committed and never
-  shows up in `git status`. `restore` copies back and then `cmp`s the result,
+  shows up in `git status`. In a git worktree the store is that worktree's own
+  git dir (`git rev-parse --git-dir`), since `.git` there is a file; before
+  2026-11-26 the script failed in every oversee worktree with "Not a directory". `restore` copies back and then `cmp`s the result,
   because `cp` reports success against a path that is not the one you meant.
   `scan` greps the changed **shipping** files for the `@negtest` marker and
   exits 1 if one survives — `gates.sh` runs it on every invocation. It skips
