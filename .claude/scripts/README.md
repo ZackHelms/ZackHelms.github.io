@@ -496,6 +496,19 @@ Deterministic helpers for working on this repo.
   watch for is any helper whose success line is computed from *intent* rather
   than from re-reading the artifact.
 
+- **`eol-guard.sh`** - flags files whose line endings changed against a base
+  (default `origin/main`): a file must keep its base's LF or CRLF, a new file must
+  be LF. `--fix` rewrites each flagged file to its base's style. Prints
+  `EOL: GREEN|FIXED|RED files=<n>`. Run it before `land-on-main.sh` on the CD's
+  Windows box, where any Python edit that writes in text mode turns an LF file
+  into CRLF and the diff shows every line changed (2026-11-26, colony-sim: four
+  docs files, 2,501 changed lines in `games/CLAUDE.md` for a 15-line edit).
+
+  ```
+  .claude/scripts/eol-guard.sh            # check against origin/main
+  .claude/scripts/eol-guard.sh --fix      # put each flagged file back to its base's endings
+  ```
+
 - **`land-on-main.sh`** - lands a branch on `main` as **one** commit by
   fast-forward: a new commit whose tree is the branch's last and whose parent
   is `origin/main`, pushed as `<sha>:refs/heads/main`. The branch keeps its
@@ -560,6 +573,11 @@ both of which produce a **silent no-op that reads as success**:
       assert s.count(a) == 1, ('anchor count %d for %r' % (s.count(a), a[:70]))
       s = s.replace(a, b, 1)
   ```
+
+  On Windows, open the file with **`newline=''`** for both the read and the
+  write (`open(p, encoding='utf-8', newline='')`). Text mode reads CRLF as LF
+  and writes every LF back as CRLF, so a one-line edit to an LF file comes out
+  as a whole-file rewrite; `eol-guard.sh` catches it after the fact.
 
   This is the same hazard `replace-fn.py` exists for, one level down: that
   script guards the *span*, this guards the *match*. Together with a final

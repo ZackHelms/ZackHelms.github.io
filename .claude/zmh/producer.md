@@ -60,6 +60,10 @@
   NO-PLAYWRIGHT and goes RED. A suite that hardcodes `/opt/pw-browsers/chromium` needs
   `process.env.SMOKE_CHROMIUM ||` in front of it (the combat suite got this). SwiftShader
   output matched the container's byte for byte (the same frame hash).
+  **Two more Windows traps** (2026-11-26, colony-sim): a Python edit in text mode rewrites
+  an LF file as CRLF (open with `newline=''`; run `.claude/scripts/eol-guard.sh` before
+  landing, which flagged and fixed 17 files that day), and the WebGL screenshot recipe
+  needs `--enable-unsafe-swiftshader` beside `--use-angle=swiftshader` on this Chromium.
 - **Driving Simulator's suite is split in two, and long commands get backgrounded**
   (2026-11-04, dsweather). One Bash call caps at 10 minutes and the main suite already takes
   about 7.5, so the weather's rows live in `drive-driving-simulator-weather.cjs` (`gates.sh`
@@ -134,6 +138,14 @@
   hidden by the 2026-09-18, 2026-09-19 and 2026-09-20 ones. The six
   character-lists commits were CLEARED on 2026-09-19; the two that remain are
   `99205d8` and `c28a947`.
+
+  **2026-11-26, Colony Sim pass** (pointer moved `fc7f66e` -> `75aaca3`, range
+  `fc7f66e..75aaca3`, 27 commits). Refined this session's work: `75aaca3` (the
+  game, squashed from branch `colony-sim`). **Left behind, the Driving Simulator
+  and Combat Simulator sessions':** the 26 commits `fc7f66e..88717ea` (DS-2 sound,
+  DS-3 seasons, the radio, DS-8 weather and their plans and backlog passes;
+  CS-2 to CS-4 and theirs). `d2b5135` in that range is a refine commit; the rest
+  had none. `git log --oneline fc7f66e..88717ea` lists them.
 
   **2026-11-02, Driving Simulator (dsstars) pass** (pointer moved `15ad39d` ->
   `fc7f66e`, range `15ad39d..fc7f66e`). Refined this session's work: `0f400b3`,
@@ -454,6 +466,20 @@
   branch, e.g. `git push origin HEAD:taas-goals`) so the per-step commits
   survive the worktree's removal. First used 2026-10-21 (taasgoals, landed
   by hand as 44d949d before the script existed).
+- **Commits made on the primary checkout's `main` before branching are left
+  behind by the landing** (2026-11-26, colony-sim). The design docs went onto
+  local `main` (`f0cbeed`, `23c8a92`), the worktree branched from there, and
+  `land-on-main.sh` put one squashed commit on `origin/main`. The local `main`
+  then held two unpushed commits whose content was already upstream, and the
+  next pull would have conflicted. After landing, check
+  `git log --oneline origin/main..main` in the primary checkout; if every
+  commit there is in the landed tree, `git reset --keep origin/main` (it
+  refuses rather than touch uncommitted work). Better: branch before the first
+  commit.
+- **On Windows a worktree folder can outlive `git worktree remove`**: git
+  unregisters it, then fails to delete the folder ("Permission denied") while a
+  background job started inside it is still running. Delete the folder after
+  that job ends.
 
 ## Publish
 - Step: pushing to `main` **is** the publish — GitHub Pages auto-deploys.

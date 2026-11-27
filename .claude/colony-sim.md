@@ -524,6 +524,11 @@ above 50 for two days (washing and bedtime are the usual last lessons).
   (CS-4).
 - No inviting settler 5: the phase 1 screen says so. Everything after phase 1 is undecided (CD).
 - At 16x, walkers whose on-screen speed passes 6 m/s switch to a sliding gait cycle.
+- Left from the final review, as minors: starting a new island does not free the old
+  island's GPU buffers; the camera's fly-to runs per frame, not per second, so it is faster
+  at 120 Hz; a followed settler under forest canopy can be hidden (no canopy fade).
+- How this draft was tuned, and every bug the final review found with its root cause:
+  `.claude/notes/20261126-colony-sim-a-watched-simulation.md`.
 - Saves are kept in this browser only. A save is checked whole (`validateSnap`) and run one
   step on a copy before it is loaded; one that fails is set aside under `colonySim.bad`.
 - Removing a goal removes its unfinished sites and returns their materials to storage.
