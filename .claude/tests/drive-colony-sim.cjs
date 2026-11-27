@@ -8,7 +8,8 @@
  * Page checks: loads with no console errors; WebGL draws (non-blank, several colours);
  * the follow dropdown selects each settler, opens their panel and flies the camera to them;
  * 16x advances the clock; a ▲ in a settler's Next list reorders their plan (input logged);
- * a goal's ▲ reorders the board; a save survives a reload (Continue = same day and minute);
+ * a goal's ▲ reorders the board; a rightward drag (mouse, one finger) turns yaw up and Q / E keep
+ * their direction (Q up, E down); a save survives a reload (Continue = same day and minute);
  * a corrupt save starts a fresh island without an error; a huge time backlog is capped at
  * 400 ticks in one frame (a hidden tab never bursts). Prints DRIVE: GREEN / RED.
  */
@@ -70,6 +71,46 @@ const check = (n, c, d) => { if (c) { passes++; console.log('  ok   ' + n); } el
   check('follow menu selects each settler and opens their panel', follow.every((f) => f.shown && f.name === f.want), JSON.stringify(follow.map((f) => f.name)));
   check('…and flies the camera to them (target within 2 m, close in)', follow.every((f) => f.d < 2 && f.dist <= 12), JSON.stringify(follow.map((f) => f.d.toFixed(1) + '@' + f.dist.toFixed(0))));
   if (shots) await page.screenshot({ path: path.join(shots, 'colony-follow.png') });
+
+  // camera rotation: a rightward drag turns yaw UP (inverted 2026-11-26); Q / E keep their direction
+  const aim = await page.evaluate(() => {
+    document.activeElement && document.activeElement.blur(); // the follow rows leave focus on a SELECT, which swallows every key
+    const G = window.__CS.G; G.following = false; G.speedIdx = 0;
+    const r = document.getElementById('view').getBoundingClientRect(), x = r.left + r.width * 0.3, y = r.top + r.height * 0.55, el = document.elementFromPoint(x, y);
+    return { x, y, id: el && el.id, tag: el && el.tagName, cls: el && String(el.className) };
+  });
+  const yawNow = () => page.evaluate(() => window.__CS.G.R.cam.yaw);
+  let y0 = await yawNow();
+  await page.mouse.move(aim.x, aim.y); await page.mouse.down(); await page.mouse.move(aim.x + 120, aim.y, { steps: 6 }); await page.mouse.up();
+  await frames(2);
+  let y1 = await yawNow();
+  check('a rightward mouse drag turns the camera the new way (yaw +0.72)', aim.id === 'view' && y1 - y0 > 0.6 && y1 - y0 < 0.85, (y1 - y0).toFixed(3) + ' from ' + JSON.stringify(aim));
+  y0 = y1;
+  const hasTouch = await page.evaluate(() => typeof Touch === 'function' && typeof TouchEvent === 'function');
+  if (hasTouch) {
+    await page.evaluate(({ x, y }) => {
+      const c = document.getElementById('view');
+      const mk = (cx) => new Touch({ identifier: 1, target: c, clientX: cx, clientY: y });
+      const fire = (type, cx, live) => c.dispatchEvent(new TouchEvent(type, { bubbles: true, cancelable: true, touches: live ? [mk(cx)] : [], targetTouches: live ? [mk(cx)] : [], changedTouches: [mk(cx)] }));
+      fire('touchstart', x, true);
+      for (let i = 1; i <= 6; i++) fire('touchmove', x + 20 * i, true);
+      fire('touchend', x + 120, false);
+    }, aim);
+  } else {
+    const cdp = await ctx.newCDPSession(page);
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: aim.x, y: aim.y }] });
+    for (let i = 1; i <= 6; i++) await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: aim.x + 20 * i, y: aim.y }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  }
+  await frames(2);
+  y1 = await yawNow();
+  check('a rightward one-finger drag turns the same way as the mouse', y1 - y0 > 0.6 && y1 - y0 < 0.85, (y1 - y0).toFixed(3) + (hasTouch ? ' (Touch events)' : ' (CDP)'));
+  y0 = y1;
+  await page.keyboard.down('q'); await frames(20); await page.keyboard.up('q');
+  const dq = (await yawNow()) - y0; y0 += dq;
+  await page.keyboard.down('e'); await frames(20); await page.keyboard.up('e');
+  const de = (await yawNow()) - y0;
+  check('Q / E still turn the way they did (Q yaw up, E yaw down)', dq > 0 && de < 0, 'Q ' + dq.toFixed(3) + ', E ' + de.toFixed(3));
 
   // 16x advances the clock
   const t0 = await page.evaluate(() => window.__CS.G.sim.t);
