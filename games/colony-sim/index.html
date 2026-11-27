@@ -71,7 +71,7 @@ ol,ul{margin:0;padding:0;list-style:none}
 @media (max-width:820px){.side.left{display:none}.side.right{width:calc(100% - 16px);top:auto;height:45%}#topbar{right:8px;left:96px;top:calc(44px + env(safe-area-inset-top))}#speeds .spd:nth-child(n+5){display:none}}</style>
 </head>
 <body>
-<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-26 23:39 UTC</div>
+<div id="build-badge" style="position:fixed;top:2px;right:6px;z-index:2147483647;font-family:'Courier New',monospace;font-size:9px;color:#888;opacity:0.55;pointer-events:none;letter-spacing:0.5px;user-select:none;">build 2026-11-27 01:32 UTC</div>
 <canvas id="view"></canvas>
 <div id="bubbles"></div>
 
@@ -2634,7 +2634,7 @@ makeRenderer = function makeRenderer(canvas, isl) {
   }
   return {
     gl, cam, frame, project, pickGround,
-    orbit(dx, dy) { cam.yaw -= dx * 0.006; cam.pitch = Math.max(0.08, Math.min(1.45, cam.pitch + dy * 0.005)); },
+    orbit(dx, dy) { cam.yaw += dx * 0.006; cam.pitch = Math.max(0.08, Math.min(1.45, cam.pitch + dy * 0.005)); },
     pan(dx, dy) {
       // drag the ground: the point under the cursor follows it
       const k = cam.dist * 0.0016, fx = -Math.cos(cam.yaw), fz = -Math.sin(cam.yaw), rx = -fz, rz = fx;
@@ -3011,7 +3011,7 @@ function frame(now) {
   if (keys.has('KeyS') || keys.has('ArrowDown')) { G.R.pan(0, -kp); G.following = false; }
   if (keys.has('KeyA') || keys.has('ArrowLeft')) { G.R.pan(kp, 0); G.following = false; }
   if (keys.has('KeyD') || keys.has('ArrowRight')) { G.R.pan(-kp, 0); G.following = false; }
-  if (keys.has('KeyQ')) G.R.orbit(-200 * dt, 0); if (keys.has('KeyE')) G.R.orbit(200 * dt, 0);
+  if (keys.has('KeyQ')) G.R.orbit(200 * dt, 0); if (keys.has('KeyE')) G.R.orbit(-200 * dt, 0); // Q / E keep their direction after the drag was inverted (CD, 2026-11-26)
   // time
   let mult = SPEEDS[G.speedIdx];
   G.nightSkip = mult > 0 && mult < 16 && sim.settlers.every((s) => s.act === 'sleep' || s.act === 'collapsed');

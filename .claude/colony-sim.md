@@ -517,6 +517,8 @@ above 50 for two days (washing and bedtime are the usual last lessons).
 - Buildings do not block walking. Their walls have door gaps drawn, but the nav grid ignores them.
 - A sun on a simple arc, not the zmh-sky kit's real sky.
 - Speech bubbles last 8 real seconds, one per settler, four at most.
+- Horizontal drag rotation was inverted at the CD's request (2026-11-26, mouse and one
+  finger); Q / E keep the direction they had (the CD named the drag only).
 
 ## Known limits of the draft
 - Settlers walk through buildings and each other.
