@@ -435,7 +435,8 @@ listed under § Calls made while building.
 | `src/brain.js` | decisions: `needOf` (urgent vs soft needs), `think`, `checkInterrupts`, the leader (`ensureSites`, `nextWork` by role), `makeTask` (every job as steps), lessons (`learnEvent`, `learnChance`), the player's inputs (`applyPlayerInput`) |
 | `src/sim.js` | the engine: clock, `drain` (needs, accidents, collapse, perseverance), movement, step execution and effects (`FX`), food batches and spoilage, buildings, tools, nightly review, discovery, the phase 1 check, `step`/`runFor`/`replay`, `snapshot`/`restore` |
 | `src/rig.js` | `ik2` + `buildPose` copied from Animation Rigs (A002 form); planted feet on the heightfield; work poses (chop, mine, build, crouch jobs, sit/eat, lie, bathe, fish, look, talk); `rigCapsules` (body, hair styles, beard, hat, the tool in hand) |
-| `src/render.js` | WebGL2: terrain mesh, sea/pond/river/falls, instanced boxes (scenery, buildings by stage, piles, loads), instanced capsules, sky and sun from the clock, firelight, blob shadows and the selection ring; orbit/pan/zoom/flyTo, `project`, `pickGround` |
+| `src/sky.js` | **generated, do not edit**: zmh-sky's drop-in as an ES module (`emit --format esm --mag 5 --parts stars,planets,glsl,webgl`; the command is its first line). Regenerate from the zmhstudio checkout or the plugin cache, then rebuild |
+| `src/render.js` | WebGL2: terrain mesh, sea/pond/river/falls, instanced boxes (scenery, buildings by stage, piles, loads), instanced capsules, zmh-sky's sky pass (`createSky`) lighting the scene from its sun, moon and ambient, firelight, blob shadows and the selection ring; orbit/pan/zoom/flyTo, `project`, `pickGround` |
 | `src/ui.js` | top bar, goals board (A), settler panel with Now/Next (B), speech bubbles, info/settings/phase 1/continue overlays; panels rebuilt by part from signatures |
 | `src/audio.js` | surf, birds, crickets, axe thunks; mute persisted |
 | `src/main.js` | boot, fixed-step accumulator (48 game seconds per real second at 1x, at most 400 ticks a frame), interpolation, input, follow, autosave every game hour |
@@ -476,6 +477,17 @@ listed under § Calls made while building.
   with the tick they arrived on; `replay(seed, inputs, tick)` reproduces a game, and the save
   is a `snapshot` (streams included).
 
+### The sky
+
+- `src/sky.js` is zmh-sky's drop-in, generated: `node <zmhstudio>/plugins/zmh-sky/cli/zmh-sky.mjs emit --format esm --mag 5 --parts stars,planets,glsl,webgl --out games/colony-sim/src/sky.js` (or the newest plugin cache's `cli/zmh-sky.mjs`), then `node games/colony-sim/build.mjs`. Never `--keep-comments`; after regenerating, check it has exactly four `export const`, no `import` and no `</script`. `LICENSE-d3-celestial.txt` ships beside the page (stored LF) and the ⓘ panel's Sky section carries the attribution.
+- `render.js` is the only place a date exists (`SKY_START`, `SKY_OBSERVER`, `SKY_FRAME`). The sim, the saves and `test-sim.mjs` never see it: `frame()` turns `sim.t` into a day index and an hour and asks `ZMH_SKY.gameClockToJd` for the instant.
+- `frame()` calls `sky.update(jdUT)` first, so this frame's sun and moon light the opaque pass, then draws: clear to black, terrain, boxes and settlers, then `sky.draw`, then the water, then the discs. The sky goes **before** the water because the water writes no depth: drawn after it, the sky would paint over open sea.
+- The sky pass is scissored to the rows where sky can show (`skyRows()`): SwiftShader shades a full-screen pass in full even where depth rejects it, and unscissored it nearly doubled the frame (210 to 400 ms) and starved the 16x clock. `sky.draw` is still called every frame, so the kit's handedness check runs even when no sky is in view.
+- Fog is never sampled from the sky pass (the kit's "discs in the fog" trap): it is the mean of `ZMH_SKY.skyRadiance` over 8 azimuths at 2° altitude, display-mapped like the pass, plus the night airglow, recomputed once per game minute.
+- `night` keeps its old meaning (from the sun's altitude), so the fire, the shadows and the crickets behave as before. `frame()` returns `{ night, light }`.
+- Known kit trait: at nautical twilight (sun about −8°) the glow ends in a hard edge on the side away from the sun, because zmh-sky's `skyRadiance` is single scattering with a geometric Earth shadow. It is in the kit, not this page; logged upstream.
+- The drive suite's six sky rows (frame, sunrise in the east north of east, camera-independence, stars, the moon's phase over the calendar, the ⓘ credit) were each shown red under a deliberate break.
+
 ## Measured (2026-11-26, `node games/colony-sim/tools/run.mjs`)
 | Set | Finished | Median day | Range | A struggle (< 30 on a meter) | Median lessons |
 |---|---|---|---|---|---|
@@ -515,7 +527,7 @@ above 50 for two days (washing and bedtime are the usual last lessons).
 - The hunter scouts inland once two days of food are stored; finding the pond gives a swim and
   a mood lift. The pond is about four hours away, so it is not a regular bath yet.
 - Buildings do not block walking. Their walls have door gaps drawn, but the nav grid ignores them.
-- A sun on a simple arc, not the zmh-sky kit's real sky.
+- The sky (plan colonysimc, 2026-11-26): 15°S 150°W, day 1 = 5 July 2027 (two days after a new moon, so full around day 14-16), local mean solar time, frame +x east / +y up / −z north (the island's own compass), no constellation lines, a night ambient floor so settlers stay readable on a moonless night (tuned SUN_GAIN 1.8, AMB_GAIN 1.4, NIGHT_FLOOR [0.035, 0.042, 0.075] in render.js, against screenshots of the old build), fog coloured from the disc-free sky radiance at the horizon.
 - Speech bubbles last 8 real seconds, one per settler, four at most.
 - Horizontal drag rotation was inverted at the CD's request (2026-11-26, mouse and one
   finger); Q / E keep the direction they had (the CD named the drag only).
