@@ -299,10 +299,9 @@ and every call made for them: `.claude/colony-sim.md`.
   that day are written into each entry.*
 - [colony-sim] **A real sky from zmh-sky** (CD, 2026-11-26: "The sky looks weird when I
   rotate the camera; use the zmh-sky plugin ... sun, moon (with phases & earthshine & etc),
-  stars, milkyway"). **Blocked on zmhstudio:** zmh-sky is not yet a drop-in sky, so
-  the CD chose to add a **drop-in sky renderer to zmh-sky first**, with Colony Sim as its
-  first user (`D:\gitrepos\zmhstudio\TODO.md` § Initiative: sky kit, "zmh-sky: a drop-in
-  sky"). **CD answers (2026-11-26):** a tropical island at about **15°S** in the South
+  stars, milkyway"). The CD chose to add a **drop-in sky renderer to zmh-sky first**, with
+  Colony Sim as its first user; it **shipped 2026-11-26** (zmhstudio plan `zmhskyb`,
+  `0cbed49..aabbc22`: `createSky`, the ES-module emit, the game clock). **CD answers (2026-11-26):** a tropical island at about **15°S** in the South
   Pacific (Southern Cross; the longitude is a call for the plan), on an **advancing
   calendar**: game day 1 is a fixed date, each game day is the next calendar day, so the
   moon runs through its phases over about 30 game days. **What is weird now (traced in the
@@ -323,6 +322,11 @@ and every call made for them: `.claude/colony-sim.md`.
   - Show the kit's star-data attribution in the ⓘ panel and ship
     `LICENSE-d3-celestial.txt`.
   - Add a drive check that the sky does not change when only the camera moves.
+  Calls the plan makes (the CD's to overrule): 150°W; day 1 = 5 July 2027, so the moon is full
+  around days 14-16; the frame +x east / −z north (the island's own compass); a night ambient
+  floor.
+  **Plan ready (2026-11-26)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/colonysimc.zmh-sky.md`
 - [colony-sim] **Campfire from zmh-vfx** (CD, 2026-11-26: "The campfire looks pretty
   good"; better versions will be asked for later). The fire is going into a new zmhstudio
   plugin, **zmh-vfx** (CD's choice), as its first asset, with a library of rotating-camera
