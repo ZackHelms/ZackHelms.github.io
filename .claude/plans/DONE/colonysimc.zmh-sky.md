@@ -1,6 +1,6 @@
 # colonysimc — a real sky for Colony Sim from the zmh-sky drop-in
 
-**Status:** DRAFT
+**Status:** IMPLEMENTED 2026-11-27 (`9d05a02..4821773` plus the wrap-up, on branch `colony-sim-sky`; landed on `main` as one commit). Follow-up: `colonysimc.zmh-sky.follow-up.md`.
 **Requested:** 2026-11-26 (CD, from the first playtest of the phase 1 draft).
 **Scope:** `games/colony-sim/src/` (new generated `sky.js`; `render.js`, `main.js`, `ui.js`),
 `games/colony-sim/build.mjs`, the generated `games/colony-sim/index.html`, a new

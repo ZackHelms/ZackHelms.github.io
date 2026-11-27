@@ -11,7 +11,12 @@
  * a goal's ▲ reorders the board; a rightward drag (mouse, one finger) turns yaw up and Q / E keep
  * their direction (Q up, E down); a save survives a reload (Continue = same day and minute);
  * a corrupt save starts a fresh island without an error; a huge time backlog is capped at
- * 400 ticks in one frame (a hidden tab never bursts). Prints DRIVE: GREEN / RED.
+ * 400 ticks in one frame (a hidden tab never bursts). The real sky (zmh-sky), each row rendering
+ * G.R.frame itself at a set clock and camera and reading pixels in the same task: the frame handed to
+ * the kit is right-handed; day 1 06:30's sun is east, north of east, and a hot disc sits where the kit
+ * says (none on the anti-sun side); the sky does not change when only the camera slides; stars show
+ * on a dark night; the moon waxes new (day 1) to full (day 15); the ⓘ panel credits the star data
+ * and its licence file ships. Prints DRIVE: GREEN / RED.
  */
 'use strict';
 const path = require('path'), fs = require('fs'), { execFileSync } = require('child_process');
@@ -20,7 +25,7 @@ const root = path.resolve(__dirname, '..', '..');
 const PAGE = path.join(root, 'games', 'colony-sim', 'index.html');
 const shots = (() => { const i = process.argv.indexOf('--shots'); return i > 0 ? process.argv[i + 1] : null; })();
 let fails = 0, passes = 0;
-const check = (n, c, d) => { if (c) { passes++; console.log('  ok   ' + n); } else { fails++; console.log('  FAIL ' + n + (d !== undefined ? '  — ' + d : '')); } };
+const check = (n, c, d, show) => { if (c) { passes++; console.log('  ok   ' + n + (show && d !== undefined ? '  — ' + d : '')); } else { fails++; console.log('  FAIL ' + n + (d !== undefined ? '  — ' + d : '')); } };
 
 (async () => {
   console.log('[headless simulation]');
@@ -53,9 +58,104 @@ const check = (n, c, d) => { if (c) { passes++; console.log('  ok   ' + n); } el
     const d = x.getImageData(0, 0, 64, 40).data, set = new Set();
     for (let i = 0; i < d.length; i += 4) set.add((d[i] >> 4) + ',' + (d[i + 1] >> 4) + ',' + (d[i + 2] >> 4));
     return set.size;
-  });
+  }).catch((e) => 'frame threw: ' + String(e.message).split('\n')[0]);
   check('the island draws (≥ 8 distinct colours)', colours >= 8, colours);
   if (shots) await page.screenshot({ path: path.join(shots, 'colony-overview.png') });
+
+  // The real sky (zmh-sky). Each row sets the clock and the camera, calls G.R.frame itself and reads
+  // pixels in the same task (no preserveDrawingBuffer needed), then puts the clock, the speed and the
+  // camera back so the rows below see what they did before. A throw is a failed row, never a crash.
+  await page.evaluate(() => {
+    const G = window.__CS.G, cv = document.getElementById('view');
+    const T = window.__skyT = {
+      run(fn) {
+        const k = G.R.cam, was = { t: G.sim.t, speed: G.speedIdx, following: G.following, cam: Object.assign({}, k) };
+        G.speedIdx = 0; G.following = false;
+        try { return fn(T); } catch (e) { return { err: String(e && e.message || e).split('\n')[0] }; }
+        finally { G.sim.t = was.t; G.speedIdx = was.speed; G.following = was.following; Object.assign(k, was.cam); }
+      },
+      // set the clock and (part of) the camera, draw one frame, return what it returned
+      draw(t, cam) { G.sim.t = t; Object.assign(G.R.cam, { fly: null }, cam); return G.R.frame(G.sim, G.rigs, () => [], performance.now() / 1000, { colors: G.colors, selected: null }); },
+      // the canvas as 8-bit RGBA at full size, copied in the task that drew it
+      px() { const k = document.createElement('canvas'); k.width = cv.width; k.height = cv.height; const x = k.getContext('2d', { willReadFrequently: true }); x.drawImage(cv, 0, 0); return x.getImageData(0, 0, k.width, k.height); },
+      lum(d, i) { return Math.max(d[i], d[i + 1], d[i + 2]); },
+      median(d, rows) { const h = new Uint32Array(256); for (let i = 0; i < rows * cv.width * 4; i += 4) h[T.lum(d, i)]++; let n = 0, half = rows * cv.width / 2; for (let v = 0; v < 256; v++) { n += h[v]; if (n >= half) return v; } return 255; },
+    };
+  });
+  const HOT_FLOOR = 500, STAR_FLOOR = 60;   // measured: ~2300 pixels at 250+ round the sun (0 on the anti-sun side), ~121-125 star pixels over 3x the median; each floor is well under half
+  const sky = (fn) => page.evaluate((src) => window.__skyT.run(new Function('T', 'return (' + src + ')(T)')), fn.toString());
+  const f2 = (v) => Array.isArray(v) ? '[' + v.map(f2).join(', ') + ']' : (typeof v === 'number' ? +v.toFixed(3) : v);
+
+  // 1. the frame handed to the kit is right-handed (a mirror passes every number except this one)
+  const hand = await sky((T) => { const o = T.draw(12 * 3600, {}); return { h: o.light.handedness }; });
+  check("the sky's frame is right-handed (handedness +1)", hand.h === 1, JSON.stringify(hand));
+
+  // 2. day 1 at 06:30: the sun is in the east, north of east, and the sky is bright where the kit says it is
+  const rise = await sky((T) => {
+    const G = window.__CS.G, k = G.R.cam, cv = document.getElementById('view');
+    const probe = T.draw(6.5 * 3600, {}), d = probe.light.sun.dir, alt = probe.light.sun.altDeg;
+    // look along the sun's azimuth from high up (the sun is a few degrees up, so no hill can hide it);
+    // the eye sits at target + (cos yaw, ., sin yaw), so yaw = atan2(-dz, -dx) looks along (dx, dz)
+    T.draw(6.5 * 3600, { ty: 150, dist: 300, pitch: 0.2, yaw: Math.atan2(-d[2], -d[0]) });
+    const sp = G.R.project(k.tx + 1e5 * d[0], k.ty + 1e5 * d[1], k.tz + 1e5 * d[2]);
+    if (!sp) return { d, alt, why: 'the sun is behind the camera' };
+    const im = T.px(), s = cv.width / cv.clientWidth, cx = sp.sx * s, cy = sp.sy * s, R = 40 * s;
+    // the brightest pixel within 40 px of the sun's screen point, and how many pixels there are hot (the disc)
+    const near = (im) => { let peak = 0, hot = 0; for (let y = Math.max(0, Math.floor(cy - R)); y < Math.min(im.height, Math.ceil(cy + R)); y++) for (let x = Math.max(0, Math.floor(cx - R)); x < Math.min(im.width, Math.ceil(cx + R)); x++) {
+      if (Math.hypot(x - cx, y - cy) > R) continue;
+      const i = (y * im.width + x) * 4, v = T.lum(im.data, i); if (v > peak) peak = v;
+      if (v >= 250) hot++;
+    } return { peak, hot }; };
+    const a = near(im), median = T.median(im.data, im.height);
+    // the same screen point with the camera turned round to the anti-sun side: no disc there
+    T.draw(6.5 * 3600, { yaw: k.yaw + Math.PI });
+    const b = near(T.px());
+    return { d, alt, at: [Math.round(cx), Math.round(cy)], peak: a.peak, hot: a.hot, median, awayPeak: b.peak, awayHot: b.hot };
+  });
+  check('day 1 sunrise is in the east, north of east, and bright there',
+    !rise.err && !rise.why && rise.d[0] > 0.8 && rise.d[2] < -0.2 && rise.alt > -2 && rise.peak >= 250 && rise.peak - rise.median >= 80 && rise.peak - rise.awayPeak >= 40 && rise.hot >= HOT_FLOOR && rise.awayHot === 0,
+    JSON.stringify(f2(rise)), true);
+
+  // 3. the sky is a function of the clock only: sliding the camera (and its eye) 28 m sideways changes nothing
+  const still = await sky((T) => {
+    const cv = document.getElementById('view'), out = {};
+    for (const [name, t] of [['09:00', 9 * 3600], ['23:00', 23 * 3600]]) {
+      const k = Object.assign({}, window.__CS.G.R.cam), base = { ty: 150, dist: 300, pitch: 0.15 };
+      T.draw(t, Object.assign({ tx: k.tx, tz: k.tz }, base)); const a = T.px();
+      T.draw(t, Object.assign({ tx: k.tx + 20, tz: k.tz + 20 }, base)); const b = T.px();
+      const n = Math.floor(a.height * 0.2) * a.width * 4; let sum = 0, big = 0;
+      for (let i = 0; i < n; i += 4) { let m = 0; for (let c = 0; c < 3; c++) { const df = Math.abs(a.data[i + c] - b.data[i + c]); sum += df; if (df > m) m = df; } if (m > 2) big++; }
+      out[name] = { mean: sum / (n / 4 * 3), big };
+    }
+    return out;
+  });
+  check('the sky does not move when only the camera does (top fifth, 09:00 and 23:00)',
+    !still.err && still['09:00'].mean < 0.05 && still['23:00'].mean < 0.05 && still['09:00'].big === 0 && still['23:00'].big === 0, JSON.stringify(f2(still)), true);
+
+  // 4. stars: day 1 at 23:00, no moon up, the camera tilted to look up (target 250 m up, eye below it)
+  const stars = await sky((T) => {
+    const cv = document.getElementById('view'), o = T.draw(23 * 3600, { ty: 250, dist: 100, pitch: -0.6, yaw: 0 }), im = T.px();
+    const rows = Math.floor(im.height * 0.6), med = T.median(im.data, rows), thr = 3 * Math.max(med, 4);
+    let n = 0; for (let i = 0; i < rows * im.width * 4; i += 4) if (T.lum(im.data, i) > thr) n++;
+    return { n, med, thr, moonAlt: o.light.moon.altDeg };
+  });
+  check('stars show on a dark night (pixels over 3x the sky\'s median, day 1 23:00)', !stars.err && stars.n >= STAR_FLOOR, JSON.stringify(f2(stars)), true);
+
+  // 5. the calendar: each game day is the next date, so the moon waxes from new to full
+  const moon = await sky((T) => ({ d1: T.draw(20 * 3600, {}).light.moon.illuminatedFraction, d15: T.draw(14 * 86400 + 20 * 3600, {}).light.moon.illuminatedFraction }));
+  check('the calendar advances the moon (new on day 1, full on day 15)', !moon.err && moon.d1 < 0.1 && moon.d15 > 0.9, JSON.stringify(f2(moon)), true);
+
+  // 6. the credit for the star data is on the info page and the licence it links to ships beside index.html
+  const credit = await page.evaluate(() => {
+    document.getElementById('info-btn').click();
+    const card = document.getElementById('overlay-card'), a = card.querySelector('a[href*="LICENSE-d3-celestial"]'), r = { text: card.textContent, href: a && a.getAttribute('href') };
+    const ok = document.getElementById('ov-ok'); if (ok) ok.click();
+    return r;
+  });
+  const licFile = credit.href && path.join(path.dirname(PAGE), credit.href);
+  check('the ⓘ panel credits the star data and its licence ships',
+    credit.text.includes('XHIP (Anderson & Francis 2012) via d3-celestial') && !!licFile && fs.existsSync(licFile) && /BSD|Redistribution/i.test(fs.readFileSync(licFile, 'utf8')),
+    JSON.stringify({ href: credit.href, exists: !!licFile && fs.existsSync(licFile) }));
 
   // follow each settler
   const follow = [];

@@ -1,5 +1,16 @@
 # DONE — done log
 
+- 2026-11-27 [colony-sim] **A real sky from zmh-sky** (CD feedback on the phase 1 draft, live at
+  `build 2026-11-27 13:21 UTC`). The hand-made sky and its sun arc are gone; zmh-sky's drop-in
+  (`createSky`, generated into `src/sky.js`) draws the real sun, the moon with its phase and
+  earthshine, stars, planets and the Milky Way over an island at 15°S 150°W, from 5 July 2027
+  with each game day the next date, and its sun, moon and ambient light the scene. The sky no
+  longer moves when the camera does; fog is coloured from the disc-free sky radiance; the ⓘ
+  panel credits the star data and the page ships `LICENSE-d3-celestial.txt`. Six drive rows
+  (frame, sunrise side, camera-independence, stars, the moon over the calendar, the credit),
+  each shown red by a deliberate break; suite 21 -> 27. Plan:
+  `.claude/plans/DONE/colonysimc.zmh-sky.md`.
+
 - 2026-11-26 [colony-sim] **Horizontal drag rotation inverted** (CD feedback on the phase 1 draft,
   live at `build 2026-11-27 01:32 UTC`). `orbit()` now turns yaw up for a rightward drag, with the
   mouse and one finger; Q / E keep their direction (the CD named the drag only). Three drive rows
