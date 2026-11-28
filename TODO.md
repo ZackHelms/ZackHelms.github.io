@@ -308,16 +308,13 @@ and every call made for them: `.claude/colony-sim.md`.
   gains. Known: at nautical twilight the glow ends in a hard edge away from the sun; that is
   the zmh-sky kit (single scattering), not this page. Review:
   `.claude/plans/DONE/colonysimc.zmh-sky.follow-up.md`.
-- [colony-sim] **Campfire from zmh-vfx** (CD, 2026-11-26: "The campfire looks pretty
-  good"; better versions will be asked for later). The fire is going into a new zmhstudio
-  plugin, **zmh-vfx** (CD's choice), as its first asset, with a library of rotating-camera
-  GIFs (`D:\gitrepos\zmhstudio\TODO.md` § Initiative: effects kit). *Decided 2026-11-27:* the CD
-  picked **`campfire.particles.embers`** (120 additive flame sprites plus 24 drifting embers).
-  Colony Sim vendors zmh-vfx's `campfire-particles.mjs` for the flame and keeps its own hearth
-  and firelight, which are the numbers zmh-vfx's boxes module was ported from; the plan also
-  enables `zmh-vfx@zmhstudio` in `.claude/settings.json`.
-  **Plan ready (2026-11-27)** — run:
-  `/zmh-producer:oversee-implementation .claude/plans/colonysimd.zmh-vfx-campfire.md`
+- [colony-sim] **Playtest the zmh-vfx campfire** (shipped 2026-11-27, see `DONE.md`; live at
+  `build 2026-11-28 04:25 UTC`). At night, zoom in on the built fire and orbit it: a soft rising
+  flame that narrows and cools to red, sparks drifting up and twinkling, the stones and logs
+  showing through its base, the ground and settlers lit as before. By day, whether the additive
+  flame still reads over sunlit grass (it is paler than the old boxes; the knob is the module's
+  `flames.alpha`). At 16x the flame keeps its own pace; on the phone, the frame rate near the
+  fire. Review: `.claude/plans/DONE/colonysimd.zmh-vfx-campfire.follow-up.md`.
 - *CS-1 to CS-3 were built together as the first draft (2026-11-26); they stay listed as the
   shape of what exists, to be revisited after the CD plays it.*
 - [colony-sim] **CS-1 Landing**: first playable. Build pipeline; island v1 (shores, rocky

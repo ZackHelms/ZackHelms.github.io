@@ -1,5 +1,15 @@
 # DONE — done log
 
+- 2026-11-27 [colony-sim] **Campfire from zmh-vfx** (the CD's pick from the library,
+  `campfire.particles.embers`; live at `build 2026-11-28 04:25 UTC`). A built campfire now burns
+  with zmh-vfx's particle fire: 120 additive camera-facing flame sprites and 24 drifting embers,
+  vendored byte for byte as `src/campfire-particles.js` (zmhstudio `c5a193a`) and drawn with the
+  module's own shaders after the disc pass. The three emissive box flames are gone; the hearth
+  and firelight stay Colony Sim's own (the numbers zmh-vfx's boxes module was ported from).
+  Three drive rows (144 sprites and no box flames, the glow at night built vs unbuilt, nothing
+  before it is built), each shown red by a deliberate break; suite 28 -> 31. `zmh-vfx@zmhstudio`
+  enabled in `.claude/settings.json`. Plan: `.claude/plans/DONE/colonysimd.zmh-vfx-campfire.md`.
+
 - 2026-11-27 [colony-sim] **A real sky from zmh-sky** (CD feedback on the phase 1 draft, live at
   `build 2026-11-27 13:21 UTC`). The hand-made sky and its sun arc are gone; zmh-sky's drop-in
   (`createSky`, generated into `src/sky.js`) draws the real sun, the moon with its phase and

@@ -1,6 +1,8 @@
 # colonysimd — Colony Sim's campfire from zmh-vfx (`campfire.particles.embers`)
 
-**Status:** DRAFT
+**Status:** implemented 2026-11-27 (oversee run; `dc82d26`, `a4ed6cc`, `65f581e` on
+`worktree-oversee+colonysimd`, landed on `main` as one commit). Follow-up:
+`colonysimd.zmh-vfx-campfire.follow-up.md`.
 **Requested:** 2026-11-27 (the CD picked the asset from the zmh-vfx library: "update campfire to
 zmhstudio zmh-vfx campfire.particles.flames", corrected the same minute to
 "campfire.particles.embers").
