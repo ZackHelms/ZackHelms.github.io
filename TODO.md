@@ -311,9 +311,13 @@ and every call made for them: `.claude/colony-sim.md`.
 - [colony-sim] **Campfire from zmh-vfx** (CD, 2026-11-26: "The campfire looks pretty
   good"; better versions will be asked for later). The fire is going into a new zmhstudio
   plugin, **zmh-vfx** (CD's choice), as its first asset, with a library of rotating-camera
-  GIFs (`D:\gitrepos\zmhstudio\TODO.md` § Initiative: effects kit). Nothing to do here
-  until the CD picks a technique from that library; then Colony Sim swaps its hand-written
-  fire for the plugin's. *Parked until then.*
+  GIFs (`D:\gitrepos\zmhstudio\TODO.md` § Initiative: effects kit). *Decided 2026-11-27:* the CD
+  picked **`campfire.particles.embers`** (120 additive flame sprites plus 24 drifting embers).
+  Colony Sim vendors zmh-vfx's `campfire-particles.mjs` for the flame and keeps its own hearth
+  and firelight, which are the numbers zmh-vfx's boxes module was ported from; the plan also
+  enables `zmh-vfx@zmhstudio` in `.claude/settings.json`.
+  **Plan ready (2026-11-27)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/colonysimd.zmh-vfx-campfire.md`
 - *CS-1 to CS-3 were built together as the first draft (2026-11-26); they stay listed as the
   shape of what exists, to be revisited after the CD plays it.*
 - [colony-sim] **CS-1 Landing**: first playable. Build pipeline; island v1 (shores, rocky
