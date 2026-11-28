@@ -17,7 +17,9 @@
  * says (none on the anti-sun side); the sky does not change when only the camera slides; stars show
  * on a dark night; the moon waxes new (day 1) to full (day 15); the sea reaches the sky with no black
  * band from high up; the ⓘ panel credits the star data
- * and its licence file ships. Prints DRIVE: GREEN / RED.
+ * and its licence file ships. The campfire (zmh-vfx's particle fire): a built one draws 144 sprites (120
+ * flames + 24 embers) and no box flames, glows at night over the hearth (built vs unbuilt), and an unbuilt
+ * one draws nothing. Prints DRIVE: GREEN / RED.
  */
 'use strict';
 const path = require('path'), fs = require('fs'), { execFileSync } = require('child_process');
@@ -171,6 +173,51 @@ const check = (n, c, d, show) => { if (c) { passes++; console.log('  ok   ' + n 
   check('the ⓘ panel credits the star data and its licence ships',
     credit.text.includes('XHIP (Anderson & Francis 2012) via d3-celestial') && !!licFile && fs.existsSync(licFile) && /BSD|Redistribution/i.test(fs.readFileSync(licFile, 'utf8')),
     JSON.stringify({ href: credit.href, exists: !!licFile && fs.existsSync(licFile) }));
+
+  // 7. the campfire's flame is zmh-vfx's particle fire (campfire.particles.embers): 120 flame sprites + 24
+  // embers drawn per built fire, a warm glow over the hearth at night, and nothing before it is built.
+  // Each draw is made with a campfire site forced built / unbuilt (one is pushed if the island has none)
+  // and the island is put back in a finally, so the rows below see what they saw before.
+  if (shots) await page.evaluate(() => { window.__fireShot = true; });
+  const fire = await sky((T) => {
+    const G = window.__CS.G, k = G.R.cam, cv = document.getElementById('view'), sites = G.sim.sites;
+    let site = sites.find((x) => x.type === 'campfire'), pushed = null, was = null;
+    try {
+      if (!site) {
+        const pos = G.sim.lay.slots.campfire;
+        site = pushed = { id: G.sim.nextId++, type: 'campfire', goal: 'campfire', x: pos.x, z: pos.z, yaw: 0, need: { wood: 4, stone: 9 }, have: { wood: 4, stone: 9 }, prog: 1.5, hours: 1.5, done: true, doneT: G.sim.t };
+        sites.push(pushed);
+      } else was = { done: site.done, prog: site.prog };
+      // aim at the fire at night: target on the ground at the site, a little above it, close in
+      Object.assign(k, { fly: null, tx: site.x, tz: site.z }); G.R.pan(0, 0);
+      const gy = k.ty, cam = { ty: gy + 0.6, dist: 6, pitch: 0.35 };
+      const hours = site.hours || 1.5, t = 23 * 3600, s = cv.width / cv.clientWidth;
+      // warm, bright pixels within 60 css px of the fire's base
+      const hot = (cx, cy) => { const im = T.px(), R = 60 * s; let n = 0;
+        for (let y = Math.max(0, Math.floor(cy - R)); y < Math.min(im.height, Math.ceil(cy + R)); y++) for (let x = Math.max(0, Math.floor(cx - R)); x < Math.min(im.width, Math.ceil(cx + R)); x++) {
+          if (Math.hypot(x - cx, y - cy) > R) continue;
+          const i = (y * im.width + x) * 4, r = im.data[i], g = im.data[i + 1], b = im.data[i + 2];
+          if (r >= 200 && r > g && g > b) n++;
+        } return n; };
+      site.done = true; site.prog = hours;
+      const on = T.draw(t, cam), p = G.R.project(site.x, gy + 0.6, site.z);   // the screen point 0.6 m over the hearth
+      if (!p) return { why: 'the fire is behind the camera' };
+      const cx = p.sx * s, cy = p.sy * s;
+      const doneHot = hot(cx, cy), url = window.__fireShot ? cv.toDataURL('image/png') : null;
+      site.done = false; site.prog = hours * 0.99;
+      const off = T.draw(t, cam), undoneHot = hot(cx, cy);
+      return { flames: on.flames, boxes: on.emissiveBoxes, doneHot, undoneHot, offFlames: off.flames, offBoxes: off.emissiveBoxes, url };
+    } finally {
+      if (pushed) sites.splice(sites.indexOf(pushed), 1); else if (was) { site.done = was.done; site.prog = was.prog; }
+    }
+  });
+  if (fire.url) { fs.writeFileSync(path.join(shots, 'colony-campfire.png'), Buffer.from(fire.url.split(',')[1], 'base64')); delete fire.url; }
+  const FIRE_FLOOR = 800;   // measured: 2033 warm pixels (r >= 200, r > g > b) within 60 css px of the lit fire at 23:00 vs 0 unbuilt; the floor is under half
+  check('a built campfire draws 144 particle sprites (120 flames, 24 embers) and no box flames',
+    !fire.err && !fire.why && fire.flames === 144 && fire.boxes === 0, JSON.stringify(fire), true);
+  check('the fire glows at night (warm pixels over the hearth, built vs unbuilt)',
+    !fire.err && !fire.why && fire.doneHot - fire.undoneHot >= FIRE_FLOOR && fire.doneHot > fire.undoneHot, JSON.stringify(fire), true);
+  check('an unbuilt campfire draws no flame', !fire.err && !fire.why && fire.offFlames === 0 && fire.offBoxes === 0, JSON.stringify(fire), true);
 
   // follow each settler
   const follow = [];
