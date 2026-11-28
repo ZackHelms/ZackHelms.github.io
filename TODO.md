@@ -315,6 +315,18 @@ and every call made for them: `.claude/colony-sim.md`.
   flame still reads over sunlit grass (it is paler than the old boxes; the knob is the module's
   `flames.alpha`). At 16x the flame keeps its own pace; on the phone, the frame rate near the
   fire. Review: `.claude/plans/DONE/colonysimd.zmh-vfx-campfire.follow-up.md`.
+- [colony-sim] **Settler motion on the zmh-anim kit** (CD, 2026-11-28: installed zmhstudio's
+  zmh-anim plugin "so that you can use it to update the settler movement animations"). Vendor the
+  kit's IK and pose builder and its snap counter, then rebuild the walk, run, settle steps and
+  turns on its rules: swings as events, `sin²` arcs, springs not lags, turn inertia
+  (`turnStep`), extrapolated blends. The gait follows the settler's pace at 1x, played in
+  time-lapse up to 4x tempo with feet planted, so a walker at 2x or 4x no longer runs or slides.
+  It is measured by a headless gait harness on the real sim. Today's baseline at 1x is 635 snaps
+  per 1000 settler-frames, 1,124 while walking; at 2x, 89% of walking frames play the run cycle;
+  at 4x, half of all movement frames slide. The plan's calls to overrule are the time-lapse cap
+  at 4x and that work poses keep real-time tempo.
+  **Plan ready (2026-11-28)** — run:
+  `/zmh-producer:oversee-implementation .claude/plans/colonysime.zmh-anim-motion.md`
 - *CS-1 to CS-3 were built together as the first draft (2026-11-26); they stay listed as the
   shape of what exists, to be revisited after the CD plays it.*
 - [colony-sim] **CS-1 Landing**: first playable. Build pipeline; island v1 (shores, rocky
