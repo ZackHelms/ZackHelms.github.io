@@ -16,7 +16,8 @@
     "zmh-3d@zmhstudio": true,
     "zmh-sky@zmhstudio": true,
     "zmh-synth@zmhstudio": true,
-    "zmh-pixart@zmhstudio": true
+    "zmh-pixart@zmhstudio": true,
+    "zmh-vfx@zmhstudio": true
   },
   "extraKnownMarketplaces": {
     "zmhstudio": {

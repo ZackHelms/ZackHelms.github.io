@@ -64,6 +64,11 @@
   an LF file as CRLF (open with `newline=''`; run `.claude/scripts/eol-guard.sh` before
   landing, which flagged and fixed 17 files that day), and the WebGL screenshot recipe
   needs `--enable-unsafe-swiftshader` beside `--use-angle=swiftshader` on this Chromium.
+- **Inside an `EnterWorktree` session, keep each `git` command on a line of its own**
+  (2026-11-27, colonysimd). The harness refuses a Bash line that mixes `git` into a compound
+  command or pipeline ("too complex to verify that it stays inside the worktree"); plain
+  `git log`, `git diff`, `git -C <worktree> ...` lines run. Subagents hit it too, so say so in
+  their spawn prompts.
 - **Driving Simulator's suite is split in two, and long commands get backgrounded**
   (2026-11-04, dsweather). One Bash call caps at 10 minutes and the main suite already takes
   about 7.5, so the weather's rows live in `drive-driving-simulator-weather.cjs` (`gates.sh`

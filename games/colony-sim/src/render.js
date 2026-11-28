@@ -8,6 +8,7 @@ import { COVER, heightAt } from './island.js';
 import { BUILDINGS } from './data.js';
 import { ZMH_SKY, SKY_DATA, ZMH_SKY_WEBGL } from './sky.js';
 import { DAY } from './sim.js';
+import { campfireParticles, campfireParticlesInstances, CAMPFIRE_PARTICLES_SHADERS, CAMPFIRE_PARTICLES_QUAD } from './campfire-particles.js';
 
 // Plan colonysimc's calls (the CD's to overrule):
 const SKY_OBSERVER = { latDeg: -15, lonEastDeg: -150, heightM: 0 };     // a South Pacific island at 15°S, 150°W
@@ -189,7 +190,7 @@ export function makeRenderer(canvas, isl) {
     for (let i = 0; i < n; i++) { const u = gl.getActiveUniform(p, i); U[u.name] = gl.getUniformLocation(p, u.name); }
     return { p, U };
   };
-  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), disc: prog(VS_DISC, FS_DISC), far: prog(VS_FAR, FS_FAR) };
+  const P = { terrain: prog(VS_TERRAIN, FS_TERRAIN), box: prog(VS_BOX, FS_BOX), cap: prog(VS_CAP, FS_CAP), water: prog(VS_WATER, FS_WATER), disc: prog(VS_DISC, FS_DISC), far: prog(VS_FAR, FS_FAR), fire: prog(CAMPFIRE_PARTICLES_SHADERS.vertex, CAMPFIRE_PARTICLES_SHADERS.fragment) };
   const farVAO = gl.createVertexArray();   // the far sea's triangle comes from gl_VertexID alone
   // The sky: zmh-sky's pass, created once. A bad config (a mirrored frame) throws here.
   let skyDpr = Math.min(2, window.devicePixelRatio || 1);
@@ -283,6 +284,7 @@ export function makeRenderer(canvas, isl) {
   }
   const capI = mkInst(sph, 11, [[2, 3], [3, 3], [4, 2], [5, 3]], [[0, 3], [1, 1]]);
   const discI = mkInst([-1, -1, 1, -1, -1, 1, 1, -1, 1, 1, -1, 1], 8, [[1, 4], [2, 4]], [[0, 2]]);
+  const fireI = mkInst(CAMPFIRE_PARTICLES_QUAD, 8, [[1, 4], [2, 4]], [[0, 2]]);   // zmh-vfx particle fire: aQ corner; iP x, y, z, size; iC r, g, b, a
 
   /* static scenery: trees, rocks, bushes. Rebuilt when the world changes. */
   let staticSig = '';
@@ -395,7 +397,7 @@ export function makeRenderer(canvas, isl) {
     if (U.uFireI) gl.uniform1f(U.uFireI, fire.i);
   }
 
-  const dyn = [], caps = [], discs = [];
+  const dyn = [], caps = [], discs = [], fireBuf = [];
   function frame(sim, rigs, capsOf, t, opts = {}) {
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     if (dpr !== skyDpr) { skyDpr = dpr; sky.setConfig({ dpr }); }
@@ -411,7 +413,8 @@ export function makeRenderer(canvas, isl) {
     const cp = Math.cos(cam.pitch), ex = cam.tx + Math.cos(cam.yaw) * cp * cam.dist, ez = cam.tz + Math.sin(cam.yaw) * cp * cam.dist;
     let ey = cam.ty + Math.sin(cam.pitch) * cam.dist; ey = Math.max(ey, heightAt(isl, ex, ez) + 1.2, 0.8);
     eye = [ex, ey, ez];
-    VP = mmul(persp(0.9, vw / vh, 0.25, 4000), lookAt(eye, [cam.tx, cam.ty, cam.tz]));
+    const V = lookAt(eye, [cam.tx, cam.ty, cam.tz]);
+    VP = mmul(persp(0.9, vw / vh, 0.25, 4000), V);
     invVP = inv(VP);
     // the sky's clock: game day 1 is SKY_START, game noon is local mean solar noon
     const dayIndex = Math.floor(sim.t / DAY), hour = (sim.t % DAY) / 3600;
@@ -433,6 +436,8 @@ export function makeRenderer(canvas, isl) {
     gl.disable(gl.CULL_FACE);
     gl.bindVertexArray(boxStatic.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, boxStatic.n);
     dyn.length = 0; buildDynamic(sim, rigs, t);
+    let emissiveBoxes = 0;   // box instances carrying the emissive flag (negative red); the drive suite checks none are left
+    for (let i = 7; i < dyn.length; i += 11) if (dyn[i] < 0) emissiveBoxes++;
     gl.bindBuffer(gl.ARRAY_BUFFER, boxDyn.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(dyn), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(boxDyn.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 36, dyn.length / 11);
     // settlers
@@ -467,8 +472,26 @@ export function makeRenderer(canvas, isl) {
     gl.useProgram(P.disc.p); gl.uniformMatrix4fv(P.disc.U.uVP, false, VP);
     gl.bindBuffer(gl.ARRAY_BUFFER, discI.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(discs), gl.DYNAMIC_DRAW);
     gl.bindVertexArray(discI.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, discs.length / 8);
+    // the campfire's flame: zmh-vfx's particle fire (campfire.particles.embers), additive sprites
+    // with the module's own reference shaders; one fire per built campfire, at its ground point
+    fireBuf.length = 0;
+    for (const x of sim.sites) {
+      if (x.type !== 'campfire' || !x.done) continue;
+      const n0 = fireBuf.length, gy = heightAt(isl, x.x, x.z);
+      campfireParticlesInstances(campfireParticles(t, { embers: true }), fireBuf);
+      for (let i = n0; i < fireBuf.length; i += 8) { fireBuf[i] += x.x; fireBuf[i + 1] += gy; fireBuf[i + 2] += x.z; }
+    }
+    if (fireBuf.length > 0) {
+      gl.useProgram(P.fire.p);
+      gl.uniformMatrix4fv(P.fire.U.uVP, false, VP);
+      gl.uniform3f(P.fire.U.uCamRight, V[0], V[4], V[8]);
+      gl.uniform3f(P.fire.U.uCamUp, V[1], V[5], V[9]);
+      gl.bindBuffer(gl.ARRAY_BUFFER, fireI.ib); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(fireBuf), gl.DYNAMIC_DRAW);
+      gl.enable(gl.BLEND); gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE, gl.ZERO, gl.ONE); gl.depthMask(false);
+      gl.bindVertexArray(fireI.vao); gl.drawArraysInstanced(gl.TRIANGLES, 0, fireI.verts, fireBuf.length / 8);
+    }
     gl.depthMask(true); gl.disable(gl.BLEND);
-    return { night, light };
+    return { night, light, flames: fireBuf.length / 8, emissiveBoxes };
   }
 
   /* buildings by stage, piles, carried loads, traps, the fire */
@@ -491,7 +514,6 @@ export function makeRenderer(canvas, isl) {
       if (x.type === 'campfire') {
         for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; local(fy, Math.cos(a) * 0.8, Math.sin(a) * 0.8, 0, 0.32, 0.24 * Math.min(1, k * 2), 0.32, STONE); }
         if (k > 0.5) { local(fy, 0, 0, 0.05, 1.1, 0.16, 0.16, LOG, 0, 0.5); local(fy, 0, 0, 0.12, 1.1, 0.16, 0.16, LOG, 0, -0.6); }
-        if (x.done) for (let i = 0; i < 3; i++) { const fl = 0.5 + 0.25 * Math.sin(t * (7 + i) + i * 2); box(dyn, x.x + Math.sin(t * 3 + i) * 0.1, heightAt(isl, x.x, x.z) + 0.15, x.z + Math.cos(t * 2 + i) * 0.1, 0.35 - i * 0.08, fl + i * 0.1, 0.35 - i * 0.08, t + i, [-1.0, 0.45 + i * 0.15, 0.08]); }
         continue;
       }
       if (x.type === 'bed') { local(fy, 0, 0, 0.0, d, 0.35 * Math.min(1, k * 2), w, WOOD); if (k > 0.6) local(fy, 0, 0, 0.35, d * 0.9, 0.12, w * 0.85, [0.5, 0.25, 0.22]); continue; }

@@ -436,6 +436,7 @@ listed under § Calls made while building.
 | `src/sim.js` | the engine: clock, `drain` (needs, accidents, collapse, perseverance), movement, step execution and effects (`FX`), food batches and spoilage, buildings, tools, nightly review, discovery, the phase 1 check, `step`/`runFor`/`replay`, `snapshot`/`restore` |
 | `src/rig.js` | `ik2` + `buildPose` copied from Animation Rigs (A002 form); planted feet on the heightfield; work poses (chop, mine, build, crouch jobs, sit/eat, lie, bathe, fish, look, talk); `rigCapsules` (body, hair styles, beard, hat, the tool in hand) |
 | `src/sky.js` | **generated, do not edit**: zmh-sky's drop-in as an ES module (`emit --format esm --mag 5 --parts stars,planets,glsl,webgl`; the command is its first line). Regenerate from the zmhstudio checkout or the plugin cache, then rebuild |
+| `src/campfire-particles.js` | **vendored, do not edit**: zmh-vfx's particle fire (`campfire.particles.embers`), copied byte for byte from zmhstudio `plugins/zmh-vfx/lib/campfire-particles.mjs` with a header naming the commit. To update: copy it again, change the commit in the header, rebuild |
 | `src/render.js` | WebGL2: terrain mesh, sea/pond/river/falls, instanced boxes (scenery, buildings by stage, piles, loads), instanced capsules, zmh-sky's sky pass (`createSky`) lighting the scene from its sun, moon and ambient, firelight, blob shadows and the selection ring; orbit/pan/zoom/flyTo, `project`, `pickGround` |
 | `src/ui.js` | top bar, goals board (A), settler panel with Now/Next (B), speech bubbles, info/settings/phase 1/continue overlays; panels rebuilt by part from signatures |
 | `src/audio.js` | surf, birds, crickets, axe thunks; mute persisted |
@@ -489,6 +490,22 @@ listed under § Calls made while building.
 - **The far sea** (CD report, 2026-11-27: "a black gap between the sky and the earth as if the sky is just a hemisphere dome"). zmh-sky shades every direction below the horizon black, because to the kit that is ground, and the sea mesh ends a few km out. So a black band showed between the far water and the horizon, a sliver from the beach and several degrees wide from high up. `VS_FAR`/`FS_FAR` is one full-screen triangle at the far plane, drawn with `LEQUAL` after the sky and before the water, so it only touches background pixels. Where the ray points down, it meets y = 0 there, lights that point as the water is lit, and from 4.5 to 40 km blends it into the sky's own horizon colour at that compass bearing (`horRing`: 16 bearings at 0.5°, computed beside the fog once per game minute). The sea now meets the sky with no seam. It is deliberately not scissored: the rows below the sky's cut are exactly where it is needed. Any sky kit that treats below the horizon as ground needs the same thing on an island.
 - The drive suite's seven sky rows (frame, sunrise in the east north of east, camera-independence, stars, the moon's phase over the calendar, the sea reaching the sky, the ⓘ credit) were each shown red under a deliberate break. The sea row counts near-black pixels from 900 m out at noon and 17:30; with the far sea off it read about 76,000 and 87,000.
 
+### The campfire
+
+- The flame is zmh-vfx's `campfire.particles.embers` (the CD's pick from the library, 2026-11-27):
+  120 additive camera-facing sprites that rise, narrow and cool from white-yellow to red, plus 24
+  drifting embers, from the vendored `src/campfire-particles.js`. `render.js` draws them after the
+  disc pass with the module's own reference shaders, unmodified: additive
+  (`blendFuncSeparate(SRC_ALPHA, ONE, ZERO, ONE)`), no depth writes, depth test on, no sort, no
+  fog, no gamma encode. Camera right and up are rows of the view matrix (`V[0], V[4], V[8]` and
+  `V[1], V[5], V[9]`).
+- One particle fire per built campfire, 144 sprites each, at the site's ground point; the clock
+  is the frame's real seconds, so the flame keeps its pace at any game speed and while paused.
+- The stones, the logs and the firelight are still Colony Sim's own code. They are not vendored
+  because zmh-vfx's `campfire-boxes.mjs` was ported from them and has the same numbers.
+- `frame()` also returns `flames` (sprites drawn) and `emissiveBoxes` (box instances with the
+  emissive flag) for the drive suite's three campfire rows.
+
 ## Measured (2026-11-26, `node games/colony-sim/tools/run.mjs`)
 | Set | Finished | Median day | Range | A struggle (< 30 on a meter) | Median lessons |
 |---|---|---|---|---|---|
@@ -532,6 +549,7 @@ above 50 for two days (washing and bedtime are the usual last lessons).
 - Speech bubbles last 8 real seconds, one per settler, four at most.
 - Horizontal drag rotation was inverted at the CD's request (2026-11-26, mouse and one
   finger); Q / E keep the direction they had (the CD named the drag only).
+- The campfire (plan colonysimd, 2026-11-27): zmh-vfx's particle fire with embers, as the library ships it (no parameter changes, no fog); Colony Sim keeps its own hearth and firelight. By day the additive flame reads paler than the old boxes did; the knob is the module's `flames.alpha`.
 
 ## Known limits of the draft
 - Settlers walk through buildings and each other.
